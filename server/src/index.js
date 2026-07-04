@@ -153,7 +153,7 @@ app.get('/api/calendar', async (req, reply) => {
 
 // favorites feed the upcoming-releases calendar; invalidate its cache on change
 const invalidateCalendar = () =>
-  db.prepare(`DELETE FROM tmdb_cache WHERE key = 'calendar:v1'`).run();
+  db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
 
 app.post('/api/tracked/bulk', async (req, reply) => {
   const { role, top } = req.body || {};

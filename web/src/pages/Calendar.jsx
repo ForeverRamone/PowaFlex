@@ -9,6 +9,14 @@ function monthLabel(ym) {
   return `${names[Number(m) - 1]} ${y}`;
 }
 
+function typeBadges(ev) {
+  const badges = [];
+  if (ev.isShort) badges.push(['Corto', 'bg-orange-900/60 text-orange-300']);
+  if (ev.isDocumentary) badges.push(['Documental', 'bg-teal-900/60 text-teal-300']);
+  if (ev.isTvMovie) badges.push(['TV', 'bg-purple-900/60 text-purple-300']);
+  return badges;
+}
+
 function EventCard({ ev, radarrIds }) {
   const img = tmdbImg(ev.poster_path, 'w185');
   return (
@@ -17,11 +25,21 @@ function EventCard({ ev, radarrIds }) {
         {img ? <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" /> : null}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="font-medium text-slate-100 text-sm">{ev.title}</div>
+        <div className="font-medium text-slate-100 text-sm">
+          {ev.title}
+          {typeBadges(ev).map(([label, cls]) => (
+            <span key={label} className={`ml-1.5 align-middle text-[10px] px-1.5 py-0.5 rounded ${cls}`}>
+              {label}
+            </span>
+          ))}
+        </div>
         {ev.original_title !== ev.title && (
           <div className="text-xs text-slate-500 italic">{ev.original_title}</div>
         )}
-        <div className="text-xs text-gold-400 mt-1">{ev.date ? fmtDate(ev.date) : 'Fecha por anunciar'}</div>
+        <div className="text-xs text-gold-400 mt-1">
+          {ev.date ? fmtDate(ev.date) : 'Fecha por anunciar'}
+          {ev.runtime ? <span className="text-slate-500"> · {ev.runtime} min</span> : null}
+        </div>
         <div className="text-xs text-slate-400 mt-1">
           {ev.people.map((p, i) => (
             <span key={`${p.id}-${p.credit}`}>
@@ -46,11 +64,26 @@ function EventCard({ ev, radarrIds }) {
   );
 }
 
+const DEFAULT_FILTERS = { shorts: false, docs: true, tv: false };
+
 export default function Calendar() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [radarrIds, setRadarrIds] = useState(new Set());
+  const [show, setShow] = useState(() => {
+    try {
+      return { ...DEFAULT_FILTERS, ...JSON.parse(localStorage.getItem('cal_filters') || '{}') };
+    } catch {
+      return DEFAULT_FILTERS;
+    }
+  });
+
+  const toggleFilter = (key) => {
+    const next = { ...show, [key]: !show[key] };
+    setShow(next);
+    localStorage.setItem('cal_filters', JSON.stringify(next));
+  };
 
   const load = (refresh = false) => {
     setError(null);
@@ -80,9 +113,20 @@ export default function Calendar() {
   if (!data) return <Spinner label="Construyendo calendario desde TMDB (la primera vez tarda un poco)…" />;
 
   const today = data.today;
-  const upcoming = data.events.filter((e) => e.date && e.date >= today);
-  const recent = data.events.filter((e) => e.date && e.date < today);
-  const undated = data.events.filter((e) => !e.date);
+
+  const counts = {
+    shorts: data.events.filter((e) => e.isShort).length,
+    docs: data.events.filter((e) => e.isDocumentary).length,
+    tv: data.events.filter((e) => e.isTvMovie).length,
+  };
+  const visible = data.events.filter(
+    (e) => (show.shorts || !e.isShort) && (show.docs || !e.isDocumentary) && (show.tv || !e.isTvMovie)
+  );
+  const hiddenCount = data.events.length - visible.length;
+
+  const upcoming = visible.filter((e) => e.date && e.date >= today);
+  const recent = visible.filter((e) => e.date && e.date < today);
+  const undated = visible.filter((e) => !e.date);
 
   const byMonth = new Map();
   for (const ev of upcoming) {
@@ -104,6 +148,29 @@ export default function Calendar() {
         automático de tu biblioteca más tus <Link to="/favoritos" className="text-gold-400 hover:underline">favoritos</Link>.
         Generado {new Date(data.generatedAt).toLocaleString('es-ES')}.
       </p>
+
+      <div className="card p-3 mb-6 flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-slate-500 text-xs mr-1">Mostrar:</span>
+        {[
+          ['shorts', 'Cortos', counts.shorts],
+          ['docs', 'Documentales', counts.docs],
+          ['tv', 'Películas de TV', counts.tv],
+        ].map(([key, label, n]) => (
+          <button
+            key={key}
+            onClick={() => toggleFilter(key)}
+            title={show[key] ? `Ocultar ${label.toLowerCase()}` : `Mostrar ${label.toLowerCase()}`}
+            className={`btn-ghost !py-1 ${show[key] ? '!border-gold-400 text-gold-400' : 'line-through opacity-60'}`}
+          >
+            {show[key] ? '👁 ' : '🚫 '}{label} ({n})
+          </button>
+        ))}
+        {hiddenCount > 0 && (
+          <span className="text-xs text-slate-500 ml-auto">
+            {hiddenCount} ocultas — solo cine largometraje
+          </span>
+        )}
+      </div>
 
       {data.errors?.length > 0 && data.events.length === 0 && (
         <ErrorBox error={`No se pudo consultar TMDB: ${data.errors[0].split(': ').slice(1).join(': ')} — revisa Ajustes y pulsa «Actualizar desde TMDB».`} />

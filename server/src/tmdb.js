@@ -249,6 +249,7 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
             date,
             poster_path: c.poster_path,
             overview: c.overview || '',
+            genre_ids: c.genre_ids || [],
             people: [],
             inLibrary: inLib.has(c.id),
           };
@@ -264,6 +265,33 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
   const out = [...events.values()];
+
+  // enrich with runtime (cached per movie) to classify shorts / docs / TV movies
+  let ei = 0;
+  async function enrichWorker() {
+    for (;;) {
+      const i = ei++;
+      if (i >= out.length) return;
+      const ev = out[i];
+      try {
+        const det = await tmdbGet(
+          `/movie/${ev.tmdb_id}`,
+          {},
+          { cacheKey: `movie:${ev.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
+        );
+        ev.runtime = det.runtime || null;
+        if (det.genres?.length) ev.genre_ids = det.genres.map((g) => g.id);
+      } catch {
+        ev.runtime = null;
+      }
+      // Letterboxd/Academy: short = under 40 min (unknown runtime counts as feature)
+      ev.isShort = !!ev.runtime && ev.runtime < 40;
+      ev.isDocumentary = (ev.genre_ids || []).includes(99);
+      ev.isTvMovie = (ev.genre_ids || []).includes(10770);
+    }
+  }
+  await Promise.all(Array.from({ length: 5 }, enrichWorker));
+
   out.sort((a, b) => (a.date || '9999-99-99').localeCompare(b.date || '9999-99-99'));
   return {
     generatedAt: Date.now(),
@@ -275,7 +303,7 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
 }
 
 export async function getCalendarCached({ refresh = false } = {}) {
-  const key = 'calendar:v1';
+  const key = 'calendar:v2';
   if (!refresh) {
     const hit = cacheRead(key, 12 * 3600 * 1000);
     if (hit) return hit;
