@@ -31,6 +31,9 @@ export default function Settings() {
   const [radarrCtx, setRadarrCtx] = useState(null);
   const [sections, setSections] = useState(null);
   const [mdbStatus, setMdbStatus] = useState(null);
+  const [radarrSync, setRadarrSync] = useState(null);
+  const [auto, setAuto] = useState(null);
+  const [lifeMsg, setLifeMsg] = useState(null);
 
   const loadSections = () =>
     api('/plex/sections').then((r) => Array.isArray(r) && setSections(r)).catch(() => {});
@@ -42,6 +45,8 @@ export default function Settings() {
     });
     api('/sync/status').then(setSync);
     api('/mdblist/status').then((st) => st && !st.error && st.total != null && setMdbStatus(st));
+    api('/radarr/ids').then((r) => r.tmdbIds && setRadarrSync({ count: r.tmdbIds.length, syncedAt: r.syncedAt }));
+    api('/radarr/auto').then((a) => !a.error && setAuto(a));
   }, []);
 
   // poll sync status while running
@@ -231,6 +236,101 @@ export default function Settings() {
             </div>
           </div>
         )}
+        {/* sync local snapshot of Radarr's library (so the UI shows «✓ en Radarr») */}
+        <div className="mt-4 pt-4 border-t border-ink-700">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              className="btn-ghost"
+              onClick={async () => {
+                await save();
+                setRadarrSync({ ...radarrSync, busy: true });
+                const r = await api('/radarr/sync', { method: 'POST' });
+                setRadarrSync(r.error ? { error: r.error } : { count: r.count, syncedAt: r.syncedAt });
+              }}
+            >
+              Sincronizar lo ya añadido a Radarr
+            </button>
+            {radarrSync?.busy && <span className="text-xs text-slate-400">Sincronizando…</span>}
+            {radarrSync?.error && <span className="text-xs text-red-400">✗ {radarrSync.error}</span>}
+            {radarrSync?.count != null && !radarrSync.busy && (
+              <span className="text-xs text-slate-400">
+                {radarrSync.count.toLocaleString('es-ES')} películas en Radarr
+                {radarrSync.syncedAt ? ` · ${new Date(radarrSync.syncedAt).toLocaleString('es-ES')}` : ''}
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-1">
+            Guarda un listado local de lo que ya tienes en Radarr para que las fichas muestren el recuadro verde
+            «✓ en Radarr» en vez de intentar añadirlo y fallar con «ya existe».
+          </p>
+        </div>
+
+        {/* daily auto-add for living favorite directors (#3) */}
+        <div className="mt-4 pt-4 border-t border-ink-700">
+          <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer">
+            <input
+              type="checkbox"
+              className="accent-[#e8b53a]"
+              checked={s.auto_radarr_enabled === '1'}
+              onChange={(e) => setS({ ...s, auto_radarr_enabled: e.target.checked ? '1' : '0' })}
+            />
+            Lanzar a Radarr automáticamente cada noche los estrenos de mis directores favoritos vivos
+          </label>
+          <div className="flex flex-wrap items-center gap-2 mt-2 ml-6">
+            <span className="text-xs text-slate-400">de los próximos</span>
+            <input
+              type="number"
+              min="1"
+              max="24"
+              className="input !w-20 text-center"
+              value={s.auto_radarr_months ?? '6'}
+              onChange={set('auto_radarr_months')}
+            />
+            <span className="text-xs text-slate-400">meses</span>
+            <button
+              className="btn-ghost !py-1"
+              onClick={async () => {
+                await save();
+                setAuto({ ...auto, running: true });
+                const r = await api('/radarr/auto/run', { method: 'POST', body: { months: Number(s.auto_radarr_months || 6), dryRun: true } });
+                setAuto({ ...r, preview: true });
+              }}
+            >
+              Previsualizar
+            </button>
+            <button
+              className="btn-gold !py-1"
+              onClick={async () => {
+                await save();
+                setAuto({ ...auto, running: true });
+                const r = await api('/radarr/auto/run', { method: 'POST', body: { months: Number(s.auto_radarr_months || 6) } });
+                setAuto(r);
+              }}
+            >
+              Ejecutar ahora
+            </button>
+          </div>
+          {auto && (auto.considered != null || auto.added != null) && (
+            <div className="ml-6 mt-2 text-xs text-slate-400">
+              {auto.preview
+                ? `${auto.considered} estrenos entrarían en Radarr`
+                : `✓ ${auto.added} añadidas de ${auto.considered} candidatas`}
+              {auto.error && <span className="text-red-400"> · {auto.error}</span>}
+              {auto.log?.length > 0 && (
+                <details className="mt-1">
+                  <summary className="cursor-pointer hover:text-slate-200">ver detalle</summary>
+                  <div className="mt-1 max-h-40 overflow-y-auto space-y-0.5">
+                    {auto.log.map((l, i) => <div key={i}>{l}</div>)}
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
+          <p className="text-[11px] text-slate-500 mt-2 ml-6">
+            Solo directores <b>vivos</b> marcados como favoritos. Los fallecidos se ignoran (no tendrán estrenos).
+          </p>
+        </div>
+
         <Guide title="¿Dónde está la API key de Radarr?">
           <p>En Radarr: <b>Settings → General → Security → API Key</b>. La URL es la misma con la que abres Radarr en el navegador, típicamente el puerto <b>7878</b>.</p>
           <p>Tras probar la conexión, elige el <b>perfil de calidad</b> y la <b>carpeta raíz</b> que usará PowaFlex al añadir películas.</p>
@@ -315,6 +415,23 @@ export default function Settings() {
         </div>
         <p className="text-xs text-slate-500 mt-2">
           Además, cualquier persona que marques con «☆ Seguir» en su ficha entra siempre en el calendario.
+        </p>
+        <div className="mt-4 pt-4 border-t border-ink-700 flex flex-wrap items-center gap-3">
+          <button
+            className="btn-ghost"
+            onClick={async () => {
+              setLifeMsg('Consultando fechas de nacimiento/fallecimiento en TMDB…');
+              const r = await api('/people/life-sync', { method: 'POST' });
+              setLifeMsg(r.error ? `✗ ${r.error}` : `✓ ${r.done} personas actualizadas · ${r.deceased} fallecidas detectadas`);
+            }}
+          >
+            Actualizar estado vital (vivos/muertos)
+          </button>
+          {lifeMsg && <span className="text-xs text-slate-400">{lifeMsg}</span>}
+        </div>
+        <p className="text-[11px] text-slate-500 mt-2">
+          Marca quién ha fallecido para no vigilar sus estrenos ni incluirlos en el auto-Radarr. En Favoritos puedes
+          quitar de golpe a los fallecidos.
         </p>
       </section>
 

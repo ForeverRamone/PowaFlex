@@ -46,7 +46,7 @@ export function MovieCard({ movie, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="group text-left cursor-pointer"
+      className="group text-left cursor-pointer w-full"
       title={`${movie.title} (${movie.year ?? '¿?'})`}
     >
       <div className="aspect-[2/3] rounded-lg overflow-hidden bg-ink-800 border border-ink-700 group-hover:border-gold-400 transition-colors relative">
@@ -116,14 +116,21 @@ export function TmdbCard({ item, badge, children }) {
   );
 }
 
-export function RadarrButton({ tmdbId, small = false, alreadyInRadarr = false }) {
+export function RadarrButton({ tmdbId, small = false, alreadyInRadarr = false, onAdded }) {
   const [state, setState] = useState(alreadyInRadarr ? 'done' : 'idle');
   const [err, setErr] = useState('');
+  // reflect a late-arriving radarr snapshot (ids often load after first paint)
+  useEffect(() => {
+    if (alreadyInRadarr) setState((s) => (s === 'idle' ? 'done' : s));
+  }, [alreadyInRadarr]);
   const add = async () => {
     setState('busy');
     const res = await api('/radarr/add', { method: 'POST', body: { tmdbId } });
-    if (res.ok) setState('done');
-    else {
+    // an "already added" isn't a failure — the film is in Radarr, show it green
+    if (res.ok || /already/i.test(res.error || '')) {
+      setState('done');
+      onAdded?.(tmdbId);
+    } else {
       setState('error');
       setErr(res.error || 'Error');
     }
@@ -188,6 +195,75 @@ export function ProgressBar({ pct }) {
 
 export function Empty({ children }) {
   return <div className="text-slate-500 text-sm py-8 text-center">{children}</div>;
+}
+
+// Radarr snapshot ids from the local cache (no network round-trip per page).
+// Returns [set, addOne] so buttons can optimistically mark films as queued.
+export function useRadarrIds() {
+  const [ids, setIds] = useState(new Set());
+  useEffect(() => {
+    api('/radarr/ids').then((r) => r.tmdbIds && setIds(new Set(r.tmdbIds)));
+  }, []);
+  const add = (tmdbId) => setIds((prev) => new Set(prev).add(tmdbId));
+  return [ids, add];
+}
+
+// Shorts / documentaries / TV-movie visibility toggles, persisted. Defaults to
+// hidden (the completist wants features first). `key` scopes the storage.
+const TYPE_DEFAULTS = { shorts: false, docs: false, tv: false };
+
+export function useTypeFilters(key = 'type_filters') {
+  const [show, setShow] = useState(() => {
+    try {
+      return { ...TYPE_DEFAULTS, ...JSON.parse(localStorage.getItem(key) || '{}') };
+    } catch {
+      return { ...TYPE_DEFAULTS };
+    }
+  });
+  const toggle = (k) => {
+    const next = { ...show, [k]: !show[k] };
+    setShow(next);
+    localStorage.setItem(key, JSON.stringify(next));
+  };
+  return [show, toggle];
+}
+
+export const matchesTypeFilters = (item, show) =>
+  (show.shorts || !item.isShort) && (show.docs || !item.isDocumentary) && (show.tv || !item.isTvMovie);
+
+export function TypeFilterBar({ show, toggle, counts }) {
+  return (
+    <div className="card p-3 mb-4 flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-slate-500 text-xs mr-1">Mostrar:</span>
+      {[
+        ['shorts', 'Cortos', counts?.shorts],
+        ['docs', 'Documentales', counts?.docs],
+        ['tv', 'Películas de TV', counts?.tv],
+      ].map(([k, label, n]) => (
+        <button
+          key={k}
+          onClick={() => toggle(k)}
+          title={show[k] ? `Ocultar ${label.toLowerCase()}` : `Mostrar ${label.toLowerCase()}`}
+          className={`btn-ghost !py-1 ${show[k] ? '!border-gold-400 text-gold-400' : 'line-through opacity-60'}`}
+        >
+          {show[k] ? '👁 ' : '🚫 '}{label}{n != null ? ` (${n})` : ''}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function DeathBadge({ deathday, className = '' }) {
+  if (!deathday) return null;
+  const year = String(deathday).slice(0, 4);
+  return (
+    <span
+      title={`Fallecido${year ? ` en ${year}` : ''}`}
+      className={`text-[10px] px-1.5 py-0.5 rounded bg-ink-700 text-slate-400 ${className}`}
+    >
+      ✝ {year}
+    </span>
+  );
 }
 
 export function MovieModal({ id, onClose }) {

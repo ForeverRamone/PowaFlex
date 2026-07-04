@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 export const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -157,7 +158,67 @@ CREATE TABLE IF NOT EXISTS sync_log (
   status TEXT,
   detail TEXT
 );
+
+-- Letterboxd challenge lists (from the export zip or a pasted list URL).
+CREATE TABLE IF NOT EXISTS lb_lists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT UNIQUE,
+  name TEXT,
+  url TEXT,
+  source TEXT,            -- export | url
+  official INTEGER DEFAULT 0,
+  item_count INTEGER,
+  added_at INTEGER,
+  refreshed_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS lb_list_items (
+  list_id INTEGER,
+  position INTEGER,
+  title TEXT,
+  year INTEGER,
+  uri TEXT,
+  tmdb_id INTEGER,
+  movie_id INTEGER,
+  PRIMARY KEY (list_id, title, year)
+);
+CREATE INDEX IF NOT EXISTS idx_lbli_list ON lb_list_items(list_id);
+
+-- Snapshot of what Radarr already has, so the UI can show the green "en Radarr"
+-- box without hammering Radarr on every page.
+CREATE TABLE IF NOT EXISTS radarr_movies (
+  tmdb_id INTEGER PRIMARY KEY,
+  title TEXT,
+  year INTEGER,
+  added TEXT,
+  has_file INTEGER,
+  monitored INTEGER,
+  synced_at INTEGER
+);
+
+-- TMDB collection (saga) membership per library movie, filled by a background scan.
+CREATE TABLE IF NOT EXISTS movie_saga (
+  movie_id INTEGER PRIMARY KEY,   -- library rating_key
+  tmdb_id INTEGER,
+  collection_id INTEGER,          -- NULL = scanned, belongs to no collection
+  collection_name TEXT,
+  scanned_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_saga_coll ON movie_saga(collection_id);
 `);
+
+// --- lightweight migrations (add columns to pre-existing tables) --------------
+
+function ensureColumn(table, column, decl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${decl}`);
+  }
+}
+
+// life status for people, cached so we can drop the dead from monitoring/favorites
+ensureColumn('people', 'birthday', 'birthday TEXT');
+ensureColumn('people', 'deathday', 'deathday TEXT');
+ensureColumn('people', 'details_fetched_at', 'details_fetched_at INTEGER');
 
 // --- settings helpers -------------------------------------------------------
 
@@ -166,13 +227,51 @@ const setStmt = db.prepare(
   'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
 );
 
+// Optional encryption-at-rest for credentials. When POWAFLEX_SECRET is set,
+// these keys are stored as AES-256-GCM blobs; without it they stay plaintext
+// (backward compatible) and we warn once. Reads are transparent either way.
+const SECRET_SETTING_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key']);
+const secretKey = process.env.POWAFLEX_SECRET
+  ? crypto.createHash('sha256').update(process.env.POWAFLEX_SECRET).digest()
+  : null;
+let warnedPlaintext = false;
+
+function encryptValue(v) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', secretKey, iv);
+  const ct = Buffer.concat([cipher.update(String(v), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `enc:v1:${iv.toString('base64')}:${tag.toString('base64')}:${ct.toString('base64')}`;
+}
+
+function decryptValue(v) {
+  if (typeof v !== 'string' || !v.startsWith('enc:v1:') || !secretKey) return v;
+  try {
+    const [, , ivB, tagB, ctB] = v.split(':');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', secretKey, Buffer.from(ivB, 'base64'));
+    decipher.setAuthTag(Buffer.from(tagB, 'base64'));
+    return Buffer.concat([decipher.update(Buffer.from(ctB, 'base64')), decipher.final()]).toString('utf8');
+  } catch {
+    return v;
+  }
+}
+
 export function getSetting(key, fallback = null) {
   const row = getStmt.get(key);
-  return row ? row.value : fallback;
+  return row ? decryptValue(row.value) : fallback;
 }
 
 export function setSetting(key, value) {
-  setStmt.run(key, value == null ? null : String(value));
+  if (value == null) return setStmt.run(key, null);
+  let stored = String(value);
+  if (SECRET_SETTING_KEYS.has(key) && stored && !stored.startsWith('enc:v1:')) {
+    if (secretKey) stored = encryptValue(stored);
+    else if (!warnedPlaintext) {
+      warnedPlaintext = true;
+      console.warn('[PowaFlex] Credenciales guardadas en claro. Define POWAFLEX_SECRET para cifrarlas en disco.');
+    }
+  }
+  return setStmt.run(key, stored);
 }
 
 export function getAllSettings() {

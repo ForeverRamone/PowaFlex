@@ -1,6 +1,13 @@
 import { db, cacheRead, cacheWrite, getSetting } from './db.js';
-import { personCredits, findPersonInfo, resolvePerson } from './tmdb.js';
+import { personCredits, findPersonInfo, resolvePerson, enrichRuntimes } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
+
+const genreFlags = (ids = []) => ({
+  genre_ids: ids,
+  isDocumentary: ids.includes(99),
+  isTvMovie: ids.includes(10770),
+  isShort: false,
+});
 
 // prefer the mdblist multi-platform score; fall back to TMDB vote volume
 const rankKey = (i) => (i.mdb?.score != null ? i.mdb.score * 10000 : Math.min(9999, i.votes || 0));
@@ -121,6 +128,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
             votes: c.vote_count,
             released: true,
             owned: false,
+            ...genreFlags(c.genre_ids),
           });
         }
         missing.sort((a, b) => (b.votes || 0) - (a.votes || 0));
@@ -146,6 +154,8 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
 
   out.sort((a, b) => b.inLibrary - a.inLibrary);
   await applyScores(out, perPerson);
+  // runtime pass so shorts can be hidden alongside docs/TV
+  await enrichRuntimes(out.flatMap((p) => p.missing));
   const result = { generatedAt: Date.now(), role, people: out, errors: errors.slice(0, 5) };
   if (out.length || !errors.length) cacheWrite(cacheKey, result);
   return result;
@@ -200,6 +210,7 @@ export async function absentGreats({ perPerson = 6 } = {}) {
             votes: c.vote_count,
             released: true,
             owned: inLib.has(c.id),
+            ...genreFlags(c.genre_ids),
           });
         }
         films.sort((a, b) => (b.votes || 0) - (a.votes || 0));

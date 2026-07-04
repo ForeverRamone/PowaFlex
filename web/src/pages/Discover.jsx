@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty } from '../components.jsx';
+import {
+  Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty,
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters,
+} from '../components.jsx';
 
 const TABS = [
   ['director', 'Tus directores top'],
@@ -9,7 +12,7 @@ const TABS = [
   ['absent', 'Grandes ausentes'],
 ];
 
-function GapsView({ role, radarrIds }) {
+function GapsView({ role, radarrIds, addRadarrId, show, toggle }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
@@ -27,13 +30,26 @@ function GapsView({ role, radarrIds }) {
   if (data.people.length === 0)
     return <Empty>Nada que rellenar: tienes completas las filmografías de tus {role === 'director' ? 'directores' : 'actores'} principales. 🏆</Empty>;
 
+  const allMissing = data.people.flatMap((p) => p.missing);
+  const counts = {
+    shorts: allMissing.filter((f) => f.isShort).length,
+    docs: allMissing.filter((f) => f.isDocumentary).length,
+    tv: allMissing.filter((f) => f.isTvMovie).length,
+  };
+  const peopleFiltered = data.people
+    .map((p) => ({ ...p, shown: p.missing.filter((f) => matchesTypeFilters(f, show)) }))
+    .filter((p) => p.shown.length);
+
   return (
     <div>
-      <p className="text-sm text-slate-500 mb-5">
+      <p className="text-sm text-slate-500 mb-4">
         Qué te falta (ya estrenado) de las {data.people.length} filmografías más presentes en tu biblioteca,
         ordenado por relevancia en TMDB. Actualizado {new Date(data.generatedAt).toLocaleString('es-ES')}.
       </p>
-      {data.people.map((p) => (
+      {(counts.shorts || counts.docs || counts.tv) > 0 && (
+        <TypeFilterBar show={show} toggle={toggle} counts={counts} />
+      )}
+      {peopleFiltered.map((p) => (
         <section key={p.id} className="card p-4 mb-5">
           <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
             <Link to={`/personas/${p.id}?role=${role}`} className="font-semibold text-slate-100 hover:text-gold-400">
@@ -48,12 +64,12 @@ function GapsView({ role, radarrIds }) {
             <ProgressBar pct={p.pct} />
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-            {p.missing.map((f) => (
+            {p.shown.map((f) => (
               <TmdbCard key={f.tmdb_id} item={f}>
                 {f.mdb?.score != null && (
                   <div className="text-[11px] text-gold-400">Σ {f.mdb.score}{f.mdb.imdb != null ? ` · IMDb ${Number(f.mdb.imdb).toFixed(1)}` : ''}</div>
                 )}
-                <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={radarrIds.has(f.tmdb_id)} />
+                <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={radarrIds.has(f.tmdb_id)} onAdded={addRadarrId} />
               </TmdbCard>
             ))}
           </div>
@@ -63,7 +79,7 @@ function GapsView({ role, radarrIds }) {
   );
 }
 
-function AbsentView({ radarrIds }) {
+function AbsentView({ radarrIds, addRadarrId }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
@@ -104,7 +120,7 @@ function AbsentView({ radarrIds }) {
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
               {d.top.map((f) => (
                 <TmdbCard key={f.tmdb_id} item={f}>
-                  <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={radarrIds.has(f.tmdb_id)} />
+                  <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={radarrIds.has(f.tmdb_id)} onAdded={addRadarrId} />
                 </TmdbCard>
               ))}
             </div>
@@ -131,13 +147,8 @@ function AbsentView({ radarrIds }) {
 
 export default function Discover() {
   const [tab, setTab] = useState('director');
-  const [radarrIds, setRadarrIds] = useState(new Set());
-
-  useEffect(() => {
-    api('/radarr/context').then((c) => {
-      if (c.tmdbIds) setRadarrIds(new Set(c.tmdbIds));
-    });
-  }, []);
+  const [radarrIds, addRadarrId] = useRadarrIds();
+  const [show, toggle] = useTypeFilters('discover_type_filters');
 
   return (
     <div>
@@ -153,7 +164,11 @@ export default function Discover() {
           </button>
         ))}
       </div>
-      {tab === 'absent' ? <AbsentView radarrIds={radarrIds} /> : <GapsView role={tab} radarrIds={radarrIds} />}
+      {tab === 'absent' ? (
+        <AbsentView radarrIds={radarrIds} addRadarrId={addRadarrId} />
+      ) : (
+        <GapsView role={tab} radarrIds={radarrIds} addRadarrId={addRadarrId} show={show} toggle={toggle} />
+      )}
     </div>
   );
 }

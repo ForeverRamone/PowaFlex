@@ -1,4 +1,4 @@
-import { getSetting } from './db.js';
+import { db, getSetting, setSetting } from './db.js';
 
 function radarrConfig() {
   const url = (getSetting('radarr_url') || '').replace(/\/+$/, '');
@@ -41,11 +41,58 @@ export async function radarrContext() {
     radarrFetch('/rootfolder'),
     radarrFetch('/movie'),
   ]);
+  storeRadarrMovies(movies);
   return {
     profiles: profiles.map((p) => ({ id: p.id, name: p.name })),
     rootFolders: roots.map((r) => ({ path: r.path, freeSpace: r.freeSpace })),
     tmdbIds: movies.map((m) => m.tmdbId),
   };
+}
+
+// --- local snapshot of Radarr's library -------------------------------------
+// Cached so pages can show "✓ en Radarr" instantly and bulk-add never fires a
+// wasteful 400 "already added". Refreshed from Ajustes or nightly.
+
+function storeRadarrMovies(movies) {
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM radarr_movies').run();
+    const ins = db.prepare(
+      `INSERT OR REPLACE INTO radarr_movies (tmdb_id, title, year, added, has_file, monitored, synced_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    const now = Date.now();
+    for (const m of movies) {
+      if (!m.tmdbId) continue;
+      ins.run(m.tmdbId, m.title || '', m.year || null, m.added || null,
+        m.hasFile ? 1 : 0, m.monitored ? 1 : 0, now);
+    }
+  });
+  tx();
+  setSetting('radarr_synced_at', String(Date.now()));
+}
+
+export async function radarrSyncMovies() {
+  const movies = await radarrFetch('/movie');
+  storeRadarrMovies(movies);
+  return { ok: true, count: movies.length, syncedAt: Number(getSetting('radarr_synced_at') || 0) };
+}
+
+/** TMDB ids Radarr already has, read from the local snapshot (no network). */
+export function radarrOwnedIds() {
+  return {
+    tmdbIds: db.prepare('SELECT tmdb_id FROM radarr_movies').all().map((r) => r.tmdb_id),
+    syncedAt: Number(getSetting('radarr_synced_at') || 0),
+  };
+}
+
+/** Most recently added to Radarr, for the dashboard. */
+export function radarrRecent(limit = 12) {
+  return db
+    .prepare(
+      `SELECT tmdb_id, title, year, added, has_file, monitored FROM radarr_movies
+       WHERE added IS NOT NULL ORDER BY added DESC LIMIT ?`
+    )
+    .all(limit);
 }
 
 // label -> Promise<id> memo; storing the promise serializes concurrent callers

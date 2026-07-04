@@ -1,5 +1,29 @@
 # Changelog
 
+## Alpha 0.3 (0.3.0-alpha) — 2026-07-04
+
+- **Vivos y muertos**: PowaFlex cachea fecha de fallecimiento de las personas; los fallecidos se
+  marcan con ✝, se pueden retirar en bloque de Favoritos y quedan fuera del auto-Radarr.
+- **Letterboxd**: importación directa del **.zip** completo del export (diario, notas, vistas,
+  watchlist y listas), matching mucho mejor (normaliza acentos, artículos y título original) y
+  **feed RSS** de tu usuario que recoge tus últimas vistas cada noche.
+- **Auto-Radarr diario**: opción para lanzar automáticamente a Radarr los estrenos de los próximos
+  N meses de tus directores favoritos vivos.
+- **Radarr**: snapshot local de lo ya añadido (botón «Sincronizar» en Ajustes) para mostrar el
+  recuadro verde «✓ en Radarr» y no reintentar añadidos que dan «ya existe».
+- **Fichas de persona y Descubrir huecos**: filtros para ocultar cortos, documentales y películas
+  de TV (ocultos por defecto).
+- **Dashboard**: últimas añadidas a Plex, últimas vistas (Plex + RSS de Letterboxd) y últimas
+  peticiones a Radarr.
+- **Sagas**: rehecho a partir de la colección real de TMDB de cada película (no de las etiquetas de
+  Plex), con escaneo resumible y detección de franquicias incompletas.
+- **Listas y retos**: anillos de completista con las listas de tu export de Letterboxd y opción de
+  pegar cualquier lista pública de Letterboxd.
+- Arreglo del diseño de pósters en «Candidatas a upgrade» y «Consenso crítico», con botón de Radarr
+  bajo cada candidata. Gráficas más legibles (tipografías que ya no se solapan, géneros completos).
+- Calendario: la minificha muestra siempre «Dirige» (el director real, aunque no sea favorito) y
+  luego «Actúa» (el favorito mejor situado en el reparto); recuento de añadido masivo corregido.
+
 ## Alpha 0.2 (0.2.0-alpha) — 2026-07-04
 
 - **Integración MDBList**: notas de IMDb, Rotten Tomatoes (crítica y público), Metacritic,

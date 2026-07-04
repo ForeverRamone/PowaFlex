@@ -12,5 +12,8 @@ services:
       - ./data:/data
     environment:
       - TZ=Europe/Madrid
+      # Cifra las credenciales (Plex/TMDB/Radarr) en disco. Pon una frase larga y
+      # secreta; si la pierdes tendrás que volver a introducir las claves en Ajustes.
+      # - POWAFLEX_SECRET=cambia-esto-por-una-frase-larga-y-secreta
     labels:
       - net.unraid.docker.icon=https://raw.githubusercontent.com/ForeverRamone/PowaFlex/main/assets/icon.png

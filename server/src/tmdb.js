@@ -12,6 +12,30 @@ function lang() {
   return getSetting('language') || 'es-ES';
 }
 
+// --- global concurrency gate ------------------------------------------------
+// Every feature (calendar, sagas, gaps, life-sync…) throttles itself, but two
+// running at once could still stack up and trip TMDB's 429. A single shared
+// limiter caps total in-flight requests across the whole process.
+function createLimiter(max) {
+  let active = 0;
+  const queue = [];
+  const pump = () => {
+    if (active >= max || !queue.length) return;
+    active++;
+    const { fn, resolve, reject } = queue.shift();
+    fn().then(resolve, reject).finally(() => {
+      active--;
+      pump();
+    });
+  };
+  return (fn) => new Promise((resolve, reject) => {
+    queue.push({ fn, resolve, reject });
+    pump();
+  });
+}
+
+const tmdbLimit = createLimiter(Number(process.env.TMDB_CONCURRENCY) || 10);
+
 export async function tmdbGet(path, params = {}, { cacheKey = null, cacheMs = DAY } = {}) {
   if (cacheKey) {
     const hit = cacheRead(cacheKey, cacheMs);
@@ -22,12 +46,15 @@ export async function tmdbGet(path, params = {}, { cacheKey = null, cacheMs = DA
   // v4 read-access tokens are long JWTs; v3 keys are short hex strings
   const isV4 = key.length > 60;
   if (!isV4) qs.set('api_key', key);
-  const res = await fetch(`https://api.themoviedb.org/3${path}?${qs}`, {
-    headers: isV4 ? { Authorization: `Bearer ${key}` } : {},
-    signal: AbortSignal.timeout(20000),
-  });
+  const res = await tmdbLimit(() =>
+    fetch(`https://api.themoviedb.org/3${path}?${qs}`, {
+      headers: isV4 ? { Authorization: `Bearer ${key}` } : {},
+      signal: AbortSignal.timeout(20000),
+    })
+  );
   if (res.status === 429) {
-    await new Promise((r) => setTimeout(r, 1500));
+    const retryAfter = Number(res.headers.get('retry-after')) || 2;
+    await new Promise((r) => setTimeout(r, retryAfter * 1000));
     return tmdbGet(path, params, { cacheKey, cacheMs });
   }
   if (!res.ok) throw new Error(`TMDB ${res.status} en ${path}`);
@@ -85,6 +112,42 @@ export async function personDetails(tmdbPersonId) {
   );
 }
 
+// Persist birthday/deathday for a library person, so "vivos y muertos" logic
+// (calendar, auto-Radarr, favoritos) can work without re-hitting TMDB.
+export function persistLife(dbPersonId, details) {
+  if (!dbPersonId || !details) return;
+  db.prepare(
+    'UPDATE people SET birthday = ?, deathday = ?, details_fetched_at = ? WHERE id = ?'
+  ).run(details.birthday || null, details.deathday || null, Date.now(), dbPersonId);
+}
+
+/**
+ * Fill birthday/deathday for a set of library people (by DB id). Used by the
+ * "actualizar estado vital" button and the nightly job. Returns counts.
+ */
+export async function enrichPeopleLife(personIds, { concurrency = 5 } = {}) {
+  const list = [...new Set(personIds)].filter(Boolean);
+  let done = 0;
+  let deceased = 0;
+  let idx = 0;
+  async function worker() {
+    for (;;) {
+      const i = idx++;
+      if (i >= list.length) return;
+      try {
+        const person = await resolvePerson(list[i]);
+        if (!person?.tmdb_id) continue;
+        const det = await personDetails(person.tmdb_id);
+        persistLife(person.id, det);
+        if (det?.deathday) deceased++;
+        done++;
+      } catch {}
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  return { requested: list.length, done, deceased };
+}
+
 /**
  * Resolve the TMDB person id for a library person (by DB id), persisting it.
  */
@@ -115,6 +178,42 @@ function today() {
 }
 
 /**
+ * Enrich TMDB items (with .tmdb_id) with runtime and short/doc/TV flags, using
+ * the per-movie cache. Runtime is not in credit lists, so a short (<40 min)
+ * can only be detected here. Concurrency-limited and cached, so repeat loads
+ * are cheap. Mutates items in place.
+ */
+export async function enrichRuntimes(items, { concurrency = 6 } = {}) {
+  let i = 0;
+  async function worker() {
+    for (;;) {
+      const idx = i++;
+      if (idx >= items.length) return;
+      const it = items[idx];
+      try {
+        const det = await tmdbGet(
+          `/movie/${it.tmdb_id}`,
+          {},
+          { cacheKey: `movie:${it.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
+        );
+        it.runtime = det.runtime || null;
+        if (det.genres?.length) {
+          const g = det.genres.map((x) => x.id);
+          it.genre_ids = g;
+          it.isDocumentary = g.includes(99);
+          it.isTvMovie = g.includes(10770);
+        }
+      } catch {
+        it.runtime = it.runtime ?? null;
+      }
+      it.isShort = !!it.runtime && it.runtime < 40;
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  return items;
+}
+
+/**
  * Filmography for a library person, split into owned / missing / upcoming.
  * role: 'director' | 'actor' | 'writer'
  */
@@ -124,6 +223,7 @@ export async function filmography(personId, role) {
 
   const credits = await personCredits(person.tmdb_id);
   const details = await personDetails(person.tmdb_id);
+  persistLife(person.id, details);
   const now = today();
   const inLib = libraryTmdbIds();
 
@@ -141,6 +241,7 @@ export async function filmography(personId, role) {
     seen.add(c.id);
     const date = c.release_date || null;
     const released = !!date && date <= now;
+    const genres = c.genre_ids || [];
     items.push({
       tmdb_id: c.id,
       title: c.title,
@@ -153,8 +254,13 @@ export async function filmography(personId, role) {
       popularity: c.popularity,
       character: c.character || null,
       job: c.job || null,
+      genre_ids: genres,
+      isDocumentary: genres.includes(99),
+      isTvMovie: genres.includes(10770),
+      isShort: false, // set after runtime enrichment
     });
   }
+  await enrichRuntimes(items);
   items.sort((a, b) => (b.date || '9999') < (a.date || '9999') ? -1 : 1);
 
   const released = items.filter((i) => i.released);
@@ -212,6 +318,11 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
   const inLib = libraryTmdbIds();
   const events = new Map(); // tmdb_id -> event
 
+  // TMDB person id -> our library person id, so the real director can be linked
+  const peopleByTmdb = new Map(
+    db.prepare('SELECT id, tmdb_id FROM people WHERE tmdb_id IS NOT NULL').all().map((r) => [r.tmdb_id, r.id])
+  );
+
   const list = [...people.values()];
   const CONCURRENCY = 5;
   let idx = 0;
@@ -250,11 +361,17 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
             poster_path: c.poster_path,
             overview: c.overview || '',
             genre_ids: c.genre_ids || [],
-            people: [],
+            followedDirectors: [], // { id, name, tmdb_id } — favorites who direct it
+            followedActors: [],    // { id, name, order } — favorites in the cast
+            people: [],            // filled in the enrich pass (Dirige first, then Actúa)
             inLibrary: inLib.has(c.id),
           };
-          if (!ev.people.some((x) => x.id === p.id && x.credit === c.credit))
-            ev.people.push({ id: p.id, name: p.name, credit: c.credit });
+          if (c.credit === 'Dirige') {
+            if (!ev.followedDirectors.some((x) => x.id === p.id))
+              ev.followedDirectors.push({ id: p.id, name: p.name, tmdb_id: resolved.tmdb_id });
+          } else if (!ev.followedActors.some((x) => x.id === p.id)) {
+            ev.followedActors.push({ id: p.id, name: p.name, order: c.order ?? 999 });
+          }
           events.set(c.id, ev);
         }
       } catch (err) {
@@ -266,21 +383,24 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
 
   const out = [...events.values()];
 
-  // enrich with runtime (cached per movie) to classify shorts / docs / TV movies
+  // enrich with runtime + full credits: the film's real director is always shown
+  // (even if not a favorite), followed by the single top-billed favorite actor.
   let ei = 0;
   async function enrichWorker() {
     for (;;) {
       const i = ei++;
       if (i >= out.length) return;
       const ev = out[i];
+      let directors = [];
       try {
         const det = await tmdbGet(
           `/movie/${ev.tmdb_id}`,
-          {},
-          { cacheKey: `movie:${ev.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
+          { append_to_response: 'credits' },
+          { cacheKey: `movie_cr:${ev.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
         );
         ev.runtime = det.runtime || null;
         if (det.genres?.length) ev.genre_ids = det.genres.map((g) => g.id);
+        directors = (det.credits?.crew || []).filter((c) => c.job === 'Director');
       } catch {
         ev.runtime = null;
       }
@@ -288,6 +408,26 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
       ev.isShort = !!ev.runtime && ev.runtime < 40;
       ev.isDocumentary = (ev.genre_ids || []).includes(99);
       ev.isTvMovie = (ev.genre_ids || []).includes(10770);
+
+      // "Dirige X" (real director, always) then "Actúa Y" (top-billed favorite)
+      const dirSource = directors.length
+        ? directors.map((d) => ({ tmdbId: d.id, name: d.name }))
+        : ev.followedDirectors.map((d) => ({ tmdbId: d.tmdb_id, name: d.name }));
+      const seenDir = new Set();
+      const dirEntries = [];
+      for (const d of dirSource) {
+        if (seenDir.has(d.name)) continue;
+        seenDir.add(d.name);
+        dirEntries.push({ id: peopleByTmdb.get(d.tmdbId) ?? null, name: d.name, credit: 'Dirige' });
+      }
+      const topActor = ev.followedActors
+        .filter((a) => !seenDir.has(a.name))
+        .sort((a, b) => a.order - b.order)[0];
+
+      ev.people = dirEntries;
+      if (topActor) ev.people.push({ id: topActor.id, name: topActor.name, credit: 'Actúa' });
+      delete ev.followedDirectors;
+      delete ev.followedActors;
     }
   }
   await Promise.all(Array.from({ length: 5 }, enrichWorker));
@@ -303,7 +443,7 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
 }
 
 export async function getCalendarCached({ refresh = false } = {}) {
-  const key = 'calendar:v2';
+  const key = 'calendar:v3';
   if (!refresh) {
     const hit = cacheRead(key, 12 * 3600 * 1000);
     if (hit) return hit;

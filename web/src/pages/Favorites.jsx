@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
-import { Spinner, Section, Empty } from '../components.jsx';
+import { Spinner, Section, Empty, DeathBadge } from '../components.jsx';
 
 const ROLES = [
   ['director', 'Directores'],
@@ -48,7 +48,17 @@ export default function Favorites() {
     loadTracked();
   };
 
+  const clearDeceased = async () => {
+    const r = await api('/tracked/deceased', { method: 'DELETE' });
+    if (r.ok) {
+      setFlash(`✓ ${r.removed} fallecidos retirados de favoritos`);
+      setTimeout(() => setFlash(''), 4000);
+      loadTracked();
+    }
+  };
+
   if (!tracked) return <Spinner />;
+  const deceasedCount = tracked.filter((t) => t.deathday).length;
 
   return (
     <div>
@@ -129,9 +139,16 @@ export default function Favorites() {
           title={`Tus favoritos (${tracked.length})`}
           action={
             tracked.length > 0 && (
-              <button className="text-xs text-red-400 hover:underline cursor-pointer" onClick={clearAll}>
-                Vaciar todos
-              </button>
+              <div className="flex items-center gap-3">
+                {deceasedCount > 0 && (
+                  <button className="text-xs text-slate-400 hover:text-gold-400 cursor-pointer" onClick={clearDeceased}>
+                    ✝ Quitar fallecidos ({deceasedCount})
+                  </button>
+                )}
+                <button className="text-xs text-red-400 hover:underline cursor-pointer" onClick={clearAll}>
+                  Vaciar todos
+                </button>
+              </div>
             )
           }
         >
@@ -151,6 +168,7 @@ export default function Favorites() {
                   >
                     {t.name}
                   </Link>
+                  <DeathBadge deathday={t.deathday} />
                   <span className="text-xs text-slate-500 shrink-0">
                     {t.directed > 0 && `${t.directed} dirigidas`}
                     {t.directed > 0 && t.acted > 0 && ' · '}

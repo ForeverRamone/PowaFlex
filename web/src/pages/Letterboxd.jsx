@@ -6,9 +6,12 @@ export default function Letterboxd() {
   const [summary, setSummary] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState(null);
+  const [rssUser, setRssUser] = useState('');
+  const [rssBusy, setRssBusy] = useState(false);
+  const [rssResult, setRssResult] = useState(null);
   const fileRef = useRef();
 
-  const load = () => api('/letterboxd/summary').then(setSummary);
+  const load = () => api('/letterboxd/summary').then((s) => { setSummary(s); if (s.rssUser != null) setRssUser(s.rssUser || ''); });
   useEffect(() => {
     load();
   }, []);
@@ -26,6 +29,15 @@ export default function Letterboxd() {
     load();
   };
 
+  const syncRss = async () => {
+    setRssBusy(true);
+    setRssResult(null);
+    const res = await api('/letterboxd/rss', { method: 'POST', body: { user: rssUser.trim(), save: true } });
+    setRssBusy(false);
+    setRssResult(res);
+    load();
+  };
+
   if (!summary) return <Spinner />;
 
   const counts = summary.counts || {};
@@ -35,14 +47,15 @@ export default function Letterboxd() {
     <div>
       <h1 className="text-2xl font-bold text-slate-100 mb-2">Letterboxd</h1>
       <p className="text-sm text-slate-500 mb-5">
-        Exporta tus datos en letterboxd.com → Settings → Data → Export, y sube aquí los CSV
-        (diary, ratings, watched, watchlist). También acepta los CSV en formato Letterboxd de WebTools-NG.
+        Exporta tus datos en letterboxd.com → Settings → Data → Export y sube aquí <b>el .zip completo</b> tal cual
+        (sin descomprimir): PowaFlex extrae diario, notas, vistas, watchlist y tus listas. También acepta CSV sueltos
+        y el formato Letterboxd de WebTools-NG.
       </p>
 
       <form onSubmit={upload} className="card p-4 mb-6 flex flex-wrap items-center gap-3">
-        <input ref={fileRef} type="file" accept=".csv" multiple className="text-sm text-slate-400" />
+        <input ref={fileRef} type="file" accept=".csv,.zip" multiple className="text-sm text-slate-400" />
         <button className="btn-gold" disabled={uploading}>
-          {uploading ? 'Importando…' : 'Importar CSV'}
+          {uploading ? 'Importando…' : 'Importar zip o CSV'}
         </button>
         {hasData && (
           <button
@@ -58,15 +71,48 @@ export default function Letterboxd() {
           </button>
         )}
         {result?.results && (
-          <div className="w-full text-xs text-slate-400">
+          <div className="w-full text-xs text-slate-400 space-y-0.5">
             {result.results.map((r, i) => (
               <div key={i}>
                 {r.file}: {r.error ? `⚠️ ${r.error}` : `${r.imported} importadas (${r.matched} emparejadas con tu biblioteca) como «${r.list}»`}
               </div>
             ))}
+            {result.lists?.length > 0 && (
+              <div className="text-gold-400">
+                + {result.lists.length} listas importadas como retos (míralas en «Listas y retos»).
+              </div>
+            )}
           </div>
         )}
       </form>
+
+      {/* RSS feed */}
+      <div className="card p-4 mb-8">
+        <h2 className="font-semibold text-slate-100 mb-1">Feed RSS de tu perfil</h2>
+        <p className="text-xs text-slate-500 mb-3 max-w-3xl">
+          Guarda tu usuario de Letterboxd y PowaFlex irá recogiendo tus últimas películas vistas automáticamente
+          (cada noche, y cuando pulses aquí). Aparecerán en el Dashboard y se emparejan con tu biblioteca.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-slate-500 text-sm">letterboxd.com/</span>
+          <input
+            className="input !w-48"
+            placeholder="tu-usuario"
+            value={rssUser}
+            onChange={(e) => setRssUser(e.target.value)}
+          />
+          <button className="btn-gold" disabled={rssBusy || !rssUser.trim()} onClick={syncRss}>
+            {rssBusy ? 'Sincronizando…' : 'Guardar y sincronizar'}
+          </button>
+          {rssResult && (
+            <span className={`text-xs ${rssResult.error ? 'text-red-400' : 'text-emerald-400'}`}>
+              {rssResult.error
+                ? `⚠️ ${rssResult.error}`
+                : `✓ ${rssResult.imported} nuevas (${rssResult.matched} en tu biblioteca) de ${rssResult.seen} del feed`}
+            </span>
+          )}
+        </div>
+      </div>
 
       {!hasData ? (
         <Empty>Sin datos de Letterboxd todavía.</Empty>

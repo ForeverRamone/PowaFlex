@@ -43,11 +43,11 @@ export default function WatchStats() {
         <Section title="Visto vs. pendiente por década">
           <div className="card p-4 h-72">
             <ResponsiveContainer>
-              <BarChart data={data.watchedByDecade}>
-                <XAxis dataKey="decade" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} />
+              <BarChart data={data.watchedByDecade} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+                <XAxis dataKey="decade" stroke="#64748b" fontSize={12} tickMargin={6} />
+                <YAxis stroke="#64748b" fontSize={12} width={38} />
                 <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#252d4266' }} />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="watched" name="Vistas" stackId="a" fill="#34d399" />
                 <Bar dataKey="total" name="Total" fill="#35405c" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -57,11 +57,11 @@ export default function WatchStats() {
         <Section title="Visto vs. total por género">
           <div className="card p-4 h-72">
             <ResponsiveContainer>
-              <BarChart data={data.watchedByGenre} layout="vertical">
+              <BarChart data={data.watchedByGenre} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
                 <XAxis type="number" stroke="#64748b" fontSize={12} />
-                <YAxis type="category" dataKey="name" width={95} stroke="#94a3b8" fontSize={11} />
+                <YAxis type="category" dataKey="name" width={120} stroke="#94a3b8" fontSize={11} interval={0} tickMargin={4} />
                 <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#252d4266' }} />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="watched" name="Vistas" fill="#34d399" />
                 <Bar dataKey="total" name="Total" fill="#35405c" />
               </BarChart>

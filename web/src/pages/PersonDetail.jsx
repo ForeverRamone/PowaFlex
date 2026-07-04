@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
-import { Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty } from '../components.jsx';
+import {
+  Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty,
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge,
+} from '../components.jsx';
 
 const VIEWS = [
   ['all', 'Todas'],
@@ -18,6 +21,8 @@ export default function PersonDetail() {
   const [error, setError] = useState(null);
   const [view, setView] = useState('all');
   const [tracked, setTracked] = useState(false);
+  const [radarrIds, addRadarrId] = useRadarrIds();
+  const [show, toggle] = useTypeFilters('person_type_filters');
 
   useEffect(() => {
     setData(null);
@@ -45,7 +50,13 @@ export default function PersonDetail() {
     );
 
   const { person, stats, items } = data;
+  const typeCounts = {
+    shorts: items.filter((i) => i.isShort).length,
+    docs: items.filter((i) => i.isDocumentary).length,
+    tv: items.filter((i) => i.isTvMovie).length,
+  };
   const filtered = items.filter((i) => {
+    if (!matchesTypeFilters(i, show)) return false;
     if (view === 'owned') return i.owned;
     if (view === 'missing') return i.released && !i.owned;
     if (view === 'upcoming') return !i.released;
@@ -61,7 +72,16 @@ export default function PersonDetail() {
         <div className="flex-1 min-w-60">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold text-slate-100">{person.name}</h1>
-            <button onClick={toggleTrack} className={tracked ? 'btn-gold' : 'btn-ghost'} title="Las personas seguidas aparecen siempre en el calendario de cine venidero">
+            <DeathBadge deathday={person.deathday} />
+            <button
+              onClick={toggleTrack}
+              className={tracked ? 'btn-gold' : 'btn-ghost'}
+              title={
+                person.deathday
+                  ? 'Ya fallecido: no tendrá nuevos estrenos, no hace falta seguirlo'
+                  : 'Las personas seguidas aparecen siempre en el calendario de cine venidero'
+              }
+            >
               {tracked ? '★ Siguiendo' : '☆ Seguir en calendario'}
             </button>
             <Link to={`/biblioteca?personId=${person.id}&personRole=${role}`} className="btn-ghost">
@@ -104,6 +124,10 @@ export default function PersonDetail() {
         ))}
       </div>
 
+      {(typeCounts.shorts || typeCounts.docs || typeCounts.tv) > 0 && (
+        <TypeFilterBar show={show} toggle={toggle} counts={typeCounts} />
+      )}
+
       {filtered.length === 0 ? (
         <Empty>Nada que mostrar aquí. {view === 'missing' && '¡Filmografía completa! 🏆'}</Empty>
       ) : (
@@ -122,7 +146,9 @@ export default function PersonDetail() {
                 ) : null
               }
             >
-              {!item.owned && <RadarrButton tmdbId={item.tmdb_id} small />}
+              {!item.owned && (
+                <RadarrButton tmdbId={item.tmdb_id} small alreadyInRadarr={radarrIds.has(item.tmdb_id)} onAdded={addRadarrId} />
+              )}
             </TmdbCard>
           ))}
         </div>

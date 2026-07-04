@@ -22,6 +22,60 @@ export function overview() {
   };
 }
 
+// Dashboard feeds (#8): latest added to Plex + latest watched (Plex + Letterboxd).
+export function dashboardRecent() {
+  const recentlyAdded = db
+    .prepare(
+      `SELECT rating_key, title, year, thumb, added_at FROM movies
+       WHERE added_at IS NOT NULL ORDER BY added_at DESC LIMIT 12`
+    )
+    .all();
+
+  const plexWatched = db
+    .prepare(
+      `SELECT rating_key, title, year, thumb, last_viewed_at FROM movies
+       WHERE last_viewed_at IS NOT NULL ORDER BY last_viewed_at DESC LIMIT 20`
+    )
+    .all()
+    .map((m) => ({
+      source: 'plex',
+      rating_key: m.rating_key,
+      title: m.title,
+      year: m.year,
+      thumb: !!m.thumb,
+      date: new Date(m.last_viewed_at * 1000).toISOString().slice(0, 10),
+    }));
+
+  const lbWatched = db
+    .prepare(
+      `SELECT e.title, e.year, e.rating, e.watched_date, e.movie_id, m.thumb
+       FROM lb_entries e LEFT JOIN movies m ON m.rating_key = e.movie_id
+       WHERE e.list IN ('diary','watched') AND e.watched_date IS NOT NULL
+       ORDER BY e.watched_date DESC LIMIT 20`
+    )
+    .all()
+    .map((e) => ({
+      source: 'letterboxd',
+      rating_key: e.movie_id || null,
+      title: e.title,
+      year: e.year,
+      thumb: !!e.thumb,
+      rating: e.rating,
+      date: e.watched_date,
+    }));
+
+  // merge, dedupe by title+year keeping the most recent, sort by date desc
+  const seen = new Map();
+  for (const w of [...plexWatched, ...lbWatched]) {
+    const key = `${w.title?.toLowerCase()}|${w.year || ''}`;
+    const prev = seen.get(key);
+    if (!prev || w.date > prev.date) seen.set(key, { ...prev, ...w, date: prev && prev.date > w.date ? prev.date : w.date });
+  }
+  const recentlyWatched = [...seen.values()].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 12);
+
+  return { recentlyAdded, recentlyWatched, hasLb: lbWatched.length > 0 };
+}
+
 export function charts() {
   const all = (sql) => db.prepare(sql).all();
   return {
@@ -64,7 +118,7 @@ export function topPeople({ role = 'director', limit = 30, offset = 0, search = 
   const args = search ? [role, `%${search}%`, limit, offset] : [role, limit, offset];
   return db
     .prepare(
-      `SELECT p.id, p.name, p.thumb, p.tmdb_id, COUNT(*) n,
+      `SELECT p.id, p.name, p.thumb, p.tmdb_id, p.deathday, COUNT(*) n,
               SUM(CASE WHEN m.view_count > 0 THEN 1 ELSE 0 END) watched,
               AVG(m.audience_rating) avg_rating
        FROM movie_people mp

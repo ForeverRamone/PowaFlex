@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
-import { Spinner, ErrorBox, RadarrButton, Empty } from '../components.jsx';
+import { Spinner, ErrorBox, RadarrButton, Empty, useRadarrIds } from '../components.jsx';
 
 function monthLabel(ym) {
   const [y, m] = ym.split('-');
@@ -17,7 +17,7 @@ function typeBadges(ev) {
   return badges;
 }
 
-function EventCard({ ev, radarrIds }) {
+function EventCard({ ev, radarrIds, onAdded }) {
   const img = tmdbImg(ev.poster_path, 'w185');
   return (
     <div className="card p-3 flex gap-3">
@@ -42,12 +42,16 @@ function EventCard({ ev, radarrIds }) {
         </div>
         <div className="text-xs text-slate-400 mt-1">
           {ev.people.map((p, i) => (
-            <span key={`${p.id}-${p.credit}`}>
+            <span key={`${p.id ?? p.name}-${p.credit}`}>
               {i > 0 && ' · '}
               {p.credit}{' '}
-              <Link to={`/personas/${p.id}?role=${p.credit === 'Dirige' ? 'director' : 'actor'}`} className="text-slate-200 hover:text-gold-400">
-                {p.name}
-              </Link>
+              {p.id ? (
+                <Link to={`/personas/${p.id}?role=${p.credit === 'Dirige' ? 'director' : 'actor'}`} className="text-slate-200 hover:text-gold-400">
+                  {p.name}
+                </Link>
+              ) : (
+                <span className="text-slate-300">{p.name}</span>
+              )}
             </span>
           ))}
         </div>
@@ -56,7 +60,7 @@ function EventCard({ ev, radarrIds }) {
           {ev.inLibrary ? (
             <span className="text-emerald-400 text-xs">✓ Ya en tu biblioteca</span>
           ) : (
-            <RadarrButton tmdbId={ev.tmdb_id} small alreadyInRadarr={radarrIds.has(ev.tmdb_id)} />
+            <RadarrButton tmdbId={ev.tmdb_id} small alreadyInRadarr={radarrIds.has(ev.tmdb_id)} onAdded={onAdded} />
           )}
         </div>
       </div>
@@ -70,7 +74,7 @@ export default function Calendar() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [radarrIds, setRadarrIds] = useState(new Set());
+  const [radarrIds, addRadarrId] = useRadarrIds();
   const [show, setShow] = useState(() => {
     try {
       return { ...DEFAULT_FILTERS, ...JSON.parse(localStorage.getItem('cal_filters') || '{}') };
@@ -100,9 +104,6 @@ export default function Calendar() {
 
   useEffect(() => {
     load();
-    api('/radarr/context').then((c) => {
-      if (c.tmdbIds) setRadarrIds(new Set(c.tmdbIds));
-    });
   }, []);
 
   if (error)
@@ -137,9 +138,10 @@ export default function Calendar() {
     d.setMonth(d.getMonth() + Number(horizon));
     return d.toISOString().slice(0, 10);
   })();
-  const eligible = [...upcoming, ...(horizon === 'all' ? undated : [])].filter(
-    (e) => !e.inLibrary && !radarrIds.has(e.tmdb_id) && (!e.date || e.date <= horizonEnd)
-  );
+  // pending = not owned and not already in Radarr; eligible = pending within the horizon
+  const pending = [...upcoming, ...undated].filter((e) => !e.inLibrary && !radarrIds.has(e.tmdb_id));
+  const eligible = pending.filter((e) => (horizon === 'all' ? true : e.date && e.date <= horizonEnd));
+  const beyondHorizon = pending.length - eligible.length;
 
   const bulkAdd = async () => {
     setBulk({ running: true, summary: null });
@@ -148,11 +150,7 @@ export default function Calendar() {
       setBulk({ running: false, summary: `⚠️ ${res.error}` });
       return;
     }
-    setRadarrIds((prev) => {
-      const next = new Set(prev);
-      for (const r of res.results || []) if (r.ok || r.alreadyExists) next.add(r.tmdbId);
-      return next;
-    });
+    for (const r of res.results || []) if (r.ok || r.alreadyExists) addRadarrId(r.tmdbId);
     setBulk({
       running: false,
       summary: `✓ ${res.added} añadidas a Radarr${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''}`,
@@ -216,7 +214,12 @@ export default function Calendar() {
           {bulk.running ? 'Añadiendo…' : `➕ Añadir ${eligible.length} a Radarr`}
         </button>
         {bulk.summary && <span className="text-xs text-emerald-400">{bulk.summary}</span>}
-        {!bulk.running && eligible.length === 0 && !bulk.summary && (
+        {!bulk.running && !bulk.summary && beyondHorizon > 0 && (
+          <span className="text-xs text-slate-500">
+            ({beyondHorizon} más pendientes fuera de ese plazo — amplía el horizonte para incluirlas)
+          </span>
+        )}
+        {!bulk.running && eligible.length === 0 && beyondHorizon === 0 && !bulk.summary && (
           <span className="text-xs text-slate-500">Nada pendiente en ese plazo: todo está en tu Plex o en Radarr.</span>
         )}
       </div>
@@ -232,7 +235,7 @@ export default function Calendar() {
         <section key={ym} className="mb-8">
           <h2 className="text-lg font-semibold text-gold-400 mb-3 capitalize">{monthLabel(ym)}</h2>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {evs.map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} />)}
+            {evs.map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} onAdded={addRadarrId} />)}
           </div>
         </section>
       ))}
@@ -241,7 +244,7 @@ export default function Calendar() {
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-sky-300 mb-3">Anunciadas, sin fecha</h2>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {undated.map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} />)}
+            {undated.map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} onAdded={addRadarrId} />)}
           </div>
         </section>
       )}
@@ -250,7 +253,7 @@ export default function Calendar() {
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-slate-400 mb-3">Estrenadas recientemente (últimos 60 días)</h2>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {recent.reverse().map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} />)}
+            {recent.reverse().map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} onAdded={addRadarrId} />)}
           </div>
         </section>
       )}

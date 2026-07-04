@@ -99,8 +99,8 @@ export default function About() {
         </Block>
         <Block icon="📚" title="Sagas" to="/colecciones">
           <p>
-            Toma las colecciones de tu Plex, las localiza en TMDB y te dice qué partes de cada saga te faltan o
-            están por estrenar.
+            Detecta tus franquicias cruzando cada película con su colección real de TMDB (no con etiquetas de
+            Plex) y te dice, saga a saga, qué partes te faltan o están por estrenar, con envío a Radarr.
           </p>
         </Block>
         <Block icon="👁️" title="Visionado" to="/visionado">
@@ -140,6 +140,8 @@ export default function About() {
             TMDB
           </a>
           . No expongas la app a internet sin un proxy con autenticación: está diseñada para tu red local.
+          Las credenciales de Plex, TMDB y Radarr se guardan en SQLite; define la variable de entorno{' '}
+          <code className="text-slate-300">POWAFLEX_SECRET</code> para cifrarlas en disco.
         </p>
         <p className="mt-2">
           Proyecto de código abierto:{' '}

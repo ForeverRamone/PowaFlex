@@ -12,8 +12,17 @@ import {
   getCalendarCached,
   searchCollection,
   collectionDetails,
+  enrichPeopleLife,
 } from './tmdb.js';
-import { radarrTest, radarrContext, radarrAdd, radarrAddBulk } from './radarr.js';
+import {
+  radarrTest,
+  radarrContext,
+  radarrAdd,
+  radarrAddBulk,
+  radarrSyncMovies,
+  radarrOwnedIds,
+  radarrRecent,
+} from './radarr.js';
 import { libraryGaps, absentGreats } from './discover.js';
 import {
   mdbTest,
@@ -27,7 +36,19 @@ import {
   listDetail,
   deleteList,
 } from './mdblist.js';
-import { importLetterboxdCsv, rematchLetterboxd, letterboxdSummary } from './letterboxd.js';
+import {
+  importLetterboxdCsv,
+  importLetterboxdZip,
+  importLetterboxdRss,
+  importLetterboxdListUrl,
+  challengeLists,
+  challengeListDetail,
+  deleteChallengeList,
+  rematchLetterboxd,
+  letterboxdSummary,
+} from './letterboxd.js';
+import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
+import { scanSagas, sagaScanStatus, sagaScanState, sagaList, sagaComplete } from './saga.js';
 import * as q from './queries.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -118,6 +139,26 @@ app.get('/api/plex/sections', async () => movieSections());
 app.get('/api/stats/overview', async () => q.overview());
 app.get('/api/stats/charts', async () => q.charts());
 app.get('/api/stats/watch', async () => q.watchStats());
+app.get('/api/stats/recent', async () => {
+  const base = q.dashboardRecent();
+  let radarr = [];
+  try {
+    radarr = radarrRecent(12);
+  } catch {}
+  return { ...base, radarrRecent: radarr };
+});
+
+// enrich birthday/deathday for all tracked/favorite people ("vivos y muertos")
+app.post('/api/people/life-sync', async () => {
+  const ids = db.prepare('SELECT person_id FROM tracked_people').all().map((r) => r.person_id);
+  const top = db
+    .prepare(
+      `SELECT person_id FROM movie_people GROUP BY person_id ORDER BY COUNT(*) DESC LIMIT 200`
+    )
+    .all()
+    .map((r) => r.person_id);
+  return await enrichPeopleLife([...new Set([...ids, ...top])]);
+});
 
 app.get('/api/movies', async (req) => {
   const query = { ...req.query };
@@ -214,7 +255,7 @@ app.delete('/api/tracked/:personId', async (req) => {
 app.get('/api/tracked', async () =>
   db
     .prepare(
-      `SELECT p.id, p.name, p.thumb,
+      `SELECT p.id, p.name, p.thumb, p.deathday,
               SUM(CASE WHEN mp.role = 'director' THEN 1 ELSE 0 END) directed,
               SUM(CASE WHEN mp.role = 'actor' THEN 1 ELSE 0 END) acted,
               COUNT(DISTINCT mp.movie_id) movies
@@ -225,6 +266,18 @@ app.get('/api/tracked', async () =>
     )
     .all()
 );
+
+// remove every deceased person from favorites in one go ("vivos y muertos")
+app.delete('/api/tracked/deceased', async () => {
+  const r = db
+    .prepare(
+      `DELETE FROM tracked_people WHERE person_id IN (
+         SELECT id FROM people WHERE deathday IS NOT NULL)`
+    )
+    .run();
+  if (r.changes) db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
+  return { ok: true, removed: r.changes };
+});
 
 app.get('/api/discover/gaps', async (req, reply) => {
   try {
@@ -242,6 +295,24 @@ app.get('/api/discover/gaps', async (req, reply) => {
 app.get('/api/discover/absent', async (req, reply) => {
   try {
     return await absentGreats({ perPerson: Math.min(Number(req.query.perPerson) || 6, 12) });
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// --- sagas / franchises (from real TMDB collection membership) --------------
+
+app.get('/api/sagas', async () => ({ state: sagaScanState(), sagas: sagaList() }));
+app.get('/api/sagas/status', async () => sagaScanState());
+app.post('/api/sagas/scan', async (req) => {
+  const force = !!req.body?.force;
+  if (!sagaScanStatus.running) scanSagas({ force }).catch(() => {});
+  return sagaScanState();
+});
+app.get('/api/sagas/:id', async (req, reply) => {
+  try {
+    return await sagaComplete(Number(req.params.id));
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -302,6 +373,25 @@ app.get('/api/radarr/context', async (req, reply) => {
     reply.code(502);
     return { error: String(err.message || err) };
   }
+});
+
+// local snapshot of what Radarr already has (fast, no network) + refresh
+app.get('/api/radarr/ids', async () => radarrOwnedIds());
+app.post('/api/radarr/sync', async (req, reply) => {
+  try {
+    return await radarrSyncMovies();
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// daily auto-add of upcoming films from favorite LIVING directors (#3)
+app.get('/api/radarr/auto', async () => ({ ...autoRadarrConfig(), status: autoRadarrStatus }));
+app.post('/api/radarr/auto/run', async (req) => {
+  const months = Number(req.body?.months) || autoRadarrConfig().months;
+  const dryRun = !!req.body?.dryRun;
+  return await runAutoRadarr({ months, dryRun });
 });
 
 app.post('/api/radarr/add', async (req, reply) => {
@@ -407,19 +497,66 @@ app.get('/api/quality/duplicates', async () => q.duplicates());
 
 app.post('/api/letterboxd/import', async (req, reply) => {
   const results = [];
+  let lists = [];
   for await (const part of req.files()) {
     const buf = await part.toBuffer();
+    const name = (part.filename || '').toLowerCase();
     try {
-      results.push({ file: part.filename, ...importLetterboxdCsv(buf, { filename: part.filename }) });
+      if (name.endsWith('.zip')) {
+        const z = importLetterboxdZip(buf);
+        results.push(...z.results);
+        lists.push(...z.lists);
+      } else {
+        results.push({ file: part.filename, ...importLetterboxdCsv(buf, { filename: part.filename }) });
+      }
     } catch (err) {
       results.push({ file: part.filename, error: String(err.message || err) });
     }
   }
-  if (!results.length) {
+  if (!results.length && !lists.length) {
     reply.code(400);
     return { error: 'No se recibió ningún archivo' };
   }
-  return { results };
+  return { results, lists };
+});
+
+// RSS feed of a user, to keep pulling recent watches
+app.post('/api/letterboxd/rss', async (req, reply) => {
+  try {
+    const user = req.body?.user ?? getSetting('letterboxd_rss');
+    if (req.body?.save != null || req.body?.user != null) setSetting('letterboxd_rss', String(user || ''));
+    if (!user) {
+      reply.code(400);
+      return { error: 'Indica tu usuario de Letterboxd' };
+    }
+    return await importLetterboxdRss(user);
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// challenge lists (completista rings)
+app.get('/api/letterboxd/lists', async () => challengeLists());
+app.get('/api/letterboxd/lists/:id', async (req, reply) => {
+  const d = challengeListDetail(Number(req.params.id));
+  if (!d) {
+    reply.code(404);
+    return { error: 'Lista no encontrada' };
+  }
+  return d;
+});
+app.post('/api/letterboxd/lists', async (req, reply) => {
+  try {
+    return await importLetterboxdListUrl(req.body?.url || '');
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+app.delete('/api/letterboxd/lists/:id', async (req) => {
+  deleteChallengeList(Number(req.params.id));
+  return { ok: true };
 });
 
 app.get('/api/letterboxd/summary', async () => letterboxdSummary());
@@ -513,15 +650,35 @@ if (fs.existsSync(webDist)) {
   });
 }
 
-// nightly auto-sync + calendar refresh (03:30)
+// nightly auto-sync + calendar refresh + automations (~03:00)
 setInterval(() => {
-  const h = new Date().getHours();
-  const m = new Date().getMinutes();
-  if (h === 3 && m < 5 && !syncStatus.running && getSetting('plex_url') && getSetting('plex_token')) {
+  const now = new Date();
+  const h = now.getHours();
+  const m = now.getMinutes();
+  const todayStr = now.toISOString().slice(0, 10);
+  // guard so a restart inside the 03:00 window doesn't re-trigger the whole run
+  if (
+    h === 3 && m < 5 &&
+    getSetting('nightly_last_run') !== todayStr &&
+    !syncStatus.running && getSetting('plex_url') && getSetting('plex_token')
+  ) {
+    setSetting('nightly_last_run', todayStr);
     runSync()
       .then(() => rematchLetterboxd())
       .then(() => getCalendarCached({ refresh: true }))
       .then(() => (getSetting('mdblist_key') ? syncRatings() : null))
+      // pull recent watches from the Letterboxd RSS feed, if configured
+      .then(() => (getSetting('letterboxd_rss') ? importLetterboxdRss(getSetting('letterboxd_rss')) : null))
+      .catch(() => {})
+      // refresh Radarr snapshot, then run the daily auto-add for living favorites
+      .then(() => (getSetting('radarr_url') && getSetting('radarr_key') ? radarrSyncMovies() : null))
+      .then(() =>
+        getSetting('auto_radarr_enabled') === '1'
+          ? runAutoRadarr({ months: Number(getSetting('auto_radarr_months') || 6) })
+          : null
+      )
+      // keep the saga scan advancing a batch each night
+      .then(() => (getSetting('tmdb_key') ? scanSagas({ budget: 800 }) : null))
       .catch(() => {});
   }
 }, 5 * 60 * 1000);

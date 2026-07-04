@@ -1,20 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
-import Dashboard from './pages/Dashboard.jsx';
-import Library from './pages/Library.jsx';
-import People from './pages/People.jsx';
-import PersonDetail from './pages/PersonDetail.jsx';
-import Calendar from './pages/Calendar.jsx';
-import Collections from './pages/Collections.jsx';
-import Letterboxd from './pages/Letterboxd.jsx';
-import Quality from './pages/Quality.jsx';
-import WatchStats from './pages/WatchStats.jsx';
-import Discover from './pages/Discover.jsx';
-import Favorites from './pages/Favorites.jsx';
-import Lists from './pages/Lists.jsx';
-import About from './pages/About.jsx';
-import Settings from './pages/Settings.jsx';
+import { Spinner } from './components.jsx';
 import { api } from './api.js';
+
+// lazy per route so heavy pages (and recharts) don't weigh down the first paint
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const Library = lazy(() => import('./pages/Library.jsx'));
+const People = lazy(() => import('./pages/People.jsx'));
+const PersonDetail = lazy(() => import('./pages/PersonDetail.jsx'));
+const Calendar = lazy(() => import('./pages/Calendar.jsx'));
+const Collections = lazy(() => import('./pages/Collections.jsx'));
+const Letterboxd = lazy(() => import('./pages/Letterboxd.jsx'));
+const Quality = lazy(() => import('./pages/Quality.jsx'));
+const WatchStats = lazy(() => import('./pages/WatchStats.jsx'));
+const Discover = lazy(() => import('./pages/Discover.jsx'));
+const Favorites = lazy(() => import('./pages/Favorites.jsx'));
+const Lists = lazy(() => import('./pages/Lists.jsx'));
+const About = lazy(() => import('./pages/About.jsx'));
+const Settings = lazy(() => import('./pages/Settings.jsx'));
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '📊' },
@@ -85,6 +88,7 @@ function Shell() {
         </a>
       )}
       <main className="flex-1 p-6 max-w-[1600px] min-w-0">
+        <Suspense fallback={<Spinner />}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/biblioteca" element={<Library />} />
@@ -101,6 +105,7 @@ function Shell() {
           <Route path="/letterboxd" element={<Letterboxd />} />
           <Route path="/ajustes" element={<Settings />} />
         </Routes>
+        </Suspense>
       </main>
     </div>
   );
