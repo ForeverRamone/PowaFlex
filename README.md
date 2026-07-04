@@ -1,9 +1,9 @@
-# 🎬 PowerPlex
+# 🎬 PowaFlex
 
 > **Alpha 0.1** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
 > de filmografías, calendario de estrenos venideros conectado a TMDB y envío directo a Radarr.
 
-PowerPlex es tu centro de mando cinéfilo. Vive junto a tu servidor Plex (en Docker), lee tu
+PowaFlex es tu centro de mando cinéfilo. Vive junto a tu servidor Plex (en Docker), lee tu
 biblioteca de películas **directamente por la API** (sin exports ni CSV), la cruza con
 **TMDB** y con **Radarr**, y convierte todo eso en dos cosas: *conocer a fondo el cine que
 tienes* y *cazar el cine que te falta o que está por venir*. Todo se guarda en local, sin
@@ -42,9 +42,9 @@ TMDB se cachean para no abusar de su API.
 
 ```yaml
 services:
-  powerplex:
-    image: ghcr.io/foreverramone/powerplex:latest
-    container_name: powerplex
+  powaflex:
+    image: ghcr.io/foreverramone/powaflex:latest
+    container_name: powaflex
     restart: unless-stopped
     ports:
       - '3860:3860'
@@ -67,7 +67,7 @@ Abre `http://IP-DEL-HOST:3860` → **Ajustes** → sigue los 4 pasos guiados. Li
 
 ### Actualizar a una nueva versión
 
-Las versiones se publican en [Releases](https://github.com/ForeverRamone/PowerPlex/releases) y
+Las versiones se publican en [Releases](https://github.com/ForeverRamone/PowaFlex/releases) y
 la imagen Docker se reconstruye automáticamente. Actualizar es:
 
 ```bash
@@ -101,8 +101,8 @@ Las mismas guías están dentro de la app (Ajustes → desplegables bajo cada ca
 ## 🧑‍💻 Desarrollo local
 
 ```bash
-git clone https://github.com/ForeverRamone/PowerPlex.git
-cd PowerPlex
+git clone https://github.com/ForeverRamone/PowaFlex.git
+cd PowaFlex
 npm install
 npm run dev        # API en :3860 + frontend Vite en :5173
 ```

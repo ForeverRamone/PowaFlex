@@ -6,7 +6,7 @@ export const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), 'dat
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(path.join(DATA_DIR, 'img'), { recursive: true });
 
-export const db = new Database(path.join(DATA_DIR, 'powerplex.db'));
+export const db = new Database(path.join(DATA_DIR, 'powaflex.db'));
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 

@@ -25,7 +25,7 @@ const app = Fastify({ logger: { level: 'info' } });
 app.get('/api/version', async () => ({
   version: pkg.version,
   label: pkg.versionLabel || `v${pkg.version}`,
-  repo: 'https://github.com/ForeverRamone/PowerPlex',
+  repo: 'https://github.com/ForeverRamone/PowaFlex',
 }));
 
 await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } });
@@ -428,4 +428,4 @@ setInterval(() => {
 
 const port = Number(process.env.PORT || 3860);
 await app.listen({ port, host: '0.0.0.0' });
-console.log(`PowerPlex escuchando en http://0.0.0.0:${port}`);
+console.log(`PowaFlex escuchando en http://0.0.0.0:${port}`);

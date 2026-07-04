@@ -1,10 +1,10 @@
 services:
-  powerplex:
+  powaflex:
     # Imagen publicada automáticamente desde GitHub (recomendado).
     # Para construir desde el código fuente, comenta "image" y descomenta "build".
-    image: ghcr.io/foreverramone/powerplex:latest
+    image: ghcr.io/foreverramone/powaflex:latest
     # build: .
-    container_name: powerplex
+    container_name: powaflex
     restart: unless-stopped
     ports:
       - '3860:3860'

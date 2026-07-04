@@ -169,7 +169,7 @@ export default function Settings() {
         )}
         <Guide title="¿Dónde está la API key de Radarr?">
           <p>En Radarr: <b>Settings → General → Security → API Key</b>. La URL es la misma con la que abres Radarr en el navegador, típicamente el puerto <b>7878</b>.</p>
-          <p>Tras probar la conexión, elige el <b>perfil de calidad</b> y la <b>carpeta raíz</b> que usará PowerPlex al añadir películas.</p>
+          <p>Tras probar la conexión, elige el <b>perfil de calidad</b> y la <b>carpeta raíz</b> que usará PowaFlex al añadir películas.</p>
         </Guide>
       </section>
 

@@ -27,7 +27,7 @@ const NAV = [
   { to: '/calidad', label: 'Calidad y disco', icon: '💾' },
   { to: '/letterboxd', label: 'Letterboxd', icon: '🟠' },
   { to: '/ajustes', label: 'Ajustes', icon: '⚙️' },
-  { to: '/acerca', label: '¿Qué es PowerPlex?', icon: '❓' },
+  { to: '/acerca', label: '¿Qué es PowaFlex?', icon: '❓' },
 ];
 
 function Shell() {
@@ -47,7 +47,7 @@ function Shell() {
     <div className="flex min-h-screen">
       <aside className="w-56 shrink-0 border-r border-ink-700 bg-ink-900 p-4 flex flex-col gap-1 sticky top-0 h-screen overflow-y-auto">
         <div className="text-xl font-black text-gold-400 mb-4 px-2">
-          Power<span className="text-slate-100">Plex</span>
+          Powa<span className="text-slate-100">Flex</span>
         </div>
         {NAV.map((n) => (
           <NavLink
@@ -76,7 +76,7 @@ function Shell() {
           href={`${version.repo}/releases`}
           target="_blank"
           rel="noreferrer"
-          title={`PowerPlex ${version.version} — ver novedades en GitHub`}
+          title={`PowaFlex ${version.version} — ver novedades en GitHub`}
           className="fixed bottom-2 right-3 z-40 text-[10px] text-slate-600 hover:text-gold-400 transition-colors"
         >
           {version.label}
