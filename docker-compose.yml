@@ -1,0 +1,14 @@
+services:
+  powerplex:
+    # Imagen publicada automáticamente desde GitHub (recomendado).
+    # Para construir desde el código fuente, comenta "image" y descomenta "build".
+    image: ghcr.io/foreverramone/powerplex:latest
+    # build: .
+    container_name: powerplex
+    restart: unless-stopped
+    ports:
+      - '3860:3860'
+    volumes:
+      - ./data:/data
+    environment:
+      - TZ=Europe/Madrid
