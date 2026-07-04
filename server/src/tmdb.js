@@ -1,4 +1,5 @@
 import { db, getSetting, cacheRead, cacheWrite } from './db.js';
+import { watchedIndex, isWatched } from './letterboxd.js';
 
 const DAY = 24 * 3600 * 1000;
 
@@ -222,7 +223,7 @@ function today() {
  * can only be detected here. Concurrency-limited and cached, so repeat loads
  * are cheap. Mutates items in place.
  */
-export async function enrichRuntimes(items, { concurrency = 6 } = {}) {
+export async function enrichRuntimes(items, { concurrency = 6, withCredits = false } = {}) {
   let i = 0;
   async function worker() {
     for (;;) {
@@ -230,17 +231,29 @@ export async function enrichRuntimes(items, { concurrency = 6 } = {}) {
       if (idx >= items.length) return;
       const it = items[idx];
       try {
-        const det = await tmdbGet(
-          `/movie/${it.tmdb_id}`,
-          {},
-          { cacheKey: `movie:${it.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
-        );
+        // With credits we can also count co-directors → "dirección coral" (#7).
+        const det = withCredits
+          ? await tmdbGet(
+              `/movie/${it.tmdb_id}`,
+              { append_to_response: 'credits' },
+              { cacheKey: `movie_cr:${it.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
+            )
+          : await tmdbGet(
+              `/movie/${it.tmdb_id}`,
+              {},
+              { cacheKey: `movie:${it.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
+            );
         it.runtime = det.runtime || null;
         if (det.genres?.length) {
           const g = det.genres.map((x) => x.id);
           it.genre_ids = g;
           it.isDocumentary = g.includes(99);
           it.isTvMovie = g.includes(10770);
+        }
+        if (withCredits) {
+          const dirs = new Set((det.credits?.crew || []).filter((c) => c.job === 'Director').map((c) => c.id));
+          it.directorCount = dirs.size || 1;
+          it.isCoral = dirs.size >= 3;
         }
       } catch {
         it.runtime = it.runtime ?? null;
@@ -288,42 +301,30 @@ export async function tmdbPoster(tmdbId) {
   }
 }
 
-/**
- * Filmography for a library person, split into owned / missing / upcoming.
- * role: 'director' | 'actor' | 'writer'
- */
-export async function filmography(personId, role) {
-  const person = await resolvePerson(personId);
-  if (!person?.tmdb_id) return { person, matched: false, items: [] };
+const roleRaw = (credits, role) => {
+  if (role === 'director') return (credits.crew || []).filter((c) => c.job === 'Director');
+  if (role === 'writer') return (credits.crew || []).filter((c) => c.department === 'Writing');
+  return credits.cast || [];
+};
 
-  const credits = await personCredits(person.tmdb_id);
-  const details = await personDetails(person.tmdb_id);
-  persistLife(person.id, details);
+function buildRoleItems(credits, role, inLib, widx) {
   const now = today();
-  const inLib = libraryTmdbIds();
-
-  let raw;
-  if (role === 'director') raw = (credits.crew || []).filter((c) => c.job === 'Director');
-  else if (role === 'writer')
-    raw = (credits.crew || []).filter((c) => c.department === 'Writing');
-  else raw = credits.cast || [];
-
   const seen = new Set();
   const items = [];
-  for (const c of raw) {
+  for (const c of roleRaw(credits, role)) {
     if (c.video) continue; // skip music videos / direct-to-video oddities flagged by TMDB
     if (seen.has(c.id)) continue;
     seen.add(c.id);
     const date = c.release_date || null;
-    const released = !!date && date <= now;
     const genres = c.genre_ids || [];
     items.push({
       tmdb_id: c.id,
       title: c.title,
       original_title: c.original_title,
       date,
-      released,
+      released: !!date && date <= now,
       owned: inLib.has(c.id),
+      watched: isWatched({ tmdb_id: c.id, title: c.title, year: date ? Number(date.slice(0, 4)) : null }, widx),
       poster_path: c.poster_path,
       vote: c.vote_average,
       popularity: c.popularity,
@@ -333,13 +334,70 @@ export async function filmography(personId, role) {
       isDocumentary: genres.includes(99),
       isTvMovie: genres.includes(10770),
       isShort: false, // set after runtime enrichment
+      isCoral: false, // set for directors after credits enrichment
     });
   }
-  await enrichRuntimes(items);
-  items.sort((a, b) => (b.date || '9999') < (a.date || '9999') ? -1 : 1);
+  items.sort((a, b) => ((b.date || '9999') < (a.date || '9999') ? -1 : 1));
+  return items;
+}
 
+// Completeness bar. For directors it counts features only (#6): no shorts, no
+// TV movies, no "coral" 3+ director films (#7), and no documentaries unless the
+// person is a documentarian (>5 directed docs). Other roles count every release.
+function roleStats(items, role) {
   const released = items.filter((i) => i.released);
-  const owned = released.filter((i) => i.owned);
+  const base = { upcoming: items.filter((i) => !i.released).length };
+  if (role !== 'director') {
+    const owned = released.filter((i) => i.owned);
+    return { ...base, released: released.length, owned: owned.length,
+      pct: released.length ? Math.round((owned.length / released.length) * 100) : 0 };
+  }
+  const documentarian = released.filter((i) => i.isDocumentary).length > 5;
+  const isFeature = (i) => !i.isShort && !i.isTvMovie && !i.isCoral && (!i.isDocumentary || documentarian);
+  const feats = released.filter(isFeature);
+  const owned = feats.filter((i) => i.owned);
+  return { ...base, released: feats.length, owned: owned.length,
+    pct: feats.length ? Math.round((owned.length / feats.length) * 100) : 0,
+    documentarian, excludedFromCompletion: released.length - feats.length };
+}
+
+/**
+ * Full person profile: builds every role they have (director/actor/writer) with
+ * its own completeness bar, so a person who both directs and acts shows two bars
+ * and you can switch between them (#8). `wantRole` decides which one opens first.
+ */
+export async function filmographyProfile(personId, wantRole = null) {
+  const person = await resolvePerson(personId);
+  if (!person?.tmdb_id) return { person, matched: false, roles: {} };
+
+  const credits = await personCredits(person.tmdb_id);
+  const details = await personDetails(person.tmdb_id);
+  persistLife(person.id, details);
+  const inLib = libraryTmdbIds();
+  const widx = watchedIndex();
+
+  // which roles this person actually has credits in
+  const present = [];
+  if ((credits.crew || []).some((c) => c.job === 'Director')) present.push('director');
+  if ((credits.cast || []).length) present.push('actor');
+  if ((credits.crew || []).some((c) => c.department === 'Writing')) present.push('writer');
+  // build director & actor whenever present; writer only when it's what was asked
+  const build = present.filter((r) => r !== 'writer' || wantRole === 'writer');
+  if (!build.length && present.length) build.push(present[0]);
+
+  const roles = {};
+  for (const role of build) {
+    const items = buildRoleItems(credits, role, inLib, widx);
+    await enrichRuntimes(items, { withCredits: role === 'director' });
+    roles[role] = { stats: roleStats(items, role), items };
+  }
+
+  // open on the requested role if we built it, else the one with most releases
+  const primary =
+    (wantRole && roles[wantRole] && wantRole) ||
+    Object.keys(roles).sort((a, b) => (roles[b].stats.released || 0) - (roles[a].stats.released || 0))[0] ||
+    null;
+
   return {
     person: {
       id: person.id,
@@ -351,13 +409,8 @@ export async function filmography(personId, role) {
       deathday: details?.deathday || null,
     },
     matched: true,
-    stats: {
-      released: released.length,
-      owned: owned.length,
-      pct: released.length ? Math.round((owned.length / released.length) * 100) : 0,
-      upcoming: items.filter((i) => !i.released).length,
-    },
-    items,
+    primary,
+    roles,
   };
 }
 
@@ -537,16 +590,55 @@ export async function getCalendarCached({ refresh = false } = {}) {
 
 // --- suggested people (favorites) -------------------------------------------
 
-// Important/current Spanish directors to surface as favorite suggestions (#1).
-const SPANISH_DIRECTORS = [
-  'Pedro Almodóvar', 'Alejandro Amenábar', 'J. A. Bayona', 'Isabel Coixet', 'Icíar Bollaín',
-  'Rodrigo Sorogoyen', 'Álex de la Iglesia', 'Fernando León de Aranoa', 'Carla Simón', 'Jonás Trueba',
-  'Paco Plaza', 'Albert Serra', 'Carlos Vermut', 'Alauda Ruiz de Azúa', 'Pilar Palomero',
-  'Víctor Erice', 'David Trueba', 'Cesc Gay', 'Fernando Trueba', 'Nacho Vigalondo',
-  'Paula Ortiz', 'Kike Maíllo', 'Oliver Laxe', 'Elena Martín', 'Alberto Rodríguez',
+// Curated "packs" of directors to follow, each surfaced with an "add all"
+// button in Favoritos → Descubrir (#9).
+const DIRECTOR_PACKS = [
+  {
+    key: 'spanish', emoji: '🇪🇸', accent: 'red',
+    title: 'Directores españoles',
+    description: 'Nombres imprescindibles y actuales del cine español.',
+    names: [
+      'Pedro Almodóvar', 'Alejandro Amenábar', 'J. A. Bayona', 'Isabel Coixet', 'Icíar Bollaín',
+      'Rodrigo Sorogoyen', 'Álex de la Iglesia', 'Fernando León de Aranoa', 'Carla Simón', 'Jonás Trueba',
+      'Paco Plaza', 'Albert Serra', 'Carlos Vermut', 'Alauda Ruiz de Azúa', 'Pilar Palomero',
+      'Víctor Erice', 'David Trueba', 'Cesc Gay', 'Fernando Trueba', 'Oliver Laxe',
+    ],
+  },
+  {
+    key: 'awarded', emoji: '🏆', accent: 'gold',
+    title: 'Premiados en grandes festivales',
+    description: 'Palmas, Leones y Osos recientes de Cannes, Venecia y Berlín, más ganadores del Óscar.',
+    names: [
+      'Bong Joon-ho', 'Hirokazu Kore-eda', 'Ruben Östlund', 'Justine Triet', 'Jonathan Glazer',
+      'Sean Baker', 'Christopher Nolan', 'Jacques Audiard', 'Yorgos Lanthimos', 'Lucrecia Martel',
+      'Cristian Mungiu', 'Michel Franco', 'Alice Rohrwacher', 'Aki Kaurismäki', 'Asghar Farhadi',
+      'Radu Jude', 'Pawel Pawlikowski', 'Kleber Mendonça Filho',
+    ],
+  },
+  {
+    key: 'emerging', emoji: '🌱', accent: 'emerald',
+    title: 'Directores emergentes',
+    description: 'Voces nuevas que están definiendo el cine de la última década.',
+    names: [
+      'Charlotte Wells', 'Celine Song', 'Julia Ducournau', 'Rose Glass', 'Robert Eggers',
+      'Ari Aster', 'Chloé Zhao', 'Emerald Fennell', 'Kogonada', 'Alice Diop',
+      'Coralie Fargeat', 'Jane Schoenbrun', 'RaMell Ross', 'Cooper Raiff', 'Zach Cregger',
+    ],
+  },
+  {
+    key: 'boxoffice', emoji: '💥', accent: 'sky',
+    title: 'Directores taquilleros',
+    description: 'Los que llenan salas y mueven la taquilla mundial.',
+    names: [
+      'James Cameron', 'Christopher Nolan', 'Denis Villeneuve', 'Greta Gerwig', 'Jordan Peele',
+      'Ryan Coogler', 'Matt Reeves', 'Taika Waititi', 'James Wan', 'Peter Jackson',
+      'Steven Spielberg', 'Ridley Scott', 'Sam Mendes', 'Guy Ritchie', 'Wes Anderson',
+      'Damien Chazelle',
+    ],
+  },
 ];
 
-/** Popular directors (TMDB) + important Spanish directors, with a tracked flag. */
+/** Curated director packs + directors "en boga" from TMDB, each with a tracked flag. */
 export async function suggestedPeople() {
   const trackedTmdb = new Set(
     db.prepare(`SELECT p.tmdb_id FROM tracked_people t JOIN people p ON p.id = t.person_id WHERE p.tmdb_id IS NOT NULL`)
@@ -560,30 +652,40 @@ export async function suggestedPeople() {
     knownFor: (p.known_for || []).map((k) => k.title || k.name).filter(Boolean).slice(0, 2),
   });
 
-  // popular people, filtered to directors ("en el candelero")
+  // popular people, filtered to directors ("en boga" según TMDB/IMDb)
   const popularRaw = [];
   for (const page of [1, 2, 3, 4]) {
     const data = await tmdbGet('/person/popular', { page }, { cacheKey: `person_popular:${page}:${lang()}`, cacheMs: DAY });
     for (const p of data.results || []) if (p.known_for_department === 'Directing') popularRaw.push(p);
   }
   const seen = new Set();
-  const popular = [];
+  const trending = [];
   for (const p of popularRaw.sort((a, b) => (b.popularity || 0) - (a.popularity || 0))) {
     if (seen.has(p.id)) continue;
     seen.add(p.id);
-    popular.push(mapP(p));
-    if (popular.length >= 24) break;
+    trending.push(mapP(p));
+    if (trending.length >= 20) break;
   }
 
-  // important Spanish directors (resolved + cached)
-  const spanish = [];
-  for (const name of SPANISH_DIRECTORS) {
-    try {
-      const info = await findPersonInfo(name, 'Directing');
-      if (info?.id) spanish.push({ tmdb_id: info.id, name: info.name || name, profile_path: info.profile_path || null, tracked: trackedTmdb.has(info.id) });
-    } catch {}
+  // resolve each curated pack (findPersonInfo is cached 30 days)
+  const packs = [];
+  for (const pack of DIRECTOR_PACKS) {
+    const people = [];
+    for (const name of pack.names) {
+      try {
+        const info = await findPersonInfo(name, 'Directing');
+        if (info?.id) people.push({ tmdb_id: info.id, name: info.name || name, profile_path: info.profile_path || null, tracked: trackedTmdb.has(info.id) });
+      } catch {}
+    }
+    if (people.length) packs.push({ key: pack.key, title: pack.title, emoji: pack.emoji, description: pack.description, accent: pack.accent, people });
   }
-  return { popular, spanish };
+  packs.push({
+    key: 'trending', title: 'Directores en boga', emoji: '🔥', accent: 'orange',
+    description: 'Los más populares ahora mismo según el ranking de TMDB/IMDb.', people: trending,
+  });
+
+  // keep `spanish`/`popular` keys for backward compatibility with older clients
+  return { packs, spanish: packs.find((p) => p.key === 'spanish')?.people || [], popular: trending };
 }
 
 /** Search TMDB people (to add anyone to favorites by typing). */

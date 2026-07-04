@@ -154,7 +154,7 @@ export default function Letterboxd() {
             </div>
           </Section>
 
-          <Section title="Tus notas de Letterboxd vs. Plex">
+          <Section title="Tus notas de Letterboxd vs. la comunidad">
             {summary.ratingCompare.length === 0 ? (
               <Empty>No hay valoraciones emparejadas.</Empty>
             ) : (
@@ -163,9 +163,9 @@ export default function Letterboxd() {
                   <thead>
                     <tr className="text-slate-500 text-left border-b border-ink-700">
                       <th className="py-2">Título</th><th>Año</th>
-                      <th className="text-right">Letterboxd</th>
-                      <th className="text-right">Plex (tú)</th>
-                      <th className="text-right">Audiencia</th>
+                      <th className="text-right">Tu nota</th>
+                      <th className="text-right">Comunidad LB</th>
+                      <th className="text-right">Σ MDBList</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -173,9 +173,9 @@ export default function Letterboxd() {
                       <tr key={m.rating_key} className="border-b border-ink-800">
                         <td className="py-1.5 text-slate-200">{m.title}</td>
                         <td className="text-slate-500">{m.year}</td>
-                        <td className="text-right text-orange-400">{m.lb?.toFixed(1)}</td>
-                        <td className="text-right text-gold-400">{m.plex ?? '—'}</td>
-                        <td className="text-right text-slate-400">{m.audience ?? '—'}</td>
+                        <td className="text-right text-gold-400">{m.lb?.toFixed(1)}</td>
+                        <td className="text-right text-orange-300">{m.community != null ? m.community.toFixed(1) : '—'}</td>
+                        <td className="text-right text-slate-400">{m.mdb_score ?? '—'}</td>
                       </tr>
                     ))}
                   </tbody>

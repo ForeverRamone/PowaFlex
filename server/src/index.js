@@ -8,17 +8,19 @@ import { db, DATA_DIR, getAllSettings, setSetting, getSetting } from './db.js';
 import { plexTest, plexConfig, runSync, syncStatus, movieSections } from './plex.js';
 import {
   tmdbTest,
-  filmography,
+  filmographyProfile,
   getCalendarCached,
   searchCollection,
   collectionDetails,
   enrichPeopleLife,
   tmdbPoster,
+  searchMovieId,
   tmdbMovieDetail,
   buildProgress,
   suggestedPeople,
   trackByTmdb,
   searchPeople,
+  findPersonInfo,
 } from './tmdb.js';
 import {
   radarrTest,
@@ -53,11 +55,12 @@ import {
   listMissingTmdbIds,
   deleteChallengeList,
   rematchLetterboxd,
+  resolveUnmatchedLb,
   letterboxdSummary,
 } from './letterboxd.js';
 import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
 import { availability, isUpgradeable } from './justwatch.js';
-import { scanSagas, sagaScanStatus, sagaScanState, sagaList, sagaComplete } from './saga.js';
+import { scanSagas, sagaScanStatus, sagaScanState, sagaList, sagaComplete, enrichSagaStats, sagaStatsStatus } from './saga.js';
 import * as q from './queries.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -152,12 +155,18 @@ app.get('/api/stats/charts', async () => q.charts());
 app.get('/api/stats/watch', async () => q.watchStats());
 app.get('/api/stats/recent', async () => {
   const base = q.dashboardRecent();
-  // fetch TMDB posters for recent watches not in the Plex library (#9)
+  // fetch TMDB posters for recent watches not in the Plex library (#2). Zip
+  // exports carry no TMDB id, so resolve it from title+year first (cached).
   if (getSetting('tmdb_key')) {
     await Promise.all(
       base.recentlyWatched
-        .filter((w) => !w.inLibrary && w.tmdb_id && !w.poster_path)
-        .map(async (w) => { w.poster_path = await tmdbPoster(w.tmdb_id); })
+        .filter((w) => !w.inLibrary && !w.poster_path)
+        .map(async (w) => {
+          try {
+            const id = w.tmdb_id || (await searchMovieId(w.title, w.year));
+            if (id) { w.tmdb_id = id; w.poster_path = await tmdbPoster(id); }
+          } catch {}
+        })
     );
   }
   let radarr = [];
@@ -208,13 +217,14 @@ app.get('/api/search', async (req) => {
 app.get('/api/people', async (req) => {
   return q.topPeople({
     role: req.query.role || 'director',
-    limit: Math.min(Number(req.query.limit) || 30, 200),
+    limit: Math.min(Number(req.query.limit) || 30, 500),
     offset: Number(req.query.offset) || 0,
     search: req.query.search || '',
     gender: req.query.gender || '',
     life: req.query.life || '',
     continent: req.query.continent || '',
     country: req.query.country || '',
+    hideDead: req.query.hideDead === '1',
   });
 });
 
@@ -245,8 +255,77 @@ app.get('/api/people/search-tmdb', async (req, reply) => {
 app.post('/api/tracked/tmdb', async (req, reply) => {
   try {
     const r = trackByTmdb(req.body || {});
+    // manual add re-allows automatic re-adds later (clears the ✕ block) (C)
+    if (r.personId) db.prepare('DELETE FROM unfollowed_people WHERE person_id = ?').run(r.personId);
     db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
     return r;
+  } catch (err) {
+    reply.code(400);
+    return { error: String(err.message || err) };
+  }
+});
+
+// add a pasted list of names (directors/actors) to favorites at once. This is an
+// explicit manual action, so it clears any ✕ block for each resolved person (C).
+app.post('/api/tracked/by-names', async (req, reply) => {
+  try {
+    const raw = String(req.body?.names || '');
+    const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : null;
+    const hint = role === 'director' ? 'Directing' : role === 'actor' ? 'Acting' : null;
+    const names = [...new Set(
+      raw.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean)
+    )].slice(0, 300);
+    if (!names.length) {
+      reply.code(400);
+      return { error: 'Pega al menos un nombre' };
+    }
+    let added = 0;
+    const notFound = [];
+    for (const name of names) {
+      try {
+        const info = await findPersonInfo(name, hint);
+        if (!info?.id) { notFound.push(name); continue; }
+        const before = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
+        const r = trackByTmdb({ tmdbId: info.id, name: info.name || name, profilePath: info.profile_path });
+        if (r.personId) db.prepare('DELETE FROM unfollowed_people WHERE person_id = ?').run(r.personId);
+        const after = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
+        if (after > before) added++;
+      } catch { notFound.push(name); }
+    }
+    if (added) db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
+    return { ok: true, added, total: names.length, notFound };
+  } catch (err) {
+    reply.code(400);
+    return { error: String(err.message || err) };
+  }
+});
+
+// add a whole pack of directors to favorites in one click (#9). Skips anyone the
+// user explicitly removed with the ✕ — those only come back via a manual add (C).
+app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
+  try {
+    const people = Array.isArray(req.body?.people) ? req.body.people : [];
+    if (!people.length) {
+      reply.code(400);
+      return { error: 'Faltan personas' };
+    }
+    const blocked = new Set(db.prepare('SELECT person_id FROM unfollowed_people').all().map((r) => r.person_id));
+    let added = 0;
+    let skipped = 0;
+    for (const p of people.slice(0, 200)) {
+      const tmdbId = p.tmdbId ?? p.tmdb_id;
+      // if this person is already known and blocked, don't re-add automatically
+      const existing = db.prepare('SELECT id FROM people WHERE tmdb_id = ?').get(tmdbId);
+      if (existing && blocked.has(existing.id)) { skipped++; continue; }
+      try {
+        const before = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
+        trackByTmdb({ tmdbId, name: p.name, profilePath: p.profilePath ?? p.profile_path });
+        const after = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
+        if (after > before) added++;
+      } catch {}
+    }
+    if (added) db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
+    return { ok: true, added, skipped, total: people.length };
   } catch (err) {
     reply.code(400);
     return { error: String(err.message || err) };
@@ -257,8 +336,8 @@ app.post('/api/tracked/tmdb', async (req, reply) => {
 
 app.get('/api/people/:id/filmography', async (req, reply) => {
   try {
-    const role = req.query.role || 'director';
-    return await filmography(Number(req.params.id), role);
+    const wantRole = ['director', 'actor', 'writer'].includes(req.query.role) ? req.query.role : null;
+    return await filmographyProfile(Number(req.params.id), wantRole);
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -356,7 +435,8 @@ app.post('/api/tracked/bulk', async (req, reply) => {
   const candidates = db
     .prepare(
       `SELECT p.id FROM movie_people mp JOIN people p ON p.id = mp.person_id
-       WHERE mp.role = ? GROUP BY p.id ORDER BY COUNT(*) DESC, p.name LIMIT ?`
+       WHERE mp.role = ? AND p.id NOT IN (SELECT person_id FROM unfollowed_people)
+       GROUP BY p.id ORDER BY COUNT(*) DESC, p.name LIMIT ?`
     )
     .all(role, Math.min(Number(top), 1000));
   const ins = db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at) VALUES (?, ?)');
@@ -370,9 +450,12 @@ app.post('/api/tracked/bulk', async (req, reply) => {
 });
 
 app.post('/api/tracked/:personId', async (req) => {
+  const id = Number(req.params.personId);
+  // a manual, explicit add clears any ✕ block (C)
+  db.prepare('DELETE FROM unfollowed_people WHERE person_id = ?').run(id);
   const r = db
     .prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at) VALUES (?, ?)')
-    .run(Number(req.params.personId), Date.now());
+    .run(id, Date.now());
   if (r.changes) invalidateCalendar();
   return { ok: true };
 });
@@ -382,7 +465,10 @@ app.delete('/api/tracked/all', async () => {
   return { ok: true };
 });
 app.delete('/api/tracked/:personId', async (req) => {
-  const r = db.prepare('DELETE FROM tracked_people WHERE person_id = ?').run(Number(req.params.personId));
+  const id = Number(req.params.personId);
+  const r = db.prepare('DELETE FROM tracked_people WHERE person_id = ?').run(id);
+  // remember the explicit ✕ so bulk/automatic adds skip this person (C)
+  db.prepare('INSERT OR IGNORE INTO unfollowed_people (person_id, at) VALUES (?, ?)').run(id, Date.now());
   if (r.changes) invalidateCalendar();
   return { ok: true };
 });
@@ -403,6 +489,12 @@ app.get('/api/tracked', async () =>
 
 // remove every deceased person from favorites in one go ("vivos y muertos")
 app.delete('/api/tracked/deceased', async () => {
+  // block them from automatic re-adds too (C)
+  db.prepare(
+    `INSERT OR IGNORE INTO unfollowed_people (person_id, at)
+     SELECT t.person_id, ? FROM tracked_people t JOIN people p ON p.id = t.person_id
+     WHERE p.deathday IS NOT NULL`
+  ).run(Date.now());
   const r = db
     .prepare(
       `DELETE FROM tracked_people WHERE person_id IN (
@@ -438,7 +530,11 @@ app.get('/api/discover/favorites', async (req, reply) => {
 
 app.get('/api/discover/absent', async (req, reply) => {
   try {
-    return await absentGreats({ perPerson: Math.min(Number(req.query.perPerson) || 6, 12), refresh: req.query.refresh === '1' });
+    return await absentGreats({
+      perPerson: Math.min(Number(req.query.perPerson) || 6, 12),
+      refresh: req.query.refresh === '1',
+      canon: ['alltime', '21c'].includes(req.query.canon) ? req.query.canon : 'alltime',
+    });
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -447,8 +543,14 @@ app.get('/api/discover/absent', async (req, reply) => {
 
 // --- sagas / franchises (from real TMDB collection membership) --------------
 
-app.get('/api/sagas', async () => ({ state: sagaScanState(), sagas: sagaList() }));
-app.get('/api/sagas/status', async () => sagaScanState());
+app.get('/api/sagas', async () => ({ state: sagaScanState(), statsStatus: sagaStatsStatus, sagas: sagaList() }));
+app.get('/api/sagas/status', async () => ({ ...sagaScanState(), statsStatus: sagaStatsStatus }));
+// compute per-franchise "missing" counts from TMDB (#H)
+app.post('/api/sagas/stats', async (req) => {
+  const force = !!req.body?.force;
+  if (!sagaStatsStatus.running) enrichSagaStats({ force }).catch(() => {});
+  return sagaStatsStatus;
+});
 app.post('/api/sagas/scan', async (req) => {
   const force = !!req.body?.force;
   // scan everything by default; the nightly job is the one that batches
@@ -722,6 +824,15 @@ app.delete('/api/letterboxd/lists/:id', async (req) => {
 
 app.get('/api/letterboxd/summary', async () => letterboxdSummary());
 app.post('/api/letterboxd/rematch', async () => rematchLetterboxd());
+// resolve still-unmatched watched entries via TMDB search, then link to library (#1)
+app.post('/api/letterboxd/resolve', async (req, reply) => {
+  try {
+    return await resolveUnmatchedLb();
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
 app.delete('/api/letterboxd', async () => {
   db.prepare('DELETE FROM lb_entries').run();
   return { ok: true };
@@ -826,6 +937,7 @@ setInterval(() => {
     setSetting('nightly_last_run', todayStr);
     runSync()
       .then(() => rematchLetterboxd())
+      .then(() => (getSetting('tmdb_key') ? resolveUnmatchedLb() : null))
       .then(() => getCalendarCached({ refresh: true }))
       .then(() => (getSetting('mdblist_key') ? syncRatings() : null))
       // pull recent watches from the Letterboxd RSS feed, if configured

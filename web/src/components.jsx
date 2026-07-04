@@ -1,7 +1,64 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, fmtDuration, tmdbImg, ratingLinks } from './api.js';
+import { api, fmtDuration, tmdbImg, ratingLinks, primaryRating } from './api.js';
 import { onToast, toast } from './toast.js';
+
+// Letterboxd's three-dot mark (orange/green/blue), used wherever we'd otherwise
+// write "LB" (#5).
+export function LetterboxdLogo({ size = 12, className = '' }) {
+  const r = size / 2;
+  return (
+    <svg width={size * 2.6} height={size} viewBox="0 0 130 50" className={className} aria-label="Letterboxd" role="img">
+      <circle cx="25" cy="25" r="24" fill="#00e054" />
+      <circle cx="65" cy="25" r="24" fill="#40bcf4" />
+      <circle cx="105" cy="25" r="24" fill="#ff8000" />
+      <circle cx="45" cy="25" r="24" fill="#40bcf4" opacity="0.85" />
+      <circle cx="85" cy="25" r="24" fill="#40bcf4" opacity="0.85" />
+    </svg>
+  );
+}
+
+// Headline rating chip on small poster cards, honouring the user's choice (#5).
+// Falls back to whatever rating exists so cards aren't blank.
+function PrimaryRating({ movie }) {
+  const pref = primaryRating();
+  const order = pref === 'imdb'
+    ? ['imdb', 'score', 'letterboxd']
+    : pref === 'letterboxd'
+      ? ['letterboxd', 'score', 'imdb']
+      : ['score', 'imdb', 'letterboxd'];
+  for (const src of order) {
+    if (src === 'score' && movie.mdb_score != null)
+      return <span className="text-gold-400 font-semibold">Σ {movie.mdb_score}</span>;
+    if (src === 'imdb' && movie.imdb != null)
+      return <span className="text-yellow-500">IMDb {Number(movie.imdb).toFixed(1)}</span>;
+    if (src === 'letterboxd' && movie.letterboxd != null)
+      return <span className="inline-flex items-center gap-1 text-slate-300"><LetterboxdLogo size={9} /> {Number(movie.letterboxd).toFixed(1)}</span>;
+  }
+  return null;
+}
+
+// Consistent status colours across the app (#3): 🟢 en Plex · 🟡 vista.
+export function StatusLegend({ className = '' }) {
+  return (
+    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400 ${className}`}>
+      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm border-2 border-emerald-500" /> En Plex</span>
+      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm border-2 border-ink-600" /> Te falta</span>
+      <span className="flex items-center gap-1.5"><span className="text-gold-400">★</span> Vista</span>
+      <span className="flex items-center gap-1.5"><span className="text-ink-500">★</span> Sin ver</span>
+    </div>
+  );
+}
+
+// Gold star = watched (Plex or Letterboxd); shown top-left on any poster.
+function WatchedStar({ watched }) {
+  if (!watched) return null;
+  return (
+    <span className="absolute top-1.5 left-1.5 bg-black/70 text-gold-400 text-[11px] leading-none px-1.5 py-1 rounded" title="Vista (Plex o Letterboxd)">
+      ★
+    </span>
+  );
+}
 
 // Global command palette: search movies + people, jump anywhere (#8).
 // Opens with Ctrl/Cmd+K or a window 'powaflex-search' event.
@@ -142,7 +199,7 @@ export function RatingsChips({ ratings, movie, className = '' }) {
   if (ratings.metacritic != null)
     chips.push(<Chip key="mc" href={links.metacritic} cls="bg-emerald-900/50 text-emerald-300 px-1.5 py-0.5 rounded">MC {ratings.metacritic}</Chip>);
   if (ratings.letterboxd != null)
-    chips.push(<Chip key="lb" href={links.letterboxd} cls="bg-orange-900/50 text-orange-300 px-1.5 py-0.5 rounded">LB {Number(ratings.letterboxd).toFixed(1)}</Chip>);
+    chips.push(<Chip key="lb" href={links.letterboxd} cls="bg-orange-900/40 text-orange-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1"><LetterboxdLogo size={9} /> {Number(ratings.letterboxd).toFixed(1)}</Chip>);
   if (ratings.score != null)
     chips.push(<Chip key="mdb" href={links.tmdb} cls="bg-ink-700 text-gold-400 px-1.5 py-0.5 rounded font-semibold">Σ {ratings.score}</Chip>);
   if (!chips.length) return null;
@@ -196,7 +253,7 @@ export function MovieCard({ movie, onClick }) {
       className="group text-left cursor-pointer w-full"
       title={`${movie.title} (${movie.year ?? '¿?'})`}
     >
-      <div className="aspect-[2/3] rounded-lg overflow-hidden bg-ink-800 border border-ink-700 group-hover:border-gold-400 transition-colors relative">
+      <div className="aspect-[2/3] rounded-lg overflow-hidden bg-ink-800 border border-emerald-600/70 group-hover:border-gold-400 transition-colors relative">
         {!imgError ? (
           <img
             src={`/img/${movie.rating_key}/poster`}
@@ -210,11 +267,7 @@ export function MovieCard({ movie, onClick }) {
             {movie.title}
           </div>
         )}
-        {movie.view_count > 0 && (
-          <span className="absolute top-1.5 right-1.5 bg-emerald-600/90 text-white text-[10px] px-1.5 py-0.5 rounded">
-            ✓
-          </span>
-        )}
+        <WatchedStar watched={movie.watched != null ? movie.watched : movie.view_count > 0} />
         {movie.resolution === '4k' && (
           <span className="absolute bottom-1.5 left-1.5 bg-black/70 text-gold-400 text-[10px] px-1.5 py-0.5 rounded font-semibold">
             4K
@@ -227,10 +280,9 @@ export function MovieCard({ movie, onClick }) {
         )}
       </div>
       <div className="mt-1.5 text-xs text-slate-300 truncate">{movie.title}</div>
-      <div className="text-[11px] text-slate-500 flex gap-2">
+      <div className="text-[11px] text-slate-500 flex gap-2 items-center">
         <span>{movie.year ?? '—'}</span>
-        {movie.audience_rating != null && <span>★ {Number(movie.audience_rating).toFixed(1)}</span>}
-        {movie.user_rating != null && <span className="text-gold-400">Tú: {Number(movie.user_rating).toFixed(1)}</span>}
+        <PrimaryRating movie={movie} />
       </div>
     </button>
   );
@@ -256,6 +308,7 @@ export function TmdbCard({ item, badge, children }) {
             {item.title}
           </div>
         )}
+        <WatchedStar watched={item.watched} />
         {badge}
       </button>
       <div className="mt-1.5 text-xs text-slate-300 truncate" title={item.title}>
@@ -441,7 +494,7 @@ export function useRadarrIds() {
 
 // Shorts / documentaries / TV-movie visibility toggles, persisted. Defaults to
 // hidden (the completist wants features first). `key` scopes the storage.
-const TYPE_DEFAULTS = { shorts: false, docs: false, tv: false };
+const TYPE_DEFAULTS = { shorts: false, docs: false, tv: false, coral: false };
 
 export function useTypeFilters(key = 'type_filters') {
   const [show, setShow] = useState(() => {
@@ -460,7 +513,8 @@ export function useTypeFilters(key = 'type_filters') {
 }
 
 export const matchesTypeFilters = (item, show) =>
-  (show.shorts || !item.isShort) && (show.docs || !item.isDocumentary) && (show.tv || !item.isTvMovie);
+  (show.shorts || !item.isShort) && (show.docs || !item.isDocumentary) &&
+  (show.tv || !item.isTvMovie) && (show.coral || !item.isCoral);
 
 export function TypeFilterBar({ show, toggle, counts }) {
   return (
@@ -470,7 +524,8 @@ export function TypeFilterBar({ show, toggle, counts }) {
         ['shorts', 'Cortos', counts?.shorts],
         ['docs', 'Documentales', counts?.docs],
         ['tv', 'Películas de TV', counts?.tv],
-      ].map(([k, label, n]) => (
+        ['coral', 'Dirección coral', counts?.coral],
+      ].filter(([, , n]) => n == null || n > 0).map(([k, label, n]) => (
         <button
           key={k}
           onClick={() => toggle(k)}
@@ -610,8 +665,7 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
                 {owned?.resolution && <span className="text-slate-300">{owned.resolution.toUpperCase?.() || owned.resolution}</span>}
                 {owned?.hdr && <span className="text-sky-300">{owned.hdr}</span>}
                 {owned?.video_codec && <span>{owned.video_codec}</span>}
-                {owned?.user_rating != null && <span className="text-gold-400">Tu nota: {owned.user_rating}</span>}
-                {owned?.view_count > 0 && <span className="text-emerald-400">Vista {owned.view_count}×</span>}
+                {owned?.view_count > 0 && <span className="text-gold-400">★ Vista {owned.view_count}×</span>}
               </div>
               <RatingsChips ratings={vm.ratings} movie={vm} className="mt-2" />
               {vm.overview && <p className="text-sm text-slate-300 mt-3 leading-relaxed">{vm.overview}</p>}

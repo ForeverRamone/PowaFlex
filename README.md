@@ -2,7 +2,7 @@
 
 # 🎬 PowaFlex
 
-> **Alpha 0.4** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
+> **Alpha 0.5** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
 > de filmografías, calendario de estrenos venideros conectado a TMDB y envío directo a Radarr.
 
 PowaFlex es tu centro de mando cinéfilo. Vive junto a tu servidor Plex (en Docker), lee tu
@@ -18,14 +18,14 @@ cuentas ni telemetría.
 | Sección | Qué encuentras |
 |---|---|
 | 📊 **Dashboard** | Totales (películas, horas, disco, vistas) y gráficas por década, género, país y resolución, más el ritmo de crecimiento de la biblioteca y tus tops. |
-| 🎞️ **Biblioteca** | Toda la colección en parrilla de pósters con filtros estilo Letterboxd: género, país, década, visto/sin ver, largo/corto (<40 min), resolución, HDR/Dolby Vision, nota mínima… y 11 ordenaciones (incluido aleatorio). |
-| 🎭 **Directores y actores** | Ranking por presencia, con filtros por género, vivo/fallecido, continente y país. Cada ficha cruza la filmografía de TMDB con lo que tienes: % de completismo, lo que falta (botón **+ Radarr**) y proyectos anunciados. |
-| 🗓️ **Cine venidero** | Calendario mensual de estrenos y proyectos anunciados de tus directores/actores top y favoritos, con envío a Radarr en un clic. |
-| ⭐ **Favoritos** | Ranking por nº de títulos con añadido en bloque, sugerencias de directores (españoles y del candelero) y añadir a cualquiera tecleando. Alimentan el calendario y el auto-Radarr. |
-| 🧭 **Descubrir huecos** | Lo que te falta de tus favoritos y de tus filmografías top, más un canon de ~110 grandes directores para detectar ausencias en tu servidor. Con buscador de personas y actualización bajo demanda. |
+| 🎞️ **Biblioteca** | Toda la colección en parrilla de pósters con código de color (🟢 en Plex · ★ vista) y filtros estilo Letterboxd: género, país, década, visto/sin ver, largo/corto (<40 min), resolución, HDR/Dolby Vision, notas mínimas de IMDb/RT/Letterboxd… y ordenaciones por cualquiera de esas notas (incluido aleatorio). La nota que sale en cada póster es configurable (IMDb, Letterboxd o la combinada de MDBList). |
+| 🎭 **Directores/as y actores/actrices** | Ranking por presencia, con filtros por género, vivo/fallecido, continente y país. Cada ficha cruza la filmografía de TMDB con lo que tienes: % de completismo (solo largometrajes, con filtros para cortos, documentales, TV y dirección coral), lo que falta (botón **+ Radarr**) y proyectos anunciados. Quien dirige **y** actúa tiene dos barras (director/a y actor/actriz). |
+| 🗓️ **Cine venidero** | Calendario mensual de estrenos y proyectos anunciados de tus directores/as y actores/actrices top y favoritos, con envío a Radarr en un clic. |
+| ⭐ **Favoritos** | Ranking paginado por nº de títulos (con filtro de fallecidos y actualización de estado vital), paquetes temáticos de directores/as (españoles, premiados en festivales, emergentes, taquilleros, en boga) con **«añadir todos»**, pegar una lista de nombres separados por comas o líneas, y añadir a cualquiera tecleando. Alimentan el calendario y el auto-Radarr. |
+| 🧭 **Descubrir huecos** | Lo que te falta de tus favoritos y de tus filmografías top, más los canon de directores/as de **They Shoot Pictures** (Top 250 de siempre y Top 100 del siglo XXI) para detectar ausencias en tu servidor. Con buscador de personas y actualización bajo demanda. |
 | 🏆 **Listas y retos** | Listas de MDBList y **retos de Letterboxd** con anillos concéntricos de «lo que tengo» vs «lo que he visto», ocultar los que no te interesen y envío en bloque a Radarr. |
 | 📚 **Sagas** | Detecta franquicias desde la colección real de TMDB de cada película: qué partes te faltan o están por estrenar, con envío a Radarr. |
-| 👁️ **Visionado** | Visto vs. pendiente (Plex + Letterboxd) por década y género, directores con obra pendiente, mejor valoradas sin ver. |
+| 👁️ **Visionado** | Contador de lo que llevas visto (Plex + Letterboxd, con lo que aún no cuadra con tu biblioteca), visto vs. pendiente por década y género, directores/as con obra pendiente, joyas y discrepancias frente a tu nota de Letterboxd, y mejor valoradas sin ver. |
 | 💾 **Calidad y disco** | Resoluciones, códecs, HDR, candidatas a upgrade (buenas películas por debajo de 1080p) con comprobación en **JustWatch** de si existe versión de más calidad, duplicados y archivos más pesados. |
 | 🟠 **Letterboxd** | Importa el **.zip completo** del export (diario, notas, vistas, watchlist y listas) o el **feed RSS** de tu usuario, y lo cruza con Plex. |
 

@@ -1,5 +1,30 @@
 # Changelog
 
+## Alpha 0.5 (0.5.0-alpha) — 2026-07-05
+
+- **Fuera las notas de Plex**: se retiran de toda la app la nota de audiencia (★) y tu nota personal
+  de Plex. Tu «nota» pasa a ser la de **Letterboxd**, que es la que usan los insights de Visionado.
+- **Nota de portada configurable**: elige en Ajustes qué nota aparece en cada póster pequeño (IMDb,
+  Letterboxd o la combinada de MDBList, por defecto). El «LB» pasa a ser el minilogo de Letterboxd.
+- **Sistema visual de estado**: código de color consistente en las tarjetas — 🟢 en Plex, borde neutro
+  te falta, ★ dorada vista (Plex o Letterboxd), con leyenda.
+- **Visionado**: contador de lo que llevas visto (Plex + Letterboxd, con lo que aún no cuadra con tu
+  biblioteca) y botón para **reemparejar por TMDB** las vistas/listas que fallan por idioma del título.
+- **Últimas vistas**: las de solo-Letterboxd (aún no en tu servidor) muestran carátula de TMDB.
+- **Completismo de dirección**: cuenta solo largometrajes (fuera cortos, TV y documentales salvo
+  documentalistas), con filtro nuevo de **dirección coral** (3+ directores). Quien dirige y actúa
+  muestra **dos barras** (director/a y actor/actriz) y se puede cambiar entre ellas.
+- **Favoritos**: paquetes temáticos de directores/as con **«añadir todos»**, **pegar una lista** de
+  nombres (por comas o líneas), ranking paginado (sin tope de 200) con filtro de fallecidos y
+  actualización de estado vital. Lo que quitas con la ✕ ya no vuelve por añadidos masivos (solo a
+  mano). Las pestañas Directores/as y Actores/actrices ya no mezclan roles. Guionistas lista solo a
+  quienes no dirigen.
+- **Descubrir huecos**: el canon de «grandes ausentes» pasa a los de **They Shoot Pictures, Don't
+  They?** — Top 250 de siempre y Top 100 del siglo XXI (conmutables) — y detecta la posesión por las
+  películas (TMDB id / título+año), no por el nombre.
+- **Sagas**: muestran cuántas y cuáles partes te faltan sin abrir cada una.
+- **Lenguaje inclusivo** en las etiquetas de la interfaz (directores/as, actores/actrices).
+
 ## Alpha 0.4 (0.4.0-alpha) — 2026-07-04
 
 - **Vistas combinadas**: el recuento de «vistas» (Dashboard y Visionado) suma Plex + Letterboxd

@@ -1,23 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid } from '../components.jsx';
+import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid, StatusLegend } from '../components.jsx';
 
 const SORT_OPTIONS = [
   ['added', 'Añadida (reciente)'],
   ['release', 'Estreno (reciente)'],
   ['release_asc', 'Estreno (antigua)'],
   ['title', 'Título'],
-  ['rating', 'Nota audiencia'],
-  ['user_rating', 'Tu nota'],
   ['runtime', 'Duración (larga)'],
   ['runtime_asc', 'Duración (corta)'],
   ['size', 'Tamaño en disco'],
   ['last_viewed', 'Vista recientemente'],
+  ['mdb_score', 'Nota combinada (MDBList)'],
   ['imdb', 'Nota IMDb'],
   ['rt_critic', 'RT crítica'],
   ['letterboxd', 'Nota Letterboxd'],
-  ['mdb_score', 'Nota combinada (MDBList)'],
   ['random', 'Aleatorio 🎲'],
 ];
 
@@ -92,7 +90,7 @@ export default function Library() {
   // active filters (everything but the free-text search and the sort/paging)
   const FILTER_LABELS = {
     genres: 'Género', countries: 'País', decade: 'Década', watched: 'Visionado', length: 'Metraje',
-    resolution: 'Resolución', hdr: 'HDR', ratingMin: 'Nota', imdbMin: 'IMDb', rtMin: 'RT', lbMin: 'LB', personId: 'Persona',
+    resolution: 'Resolución', hdr: 'HDR', imdbMin: 'IMDb', rtMin: 'RT', lbMin: 'LB', personId: 'Persona',
   };
   const VALUE_LABELS = { yes: 'Vistas', no: 'Sin ver', feature: 'Largometraje', short: 'Corto', hdr: 'HDR/DV', dv: 'Dolby Vision', sdr: 'SDR' };
   const activeKeys = Object.keys(q).filter((k) => FILTER_LABELS[k] && q[k]);
@@ -114,6 +112,7 @@ export default function Library() {
         )}
         {data && <span className="text-sm text-slate-400 ml-auto">{data.total.toLocaleString('es-ES')} películas</span>}
       </div>
+      <StatusLegend className="mb-3" />
 
       {(activeKeys.length > 0 || q.search) && (
         <div className="flex flex-wrap gap-1.5 mb-3">
@@ -146,8 +145,6 @@ export default function Library() {
             options={filters.resolutions.map((r) => [r.name, `${r.name} (${r.n})`])} />
           <Select value={q.hdr || ''} onChange={(v) => set('hdr', v)} placeholder="HDR/SDR"
             options={[['hdr', 'Con HDR o DV'], ['dv', 'Solo Dolby Vision'], ['sdr', 'Solo SDR']]} />
-          <Select value={q.ratingMin || ''} onChange={(v) => set('ratingMin', v)} placeholder="Nota mínima"
-            options={[6, 7, 8].map((n) => [String(n), `★ ${n}+`])} />
           <Select value={q.imdbMin || ''} onChange={(v) => set('imdbMin', v)} placeholder="IMDb mín."
             options={[['6', 'IMDb 6+'], ['7', 'IMDb 7+'], ['8', 'IMDb 8+']]} />
           <Select value={q.rtMin || ''} onChange={(v) => set('rtMin', v)} placeholder="RT crítica mín."

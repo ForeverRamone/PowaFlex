@@ -102,6 +102,13 @@ CREATE TABLE IF NOT EXISTS tracked_people (
   added_at INTEGER
 );
 
+-- People the user explicitly removed from favorites with the "✕". Bulk/automatic
+-- add operations (top-N, packs) skip these; a manual single add clears the block.
+CREATE TABLE IF NOT EXISTS unfollowed_people (
+  person_id INTEGER PRIMARY KEY,
+  at INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS lb_entries (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   list TEXT,             -- diary | ratings | watched | watchlist
@@ -204,6 +211,18 @@ CREATE TABLE IF NOT EXISTS movie_saga (
   scanned_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_saga_coll ON movie_saga(collection_id);
+
+-- Per-franchise completeness (released/owned/missing), so the Sagas list can show
+-- what you're missing without opening each one. Filled from TMDB collection data.
+CREATE TABLE IF NOT EXISTS saga_stats (
+  collection_id INTEGER PRIMARY KEY,
+  released INTEGER,
+  owned INTEGER,
+  missing INTEGER,
+  upcoming INTEGER,
+  missing_titles TEXT,
+  fetched_at INTEGER
+);
 `);
 
 // --- lightweight migrations (add columns to pre-existing tables) --------------

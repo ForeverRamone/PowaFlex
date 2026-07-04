@@ -218,34 +218,37 @@ export async function enrichWithScores(items, { fetchMissing = true, maxFetch = 
 
 export function insights() {
   const all = (sql) => db.prepare(sql).all();
+  // "Your rating" is your Letterboxd rating (0–5) scaled to 0–10 — the Plex
+  // personal rating was removed in v0.5.
+  const MINE = `(SELECT MAX(rating) * 2 FROM lb_entries WHERE movie_id = m.rating_key AND rating IS NOT NULL)`;
   return {
     // you love them, critics don't
     hiddenGems: all(
-      `SELECT m.rating_key, m.title, m.year, m.thumb, m.user_rating, r.rt_critic, r.imdb, r.letterboxd
+      `SELECT m.rating_key, m.title, m.year, m.thumb, ${MINE} AS my_rating, r.rt_critic, r.imdb, r.letterboxd, r.score AS mdb_score
        FROM movies m JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
-       WHERE m.user_rating >= 8 AND r.rt_critic IS NOT NULL AND r.rt_critic <= 55
-       ORDER BY m.user_rating DESC, r.rt_critic ASC LIMIT 24`
+       WHERE ${MINE} >= 8 AND r.rt_critic IS NOT NULL AND r.rt_critic <= 55
+       ORDER BY my_rating DESC, r.rt_critic ASC LIMIT 24`
     ),
     // critical consensus you haven't watched
     consensusUnwatched: all(
-      `SELECT m.rating_key, m.title, m.year, m.thumb, r.rt_critic, r.metacritic, r.imdb, r.score
+      `SELECT m.rating_key, m.title, m.year, m.thumb, r.rt_critic, r.metacritic, r.imdb, r.letterboxd, r.score AS mdb_score, r.score
        FROM movies m JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
        WHERE (m.view_count IS NULL OR m.view_count = 0) AND r.score IS NOT NULL
        ORDER BY r.score DESC LIMIT 24`
     ),
     // the world loves them, you don't
     overrated: all(
-      `SELECT m.rating_key, m.title, m.year, m.thumb, m.user_rating, r.score, r.imdb, r.rt_audience
+      `SELECT m.rating_key, m.title, m.year, m.thumb, ${MINE} AS my_rating, r.score, r.imdb, r.letterboxd, r.score AS mdb_score, r.rt_audience
        FROM movies m JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
-       WHERE m.user_rating IS NOT NULL AND m.user_rating <= 5 AND r.score >= 75
+       WHERE ${MINE} IS NOT NULL AND ${MINE} <= 5 AND r.score >= 75
        ORDER BY r.score DESC LIMIT 24`
     ),
-    // your taste vs letterboxd community
+    // your taste vs the letterboxd community
     letterboxdDivergence: all(
-      `SELECT m.rating_key, m.title, m.year, m.thumb, m.user_rating, r.letterboxd,
-              ABS(m.user_rating - r.letterboxd * 2) AS diff
+      `SELECT m.rating_key, m.title, m.year, m.thumb, ${MINE} AS my_rating, r.letterboxd, r.imdb, r.score AS mdb_score,
+              ABS(${MINE} - r.letterboxd * 2) AS diff
        FROM movies m JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
-       WHERE m.user_rating IS NOT NULL AND r.letterboxd IS NOT NULL AND ABS(m.user_rating - r.letterboxd * 2) >= 3
+       WHERE ${MINE} IS NOT NULL AND r.letterboxd IS NOT NULL AND ABS(${MINE} - r.letterboxd * 2) >= 3
        ORDER BY diff DESC LIMIT 24`
     ),
   };

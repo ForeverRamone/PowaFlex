@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend,
 } from 'recharts';
 import { api, fmtBytes, fmtDate, tmdbImg } from '../api.js';
-import { Spinner, StatCard, Section, PersonCard, Empty, MovieModal } from '../components.jsx';
+import { Spinner, StatCard, Section, PersonCard, Empty, MovieModal, LetterboxdLogo } from '../components.jsx';
 
 const GOLD = '#e8b53a';
 const COLORS = ['#e8b53a', '#38bdf8', '#34d399', '#f472b6', '#a78bfa', '#fb923c', '#f87171', '#94a3b8'];
@@ -54,7 +54,7 @@ function RecentStrip({ items, onSelect, kind }) {
           onClick={() => m.rating_key && onSelect(m.rating_key)}
           badge={
             kind === 'watched' && m.source === 'letterboxd' ? (
-              <span className="absolute top-1 right-1 bg-orange-600/90 text-white text-[9px] px-1 py-0.5 rounded">LB</span>
+              <span className="absolute top-1 right-1 bg-black/70 px-1 py-1 rounded" title="Vista en Letterboxd"><LetterboxdLogo size={9} /></span>
             ) : kind === 'watched' && m.source === 'plex' ? (
               <span className="absolute top-1 right-1 bg-emerald-600/90 text-white text-[9px] px-1 py-0.5 rounded">Plex</span>
             ) : null
@@ -112,7 +112,7 @@ export default function Dashboard() {
         <StatCard label="Horas de cine" value={ov.hours.toLocaleString('es-ES')} sub={`≈ ${Math.round(ov.hours / 24)} días`} />
         <StatCard label="En disco" value={fmtBytes(ov.sizeBytes)} />
         <StatCard label="Vistas" value={ov.watched.toLocaleString('es-ES')} sub={`${Math.round((ov.watched / ov.movies) * 100)}% de la biblioteca`} />
-        <StatCard label="Directores" value={ov.directors.toLocaleString('es-ES')} />
+        <StatCard label="Directores/as" value={ov.directors.toLocaleString('es-ES')} />
         <StatCard label="En 4K" value={ov.fourK.toLocaleString('es-ES')} />
       </div>
 
@@ -214,7 +214,7 @@ export default function Dashboard() {
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Section
-          title="Directores con más películas"
+          title="Directores/as con más películas"
           action={<Link to="/personas" className="text-xs text-gold-400 hover:underline">Ver todos →</Link>}
         >
           <div className="grid sm:grid-cols-2 gap-2">
@@ -222,7 +222,7 @@ export default function Dashboard() {
           </div>
         </Section>
         <Section
-          title="Actores con más películas"
+          title="Actores/actrices con más películas"
           action={<Link to="/personas?role=actor" className="text-xs text-gold-400 hover:underline">Ver todos →</Link>}
         >
           <div className="grid sm:grid-cols-2 gap-2">

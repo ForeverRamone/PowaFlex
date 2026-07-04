@@ -8,8 +8,8 @@ import {
 
 const TABS = [
   ['favorites', '⭐ Tus favoritos'],
-  ['director', 'Directores top'],
-  ['actor', 'Actores top'],
+  ['director', 'Directores/as top'],
+  ['actor', 'Actores/actrices top'],
   ['absent', 'Grandes ausentes'],
 ];
 
@@ -92,29 +92,51 @@ function GapsView({ endpoint, role, radarrIds, addRadarrId, show, toggle, intro 
   );
 }
 
+const CANONS = [
+  ['alltime', 'Top 250 de siempre', 'https://theyshootpictures.com/gf1000_top250directors.htm'],
+  ['21c', 'Top 100 del siglo XXI', 'https://theyshootpictures.com/21stcentury_top100directors.htm'],
+];
+
 function AbsentView({ radarrIds, addRadarrId }) {
+  const [canon, setCanon] = useState('alltime');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = (refresh = false) => {
+    setError(null);
     if (refresh) setRefreshing(true);
-    api(`/discover/absent${refresh ? '?refresh=1' : ''}`).then((d) => {
+    else setData(null);
+    api(`/discover/absent?canon=${canon}${refresh ? '&refresh=1' : ''}`).then((d) => {
       setRefreshing(false);
       if (d.error) setError(d.error);
       else setData(d);
     });
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [canon]);
 
-  if (error) return <ErrorBox error={`${error} — comprueba la API key de TMDB en Ajustes.`} />;
-  if (!data) return <Spinner label="Comprobando el canon de grandes directores contra tu Plex…" />;
+  const canonUrl = CANONS.find(([k]) => k === canon)?.[2];
 
   return (
     <div>
+      <div className="flex gap-2 mb-3">
+        {CANONS.map(([k, label]) => (
+          <button key={k} onClick={() => setCanon(k)} className={`btn-ghost !py-1 text-sm ${canon === k ? '!border-gold-400 text-gold-400' : ''}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {error ? (
+        <ErrorBox error={`${error} — comprueba la API key de TMDB en Ajustes.`} />
+      ) : !data ? (
+        <Spinner label="Comprobando el canon de grandes directores/as contra tu Plex…" />
+      ) : (
+      <>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
         <p className="text-sm text-slate-500">
-          De un canon de {data.checked} grandes directores del cine mundial,{' '}
+          Del canon de {data.checked} grandes directores/as de{' '}
+          <a href={canonUrl} target="_blank" rel="noreferrer" className="underline hover:text-gold-400">They Shoot Pictures</a>,{' '}
           <b className="text-gold-400">{data.absent.length} no tienen ni una película en tu Plex</b> ({data.present.length} sí están).
         </p>
         <button className="btn-ghost !py-1 shrink-0" onClick={() => load(true)} disabled={refreshing}>
@@ -160,6 +182,8 @@ function AbsentView({ radarrIds, addRadarrId }) {
             ))}
           </div>
         </details>
+      )}
+      </>
       )}
     </div>
   );

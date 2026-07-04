@@ -35,24 +35,41 @@ function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
 }
 
 const ROLES = [
-  ['director', 'Directores'],
-  ['actor', 'Actores'],
+  ['director', 'Directores/as'],
+  ['actor', 'Actores/actrices'],
   ['writer', 'Guionistas'],
 ];
+
+// accent palette per curated pack (#9)
+const ACCENTS = {
+  red: { border: 'border-red-500', bg: 'bg-red-500/15', text: 'text-red-300' },
+  gold: { border: 'border-gold-400', bg: 'bg-gold-400/15', text: 'text-gold-400' },
+  emerald: { border: 'border-emerald-500', bg: 'bg-emerald-500/15', text: 'text-emerald-300' },
+  sky: { border: 'border-sky-500', bg: 'bg-sky-500/15', text: 'text-sky-300' },
+  orange: { border: 'border-orange-500', bg: 'bg-orange-500/15', text: 'text-orange-300' },
+};
 
 export default function Favorites() {
   const [tracked, setTracked] = useState(null);
   const [role, setRole] = useState('director');
-  const [ranking, setRanking] = useState(null);
+  const [rankItems, setRankItems] = useState(null);
+  const [rankMore, setRankMore] = useState(false);
+  const [hideDead, setHideDead] = useState(false);
+  const [lifeMsg, setLifeMsg] = useState('');
+  const [updatingLife, setUpdatingLife] = useState(false);
   const [topN, setTopN] = useState(10);
   const [flash, setFlash] = useState('');
-  const [rankLimit, setRankLimit] = useState(50);
   const [favView, setFavView] = useState('all'); // all | director | actor
   const [tab, setTab] = useState('mine'); // mine | discover
   const [suggest, setSuggest] = useState(null);
   const [pq, setPq] = useState('');
   const [presults, setPresults] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [packBusy, setPackBusy] = useState(null);
+  const [bulkNames, setBulkNames] = useState('');
+  const [bulkRole, setBulkRole] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
 
   const loadTracked = () => api('/tracked').then((r) => setTracked(Array.isArray(r) ? r : []));
   useEffect(() => {
@@ -70,6 +87,29 @@ export default function Favorites() {
     const t = (tracked || []).find((x) => x.tmdb_id === p.tmdb_id);
     if (t) { await api(`/tracked/${t.id}`, { method: 'DELETE' }); toast(`${p.name} quitado de favoritos`); loadTracked(); }
   };
+  const addByNames = async () => {
+    if (!bulkNames.trim()) return;
+    setBulkBusy(true);
+    setBulkResult(null);
+    const res = await api('/tracked/by-names', { method: 'POST', body: { names: bulkNames, role: bulkRole || null } });
+    setBulkBusy(false);
+    if (res.ok) {
+      setBulkResult(res);
+      toast(`⭐ ${res.added} añadidos a favoritos`, 'success');
+      setBulkNames('');
+      loadTracked();
+    } else toast(`⚠️ ${res.error || 'error'}`, 'error');
+  };
+  const addPack = async (pack) => {
+    setPackBusy(pack.key);
+    const res = await api('/tracked/tmdb-bulk', {
+      method: 'POST',
+      body: { people: pack.people.map((p) => ({ tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path })) },
+    });
+    setPackBusy(null);
+    if (res.ok) { toast(`⭐ ${res.added} de «${pack.title}» añadidos a favoritos`, 'success'); loadTracked(); }
+    else toast(`⚠️ ${res.error || 'error'}`, 'error');
+  };
   const searchPeople = async (e) => {
     e.preventDefault();
     if (!pq.trim()) return;
@@ -79,10 +119,27 @@ export default function Favorites() {
     setPresults(Array.isArray(r) ? r : []);
   };
 
-  useEffect(() => {
-    setRanking(null);
-    api(`/people?role=${role}&limit=${rankLimit}`).then((r) => setRanking(Array.isArray(r) ? r : []));
-  }, [role, rankLimit]);
+  const RANK_PAGE = 100;
+  const loadRanking = (reset = true) => {
+    const offset = reset ? 0 : rankItems?.length || 0;
+    if (reset) setRankItems(null);
+    api(`/people?role=${role}&limit=${RANK_PAGE}&offset=${offset}&hideDead=${hideDead ? '1' : '0'}`).then((r) => {
+      const arr = Array.isArray(r) ? r : [];
+      setRankItems((prev) => (reset ? arr : [...(prev || []), ...arr]));
+      setRankMore(arr.length === RANK_PAGE);
+    });
+  };
+  useEffect(() => { loadRanking(true); }, [role, hideDead]);
+
+  const updateLife = async () => {
+    setUpdatingLife(true);
+    setLifeMsg('Consultando fechas de nacimiento/fallecimiento en TMDB…');
+    const r = await api('/people/life-sync', { method: 'POST' });
+    setUpdatingLife(false);
+    setLifeMsg(r.error ? `✗ ${r.error}` : `✓ ${r.done} actualizadas · ${r.deceased} fallecidos/as detectados/as`);
+    loadRanking(true);
+    loadTracked();
+  };
 
   const trackedIds = new Set((tracked || []).map((t) => t.id));
 
@@ -117,13 +174,23 @@ export default function Favorites() {
   if (!tracked) return <Spinner />;
   const deceasedCount = tracked.filter((t) => t.deathday).length;
   const primaryRole = (t) => ((t.directed || 0) >= (t.acted || 0) ? 'director' : 'actor');
-  const shownFavs = tracked.filter((t) => favView === 'all' || primaryRole(t) === favView);
+  // don't mix roles (D): each tab shows only the matching role's films/count.
+  // People with no library titles yet (added from TMDB) are treated as directors.
+  const isDir = (t) => (t.directed || 0) > 0 || (t.acted || 0) === 0;
+  const isAct = (t) => (t.acted || 0) > 0;
+  const favRole = (t) => (favView === 'actor' ? 'actor' : favView === 'director' ? 'director' : primaryRole(t));
+  const shownFavs = tracked.filter((t) => (favView === 'all' ? true : favView === 'director' ? isDir(t) : isAct(t)));
+  const favCounts = {
+    all: tracked.length,
+    director: tracked.filter(isDir).length,
+    actor: tracked.filter(isAct).length,
+  };
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-100 mb-2">Favoritos</h1>
       <p className="text-sm text-slate-500 mb-4 max-w-3xl">
-        Tus directores y actores de cabecera. Todos los favoritos entran <b>siempre</b> en el calendario de{' '}
+        Tus directores/as y actores/actrices de cabecera. Todos los favoritos entran <b>siempre</b> en el calendario de{' '}
         <Link to="/calendario" className="text-gold-400 hover:underline">Cine venidero</Link> (además del top
         automático que configures en Ajustes).
       </p>
@@ -160,6 +227,42 @@ export default function Favorites() {
       </div>
       )}
 
+      {/* add a whole pasted list of names at once */}
+      {tab === 'discover' && (
+      <div className="card p-4 mb-6">
+        <h2 className="font-semibold text-slate-100 mb-1">Añadir una lista de nombres</h2>
+        <p className="text-xs text-slate-500 mb-3 max-w-2xl">
+          Pega directores/as y/o actores/actrices, <b>separados por comas o uno por línea</b>. PowaFlex los busca en
+          TMDB y los añade todos de una vez a tus favoritos.
+        </p>
+        <textarea
+          className="input !h-28 font-mono text-xs leading-relaxed"
+          placeholder={'Pedro Almodóvar, Céline Sciamma\nHirokazu Kore-eda\nGreta Gerwig'}
+          value={bulkNames}
+          onChange={(e) => setBulkNames(e.target.value)}
+        />
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <span className="text-xs text-slate-400">Si hay ambigüedad, priorizar:</span>
+          <select className="input !w-auto !py-1 text-sm" value={bulkRole} onChange={(e) => setBulkRole(e.target.value)}>
+            <option value="">Automático</option>
+            <option value="director">Dirección</option>
+            <option value="actor">Interpretación</option>
+          </select>
+          <button className="btn-gold shrink-0" onClick={addByNames} disabled={bulkBusy || !bulkNames.trim()}>
+            {bulkBusy ? 'Añadiendo…' : '⭐ Añadir todos'}
+          </button>
+        </div>
+        {bulkResult && (
+          <div className="text-xs text-slate-400 mt-2">
+            ✓ {bulkResult.added} añadidos de {bulkResult.total}.
+            {bulkResult.notFound?.length > 0 && (
+              <span className="text-orange-300"> No encontrados en TMDB: {bulkResult.notFound.join(', ')}.</span>
+            )}
+          </div>
+        )}
+      </div>
+      )}
+
       {/* add anyone by typing (#3) */}
       {tab === 'discover' && (
       <div className="card p-4 mb-6">
@@ -180,23 +283,35 @@ export default function Favorites() {
       </div>
       )}
 
-      {/* suggested directors (#1) */}
-      {tab === 'discover' && suggest && (
-        <div className="mb-8 space-y-6">
-          {suggest.spanish?.length > 0 && (
-            <Section title="🇪🇸 Directores españoles a seguir">
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                {suggest.spanish.map((p) => <SuggestionCard key={p.tmdb_id} person={p} trackedIds={trackedTmdb} onAdd={addTmdb} onRemove={removeTmdb} />)}
-              </div>
-            </Section>
-          )}
-          {suggest.popular?.length > 0 && (
-            <Section title="🔥 Directores en el candelero (TMDB)">
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                {suggest.popular.map((p) => <SuggestionCard key={p.tmdb_id} person={p} trackedIds={trackedTmdb} onAdd={addTmdb} onRemove={removeTmdb} />)}
-              </div>
-            </Section>
-          )}
+      {/* curated director packs (#9) */}
+      {tab === 'discover' && suggest?.packs && (
+        <div className="mb-8 space-y-5">
+          {suggest.packs.map((pack) => {
+            const pending = pack.people.filter((p) => !p.tracked && !trackedTmdb.has(p.tmdb_id)).length;
+            const accent = ACCENTS[pack.accent] || ACCENTS.gold;
+            return (
+              <section key={pack.key} className={`card p-0 overflow-hidden border-l-4 ${accent.border}`}>
+                <div className="flex items-start gap-3 p-4 pb-3 flex-wrap">
+                  <div className={`text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${accent.bg}`}>{pack.emoji}</div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-slate-100">{pack.title}</h3>
+                    <p className="text-xs text-slate-500">{pack.description}</p>
+                  </div>
+                  <button
+                    className={`btn-ghost !py-1 shrink-0 ${pending ? `!border-current ${accent.text}` : 'opacity-50'}`}
+                    disabled={!pending || packBusy === pack.key}
+                    onClick={() => addPack(pack)}
+                    title={pending ? `Añade los ${pending} que aún no sigues` : 'Ya los sigues a todos'}
+                  >
+                    {packBusy === pack.key ? 'Añadiendo…' : pending ? `⭐ Añadir todos (${pending})` : '✓ Todos añadidos'}
+                  </button>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 p-4 pt-0">
+                  {pack.people.map((p) => <SuggestionCard key={p.tmdb_id} person={p} trackedIds={trackedTmdb} onAdd={addTmdb} onRemove={removeTmdb} />)}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
 
@@ -204,18 +319,32 @@ export default function Favorites() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* ranking */}
         <Section title={`Ranking de ${ROLES.find(([r]) => r === role)[1].toLowerCase()} por títulos en tu Plex`}>
-          {!ranking ? (
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <button
+              onClick={() => setHideDead((v) => !v)}
+              className={`btn-ghost !py-1 text-xs ${hideDead ? '!border-gold-400 text-gold-400' : ''}`}
+              title="Oculta a quienes ya han fallecido (a quienes se les conoce la fecha)"
+            >
+              {hideDead ? '✓ Ocultando fallecidos/as' : '✝ Ocultar fallecidos/as'}
+            </button>
+            <button className="btn-ghost !py-1 text-xs" onClick={updateLife} disabled={updatingLife}>
+              {updatingLife ? 'Actualizando…' : '↻ Actualizar vivos/muertos'}
+            </button>
+            {lifeMsg && <span className="text-[11px] text-slate-400">{lifeMsg}</span>}
+          </div>
+          {!rankItems ? (
             <Spinner />
           ) : (
             <div className="card divide-y divide-ink-800 max-h-[70vh] overflow-y-auto">
-              {ranking.map((p, i) => (
+              {rankItems.map((p, i) => (
                 <div key={p.id} className="flex items-center gap-3 px-4 py-2">
                   <span className="text-slate-600 text-sm w-8 text-right shrink-0">{i + 1}.</span>
                   <Link
                     to={`/personas/${p.id}?role=${role}`}
-                    className="text-sm text-slate-200 hover:text-gold-400 truncate flex-1"
+                    className="text-sm text-slate-200 hover:text-gold-400 truncate flex-1 flex items-center gap-1.5 min-w-0"
                   >
-                    {p.name}
+                    <span className="truncate">{p.name}</span>
+                    <DeathBadge deathday={p.deathday} />
                   </Link>
                   <span className="text-xs text-slate-500 shrink-0">{p.n} títulos</span>
                   <button
@@ -229,10 +358,10 @@ export default function Favorites() {
                   </button>
                 </div>
               ))}
-              {ranking.length >= rankLimit && (
+              {rankMore && (
                 <button
                   className="w-full py-2 text-xs text-slate-400 hover:text-gold-400 cursor-pointer"
-                  onClick={() => setRankLimit((l) => l + 50)}
+                  onClick={() => loadRanking(false)}
                 >
                   Ver más
                 </button>
@@ -267,27 +396,28 @@ export default function Favorites() {
           ) : (
             <>
             <div className="flex gap-2 mb-2">
-              {[['all', 'Todos'], ['director', 'Directores'], ['actor', 'Actores']].map(([v, label]) => (
+              {[['all', 'Todos'], ['director', 'Directores/as'], ['actor', 'Actores/actrices']].map(([v, label]) => (
                 <button key={v} onClick={() => setFavView(v)} className={`btn-ghost !py-1 text-xs ${favView === v ? '!border-gold-400 text-gold-400' : ''}`}>
-                  {label} ({v === 'all' ? tracked.length : tracked.filter((t) => primaryRole(t) === v).length})
+                  {label} ({favCounts[v]})
                 </button>
               ))}
             </div>
             <div className="card divide-y divide-ink-800 max-h-[70vh] overflow-y-auto">
-              {shownFavs.map((t) => (
+              {shownFavs.map((t) => {
+                const r = favRole(t);
+                const count = r === 'director' ? t.directed : t.acted;
+                return (
                 <div key={t.id} className="flex items-center gap-3 px-4 py-2">
                   <span className="text-gold-400">★</span>
                   <Link
-                    to={`/personas/${t.id}?role=${t.directed >= t.acted ? 'director' : 'actor'}`}
-                    className="text-sm text-slate-200 hover:text-gold-400 truncate flex-1"
+                    to={`/personas/${t.id}?role=${r}`}
+                    className="text-sm text-slate-200 hover:text-gold-400 truncate flex-1 flex items-center gap-1.5 min-w-0"
                   >
-                    {t.name}
+                    <span className="truncate">{t.name}</span>
+                    <DeathBadge deathday={t.deathday} />
                   </Link>
-                  <DeathBadge deathday={t.deathday} />
                   <span className="text-xs text-slate-500 shrink-0">
-                    {t.directed > 0 && `${t.directed} dirigidas`}
-                    {t.directed > 0 && t.acted > 0 && ' · '}
-                    {t.acted > 0 && `${t.acted} actuadas`}
+                    {count > 0 ? `${count} ${r === 'director' ? 'dirigidas' : 'actuadas'}` : ''}
                   </span>
                   <button
                     onClick={() => toggle(t.id)}
@@ -297,7 +427,8 @@ export default function Favorites() {
                     ✕
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
             </>
           )}

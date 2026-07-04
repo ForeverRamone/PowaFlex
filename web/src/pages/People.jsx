@@ -4,8 +4,8 @@ import { api } from '../api.js';
 import { Spinner, PersonCard, Empty } from '../components.jsx';
 
 const ROLES = [
-  ['director', 'Directores'],
-  ['actor', 'Actores'],
+  ['director', 'Directores/as'],
+  ['actor', 'Actores/actrices'],
   ['writer', 'Guionistas'],
 ];
 
@@ -41,7 +41,7 @@ export default function People() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-4">Directores y actores</h1>
+      <h1 className="text-2xl font-bold text-slate-100 mb-4">Directores/as y actores/actrices</h1>
       <div className="flex flex-wrap gap-2 mb-3 items-center">
         {ROLES.map(([r, label]) => (
           <button

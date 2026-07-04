@@ -58,6 +58,8 @@ export default function Settings() {
 
   const save = async () => {
     await api('/settings', { method: 'PUT', body: s });
+    // mirror the display pref so poster cards can read it synchronously (#5)
+    localStorage.setItem('primary_rating', s.primary_rating || 'score');
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -274,7 +276,7 @@ export default function Settings() {
               checked={s.auto_radarr_enabled === '1'}
               onChange={(e) => setS({ ...s, auto_radarr_enabled: e.target.checked ? '1' : '0' })}
             />
-            Lanzar a Radarr automáticamente cada noche los estrenos de mis directores favoritos vivos
+            Lanzar a Radarr automáticamente cada noche los estrenos de mis directores/as favoritos/as vivos
           </label>
           <div className="flex flex-wrap items-center gap-2 mt-2 ml-6">
             <span className="text-xs text-slate-400">de los próximos</span>
@@ -327,7 +329,7 @@ export default function Settings() {
             </div>
           )}
           <p className="text-[11px] text-slate-500 mt-2 ml-6">
-            Solo directores <b>vivos</b> marcados como favoritos. Los fallecidos se ignoran (no tendrán estrenos).
+            Solo directores/as <b>vivos</b> marcados como favoritos. Los fallecidos se ignoran (no tendrán estrenos).
           </p>
         </div>
 
@@ -425,6 +427,18 @@ export default function Settings() {
                 </label>
               ))}
             </div>
+            <div className="mt-4 pt-4 border-t border-ink-700">
+              <label className="text-xs text-slate-400">Nota principal en las portadas (junto al título)</label>
+              <select className="input mt-1 !w-auto" value={s.primary_rating || 'score'} onChange={set('primary_rating')}>
+                <option value="score">Nota combinada MDBList (Σ)</option>
+                <option value="imdb">IMDb</option>
+                <option value="letterboxd">Letterboxd</option>
+              </select>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Es la nota que aparece en la vista de portada pequeña. Si una película no tiene esa nota, se usa la
+                primera disponible. Necesita MDBList sincronizado.
+              </p>
+            </div>
           </section>
         );
       })()}
@@ -434,11 +448,11 @@ export default function Settings() {
         <h2 className="font-semibold text-slate-100">5 · Calendario de cine venidero</h2>
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           <div>
-            <label className="text-xs text-slate-400">Nº de directores top a vigilar</label>
+            <label className="text-xs text-slate-400">Nº de directores/as top a vigilar</label>
             <input className="input mt-1" type="number" min="5" max="100" placeholder="25" value={s.cal_top_directors || ''} onChange={set('cal_top_directors')} />
           </div>
           <div>
-            <label className="text-xs text-slate-400">Nº de actores top a vigilar</label>
+            <label className="text-xs text-slate-400">Nº de actores/actrices top a vigilar</label>
             <input className="input mt-1" type="number" min="0" max="100" placeholder="15" value={s.cal_top_actors || ''} onChange={set('cal_top_actors')} />
           </div>
         </div>

@@ -1,7 +1,16 @@
 import { db, cacheRead, cacheWrite, getSetting } from './db.js';
 import { personCredits, findPersonInfo, resolvePerson, enrichRuntimes, setBuildProgress, clearBuildProgress } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
-import { matchMovie } from './letterboxd.js';
+import { matchMovie, watchedIndex, isWatched } from './letterboxd.js';
+import { TSPDT_DIRECTORS, TSPDT_21C_DIRECTORS } from './data/tspdt-directors.js';
+
+// Mark TMDB items as watched (Plex view or Letterboxd), for the status system (#3).
+function applyWatched(items) {
+  const widx = watchedIndex();
+  for (const it of items) {
+    it.watched = isWatched({ tmdb_id: it.tmdb_id, title: it.title, year: it.date ? Number(String(it.date).slice(0, 4)) : null }, widx);
+  }
+}
 
 // A TMDB film counts as owned if its id is in the library OR a title+year match
 // exists — Plex sometimes stores a different TMDB id for the same film, which
@@ -30,39 +39,19 @@ async function applyScores(people, perPerson) {
 
 const HOUR = 3600 * 1000;
 
-// Canonical "great directors" checklist for a completist collection.
-export const GREAT_DIRECTORS = [
-  // Japón
-  'Akira Kurosawa', 'Yasujirō Ozu', 'Kenji Mizoguchi', 'Masaki Kobayashi', 'Shohei Imamura',
-  'Nagisa Ōshima', 'Hayao Miyazaki', 'Isao Takahata', 'Hirokazu Kore-eda', 'Kiyoshi Kurosawa',
-  // Europa clásica
-  'Ingmar Bergman', 'Federico Fellini', 'Michelangelo Antonioni', 'Luchino Visconti',
-  'Vittorio De Sica', 'Roberto Rossellini', 'Pier Paolo Pasolini', 'Sergio Leone',
-  'Andrei Tarkovsky', 'Sergei Eisenstein', 'Carl Theodor Dreyer', 'F.W. Murnau', 'Fritz Lang',
-  'Jean Renoir', 'Robert Bresson', 'Jean-Pierre Melville', 'Jean-Luc Godard',
-  'François Truffaut', 'Éric Rohmer', 'Claude Chabrol', 'Alain Resnais', 'Agnès Varda',
-  'Henri-Georges Clouzot', 'Jacques Tati', 'Chantal Akerman', 'Rainer Werner Fassbinder',
-  'Werner Herzog', 'Wim Wenders', 'Michael Haneke', 'Krzysztof Kieślowski', 'Andrzej Wajda',
-  'Roman Polanski', 'Miloš Forman', 'Béla Tarr', 'Theo Angelopoulos', 'Bernardo Bertolucci',
-  // España e Iberoamérica
-  'Luis Buñuel', 'Pedro Almodóvar', 'Víctor Erice', 'Luis García Berlanga', 'Carlos Saura',
-  'Lucrecia Martel', 'Glauber Rocha', 'Alejandro González Iñárritu', 'Alfonso Cuarón',
-  'Guillermo del Toro',
-  // Hollywood y anglosfera
-  'Alfred Hitchcock', 'Stanley Kubrick', 'Orson Welles', 'John Ford', 'Howard Hawks',
-  'Billy Wilder', 'Charlie Chaplin', 'Buster Keaton', 'David Lean', 'Michael Powell',
-  'Carol Reed', 'John Cassavetes', 'Robert Altman', 'Martin Scorsese', 'Francis Ford Coppola',
-  'Steven Spielberg', 'Brian De Palma', 'Terrence Malick', 'David Lynch', 'David Cronenberg',
-  'John Carpenter', 'Clint Eastwood', 'Woody Allen', 'Sidney Lumet', 'Mike Leigh', 'Ken Loach',
-  'Nicolas Roeg', 'Terry Gilliam', 'Ridley Scott', 'David Fincher', 'Christopher Nolan',
-  'Paul Thomas Anderson', 'Wes Anderson', 'Joel Coen', 'Quentin Tarantino', 'Denis Villeneuve',
-  'Kathryn Bigelow', 'Spike Lee', 'Jim Jarmusch',
-  // Asia y otros
-  'Wong Kar-wai', 'Hou Hsiao-hsien', 'Edward Yang', 'Zhang Yimou', 'Jia Zhangke',
-  'Bong Joon-ho', 'Park Chan-wook', 'Lee Chang-dong', 'Hong Sang-soo', 'Satyajit Ray',
-  'Abbas Kiarostami', 'Asghar Farhadi', 'Nuri Bilge Ceylan', 'Aleksandr Sokurov',
-  'Andrey Zvyagintsev', 'Claire Denis', 'Leos Carax',
+// "Grandes ausentes" canons from They Shoot Pictures, Don't They?: the all-time
+// Top 250 Directors and the 21st Century Top 100. Directing teams (e.g. "Joel
+// Coen & Ethan Coen") are reduced to their lead credited director so each
+// resolves to a single TMDB person, then deduped.
+const cleanCanon = (names) => [
+  ...new Map(names.map((n) => n.split(/\s*&\s*/)[0].trim()).map((n) => [n.toLowerCase(), n])).values(),
 ];
+export const CANONS = {
+  alltime: { label: 'TSPDT · Top 250 de siempre', names: cleanCanon(TSPDT_DIRECTORS) },
+  '21c': { label: 'TSPDT · Top 100 del siglo XXI', names: cleanCanon(TSPDT_21C_DIRECTORS) },
+};
+// back-compat default export (all-time)
+export const GREAT_DIRECTORS = CANONS.alltime.names;
 
 const libraryTmdbIds = () =>
   new Set(db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((r) => r.tmdb_id));
@@ -166,6 +155,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
   await applyScores(out, perPerson);
   // runtime pass so shorts can be hidden alongside docs/TV
   await enrichRuntimes(out.flatMap((p) => p.missing));
+  applyWatched(out.flatMap((p) => p.missing));
   clearBuildProgress('discover');
   const result = { generatedAt: Date.now(), role, people: out, errors: errors.slice(0, 5) };
   if (out.length || !errors.length) cacheWrite(cacheKey, result);
@@ -249,6 +239,7 @@ export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
   out.sort((a, b) => b.missingTotal - a.missingTotal);
   await applyScores(out, perPerson);
   await enrichRuntimes(out.flatMap((pp) => pp.missing));
+  applyWatched(out.flatMap((pp) => pp.missing));
   clearBuildProgress('discover');
   const result = { generatedAt: Date.now(), people: out, tracked: tracked.length, errors: errors.slice(0, 5) };
   if (out.length || !errors.length) cacheWrite(cacheKey, result);
@@ -259,17 +250,14 @@ export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
  * Great directors with ZERO films in the library, with their essential
  * (most-voted) films as suggestions.
  */
-export async function absentGreats({ perPerson = 6, refresh = false } = {}) {
-  const cacheKey = `discover_absent:${perPerson}`;
+export async function absentGreats({ perPerson = 6, refresh = false, canon = 'alltime' } = {}) {
+  const names = (CANONS[canon] || CANONS.alltime).names;
+  const cacheKey = `discover_absent:${canon}:${perPerson}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 24 * HOUR);
     if (hit) return hit;
   }
 
-  const countStmt = db.prepare(
-    `SELECT COUNT(*) n FROM movie_people mp JOIN people p ON p.id = mp.person_id
-     WHERE mp.role = 'director' AND p.name = ? COLLATE NOCASE`
-  );
   const inLib = libraryTmdbIds();
   const now = today();
   const absent = [];
@@ -280,23 +268,23 @@ export async function absentGreats({ perPerson = 6, refresh = false } = {}) {
   async function worker() {
     for (;;) {
       const i = idx++;
-      if (i >= GREAT_DIRECTORS.length) return;
-      const name = GREAT_DIRECTORS[i];
+      if (i >= names.length) return;
+      const name = names[i];
       try {
-        const count = countStmt.get(name).n;
-        if (count > 0) {
-          present.push({ name, inLibrary: count });
-          continue;
-        }
         const info = await findPersonInfo(name, 'Directing');
         if (!info.id) continue;
         const credits = await personCredits(info.id);
         const seen = new Set();
         const films = [];
+        let owned = 0;
         for (const c of credits.crew || []) {
           if (c.job !== 'Director' || c.video || seen.has(c.id)) continue;
           seen.add(c.id);
           if (!c.release_date || c.release_date > now) continue;
+          // ownership by the film's TMDB id or a title+year match — not by the
+          // director's name, which fails across languages/spellings (Bong, Murnau)
+          const isOwned = ownsFilm(c, inLib);
+          if (isOwned) owned++;
           films.push({
             tmdb_id: c.id,
             title: c.title,
@@ -305,12 +293,18 @@ export async function absentGreats({ perPerson = 6, refresh = false } = {}) {
             vote: c.vote_average,
             votes: c.vote_count,
             released: true,
-            owned: ownsFilm(c, inLib),
+            owned: isOwned,
             ...genreFlags(c.genre_ids),
           });
         }
+        // "present" = you already have at least one of their films
+        if (owned > 0) {
+          present.push({ name, inLibrary: owned });
+          continue;
+        }
         films.sort((a, b) => (b.votes || 0) - (a.votes || 0));
         const top = films.filter((f) => !f.owned).slice(0, perPerson);
+        applyWatched(top);
         if (top.length) {
           absent.push({
             name,
@@ -331,7 +325,8 @@ export async function absentGreats({ perPerson = 6, refresh = false } = {}) {
   present.sort((a, b) => b.inLibrary - a.inLibrary);
   const result = {
     generatedAt: Date.now(),
-    checked: GREAT_DIRECTORS.length,
+    checked: names.length,
+    canon,
     absent,
     present,
     errors: errors.slice(0, 5),

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
 import {
-  Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty,
+  Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, StatusLegend,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge,
 } from '../components.jsx';
 
@@ -13,12 +13,16 @@ const VIEWS = [
   ['upcoming', 'Próximas'],
 ];
 
+const ROLE_LABEL = { director: 'director/a', actor: 'actor/actriz', writer: 'guionista' };
+const ROLE_TAB = { director: '🎬 Como director/a', actor: '🎭 Como actor/actriz', writer: '✍️ Como guionista' };
+
 export default function PersonDetail() {
   const { id } = useParams();
   const [params] = useSearchParams();
-  const role = params.get('role') || 'director';
+  const wantRole = params.get('role') || 'director';
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [role, setRole] = useState(null); // active role tab
   const [view, setView] = useState('all');
   const [tracked, setTracked] = useState(false);
   const [radarrIds, addRadarrId] = useRadarrIds();
@@ -27,12 +31,16 @@ export default function PersonDetail() {
   useEffect(() => {
     setData(null);
     setError(null);
-    api(`/people/${id}/filmography?role=${role}`).then((d) => {
+    setRole(null);
+    api(`/people/${id}/filmography?role=${wantRole}`).then((d) => {
       if (d.error) setError(d.error);
-      else setData(d);
+      else {
+        setData(d);
+        setRole(d.roles?.[wantRole] ? wantRole : d.primary);
+      }
     });
     api('/tracked').then((list) => Array.isArray(list) && setTracked(list.some((t) => t.id === Number(id))));
-  }, [id, role]);
+  }, [id, wantRole]);
 
   const toggleTrack = async () => {
     await api(`/tracked/${id}`, { method: tracked ? 'DELETE' : 'POST' });
@@ -49,11 +57,23 @@ export default function PersonDetail() {
       </div>
     );
 
-  const { person, stats, items } = data;
+  const { person, roles } = data;
+  const roleKeys = Object.keys(roles || {});
+  const active = (role && roles[role] && role) || (roles[data.primary] && data.primary) || roleKeys[0];
+  if (!active)
+    return (
+      <div>
+        <h1 className="text-2xl font-bold mb-2">{person?.name}</h1>
+        <Empty>No hay filmografía que mostrar.</Empty>
+      </div>
+    );
+  const { stats, items } = roles[active];
+
   const typeCounts = {
     shorts: items.filter((i) => i.isShort).length,
     docs: items.filter((i) => i.isDocumentary).length,
     tv: items.filter((i) => i.isTvMovie).length,
+    coral: items.filter((i) => i.isCoral).length,
   };
   const filtered = items.filter((i) => {
     if (!matchesTypeFilters(i, show)) return false;
@@ -84,7 +104,7 @@ export default function PersonDetail() {
             >
               {tracked ? '★ Siguiendo' : '☆ Seguir en calendario'}
             </button>
-            <Link to={`/biblioteca?personId=${person.id}&personRole=${role}`} className="btn-ghost">
+            <Link to={`/biblioteca?personId=${person.id}&personRole=${active}`} className="btn-ghost">
               Ver en tu biblioteca
             </Link>
           </div>
@@ -94,16 +114,37 @@ export default function PersonDetail() {
               {person.deathday && ` — ${fmtDate(person.deathday)}`}
             </div>
           )}
-          <div className="mt-4 max-w-md">
+
+          {/* role switch when the person both directs and acts (#8) */}
+          {roleKeys.length > 1 && (
+            <div className="flex gap-2 mt-3">
+              {roleKeys.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => { setRole(r); setView('all'); }}
+                  className={`btn-ghost !py-1 text-xs ${active === r ? '!border-gold-400 text-gold-400' : ''}`}
+                >
+                  {ROLE_TAB[r] || r} ({roles[r].stats.owned}/{roles[r].stats.released})
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 max-w-md">
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-slate-300">
-                Completismo ({role === 'director' ? 'como director' : role === 'writer' ? 'como guionista' : 'como actor'})
-              </span>
+              <span className="text-slate-300">Completismo (como {ROLE_LABEL[active] || active})</span>
               <span className="text-gold-400 font-semibold">
                 {stats.owned} / {stats.released} · {stats.pct}%
               </span>
             </div>
             <ProgressBar pct={stats.pct} />
+            {active === 'director' && (
+              <div className="text-[11px] text-slate-500 mt-1">
+                Solo largometrajes
+                {stats.documentarian ? ' (incluye documentales: es documentalista)' : ''}
+                {stats.excludedFromCompletion > 0 && ` · ${stats.excludedFromCompletion} fuera del cómputo (cortos, TV, docs o dirección coral)`}
+              </div>
+            )}
             {stats.upcoming > 0 && (
               <div className="text-xs text-sky-300 mt-2">🗓️ {stats.upcoming} proyectos anunciados o por estrenar</div>
             )}
@@ -114,7 +155,7 @@ export default function PersonDetail() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-3 flex-wrap items-center">
         {VIEWS.map(([v, label]) => (
           <button key={v} onClick={() => setView(v)} className={view === v ? 'btn-gold' : 'btn-ghost'}>
             {label}
@@ -122,9 +163,10 @@ export default function PersonDetail() {
             {v === 'upcoming' && ` (${stats.upcoming})`}
           </button>
         ))}
+        <StatusLegend className="ml-auto" />
       </div>
 
-      {(typeCounts.shorts || typeCounts.docs || typeCounts.tv) > 0 && (
+      {(typeCounts.shorts || typeCounts.docs || typeCounts.tv || typeCounts.coral) > 0 && (
         <TypeFilterBar show={show} toggle={toggle} counts={typeCounts} />
       )}
 

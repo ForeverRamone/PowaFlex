@@ -22,7 +22,7 @@ const Settings = lazy(() => import('./pages/Settings.jsx'));
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '📊' },
   { to: '/biblioteca', label: 'Biblioteca', icon: '🎞️' },
-  { to: '/personas', label: 'Directores y actores', icon: '🎭' },
+  { to: '/personas', label: 'Directores/as y actores/actrices', icon: '🎭' },
   { to: '/calendario', label: 'Cine venidero', icon: '🗓️' },
   { to: '/favoritos', label: 'Favoritos', icon: '⭐' },
   { to: '/descubrir', label: 'Descubrir huecos', icon: '🧭' },
@@ -47,6 +47,8 @@ function Shell() {
       if (!s.plex && window.location.pathname !== '/ajustes') navigate('/ajustes');
     });
     api('/version').then((v) => v.label && setVersion(v));
+    // mirror the headline-rating pref so poster cards can read it synchronously (#5)
+    api('/settings').then((st) => st && localStorage.setItem('primary_rating', st.primary_rating || 'score'));
   }, []);
 
   return (

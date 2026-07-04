@@ -37,6 +37,11 @@ export const fmtDate = (d) => {
 
 export const tmdbImg = (path, size = 'w342') => (path ? `https://image.tmdb.org/t/p/${size}${path}` : null);
 
+// Which rating shows as the headline chip on small poster cards (#5). Mirrored
+// from the server setting into localStorage on app load, so cards read it
+// synchronously. Values: 'score' (MDBList Σ, default) | 'imdb' | 'letterboxd'.
+export const primaryRating = () => localStorage.getItem('primary_rating') || 'score';
+
 // External links per rating source, so a score chip opens that film on its site.
 export const ratingLinks = ({ imdb_id, tmdb_id, title } = {}) => ({
   imdb: imdb_id

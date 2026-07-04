@@ -26,6 +26,17 @@ export const LB_WATCHED_KEYS =
 export const WATCHED = `(m.view_count > 0 OR m.rating_key IN ${LB_WATCHED_KEYS})`;
 export const UNWATCHED = `(m.view_count = 0 AND m.rating_key NOT IN ${LB_WATCHED_KEYS})`;
 
+// The user's own rating no longer comes from Plex (removed in v0.5) — it lives on
+// Letterboxd. "Tu nota" is the max Letterboxd rating (0–5) scaled to 0–10.
+export const MY_RATING =
+  `(SELECT MAX(rating) * 2 FROM lb_entries WHERE movie_id = m.rating_key AND rating IS NOT NULL)`;
+
+// Columns every small poster card needs: the three external ratings (for the
+// configurable headline chip, #5) plus a watched flag (for the status system, #3).
+export const CARD_JOIN = `LEFT JOIN mdb_ratings rc ON rc.tmdb_id = m.tmdb_id`;
+export const CARD_COLS =
+  `rc.imdb, rc.letterboxd, rc.score AS mdb_score, (${WATCHED}) AS watched`;
+
 // --- dashboard ---------------------------------------------------------------
 
 export function overview() {
@@ -37,7 +48,6 @@ export function overview() {
     sizeBytes: t('SELECT SUM(size_bytes) s FROM movies').s || 0,
     watched: t(`SELECT COUNT(*) n FROM movies m WHERE ${WATCHED}`).n,
     watchedPlex: t('SELECT COUNT(*) n FROM movies WHERE view_count > 0').n,
-    rated: t('SELECT COUNT(*) n FROM movies WHERE user_rating IS NOT NULL').n,
     directors: t(`SELECT COUNT(DISTINCT person_id) n FROM movie_people WHERE role = 'director'`).n,
     actors: t(`SELECT COUNT(DISTINCT person_id) n FROM movie_people WHERE role = 'actor'`).n,
     genres: t(`SELECT COUNT(*) n FROM tags WHERE type = 'genre'`).n,
@@ -137,10 +147,6 @@ export function charts() {
       `SELECT strftime('%Y-%m', added_at, 'unixepoch') month, COUNT(*) n FROM movies
        WHERE added_at IS NOT NULL GROUP BY month ORDER BY month DESC LIMIT 36`
     ).reverse(),
-    ratingHistogram: all(
-      `SELECT CAST(audience_rating AS INTEGER) bucket, COUNT(*) n FROM movies
-       WHERE audience_rating IS NOT NULL GROUP BY bucket ORDER BY bucket`
-    ),
     runtimeBuckets: all(
       `SELECT CASE
          WHEN duration_ms < 40*60000 THEN 'Corto (<40m)'
@@ -153,9 +159,14 @@ export function charts() {
   };
 }
 
-export function topPeople({ role = 'director', limit = 30, offset = 0, search = '', gender = '', life = '', continent = '', country = '' } = {}) {
+export function topPeople({ role = 'director', limit = 30, offset = 0, search = '', gender = '', life = '', continent = '', country = '', hideDead = false } = {}) {
   const conds = ['mp.role = ?'];
   const args = [role];
+  // "Guionistas" should list pure writers only — drop anyone who also directs (B).
+  if (role === 'writer')
+    conds.push(`p.id NOT IN (SELECT person_id FROM movie_people WHERE role = 'director')`);
+  // hide only the known-dead, keeping people whose status we don't have yet (E)
+  if (hideDead) conds.push('p.deathday IS NULL');
   if (search) { conds.push('p.name LIKE ?'); args.push(`%${search}%`); }
   if (gender === 'female') conds.push('p.gender = 1');
   if (gender === 'male') conds.push('p.gender = 2');
@@ -168,8 +179,7 @@ export function topPeople({ role = 'director', limit = 30, offset = 0, search = 
   return db
     .prepare(
       `SELECT p.id, p.name, p.thumb, p.tmdb_id, p.deathday, p.gender, p.country, p.continent, COUNT(*) n,
-              SUM(CASE WHEN ${WATCHED} THEN 1 ELSE 0 END) watched,
-              AVG(m.audience_rating) avg_rating
+              SUM(CASE WHEN ${WATCHED} THEN 1 ELSE 0 END) watched
        FROM movie_people mp
        JOIN people p ON p.id = mp.person_id
        JOIN movies m ON m.rating_key = mp.movie_id
@@ -195,8 +205,6 @@ const SORTS = {
   release: 'm.release_date DESC',
   release_asc: 'm.release_date ASC',
   title: 'm.sort_title COLLATE NOCASE ASC',
-  rating: 'm.audience_rating DESC',
-  user_rating: 'm.user_rating DESC',
   runtime: 'm.duration_ms DESC',
   runtime_asc: 'm.duration_ms ASC',
   size: 'm.size_bytes DESC',
@@ -247,8 +255,6 @@ export function listMovies(q) {
   if (q.yearMax) { where.push('m.year <= ?'); args.push(Number(q.yearMax)); }
   if (q.watched === 'yes') where.push(WATCHED);
   if (q.watched === 'no') where.push(UNWATCHED);
-  if (q.ratingMin) { where.push('m.audience_rating >= ?'); args.push(Number(q.ratingMin)); }
-  if (q.userRated === 'yes') where.push('m.user_rating IS NOT NULL');
   // Letterboxd/Academy: a short is under 40 minutes
   if (q.length === 'short') where.push('m.duration_ms < 2400000');
   if (q.length === 'feature') where.push('m.duration_ms >= 2400000');
@@ -275,9 +281,9 @@ export function listMovies(q) {
 
   const rows = db
     .prepare(
-      `SELECT DISTINCT m.rating_key, m.title, m.year, m.thumb, m.audience_rating, m.user_rating,
+      `SELECT DISTINCT m.rating_key, m.title, m.year, m.thumb,
               m.duration_ms, m.resolution, m.hdr, m.view_count, m.size_bytes, m.release_date, m.added_at,
-              r.imdb, r.rt_critic, r.letterboxd, r.score AS mdb_score
+              r.imdb, r.rt_critic, r.letterboxd, r.score AS mdb_score, (${WATCHED}) AS watched
        FROM movies m ${joinSql} ${whereSql} ORDER BY ${order} LIMIT ? OFFSET ?`
     )
     .all(...args, limit, offset);
@@ -380,10 +386,10 @@ export function upgradeCandidates({ limit = 100 } = {}) {
   return db
     .prepare(
       `SELECT m.rating_key, m.title, m.year, m.thumb, m.resolution, m.video_codec,
-              m.audience_rating, m.user_rating, m.tmdb_id, m.size_bytes, r.score AS mdb_score, r.imdb
+              m.tmdb_id, m.size_bytes, r.score AS mdb_score, r.imdb
        FROM movies m LEFT JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
        WHERE m.resolution IN ('sd','480','576','720') OR m.resolution IS NULL
-       ORDER BY COALESCE(m.user_rating, 0) DESC, COALESCE(r.score, 0) DESC, COALESCE(m.audience_rating, 0) DESC
+       ORDER BY COALESCE(r.score, 0) DESC, COALESCE(r.imdb, 0) DESC
        LIMIT ?`
     )
     .all(limit);
@@ -409,8 +415,31 @@ export function duplicates() {
 
 export function watchStats() {
   const all = (sql) => db.prepare(sql).all();
+  const one = (sql) => db.prepare(sql).get();
   const W = `CASE WHEN ${WATCHED} THEN 1 ELSE 0 END`;
+  // Watched counter (#1): total marked as watched, and where each came from.
+  const lbWatchedTotal = one(
+    `SELECT COUNT(DISTINCT COALESCE(movie_id, title || '|' || IFNULL(year,''))) n
+     FROM lb_entries WHERE list IN ('diary','watched','ratings')`
+  ).n;
+  const summary = {
+    total: one(`SELECT COUNT(*) n FROM movies m WHERE ${WATCHED}`).n,
+    plex: one('SELECT COUNT(*) n FROM movies WHERE view_count > 0').n,
+    library: one('SELECT COUNT(*) n FROM movies').n,
+    // in your library, marked watched thanks to Letterboxd (not a Plex view)
+    lbInLibrary: one(
+      `SELECT COUNT(*) n FROM movies m WHERE m.view_count = 0 AND m.rating_key IN ${LB_WATCHED_KEYS}`
+    ).n,
+    // total distinct films you've logged on Letterboxd (in or out of the library)
+    lbTotal: lbWatchedTotal,
+    // logged on Letterboxd but not (yet) matched to a film in your library
+    lbUnmatched: one(
+      `SELECT COUNT(DISTINCT title || '|' || IFNULL(year,'')) n
+       FROM lb_entries WHERE list IN ('diary','watched','ratings') AND movie_id IS NULL`
+    ).n,
+  };
   return {
+    summary,
     watchedByDecade: all(
       `SELECT (year/10)*10 decade, SUM(${W}) watched, COUNT(*) total
        FROM movies m WHERE year IS NOT NULL GROUP BY decade ORDER BY decade`
@@ -421,13 +450,13 @@ export function watchStats() {
        WHERE t.type = 'genre' GROUP BY t.id ORDER BY total DESC LIMIT 15`
     ),
     recentlyViewed: all(
-      `SELECT rating_key, title, year, thumb, last_viewed_at FROM movies
-       WHERE last_viewed_at IS NOT NULL ORDER BY last_viewed_at DESC LIMIT 24`
+      `SELECT m.rating_key, m.title, m.year, m.thumb, m.last_viewed_at, ${CARD_COLS} FROM movies m
+       ${CARD_JOIN} WHERE m.last_viewed_at IS NOT NULL ORDER BY m.last_viewed_at DESC LIMIT 24`
     ),
     unwatchedTopRated: all(
-      `SELECT rating_key, title, year, thumb, audience_rating FROM movies m
-       WHERE ${UNWATCHED} AND audience_rating IS NOT NULL
-       ORDER BY audience_rating DESC LIMIT 24`
+      `SELECT m.rating_key, m.title, m.year, m.thumb, ${CARD_COLS} FROM movies m
+       ${CARD_JOIN} WHERE ${UNWATCHED} AND rc.score IS NOT NULL
+       ORDER BY rc.score DESC LIMIT 24`
     ),
     directorsPending: all(
       `SELECT p.id, p.name, COUNT(*) total, SUM(${W}) watched

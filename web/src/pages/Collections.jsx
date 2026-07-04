@@ -58,12 +58,27 @@ export default function Collections() {
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(null);
   const [scan, setScan] = useState(null);
+  const [statsBusy, setStatsBusy] = useState(false);
   const [radarrIds, addRadarrId] = useRadarrIds();
 
   const load = () => api('/sagas').then(setData);
   useEffect(() => {
     load();
   }, []);
+
+  // compute "what you're missing" counts per franchise from TMDB (#H)
+  const computeStats = async () => {
+    setStatsBusy(true);
+    await api('/sagas/stats', { method: 'POST' });
+    const t = setInterval(async () => {
+      const st = await api('/sagas/status');
+      if (!st.statsStatus?.running) {
+        clearInterval(t);
+        setStatsBusy(false);
+        load();
+      }
+    }, 1500);
+  };
 
   // poll scan progress
   useEffect(() => {
@@ -132,26 +147,55 @@ export default function Collections() {
             : 'No se han detectado franquicias con más de una película tuya.'}
         </Empty>
       ) : (
-        <div className="flex flex-col gap-2">
-          {sagas.map((s) => (
-            <section key={s.collection_id} className="card p-4">
-              <button
-                className="flex items-center justify-between w-full gap-3 text-left"
-                onClick={() => setOpen(open === s.collection_id ? null : s.collection_id)}
-              >
-                <span className="font-semibold text-slate-100 hover:text-gold-400">
-                  {open === s.collection_id ? '▾' : '▸'} {s.name}
-                </span>
-                <span className="text-xs text-slate-400 shrink-0">
-                  <b className="text-gold-400">{s.owned}</b> {s.owned === 1 ? 'película tuya' : 'películas tuyas'}
-                </span>
+        <>
+          {/* compute what's missing per franchise (#H) */}
+          {sagas.some((s) => s.missing == null) && (
+            <div className="card p-3 mb-3 flex flex-wrap items-center gap-3 text-sm">
+              <span className="text-slate-400">Calcula cuántas partes te faltan en cada saga (consulta TMDB):</span>
+              <button className="btn-gold !py-1 shrink-0" onClick={computeStats} disabled={statsBusy}>
+                {statsBusy ? 'Calculando…' : 'Calcular lo que falta'}
               </button>
-              {open === s.collection_id && (
-                <SagaDetail id={s.collection_id} radarrIds={radarrIds} addRadarrId={addRadarrId} />
-              )}
-            </section>
-          ))}
-        </div>
+            </div>
+          )}
+          <div className="flex flex-col gap-2">
+            {sagas.map((s) => (
+              <section key={s.collection_id} className="card p-4">
+                <button
+                  className="flex items-center justify-between w-full gap-3 text-left"
+                  onClick={() => setOpen(open === s.collection_id ? null : s.collection_id)}
+                >
+                  <span className="font-semibold text-slate-100 hover:text-gold-400">
+                    {open === s.collection_id ? '▾' : '▸'} {s.name}
+                  </span>
+                  <span className="text-xs text-slate-400 shrink-0 flex items-center gap-2">
+                    <span><b className="text-gold-400">{s.owned}</b> {s.owned === 1 ? 'tuya' : 'tuyas'}</span>
+                    {s.missing != null && s.missing > 0 && (
+                      <span className="text-orange-300">· te faltan {s.missing}</span>
+                    )}
+                    {s.missing === 0 && <span className="text-emerald-400">· completa ✓</span>}
+                    {s.upcoming > 0 && <span className="text-sky-300">· {s.upcoming} por estrenar</span>}
+                  </span>
+                </button>
+                {/* missing titles at a glance, without opening (#H) */}
+                {open !== s.collection_id && s.missingTitles?.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {s.missingTitles.slice(0, 8).map((m, i) => (
+                      <span key={i} className="text-[11px] bg-ink-800 border border-ink-700 rounded-full px-2 py-0.5 text-slate-400">
+                        {m.title}{m.year ? ` (${m.year})` : ''}
+                      </span>
+                    ))}
+                    {s.missingTitles.length > 8 && (
+                      <span className="text-[11px] text-slate-500 px-1 py-0.5">+{s.missingTitles.length - 8} más</span>
+                    )}
+                  </div>
+                )}
+                {open === s.collection_id && (
+                  <SagaDetail id={s.collection_id} radarrIds={radarrIds} addRadarrId={addRadarrId} />
+                )}
+              </section>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

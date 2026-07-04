@@ -347,7 +347,7 @@ export async function importLetterboxdListUrl(url) {
 
 // Everything you've watched: Plex views + Letterboxd diary/watched/ratings.
 // Used for the "watched" completista ring (distinct from "owned" in Plex).
-function watchedIndex() {
+export function watchedIndex() {
   const keys = new Set();      // normalised "title|year"
   const tmdbIds = new Set();
   const movieIds = new Set();  // library rating_keys that are watched
@@ -364,7 +364,7 @@ function watchedIndex() {
   }
   return { keys, tmdbIds, movieIds };
 }
-const isWatched = (item, idx) =>
+export const isWatched = (item, idx) =>
   (item.movie_id && idx.movieIds.has(item.movie_id)) ||
   (item.tmdb_id && idx.tmdbIds.has(item.tmdb_id)) ||
   idx.keys.has(`${normTitle(item.title)}|${item.year || ''}`);
@@ -453,6 +453,89 @@ export function rematchLetterboxd() {
   return { rematched: matched };
 }
 
+/**
+ * Standard Letterboxd exports (diary/watched/ratings CSVs) carry no TMDB id and
+ * use the film's original/English title, so a Spanish library misses matches
+ * (e.g. "Breathless" ↔ "Al final de la escapada"). This resolves each still-
+ * unmatched watched entry to a TMDB id (search by title+year, cached) and then
+ * links it to a library film by that id. Returns counts. (#1)
+ */
+export async function resolveUnmatchedLb() {
+  const { searchMovieId } = await import('./tmdb.js');
+  // unique (title, year) of watched entries with no TMDB id yet
+  const groups = db
+    .prepare(
+      `SELECT title, year FROM lb_entries
+       WHERE tmdb_id IS NULL AND title IS NOT NULL AND list IN ('diary','watched','ratings')
+       GROUP BY title, year`
+    )
+    .all();
+
+  const setTmdb = db.prepare(
+    `UPDATE lb_entries SET tmdb_id = ? WHERE tmdb_id IS NULL AND title = ? AND (year IS ? OR year = ?)`
+  );
+  let resolved = 0;
+  let i = 0;
+  async function worker() {
+    for (;;) {
+      const idx = i++;
+      if (idx >= groups.length) return;
+      const g = groups[idx];
+      try {
+        const id = await searchMovieId(g.title, g.year);
+        if (id) { setTmdb.run(id, g.title, g.year, g.year); resolved++; }
+      } catch {}
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, worker));
+
+  // also resolve challenge-list items (e.g. AFI/IMDb lists) the same way, so films
+  // you own under a localised title (Sunset Boulevard ↔ El crepúsculo…) count (#G)
+  const listGroups = db
+    .prepare(
+      `SELECT title, year FROM lb_list_items WHERE tmdb_id IS NULL AND title IS NOT NULL GROUP BY title, year`
+    )
+    .all();
+  const setListTmdb = db.prepare(
+    `UPDATE lb_list_items SET tmdb_id = ? WHERE tmdb_id IS NULL AND title = ? AND (year IS ? OR year = ?)`
+  );
+  let j = 0;
+  async function listWorker() {
+    for (;;) {
+      const idx = j++;
+      if (idx >= listGroups.length) return;
+      const g = listGroups[idx];
+      try {
+        const id = await searchMovieId(g.title, g.year);
+        if (id) { setListTmdb.run(id, g.title, g.year, g.year); resolved++; }
+      } catch {}
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, listWorker));
+
+  // now link any still-unmatched entry / list item to a library film via TMDB id
+  const index = getMatcher();
+  let matched = 0;
+  const tx = db.transaction(() => {
+    const upd = db.prepare('UPDATE lb_entries SET movie_id = ? WHERE id = ?');
+    for (const e of db
+      .prepare(`SELECT id, title, year, tmdb_id FROM lb_entries WHERE movie_id IS NULL AND tmdb_id IS NOT NULL`)
+      .all()) {
+      const mid = matchMovie({ title: e.title, year: e.year, tmdbId: e.tmdb_id }, index);
+      if (mid) { upd.run(mid, e.id); matched++; }
+    }
+    const updL = db.prepare('UPDATE lb_list_items SET movie_id = ? WHERE rowid = ?');
+    for (const it of db
+      .prepare(`SELECT rowid, title, year, tmdb_id FROM lb_list_items WHERE movie_id IS NULL AND tmdb_id IS NOT NULL`)
+      .all()) {
+      const mid = matchMovie({ title: it.title, year: it.year, tmdbId: it.tmdb_id }, index);
+      if (mid) { updL.run(mid, it.rowid); matched++; }
+    }
+  });
+  tx();
+  return { groups: groups.length + listGroups.length, resolved, matched };
+}
+
 export function letterboxdSummary() {
   const counts = {};
   for (const row of db
@@ -473,13 +556,15 @@ export function letterboxdSummary() {
     )
     .all();
 
+  // Your Letterboxd rating vs the Letterboxd community and the combined score.
   const ratingCompare = db
     .prepare(
-      `SELECT m.rating_key, m.title, m.year, m.thumb, e.rating * 2 AS lb, m.user_rating AS plex,
-              m.audience_rating AS audience
+      `SELECT m.rating_key, m.title, m.year, m.thumb, MAX(e.rating) * 2 AS lb,
+              r.letterboxd * 2 AS community, r.score AS mdb_score
        FROM lb_entries e JOIN movies m ON m.rating_key = e.movie_id
+       LEFT JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
        WHERE e.list IN ('ratings','diary') AND e.rating IS NOT NULL
-       GROUP BY m.rating_key ORDER BY e.rating DESC`
+       GROUP BY m.rating_key ORDER BY MAX(e.rating) DESC`
     )
     .all();
 

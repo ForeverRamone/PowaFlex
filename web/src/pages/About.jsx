@@ -34,19 +34,19 @@ export default function About() {
             <ul className="list-disc pl-5 space-y-1">
               <li>Ver totales: cuántas películas, horas de cine, disco ocupado y % visto.</li>
               <li>Explorar gráficas por década, género, país y resolución.</li>
-              <li>Filtrar la biblioteca al estilo Letterboxd (género, país, década, metraje, HDR, nota…) y ordenarla de 15 formas.</li>
-              <li>Abrir la ficha de cualquier película con reparto, notas de varias webs y datos técnicos.</li>
-              <li>Ver rankings de directores, actores y guionistas por presencia, y filtrarlos por género, país, continente o si están vivos.</li>
+              <li>Filtrar la biblioteca al estilo Letterboxd (género, país, década, metraje, HDR, notas de IMDb/RT/Letterboxd…) con código de color 🟢 en Plex · ★ vista, y ordenarla por cualquiera de esas notas.</li>
+              <li>Abrir la ficha de cualquier película con reparto, notas de varias webs y datos técnicos, y elegir qué nota sale en cada póster.</li>
+              <li>Ver rankings de directores/as, actores/actrices y guionistas por presencia, y filtrarlos por género, país, continente o si están vivos.</li>
             </ul>
           </div>
           <div>
             <div className="text-slate-200 font-medium mb-1">Cazar lo que te falta</div>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Ver el % de completismo de cada director/actor y lo que te falta de su filmografía.</li>
+              <li>Ver el % de completismo de cada director/a o actor/actriz (solo largometrajes) y lo que te falta de su filmografía.</li>
               <li>Seguir un calendario de estrenos y proyectos anunciados de tus cineastas.</li>
-              <li>Detectar franquicias empezadas y sin terminar (sagas de TMDB).</li>
+              <li>Detectar franquicias empezadas y sin terminar (sagas de TMDB), con las partes que faltan a la vista.</li>
               <li>Comprobar retos de listas famosas (IMDb Top 250, Cannes, 1001…) con anillos de «tengo» vs «visto».</li>
-              <li>Encontrar grandes directores del canon ausentes de tu servidor.</li>
+              <li>Encontrar grandes directores/as del canon de They Shoot Pictures ausentes de tu servidor.</li>
               <li>Comprobar en JustWatch si existe una versión de más calidad (HD/4K) en el mercado.</li>
             </ul>
           </div>
@@ -55,7 +55,7 @@ export default function About() {
             <ul className="list-disc pl-5 space-y-1">
               <li>Añadir a Radarr cualquier película que te falte con un clic, con perfil y carpeta configurables.</li>
               <li>Añadir en bloque toda una lista, saga o el cine venidero de un plazo.</li>
-              <li>Automatizar el día a día: lanzar solo cada noche los estrenos de tus directores favoritos vivos.</li>
+              <li>Automatizar el día a día: lanzar solo cada noche los estrenos de tus directores/as favoritos/as vivos.</li>
               <li>Pedir upgrades de las películas por debajo de 1080p.</li>
             </ul>
           </div>
@@ -64,8 +64,8 @@ export default function About() {
             <ul className="list-disc pl-5 space-y-1">
               <li>Importar tu Letterboxd (zip completo) y su feed RSS para marcar vistas y notas.</li>
               <li>Ver últimas añadidas a Plex, últimas vistas (Plex + Letterboxd) y últimas peticiones a Radarr.</li>
-              <li>Comparar tus notas con las de la crítica y la comunidad (joyas ocultas, discrepancias).</li>
-              <li>Marcar favoritos (incluidos directores que aún no tienes) y añadir a los españoles o a los del candelero de un vistazo.</li>
+              <li>Comparar tus notas de Letterboxd con las de la crítica y la comunidad (joyas ocultas, discrepancias).</li>
+              <li>Marcar favoritos (incluidos directores/as que aún no tienes): por paquetes temáticos, pegando una lista de nombres o de uno en uno.</li>
               <li>Elegir de qué webs (IMDb, RT, Metacritic, Letterboxd…) quieres ver las notas.</li>
             </ul>
           </div>
@@ -77,7 +77,7 @@ export default function About() {
         <p>
           <b className="text-slate-200">1. Sincronización con Plex.</b> Con tu X-Plex-Token, PowaFlex recorre tu
           biblioteca y descarga de cada película el reparto completo, dirección, guion, géneros, países,
-          colecciones, tu nota, visionados, y los datos técnicos del archivo (resolución, códec, HDR/Dolby
+          colecciones, visionados, y los datos técnicos del archivo (resolución, códec, HDR/Dolby
           Vision, tamaño). La primera vez tarda unos minutos; después es incremental y se repite sola cada noche.
         </p>
         <p>
@@ -98,42 +98,47 @@ export default function About() {
           <p>
             La foto general: cuántas películas tienes, cuántas horas de cine suman, cuánto disco ocupan, y
             gráficas por década, género, país y resolución, además del ritmo al que crece la biblioteca y los
-            directores y actores con más presencia.
+            directores/as y actores/actrices con más presencia.
           </p>
         </Block>
         <Block icon="🎞️" title="Biblioteca" to="/biblioteca">
           <p>
-            Toda tu colección en una parrilla de pósters con filtros al estilo Letterboxd: género, país, década,
-            visto/sin ver, largometraje o corto (menos de 40 minutos), resolución, HDR/Dolby Vision, nota mínima…
-            y ordenación por fecha añadida, estreno, nota, duración, tamaño o aleatorio para las noches indecisas.
+            Toda tu colección en una parrilla de pósters (con código de color 🟢 en Plex · ★ vista) y filtros al
+            estilo Letterboxd: género, país, década, visto/sin ver, largometraje o corto (menos de 40 minutos),
+            resolución, HDR/Dolby Vision, notas mínimas de IMDb/RT/Letterboxd… y ordenación por fecha añadida,
+            estreno, esas notas, duración, tamaño o aleatorio. La nota que sale en cada póster la eliges tú.
           </p>
         </Block>
-        <Block icon="🎭" title="Directores y actores" to="/personas">
+        <Block icon="🎭" title="Directores/as y actores/actrices" to="/personas">
           <p>
-            Ranking de directores, actores y guionistas por presencia en tu biblioteca. La ficha de cada persona
-            cruza su filmografía completa de TMDB con lo que tienes: porcentaje de completismo, lo que te falta
-            (con botón directo a Radarr) y sus proyectos anunciados. Con «☆ Seguir» la fijas en el calendario.
+            Ranking de directores/as, actores/actrices y guionistas por presencia en tu biblioteca. La ficha de
+            cada persona cruza su filmografía completa de TMDB con lo que tienes: porcentaje de completismo (solo
+            largometrajes, con filtros para cortos, documentales, TV y dirección coral), lo que te falta (con
+            botón directo a Radarr) y sus proyectos anunciados. Quien dirige y actúa tiene dos barras. Con
+            «☆ Seguir» la fijas en el calendario.
           </p>
         </Block>
         <Block icon="🗓️" title="Cine venidero" to="/calendario">
           <p>
-            Un calendario mensual con los próximos estrenos y proyectos anunciados de los directores y actores más
-            importantes de tu biblioteca (y de los que sigas manualmente). Cada estreno se puede mandar a Radarr
-            para tenerlo monitorizado desde ya.
+            Un calendario mensual con los próximos estrenos y proyectos anunciados de los directores/as y
+            actores/actrices más importantes de tu biblioteca (y de los que sigas manualmente). Cada estreno se
+            puede mandar a Radarr para tenerlo monitorizado desde ya.
           </p>
         </Block>
         <Block icon="⭐" title="Favoritos" to="/favoritos">
           <p>
-            Tu lista de directores y actores de cabecera, la que alimenta el calendario. Incluye un ranking por
-            número de títulos en tu servidor con el que puedes añadir «los X primeros» de golpe, y quitar o añadir
-            individualmente cuando quieras.
+            Tu lista de directores/as y actores/actrices de cabecera, la que alimenta el calendario. Incluye un
+            ranking paginado por número de títulos (con filtro de fallecidos y actualización de estado vital),
+            paquetes temáticos con «añadir todos», pegar una lista de nombres, y quitar o añadir individualmente.
+            Lo que quites con la ✕ no vuelve por los añadidos masivos (solo a mano).
           </p>
         </Block>
         <Block icon="🧭" title="Descubrir huecos" to="/descubrir">
           <p>
-            El modo completista: agrega lo que te falta de las filmografías de tus directores y actores top, y
-            además comprueba un canon de ~100 grandes directores del cine mundial para detectar los que no tienen
-            ni una sola película en tu servidor, con sus obras esenciales listas para añadir.
+            El modo completista: agrega lo que te falta de las filmografías de tus directores/as y actores/actrices
+            top, y además comprueba el canon de los 250 grandes directores/as de <i>They Shoot Pictures, Don't
+            They?</i> para detectar los que no tienen ni una sola película en tu servidor, con sus obras esenciales
+            listas para añadir.
           </p>
         </Block>
         <Block icon="🏆" title="Listas y retos" to="/listas">
@@ -151,8 +156,9 @@ export default function About() {
         </Block>
         <Block icon="👁️" title="Visionado" to="/visionado">
           <p>
-            Lo visto contra lo pendiente: por década, por género, los directores de los que más te queda por ver,
-            las mejor valoradas que aún no has visto y tu historial reciente.
+            El contador de lo que llevas visto (Plex + Letterboxd) y lo visto contra lo pendiente: por década, por
+            género, los directores/as de los que más te queda por ver, joyas y discrepancias frente a tu nota de
+            Letterboxd, las mejor valoradas que aún no has visto y tu historial reciente.
           </p>
         </Block>
         <Block icon="💾" title="Calidad y disco" to="/calidad">
@@ -165,7 +171,8 @@ export default function About() {
         <Block icon="🟠" title="Letterboxd" to="/letterboxd">
           <p>
             Importa tu export de Letterboxd (diario, notas, watchlist, vistas) y lo cruza con Plex: qué parte de
-            tu watchlist ya tienes en casa, cuál te falta, y cómo casan tus notas de Letterboxd con las de Plex.
+            tu watchlist ya tienes en casa, cuál te falta, y cómo casan tus notas de Letterboxd con las de la
+            comunidad y la nota combinada de MDBList.
           </p>
         </Block>
         <Block icon="⚙️" title="Ajustes" to="/ajustes">
