@@ -190,6 +190,20 @@ export default function Settings() {
             <input className="input mt-1" placeholder="Radarr → Settings → General" value={s.radarr_key || ''} onChange={set('radarr_key')} />
           </div>
         </div>
+        <div className="grid sm:grid-cols-2 gap-3 mt-3">
+          <div>
+            <label className="text-xs text-slate-400">Etiqueta para lo añadido desde PowaFlex</label>
+            <input
+              className="input mt-1"
+              placeholder="PowaFlex"
+              value={s.radarr_tag ?? 'PowaFlex'}
+              onChange={set('radarr_tag')}
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Se crea en Radarr si no existe y se aplica a cada película añadida. Déjalo vacío para no etiquetar.
+            </p>
+          </div>
+        </div>
         <div className="mt-3 flex gap-2 items-center flex-wrap">
           <button className="btn-ghost" onClick={() => test('radarr')}>Probar y cargar perfiles</button>
         </div>

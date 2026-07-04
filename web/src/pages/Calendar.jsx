@@ -78,6 +78,8 @@ export default function Calendar() {
       return DEFAULT_FILTERS;
     }
   });
+  const [horizon, setHorizon] = useState('6');
+  const [bulk, setBulk] = useState({ running: false, summary: null });
 
   const toggleFilter = (key) => {
     const next = { ...show, [key]: !show[key] };
@@ -128,6 +130,35 @@ export default function Calendar() {
   const recent = visible.filter((e) => e.date && e.date < today);
   const undated = visible.filter((e) => !e.date);
 
+  // bulk add: visible upcoming within horizon, not yet owned/queued
+  const horizonEnd = (() => {
+    if (horizon === 'all') return '9999-12-31';
+    const d = new Date(today);
+    d.setMonth(d.getMonth() + Number(horizon));
+    return d.toISOString().slice(0, 10);
+  })();
+  const eligible = [...upcoming, ...(horizon === 'all' ? undated : [])].filter(
+    (e) => !e.inLibrary && !radarrIds.has(e.tmdb_id) && (!e.date || e.date <= horizonEnd)
+  );
+
+  const bulkAdd = async () => {
+    setBulk({ running: true, summary: null });
+    const res = await api('/radarr/add-bulk', { method: 'POST', body: { tmdbIds: eligible.map((e) => e.tmdb_id) } });
+    if (res.error) {
+      setBulk({ running: false, summary: `⚠️ ${res.error}` });
+      return;
+    }
+    setRadarrIds((prev) => {
+      const next = new Set(prev);
+      for (const r of res.results || []) if (r.ok || r.alreadyExists) next.add(r.tmdbId);
+      return next;
+    });
+    setBulk({
+      running: false,
+      summary: `✓ ${res.added} añadidas a Radarr${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''}`,
+    });
+  };
+
   const byMonth = new Map();
   for (const ev of upcoming) {
     const ym = ev.date.slice(0, 7);
@@ -169,6 +200,24 @@ export default function Calendar() {
           <span className="text-xs text-slate-500 ml-auto">
             {hiddenCount} ocultas — solo cine largometraje
           </span>
+        )}
+      </div>
+
+      <div className="card p-3 mb-6 flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-slate-400">Monitorizar en bloque lo visible de los próximos</span>
+        <select className="input !w-auto !py-1" value={horizon} onChange={(e) => setHorizon(e.target.value)}>
+          <option value="3">3 meses</option>
+          <option value="6">6 meses</option>
+          <option value="12">12 meses</option>
+          <option value="24">2 años</option>
+          <option value="all">todo (incl. sin fecha)</option>
+        </select>
+        <button className="btn-gold !py-1.5" onClick={bulkAdd} disabled={bulk.running || eligible.length === 0}>
+          {bulk.running ? 'Añadiendo…' : `➕ Añadir ${eligible.length} a Radarr`}
+        </button>
+        {bulk.summary && <span className="text-xs text-emerald-400">{bulk.summary}</span>}
+        {!bulk.running && eligible.length === 0 && !bulk.summary && (
+          <span className="text-xs text-slate-500">Nada pendiente en ese plazo: todo está en tu Plex o en Radarr.</span>
         )}
       </div>
 

@@ -13,7 +13,7 @@ import {
   searchCollection,
   collectionDetails,
 } from './tmdb.js';
-import { radarrTest, radarrContext, radarrAdd } from './radarr.js';
+import { radarrTest, radarrContext, radarrAdd, radarrAddBulk } from './radarr.js';
 import { libraryGaps, absentGreats } from './discover.js';
 import { importLetterboxdCsv, rematchLetterboxd, letterboxdSummary } from './letterboxd.js';
 import * as q from './queries.js';
@@ -298,6 +298,24 @@ app.post('/api/radarr/add', async (req, reply) => {
   } catch (err) {
     reply.code(502);
     return { ok: false, error: String(err.message || err) };
+  }
+});
+
+app.post('/api/radarr/add-bulk', async (req, reply) => {
+  try {
+    const ids = (req.body?.tmdbIds || []).map(Number).filter(Boolean);
+    if (!ids.length) {
+      reply.code(400);
+      return { error: 'Falta tmdbIds' };
+    }
+    if (ids.length > 300) {
+      reply.code(400);
+      return { error: 'Máximo 300 películas por tanda' };
+    }
+    return await radarrAddBulk(ids);
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
   }
 });
 
