@@ -114,6 +114,42 @@ CREATE TABLE IF NOT EXISTS lb_entries (
 );
 CREATE INDEX IF NOT EXISTS idx_lb_list ON lb_entries(list);
 
+CREATE TABLE IF NOT EXISTS mdb_ratings (
+  tmdb_id INTEGER PRIMARY KEY,
+  imdb REAL,
+  imdb_votes INTEGER,
+  rt_critic INTEGER,
+  rt_audience INTEGER,
+  metacritic INTEGER,
+  letterboxd REAL,
+  trakt INTEGER,
+  score INTEGER,          -- mdblist combined score 0-100
+  json TEXT,
+  fetched_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS mdb_lists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mdb_id INTEGER UNIQUE,
+  name TEXT,
+  slug TEXT,
+  user_name TEXT,
+  url TEXT,
+  item_count INTEGER,
+  added_at INTEGER,
+  refreshed_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS mdb_list_items (
+  list_id INTEGER,
+  tmdb_id INTEGER,
+  rank INTEGER,
+  title TEXT,
+  year INTEGER,
+  imdb_id TEXT,
+  PRIMARY KEY (list_id, tmdb_id)
+);
+
 CREATE TABLE IF NOT EXISTS sync_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   started_at INTEGER,

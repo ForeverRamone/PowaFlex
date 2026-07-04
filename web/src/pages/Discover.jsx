@@ -50,6 +50,9 @@ function GapsView({ role, radarrIds }) {
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
             {p.missing.map((f) => (
               <TmdbCard key={f.tmdb_id} item={f}>
+                {f.mdb?.score != null && (
+                  <div className="text-[11px] text-gold-400">Σ {f.mdb.score}{f.mdb.imdb != null ? ` · IMDb ${Number(f.mdb.imdb).toFixed(1)}` : ''}</div>
+                )}
                 <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={radarrIds.has(f.tmdb_id)} />
               </TmdbCard>
             ))}

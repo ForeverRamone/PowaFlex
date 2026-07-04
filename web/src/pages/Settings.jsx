@@ -30,6 +30,7 @@ export default function Settings() {
   const [sync, setSync] = useState(null);
   const [radarrCtx, setRadarrCtx] = useState(null);
   const [sections, setSections] = useState(null);
+  const [mdbStatus, setMdbStatus] = useState(null);
 
   const loadSections = () =>
     api('/plex/sections').then((r) => Array.isArray(r) && setSections(r)).catch(() => {});
@@ -40,6 +41,7 @@ export default function Settings() {
       if (st.plex_url && st.plex_token_set) loadSections();
     });
     api('/sync/status').then(setSync);
+    api('/mdblist/status').then((st) => st && !st.error && st.total != null && setMdbStatus(st));
   }, []);
 
   // poll sync status while running
@@ -235,9 +237,72 @@ export default function Settings() {
         </Guide>
       </section>
 
+      {/* MDBLIST */}
+      <section className="card p-5 mb-5">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-slate-100">4 · MDBList <span className="text-slate-500 text-xs font-normal">(opcional: notas multi-plataforma y listas)</span></h2>
+          <TestBadge result={tests.mdblist} />
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3 mt-3">
+          <div>
+            <label className="text-xs text-slate-400">API key</label>
+            <input className="input mt-1" placeholder="mdblist.com → Preferences → API Access" value={s.mdblist_key || ''} onChange={set('mdblist_key')} />
+          </div>
+          <div>
+            <label className="text-xs text-slate-400">Tipo de cuenta</label>
+            <select className="input mt-1" value={s.mdblist_tier || 'auto'} onChange={set('mdblist_tier')}>
+              <option value="auto">Detectar automáticamente</option>
+              <option value="free">Gratuita (1.000 peticiones/día)</option>
+              <option value="supporter">Supporter (25.000/día)</option>
+            </select>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Define cuántas notas se refrescan al día: con cuenta gratuita el llenado inicial se reparte en
+              varios días; con Supporter cabe la biblioteca entera de una tanda.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 flex gap-2 items-center flex-wrap">
+          <button className="btn-ghost" onClick={() => test('mdblist')}>Probar conexión</button>
+          {tests.mdblist?.ok && tests.mdblist.limit != null && (
+            <span className="text-xs text-slate-400">
+              Límite {Number(tests.mdblist.limit).toLocaleString('es-ES')}/día
+              {tests.mdblist.usedToday != null && ` · usadas hoy ${tests.mdblist.usedToday}`}
+            </span>
+          )}
+          <button
+            className="btn-gold"
+            onClick={async () => {
+              await save();
+              await api('/mdblist/sync', { method: 'POST' });
+              const poll = setInterval(async () => {
+                const st = await api('/mdblist/status');
+                setMdbStatus(st);
+                if (!st.running) clearInterval(poll);
+              }, 2000);
+            }}
+          >
+            Sincronizar notas ahora
+          </button>
+          {mdbStatus && (
+            <span className="text-xs text-slate-400">
+              {mdbStatus.running
+                ? `Notas ${mdbStatus.done} / ${mdbStatus.total}…`
+                : mdbStatus.error
+                  ? `✗ ${mdbStatus.error}`
+                  : `${mdbStatus.withRatings?.toLocaleString('es-ES')} de ${mdbStatus.total?.toLocaleString('es-ES')} películas con notas`}
+            </span>
+          )}
+        </div>
+        <Guide title="¿Cómo consigo la API key de MDBList?">
+          <p>1. Cuenta en <b>mdblist.com</b> (puedes entrar con Trakt).</p>
+          <p>2. Ve a <b>Preferences → API Access</b> y copia la key.</p>
+          <p>3. La cuenta gratuita da 1.000 peticiones/día; las Supporter, bastantes más. PowaFlex respeta el límite y reparte el trabajo.</p>
+        </Guide>
+      </section>
+
       {/* CALENDAR */}
       <section className="card p-5 mb-5">
-        <h2 className="font-semibold text-slate-100">4 · Calendario de cine venidero</h2>
+        <h2 className="font-semibold text-slate-100">5 · Calendario de cine venidero</h2>
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           <div>
             <label className="text-xs text-slate-400">Nº de directores top a vigilar</label>

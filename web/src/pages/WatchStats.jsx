@@ -7,12 +7,30 @@ import { MovieModal } from '../components.jsx';
 
 const tooltipStyle = { backgroundColor: '#1a2030', border: '1px solid #35405c', borderRadius: 8, color: '#e2e8f0' };
 
+function InsightGrid({ title, items, caption, onSelect }) {
+  if (!items?.length) return null;
+  return (
+    <Section title={title}>
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-12 gap-3">
+        {items.map((m) => (
+          <div key={m.rating_key}>
+            <MovieCard movie={m} onClick={() => onSelect(m.rating_key)} />
+            <div className="text-[11px] text-slate-500">{caption(m)}</div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 export default function WatchStats() {
   const [data, setData] = useState(null);
+  const [ins, setIns] = useState(null);
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
     api('/stats/watch').then(setData);
+    api('/mdblist/insights').then((r) => !r.error && setIns(r));
   }, []);
 
   if (!data) return <Spinner />;
@@ -68,6 +86,35 @@ export default function WatchStats() {
           </div>
         )}
       </Section>
+
+      {ins && (
+        <>
+          <InsightGrid
+            title="💎 Joyas tuyas que la crítica no entendió (tu nota ≥ 8, RT ≤ 55%)"
+            items={ins.hiddenGems}
+            caption={(m) => `Tú: ${m.user_rating} · 🍅 ${m.rt_critic}%`}
+            onSelect={setSelected}
+          />
+          <InsightGrid
+            title="🏛️ Consenso crítico que tienes sin ver"
+            items={ins.consensusUnwatched}
+            caption={(m) => `Σ ${m.score}${m.rt_critic != null ? ` · 🍅 ${m.rt_critic}%` : ''}`}
+            onSelect={setSelected}
+          />
+          <InsightGrid
+            title="🎈 El mundo las ama, tú no (tu nota ≤ 5, consenso ≥ 75)"
+            items={ins.overrated}
+            caption={(m) => `Tú: ${m.user_rating} · Σ ${m.score}`}
+            onSelect={setSelected}
+          />
+          <InsightGrid
+            title="↔️ Donde más discrepas de Letterboxd"
+            items={ins.letterboxdDivergence}
+            caption={(m) => `Tú: ${m.user_rating} · LB ${Number(m.letterboxd).toFixed(1)} (${(m.letterboxd * 2).toFixed(1)}/10)`}
+            onSelect={setSelected}
+          />
+        </>
+      )}
 
       <Section title="Mejor valoradas que aún no has visto">
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-12 gap-3">

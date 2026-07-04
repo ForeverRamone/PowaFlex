@@ -11,6 +11,7 @@ import Quality from './pages/Quality.jsx';
 import WatchStats from './pages/WatchStats.jsx';
 import Discover from './pages/Discover.jsx';
 import Favorites from './pages/Favorites.jsx';
+import Lists from './pages/Lists.jsx';
 import About from './pages/About.jsx';
 import Settings from './pages/Settings.jsx';
 import { api } from './api.js';
@@ -22,6 +23,7 @@ const NAV = [
   { to: '/calendario', label: 'Cine venidero', icon: '🗓️' },
   { to: '/favoritos', label: 'Favoritos', icon: '⭐' },
   { to: '/descubrir', label: 'Descubrir huecos', icon: '🧭' },
+  { to: '/listas', label: 'Listas y retos', icon: '🏆' },
   { to: '/colecciones', label: 'Sagas', icon: '📚' },
   { to: '/visionado', label: 'Visionado', icon: '👁️' },
   { to: '/calidad', label: 'Calidad y disco', icon: '💾' },
@@ -93,6 +95,7 @@ function Shell() {
           <Route path="/visionado" element={<WatchStats />} />
           <Route path="/descubrir" element={<Discover />} />
           <Route path="/favoritos" element={<Favorites />} />
+          <Route path="/listas" element={<Lists />} />
           <Route path="/acerca" element={<About />} />
           <Route path="/calidad" element={<Quality />} />
           <Route path="/letterboxd" element={<Letterboxd />} />

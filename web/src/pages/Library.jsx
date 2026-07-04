@@ -14,6 +14,10 @@ const SORT_OPTIONS = [
   ['runtime_asc', 'Duración (corta)'],
   ['size', 'Tamaño en disco'],
   ['last_viewed', 'Vista recientemente'],
+  ['imdb', 'Nota IMDb'],
+  ['rt_critic', 'RT crítica'],
+  ['letterboxd', 'Nota Letterboxd'],
+  ['mdb_score', 'Nota combinada (MDBList)'],
   ['random', 'Aleatorio 🎲'],
 ];
 
@@ -104,6 +108,12 @@ export default function Library() {
           options={[['yes', 'HDR / DV'], ['dv', 'Solo Dolby Vision']]} />
         <Select value={q.ratingMin || ''} onChange={(v) => set('ratingMin', v)} placeholder="Nota mínima"
           options={[6, 7, 8].map((n) => [String(n), `★ ${n}+`])} />
+        <Select value={q.imdbMin || ''} onChange={(v) => set('imdbMin', v)} placeholder="IMDb mín."
+          options={[['6', 'IMDb 6+'], ['7', 'IMDb 7+'], ['8', 'IMDb 8+']]} />
+        <Select value={q.rtMin || ''} onChange={(v) => set('rtMin', v)} placeholder="RT crítica mín."
+          options={[['60', '🍅 60%+'], ['75', '🍅 75%+'], ['90', '🍅 90%+']]} />
+        <Select value={q.lbMin || ''} onChange={(v) => set('lbMin', v)} placeholder="Letterboxd mín."
+          options={[['3.5', 'LB 3.5+'], ['4', 'LB 4+'], ['4.3', 'LB 4.3+']]} />
         <Select value={q.sort || ''} onChange={(v) => set('sort', v)} placeholder="Orden: añadida"
           options={SORT_OPTIONS} />
         {[...params.keys()].length > 0 && (

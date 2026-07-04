@@ -228,6 +228,28 @@ export function MovieModal({ id, onClose }) {
             {movie.user_rating != null && <span className="text-gold-400">Tu nota: {movie.user_rating}</span>}
             {movie.view_count > 0 && <span className="text-emerald-400">Vista {movie.view_count}×</span>}
           </div>
+          {movie.ratings && (
+            <div className="flex flex-wrap gap-1.5 mt-2 text-[11px]">
+              {movie.ratings.imdb != null && (
+                <span className="bg-yellow-900/50 text-yellow-300 px-1.5 py-0.5 rounded">IMDb {Number(movie.ratings.imdb).toFixed(1)}</span>
+              )}
+              {movie.ratings.rt_critic != null && (
+                <span className="bg-red-900/50 text-red-300 px-1.5 py-0.5 rounded">🍅 {movie.ratings.rt_critic}%</span>
+              )}
+              {movie.ratings.rt_audience != null && (
+                <span className="bg-red-900/40 text-orange-300 px-1.5 py-0.5 rounded">🍿 {movie.ratings.rt_audience}%</span>
+              )}
+              {movie.ratings.metacritic != null && (
+                <span className="bg-emerald-900/50 text-emerald-300 px-1.5 py-0.5 rounded">MC {movie.ratings.metacritic}</span>
+              )}
+              {movie.ratings.letterboxd != null && (
+                <span className="bg-orange-900/50 text-orange-300 px-1.5 py-0.5 rounded">LB {Number(movie.ratings.letterboxd).toFixed(1)}</span>
+              )}
+              {movie.ratings.score != null && (
+                <span className="bg-ink-700 text-gold-400 px-1.5 py-0.5 rounded font-semibold">Σ {movie.ratings.score}</span>
+              )}
+            </div>
+          )}
           <p className="text-sm text-slate-300 mt-3 leading-relaxed">{movie.summary}</p>
           <div className="mt-3 text-sm">
             {directors.length > 0 && (

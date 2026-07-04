@@ -1,5 +1,18 @@
 # Changelog
 
+## Sin publicar
+
+- **Integración MDBList**: notas de IMDb, Rotten Tomatoes (crítica y público), Metacritic,
+  Letterboxd y Trakt para toda la biblioteca, con sync por lotes que respeta el límite diario
+  según el tipo de cuenta (gratuita/Supporter/auto). Nuevos filtros y ordenaciones en Biblioteca,
+  chips de notas en la ficha, secciones de joyas/discrepancias en Visionado, priorización por
+  nota combinada en Descubrir/upgrades y página **Listas y retos** (seguir listas de MDBList con
+  % completado y envío en bloque a Radarr).
+- Cine venidero: filtros estilo Letterboxd (cortos, documentales, TV), etiqueta configurable de
+  Radarr, añadido masivo por horizonte temporal.
+- Ajustes: selección de bibliotecas de Plex a sincronizar.
+- Icono propio de la app (favicon, Docker/UNRAID, README).
+
 ## Alpha 0.1 (0.1.0-alpha) — 2026-07-04
 
 Primera versión pública.

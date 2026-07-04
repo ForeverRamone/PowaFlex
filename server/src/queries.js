@@ -92,6 +92,10 @@ const SORTS = {
   year_asc: 'm.year ASC',
   last_viewed: 'm.last_viewed_at DESC',
   random: 'RANDOM()',
+  imdb: 'r.imdb DESC NULLS LAST',
+  rt_critic: 'r.rt_critic DESC NULLS LAST',
+  letterboxd: 'r.letterboxd DESC NULLS LAST',
+  mdb_score: 'r.score DESC NULLS LAST',
 };
 
 export function listMovies(q) {
@@ -142,9 +146,12 @@ export function listMovies(q) {
   }
   if (q.hdr === 'yes') where.push('m.hdr IS NOT NULL');
   if (q.hdr === 'dv') where.push(`m.hdr = 'Dolby Vision'`);
+  if (q.imdbMin) { where.push('r.imdb >= ?'); args.push(Number(q.imdbMin)); }
+  if (q.rtMin) { where.push('r.rt_critic >= ?'); args.push(Number(q.rtMin)); }
+  if (q.lbMin) { where.push('r.letterboxd >= ?'); args.push(Number(q.lbMin)); }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const joinSql = joins.join('\n');
+  const joinSql = `LEFT JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id\n${joins.join('\n')}`;
   const order = SORTS[q.sort] || SORTS.added;
   const limit = Math.min(Number(q.limit) || 60, 200);
   const offset = Number(q.offset) || 0;
@@ -156,7 +163,8 @@ export function listMovies(q) {
   const rows = db
     .prepare(
       `SELECT DISTINCT m.rating_key, m.title, m.year, m.thumb, m.audience_rating, m.user_rating,
-              m.duration_ms, m.resolution, m.hdr, m.view_count, m.size_bytes, m.release_date, m.added_at
+              m.duration_ms, m.resolution, m.hdr, m.view_count, m.size_bytes, m.release_date, m.added_at,
+              r.imdb, r.rt_critic, r.letterboxd, r.score AS mdb_score
        FROM movies m ${joinSql} ${whereSql} ORDER BY ${order} LIMIT ? OFFSET ?`
     )
     .all(...args, limit, offset);
@@ -200,7 +208,10 @@ export function movieDetail(ratingKey) {
     )
     .all(ratingKey);
   const lb = db.prepare('SELECT list, rating, watched_date FROM lb_entries WHERE movie_id = ?').all(ratingKey);
-  return { ...movie, people, tags, letterboxd: lb };
+  const ratings = movie.tmdb_id
+    ? db.prepare('SELECT imdb, imdb_votes, rt_critic, rt_audience, metacritic, letterboxd, trakt, score FROM mdb_ratings WHERE tmdb_id = ?').get(movie.tmdb_id) || null
+    : null;
+  return { ...movie, people, tags, letterboxd: lb, ratings };
 }
 
 // --- quality / disk -----------------------------------------------------------
@@ -226,13 +237,14 @@ export function qualityOverview() {
 }
 
 export function upgradeCandidates({ limit = 100 } = {}) {
-  // well-rated films still below 1080p (or below 4k if you filter client-side)
+  // well-rated films still below 1080p; multi-platform score first when available
   return db
     .prepare(
-      `SELECT rating_key, title, year, thumb, resolution, video_codec, audience_rating, user_rating, tmdb_id, size_bytes
-       FROM movies
-       WHERE resolution IN ('sd','480','576','720') OR resolution IS NULL
-       ORDER BY COALESCE(user_rating, 0) DESC, COALESCE(audience_rating, 0) DESC
+      `SELECT m.rating_key, m.title, m.year, m.thumb, m.resolution, m.video_codec,
+              m.audience_rating, m.user_rating, m.tmdb_id, m.size_bytes, r.score AS mdb_score, r.imdb
+       FROM movies m LEFT JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
+       WHERE m.resolution IN ('sd','480','576','720') OR m.resolution IS NULL
+       ORDER BY COALESCE(m.user_rating, 0) DESC, COALESCE(r.score, 0) DESC, COALESCE(m.audience_rating, 0) DESC
        LIMIT ?`
     )
     .all(limit);

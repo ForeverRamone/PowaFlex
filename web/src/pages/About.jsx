@@ -90,6 +90,13 @@ export default function About() {
             ni una sola película en tu servidor, con sus obras esenciales listas para añadir.
           </p>
         </Block>
+        <Block icon="🏆" title="Listas y retos" to="/listas">
+          <p>
+            Sigue listas de MDBList (1001 películas, palmarés de premios, tops de la comunidad) y conviértelas en
+            retos de completismo: % conseguido, lo que falta y envío en bloque a Radarr. Con MDBList además toda
+            la app gana notas de IMDb, Rotten Tomatoes, Metacritic y Letterboxd.
+          </p>
+        </Block>
         <Block icon="📚" title="Sagas" to="/colecciones">
           <p>
             Toma las colecciones de tu Plex, las localiza en TMDB y te dice qué partes de cada saga te faltan o

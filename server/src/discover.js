@@ -1,5 +1,19 @@
-import { db, cacheRead, cacheWrite } from './db.js';
+import { db, cacheRead, cacheWrite, getSetting } from './db.js';
 import { personCredits, findPersonInfo, resolvePerson } from './tmdb.js';
+import { enrichWithScores } from './mdblist.js';
+
+// prefer the mdblist multi-platform score; fall back to TMDB vote volume
+const rankKey = (i) => (i.mdb?.score != null ? i.mdb.score * 10000 : Math.min(9999, i.votes || 0));
+
+async function applyScores(people, perPerson) {
+  if (!getSetting('mdblist_key')) return;
+  const all = people.flatMap((p) => p.missing);
+  await enrichWithScores(all, { maxFetch: 300 });
+  for (const p of people) {
+    p.missing.sort((a, b) => rankKey(b) - rankKey(a));
+    p.missing = p.missing.slice(0, perPerson);
+  }
+}
 
 const HOUR = 3600 * 1000;
 
@@ -119,7 +133,8 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
             owned,
             pct: released ? Math.round((owned / released) * 100) : 0,
             missingTotal: missing.length,
-            missing: missing.slice(0, perPerson),
+            // keep a few extra so the mdblist re-rank can promote better films
+            missing: missing.slice(0, perPerson * 2),
           });
         }
       } catch (err) {
@@ -130,6 +145,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
   await Promise.all(Array.from({ length: 5 }, worker));
 
   out.sort((a, b) => b.inLibrary - a.inLibrary);
+  await applyScores(out, perPerson);
   const result = { generatedAt: Date.now(), role, people: out, errors: errors.slice(0, 5) };
   if (out.length || !errors.length) cacheWrite(cacheKey, result);
   return result;

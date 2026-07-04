@@ -15,6 +15,18 @@ import {
 } from './tmdb.js';
 import { radarrTest, radarrContext, radarrAdd, radarrAddBulk } from './radarr.js';
 import { libraryGaps, absentGreats } from './discover.js';
+import {
+  mdbTest,
+  syncRatings,
+  mdbSyncStatus,
+  ratingsCoverage,
+  insights,
+  searchLists,
+  addList,
+  savedLists,
+  listDetail,
+  deleteList,
+} from './mdblist.js';
 import { importLetterboxdCsv, rematchLetterboxd, letterboxdSummary } from './letterboxd.js';
 import * as q from './queries.js';
 
@@ -60,6 +72,11 @@ app.post('/api/settings/test/:service', async (req, reply) => {
     if (service === 'plex') return await plexTest();
     if (service === 'tmdb') return await tmdbTest();
     if (service === 'radarr') return await radarrTest();
+    if (service === 'mdblist') {
+      const r = await mdbTest();
+      if (r.limit) setSetting('mdblist_detected_limit', String(r.limit));
+      return r;
+    }
     reply.code(400);
     return { ok: false, error: 'Servicio desconocido' };
   } catch (err) {
@@ -319,6 +336,67 @@ app.post('/api/radarr/add-bulk', async (req, reply) => {
   }
 });
 
+// --- mdblist -----------------------------------------------------------------------------
+
+app.post('/api/mdblist/sync', async () => {
+  if (!mdbSyncStatus.running) syncRatings().catch(() => {});
+  return mdbSyncStatus;
+});
+
+app.get('/api/mdblist/status', async () => ({ ...mdbSyncStatus, ...ratingsCoverage() }));
+
+app.get('/api/mdblist/insights', async () => insights());
+
+app.get('/api/mdblist/lists', async () => savedLists());
+
+app.get('/api/mdblist/lists/search', async (req, reply) => {
+  try {
+    const q = String(req.query.query || '').trim();
+    if (!q) return [];
+    return await searchLists(q);
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.post('/api/mdblist/lists', async (req, reply) => {
+  try {
+    return await addList(req.body || {});
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.get('/api/mdblist/lists/:id', async (req, reply) => {
+  const d = listDetail(Number(req.params.id));
+  if (!d) {
+    reply.code(404);
+    return { error: 'Lista no encontrada' };
+  }
+  return d;
+});
+
+app.post('/api/mdblist/lists/:id/refresh', async (req, reply) => {
+  try {
+    const list = db.prepare('SELECT * FROM mdb_lists WHERE id = ?').get(Number(req.params.id));
+    if (!list) {
+      reply.code(404);
+      return { error: 'Lista no encontrada' };
+    }
+    return await addList({ mdbId: list.mdb_id, name: list.name, slug: list.slug, userName: list.user_name });
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.delete('/api/mdblist/lists/:id', async (req) => {
+  deleteList(Number(req.params.id));
+  return { ok: true };
+});
+
 // --- quality / letterboxd ---------------------------------------------------------------
 
 app.get('/api/quality/overview', async () => q.qualityOverview());
@@ -440,7 +518,11 @@ setInterval(() => {
   const h = new Date().getHours();
   const m = new Date().getMinutes();
   if (h === 3 && m < 5 && !syncStatus.running && getSetting('plex_url') && getSetting('plex_token')) {
-    runSync().then(() => rematchLetterboxd()).then(() => getCalendarCached({ refresh: true })).catch(() => {});
+    runSync()
+      .then(() => rematchLetterboxd())
+      .then(() => getCalendarCached({ refresh: true }))
+      .then(() => (getSetting('mdblist_key') ? syncRatings() : null))
+      .catch(() => {});
   }
 }, 5 * 60 * 1000);
 

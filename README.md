@@ -23,6 +23,7 @@ cuentas ni telemetría.
 | 🗓️ **Cine venidero** | Calendario mensual de estrenos próximos y proyectos anunciados de tus directores/actores top y favoritos, con envío a Radarr en un clic. |
 | ⭐ **Favoritos** | Ranking por nº de títulos con añadido en bloque («los X primeros») y edición individual. Los favoritos entran siempre en el calendario. |
 | 🧭 **Descubrir huecos** | Lo que te falta de tus filmografías top, y un canon de ~110 grandes directores del cine mundial para detectar los que no tienen ni una película en tu servidor, con sus obras esenciales. |
+| 🏆 **Listas y retos** | Sigue listas de MDBList (1001 Movies, premios, tops) como retos: % completado, qué falta y envío en bloque a Radarr. |
 | 📚 **Sagas** | Cruza las colecciones de tu Plex con TMDB: qué partes de cada saga te faltan o están por estrenar. |
 | 👁️ **Visionado** | Visto vs. pendiente por década y género, directores con obra pendiente, mejor valoradas sin ver. |
 | 💾 **Calidad y disco** | Resoluciones, códecs, HDR, candidatas a upgrade (buenas películas por debajo de 1080p), duplicados, archivos más pesados. |
@@ -99,6 +100,13 @@ Las mismas guías están dentro de la app (Ajustes → desplegables bajo cada ca
 - URL: la misma con la que abres Radarr (puerto 7878 por defecto).
 - API key: **Settings → General → Security → API Key**.
 - Tras «Probar y cargar perfiles», elige perfil de calidad y carpeta raíz.
+
+**MDBList** (opcional, recomendado)
+- Cuenta en [mdblist.com](https://mdblist.com) → **Preferences → API Access**.
+- Añade a toda la app las notas de IMDb, Rotten Tomatoes (crítica y público), Metacritic,
+  Letterboxd y Trakt (filtros, ordenaciones, joyas/discrepancias) y las listas como retos.
+- PowaFlex respeta el límite diario de tu cuenta (gratuita o Supporter, configurable en Ajustes)
+  repartiendo la sincronización de notas en varios días si hace falta.
 
 ## 🧑‍💻 Desarrollo local
 
