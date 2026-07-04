@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Spinner, Section, Empty, StatCard } from '../components.jsx';
+import { Spinner, Section, Empty, StatCard, Dropzone } from '../components.jsx';
 
 export default function Letterboxd() {
   const [summary, setSummary] = useState(null);
@@ -9,16 +9,13 @@ export default function Letterboxd() {
   const [rssUser, setRssUser] = useState('');
   const [rssBusy, setRssBusy] = useState(false);
   const [rssResult, setRssResult] = useState(null);
-  const fileRef = useRef();
 
   const load = () => api('/letterboxd/summary').then((s) => { setSummary(s); if (s.rssUser != null) setRssUser(s.rssUser || ''); });
   useEffect(() => {
     load();
   }, []);
 
-  const upload = async (e) => {
-    e.preventDefault();
-    const files = fileRef.current?.files;
+  const upload = async (files) => {
     if (!files?.length) return;
     setUploading(true);
     const fd = new FormData();
@@ -52,26 +49,27 @@ export default function Letterboxd() {
         y el formato Letterboxd de WebTools-NG.
       </p>
 
-      <form onSubmit={upload} className="card p-4 mb-6 flex flex-wrap items-center gap-3">
-        <input ref={fileRef} type="file" accept=".csv,.zip" multiple className="text-sm text-slate-400" />
-        <button className="btn-gold" disabled={uploading}>
-          {uploading ? 'Importando…' : 'Importar zip o CSV'}
-        </button>
+      <div className="card p-4 mb-6">
+        <Dropzone
+          accept=".csv,.zip"
+          busy={uploading}
+          onFiles={upload}
+          label="Arrastra aquí el .zip de Letterboxd (o CSV sueltos), o haz clic para elegir"
+          hint="Acepta el export completo sin descomprimir · también CSV en formato WebTools-NG"
+        />
         {hasData && (
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={async () => {
-              await api('/letterboxd', { method: 'DELETE' });
-              setResult(null);
-              load();
-            }}
-          >
-            Vaciar datos importados
-          </button>
+          <div className="mt-3">
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={async () => { await api('/letterboxd', { method: 'DELETE' }); setResult(null); load(); }}
+            >
+              Vaciar datos importados
+            </button>
+          </div>
         )}
         {result?.results && (
-          <div className="w-full text-xs text-slate-400 space-y-0.5">
+          <div className="text-xs text-slate-400 space-y-0.5 mt-3">
             {result.results.map((r, i) => (
               <div key={i}>
                 {r.file}: {r.error ? `⚠️ ${r.error}` : `${r.imported} importadas (${r.matched} emparejadas con tu biblioteca) como «${r.list}»`}
@@ -84,7 +82,7 @@ export default function Letterboxd() {
             )}
           </div>
         )}
-      </form>
+      </div>
 
       {/* RSS feed */}
       <div className="card p-4 mb-8">

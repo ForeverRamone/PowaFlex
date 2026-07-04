@@ -1,5 +1,36 @@
 # Changelog
 
+## Alpha 0.4 (0.4.0-alpha) — 2026-07-04
+
+- **Vistas combinadas**: el recuento de «vistas» (Dashboard y Visionado) suma Plex + Letterboxd
+  (importación y RSS). También el filtro Vista/Sin ver de la biblioteca.
+- **Fichas de película en toda la web**: cualquier póster (biblioteca, calendario, descubrir, sagas…)
+  abre una ficha unificada con reparto y dirección clicables, notas enlazadas a su web (IMDb, RT,
+  Metacritic, Letterboxd) y botón de Radarr. Upgrade a Radarr desde la ficha si está por debajo de 1080p.
+- **JustWatch**: comprueba si existe una versión de más calidad (HD/4K) en el mercado antes de pedir
+  un upgrade, y en qué plataformas. API no oficial, best-effort.
+- **Descubrir huecos** rehecho: pestaña de tus favoritos, botón de actualizar, buscador de personas y
+  filtros de cortos/documentales/TV siempre visibles. Arreglado el falso «no lo tienes» (matching por
+  título/año además de por id de TMDB).
+- **Anillos de completista** de Letterboxd con doble anillo concéntrico: **tengo** (Plex) vs **visto**
+  (Plex o Letterboxd), seleccionable; ocultar retos que no interesen y mandar lo que falta a Radarr.
+- **Directores y actores**: filtros por género, vivo/fallecido, continente y país.
+- **Favoritos**: separa directores y actores.
+- **Dashboard**: la tarta de resoluciones es clicable (filtra la biblioteca); en «últimas vistas» Plex
+  prioriza sobre Letterboxd y las vistas fuera de Plex traen carátula de TMDB.
+- Barra de progreso real al construir el calendario o descubrir huecos desde TMDB.
+- Arreglado el filtro HDR/SDR de la biblioteca (ahora con opción «Solo SDR»).
+- Barra lateral: «+X» en verde con las películas nuevas de la última sincronización.
+- Sagas: analiza todas las pendientes de una (antes por lotes de 800).
+- Ajustes: elegir de qué webs se muestran las notas.
+- **Favoritos**: sugerencias de directores (españoles y del candelero de TMDB), añadir a cualquiera
+  tecleando, tope de añadido en bloque hasta 1000 y pestañas «Mis favoritos» / «Descubrir a quién seguir».
+- **Buscador global** (Ctrl/⌘ + K) de películas y personas.
+- **Interfaz**: barra lateral responsive (menú hamburguesa en móvil), ficha de película unificada,
+  toasts de acciones, filtros de biblioteca plegables con chips y memoria, subida de archivos por
+  arrastrar-y-soltar, cerrar fichas con Esc, y Ajustes/«¿Qué es PowaFlex?» a ancho completo.
+- «Listas y retos» con pestañas MDBList/Letterboxd; «¿Qué es PowaFlex?» con listado de capacidades.
+
 ## Alpha 0.3 (0.3.0-alpha) — 2026-07-04
 
 - **Vivos y muertos**: PowaFlex cachea fecha de fallecimiento de las personas; los fallecidos se

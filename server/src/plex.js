@@ -1,4 +1,4 @@
-import { db, getSetting } from './db.js';
+import { db, getSetting, setSetting } from './db.js';
 
 // --- low-level client -------------------------------------------------------
 
@@ -253,6 +253,7 @@ export async function runSync({ force = false } = {}) {
       if (filtered.length) sections = filtered;
     }
 
+    const preExisting = new Set(db.prepare('SELECT rating_key FROM movies').all().map((r) => r.rating_key));
     const seen = new Set();
     const PAGE = 240;
 
@@ -321,11 +322,16 @@ export async function runSync({ force = false } = {}) {
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
+    // count films that weren't in the library before this sync (#8)
+    const newlyAdded = [...seen].filter((k) => !preExisting.has(k)).length;
+    setSetting('last_sync_added', String(newlyAdded));
+    setSetting('last_sync_at', String(Date.now()));
+
     syncStatus.phase = 'done';
     db.prepare('UPDATE sync_log SET finished_at = ?, status = ?, detail = ? WHERE id = ?').run(
       Date.now(),
       'ok',
-      JSON.stringify({ movies: seen.size, details: pending.length, failures }),
+      JSON.stringify({ movies: seen.size, added: newlyAdded, details: pending.length, failures }),
       logId
     );
   } catch (err) {

@@ -91,7 +91,7 @@ export default function Settings() {
         : 0;
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <h1 className="text-2xl font-bold text-slate-100 mb-6">Ajustes</h1>
 
       {/* PLEX */}
@@ -399,6 +399,35 @@ export default function Settings() {
           <p>3. La cuenta gratuita da 1.000 peticiones/día; las Supporter, bastantes más. PowaFlex respeta el límite y reparte el trabajo.</p>
         </Guide>
       </section>
+
+      {/* RATINGS SOURCES */}
+      {(() => {
+        const ALL = [
+          ['imdb', 'IMDb'], ['rt_critic', 'Rotten Tomatoes (crítica)'], ['rt_audience', 'Rotten Tomatoes (público)'],
+          ['metacritic', 'Metacritic'], ['letterboxd', 'Letterboxd'], ['score', 'Nota combinada (Σ)'],
+        ];
+        const enabled = s.ratings_sources == null ? ALL.map(([k]) => k) : s.ratings_sources.split(',').filter(Boolean);
+        const toggle = (k) => {
+          const next = enabled.includes(k) ? enabled.filter((x) => x !== k) : [...enabled, k];
+          setS({ ...s, ratings_sources: next.join(',') });
+        };
+        return (
+          <section className="card p-5 mb-5">
+            <h2 className="font-semibold text-slate-100 mb-1">Notas y puntuaciones que mostrar</h2>
+            <p className="text-xs text-slate-500 mb-3">
+              Elige de qué webs aparecen las notas en las fichas de película (necesita MDBList para tenerlas). Desmarca las que no te interesen.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {ALL.map(([k, label]) => (
+                <label key={k} className={`btn-ghost !py-1.5 flex items-center gap-2 select-none cursor-pointer ${enabled.includes(k) ? '!border-gold-400 text-gold-400' : 'opacity-60'}`}>
+                  <input type="checkbox" className="accent-[#e8b53a]" checked={enabled.includes(k)} onChange={() => toggle(k)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* CALENDAR */}
       <section className="card p-5 mb-5">

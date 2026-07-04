@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
-import { Spinner, ErrorBox, RadarrButton, Empty, useRadarrIds } from '../components.jsx';
+import { Spinner, ErrorBox, RadarrButton, Empty, useRadarrIds, MediaModal, BuildProgress } from '../components.jsx';
 
 function monthLabel(ym) {
   const [y, m] = ym.split('-');
@@ -19,11 +19,18 @@ function typeBadges(ev) {
 
 function EventCard({ ev, radarrIds, onAdded }) {
   const img = tmdbImg(ev.poster_path, 'w185');
+  const [ficha, setFicha] = useState(false);
   return (
     <div className="card p-3 flex gap-3">
-      <div className="w-20 shrink-0 aspect-[2/3] rounded overflow-hidden bg-ink-800">
+      <button
+        type="button"
+        onClick={() => setFicha(true)}
+        className="w-20 shrink-0 aspect-[2/3] rounded overflow-hidden bg-ink-800 cursor-pointer hover:ring-2 hover:ring-gold-400"
+        title="Ver ficha"
+      >
         {img ? <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" /> : null}
-      </div>
+      </button>
+      {ficha && <MediaModal tmdbId={ev.tmdb_id} onClose={() => setFicha(false)} />}
       <div className="min-w-0 flex-1">
         <div className="font-medium text-slate-100 text-sm">
           {ev.title}
@@ -113,7 +120,7 @@ export default function Calendar() {
         <ErrorBox error={`${error} — comprueba la API key de TMDB en Ajustes.`} />
       </div>
     );
-  if (!data) return <Spinner label="Construyendo calendario desde TMDB (la primera vez tarda un poco)…" />;
+  if (!data) return <BuildProgress label="Construyendo el calendario desde TMDB (la primera vez tarda un poco)…" />;
 
   const today = data.today;
 

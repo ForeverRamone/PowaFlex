@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Legend } from 'recharts';
 import { api, fmtBytes } from '../api.js';
-import { Spinner, Section, MovieCard, MovieModal, Empty, RadarrButton, useRadarrIds } from '../components.jsx';
+import { Spinner, Section, MovieCard, MovieModal, Empty, RadarrButton, useRadarrIds, JustWatchCheck } from '../components.jsx';
 
 const COLORS = ['#e8b53a', '#38bdf8', '#34d399', '#f472b6', '#a78bfa', '#fb923c', '#f87171', '#94a3b8'];
 const tooltipStyle = { backgroundColor: '#1a2030', border: '1px solid #35405c', borderRadius: 8, color: '#e2e8f0' };
@@ -27,46 +27,26 @@ export default function Quality() {
     <div>
       <h1 className="text-2xl font-bold text-slate-100 mb-6">Calidad y disco</h1>
 
-      <div className="grid lg:grid-cols-3 gap-6 mb-8">
-        <Section title="Resolución (nº y peso)">
-          <div className="card p-4 h-64">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={ov.byResolution} dataKey="n" nameKey="name" innerRadius={42} outerRadius={72}>
-                  {ov.byResolution.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v, n, p) => [`${v} pelis · ${fmtBytes(p.payload.size)}`, p.payload.name]} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
-        <Section title="Códecs de vídeo">
-          <div className="card p-4 h-64">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={ov.byCodec} dataKey="n" nameKey="name" innerRadius={42} outerRadius={72}>
-                  {ov.byCodec.map((_, i) => <Cell key={i} fill={COLORS[(i + 2) % COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v, n, p) => [`${v} películas`, p.payload.name]} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
-        <Section title="HDR / Dolby Vision">
-          <div className="card p-4 h-64">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={ov.hdr} dataKey="n" nameKey="name" innerRadius={42} outerRadius={72}>
-                  {ov.hdr.map((_, i) => <Cell key={i} fill={COLORS[(i + 4) % COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v, n, p) => [`${v} películas`, p.payload.name]} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {[
+          ['Resolución', ov.byResolution, 0, (p) => `${p.payload.n} pelis · ${fmtBytes(p.payload.size)}`],
+          ['Códecs de vídeo', ov.byCodec, 2, (p) => `${p.payload.n} películas`],
+          ['HDR / Dolby Vision', ov.hdr, 4, (p) => `${p.payload.n} películas`],
+        ].map(([title, data, shift, fmt]) => (
+          <Section key={title} title={title}>
+            <div className="card p-4 h-80">
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={data} dataKey="n" nameKey="name" innerRadius={40} outerRadius={68} cy="45%">
+                    {data.map((_, i) => <Cell key={i} fill={COLORS[(i + shift) % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v, n, p) => [fmt(p), p.payload.name]} />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </Section>
+        ))}
       </div>
 
       <Section title="Espacio en disco por década">
@@ -88,13 +68,14 @@ export default function Quality() {
         ) : upgrades.length === 0 ? (
           <Empty>Todo está al menos en 1080p. 💪</Empty>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 mb-8">
             {upgrades.map((m) => (
-              <div key={m.rating_key} className="flex flex-col">
+              <div key={m.rating_key} className="card p-2 flex flex-col">
                 <MovieCard movie={m} onClick={() => setSelected(m.rating_key)} />
-                <div className="text-[11px] text-orange-400 mt-0.5">{m.resolution || 'SD'} · {fmtBytes(m.size_bytes)}</div>
+                <div className="text-[11px] text-orange-400 mt-1">{(m.resolution || 'SD').toUpperCase()} · {fmtBytes(m.size_bytes)}</div>
                 {m.tmdb_id && (
-                  <div className="mt-1">
+                  <div className="mt-auto pt-1.5 flex items-center justify-between gap-1">
+                    <JustWatchCheck tmdbId={m.tmdb_id} />
                     <RadarrButton tmdbId={m.tmdb_id} small alreadyInRadarr={radarrIds.has(m.tmdb_id)} onAdded={addRadarrId} />
                   </div>
                 )}

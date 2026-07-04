@@ -36,3 +36,17 @@ export const fmtDate = (d) => {
 };
 
 export const tmdbImg = (path, size = 'w342') => (path ? `https://image.tmdb.org/t/p/${size}${path}` : null);
+
+// External links per rating source, so a score chip opens that film on its site.
+export const ratingLinks = ({ imdb_id, tmdb_id, title } = {}) => ({
+  imdb: imdb_id
+    ? `https://www.imdb.com/title/${imdb_id}/`
+    : title
+      ? `https://www.imdb.com/find/?q=${encodeURIComponent(title)}`
+      : null,
+  // letterboxd resolves /tmdb/<id> to the film page
+  letterboxd: tmdb_id ? `https://letterboxd.com/tmdb/${tmdb_id}/` : null,
+  rt: title ? `https://www.rottentomatoes.com/search?search=${encodeURIComponent(title)}` : null,
+  metacritic: title ? `https://www.metacritic.com/search/${encodeURIComponent(title)}/` : null,
+  tmdb: tmdb_id ? `https://www.themoviedb.org/movie/${tmdb_id}` : null,
+});

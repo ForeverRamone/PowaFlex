@@ -219,6 +219,19 @@ function ensureColumn(table, column, decl) {
 ensureColumn('people', 'birthday', 'birthday TEXT');
 ensureColumn('people', 'deathday', 'deathday TEXT');
 ensureColumn('people', 'details_fetched_at', 'details_fetched_at INTEGER');
+// demographics for the people filters (gender/continent/country)
+ensureColumn('people', 'gender', 'gender INTEGER');          // TMDB: 1=female 2=male 3=non-binary
+ensureColumn('people', 'place_of_birth', 'place_of_birth TEXT');
+ensureColumn('people', 'country', 'country TEXT');
+ensureColumn('people', 'continent', 'continent TEXT');
+
+// letterboxd entries: keep the TMDB id + poster so non-library watches still
+// show artwork on the dashboard
+ensureColumn('lb_entries', 'tmdb_id', 'tmdb_id INTEGER');
+ensureColumn('lb_entries', 'poster_path', 'poster_path TEXT');
+
+// challenge lists can be hidden by the user without deleting them
+ensureColumn('lb_lists', 'hidden', 'hidden INTEGER DEFAULT 0');
 
 // --- settings helpers -------------------------------------------------------
 

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend,
 } from 'recharts';
-import { api, fmtBytes, fmtDate } from '../api.js';
+import { api, fmtBytes, fmtDate, tmdbImg } from '../api.js';
 import { Spinner, StatCard, Section, PersonCard, Empty, MovieModal } from '../components.jsx';
 
 const GOLD = '#e8b53a';
@@ -20,12 +20,18 @@ const tooltipStyle = {
 // small poster tile used across the "recent" strips
 function PosterTile({ item, onClick, badge, sub }) {
   const [err, setErr] = useState(false);
-  const showImg = item.rating_key && item.thumb !== false && !err;
+  // Plex poster if in library; otherwise the TMDB poster so LB-only watches
+  // still show artwork (#9)
+  const src = item.rating_key && item.thumb !== false
+    ? `/img/${item.rating_key}/poster`
+    : item.poster_path
+      ? tmdbImg(item.poster_path)
+      : null;
   return (
     <button onClick={onClick} disabled={!item.rating_key} className="w-full text-left group disabled:cursor-default">
       <div className="aspect-[2/3] rounded-lg overflow-hidden bg-ink-800 border border-ink-700 group-enabled:group-hover:border-gold-400 transition-colors relative flex items-center justify-center">
-        {showImg ? (
-          <img src={`/img/${item.rating_key}/poster`} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover" />
+        {src && !err ? (
+          <img src={src} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover" />
         ) : (
           <span className="text-[11px] text-slate-400 text-center p-2">{item.title}</span>
         )}
@@ -67,12 +73,18 @@ function RecentStrip({ items, onSelect, kind }) {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [ov, setOv] = useState(null);
   const [charts, setCharts] = useState(null);
   const [recent, setRecent] = useState(null);
   const [directors, setDirectors] = useState([]);
   const [actors, setActors] = useState([]);
   const [selected, setSelected] = useState(null);
+
+  const openResolution = (name) => {
+    if (!name || name === 'desconocida') return navigate('/biblioteca');
+    navigate(`/biblioteca?resolution=${encodeURIComponent(name)}`);
+  };
 
   useEffect(() => {
     api('/stats/overview').then(setOv);
@@ -172,7 +184,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </Section>
-        <Section title="Resoluciones">
+        <Section title="Resoluciones" action={<span className="text-xs text-slate-500">clic para filtrar la biblioteca</span>}>
           <div className="card p-4 h-72">
             <ResponsiveContainer>
               <PieChart>
@@ -182,13 +194,18 @@ export default function Dashboard() {
                   nameKey="name"
                   innerRadius={48}
                   outerRadius={80}
+                  onClick={(d) => openResolution(d?.name || d?.payload?.name)}
+                  className="cursor-pointer"
                 >
                   {charts.byResolution.map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} formatter={(v, n, p) => [`${v} películas`, p.payload.name]} />
-                <Legend formatter={(v) => <span className="text-xs text-slate-300">{v}</span>} />
+                <Legend
+                  onClick={(e) => openResolution(e?.value)}
+                  formatter={(v) => <span className="text-xs text-slate-300 cursor-pointer hover:text-gold-400">{v}</span>}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>

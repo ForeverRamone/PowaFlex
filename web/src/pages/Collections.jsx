@@ -91,7 +91,7 @@ export default function Collections() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-2">Sagas y franquicias</h1>
+      <h1 className="text-2xl font-bold text-slate-100 mb-2">Sagas</h1>
       <p className="text-sm text-slate-500 mb-5 max-w-3xl">
         Franquicias detectadas cruzando cada película de tu biblioteca con su colección real de TMDB (no con las
         etiquetas manuales de Plex). Abre cualquiera para ver qué partes te faltan y mandarlas a Radarr.
@@ -114,7 +114,7 @@ export default function Collections() {
             </span>
             {pendingScan > 0 ? (
               <button className="btn-gold" onClick={() => startScan(false)}>
-                Analizar {Math.min(pendingScan, 800).toLocaleString('es-ES')} pendientes
+                Analizar {pendingScan.toLocaleString('es-ES')} pendientes
               </button>
             ) : (
               <button className="btn-ghost" onClick={() => startScan(true)} title="Volver a analizar todo">

@@ -14,9 +14,9 @@ function Block({ icon, title, to, children }) {
 
 export default function About() {
   return (
-    <div className="max-w-4xl">
+    <div>
       <h1 className="text-2xl font-bold text-slate-100 mb-2">¿Qué es PowaFlex?</h1>
-      <p className="text-slate-300 leading-relaxed mb-6">
+      <p className="text-slate-300 leading-relaxed mb-6 max-w-5xl">
         PowaFlex es tu centro de mando cinéfilo: una aplicación que vive junto a tu servidor Plex, lee tu
         biblioteca de películas directamente por la API (sin exports ni CSV), la cruza con{' '}
         <b className="text-slate-100">TMDB</b> (la base de datos abierta de cine) y con{' '}
@@ -25,6 +25,52 @@ export default function About() {
         <b className="text-gold-400">cazar el cine que te falta o que está por venir</b>. Todo se guarda en local,
         en tu propia máquina; nada sale de tu red salvo las consultas a TMDB.
       </p>
+
+      <h2 className="text-lg font-semibold text-slate-100 mb-3">¿Qué puedo hacer con PowaFlex?</h2>
+      <div className="card p-5 mb-6 text-sm text-slate-400 leading-relaxed">
+        <div className="grid md:grid-cols-2 gap-x-8 gap-y-4">
+          <div>
+            <div className="text-slate-200 font-medium mb-1">Conocer tu colección</div>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Ver totales: cuántas películas, horas de cine, disco ocupado y % visto.</li>
+              <li>Explorar gráficas por década, género, país y resolución.</li>
+              <li>Filtrar la biblioteca al estilo Letterboxd (género, país, década, metraje, HDR, nota…) y ordenarla de 15 formas.</li>
+              <li>Abrir la ficha de cualquier película con reparto, notas de varias webs y datos técnicos.</li>
+              <li>Ver rankings de directores, actores y guionistas por presencia, y filtrarlos por género, país, continente o si están vivos.</li>
+            </ul>
+          </div>
+          <div>
+            <div className="text-slate-200 font-medium mb-1">Cazar lo que te falta</div>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Ver el % de completismo de cada director/actor y lo que te falta de su filmografía.</li>
+              <li>Seguir un calendario de estrenos y proyectos anunciados de tus cineastas.</li>
+              <li>Detectar franquicias empezadas y sin terminar (sagas de TMDB).</li>
+              <li>Comprobar retos de listas famosas (IMDb Top 250, Cannes, 1001…) con anillos de «tengo» vs «visto».</li>
+              <li>Encontrar grandes directores del canon ausentes de tu servidor.</li>
+              <li>Comprobar en JustWatch si existe una versión de más calidad (HD/4K) en el mercado.</li>
+            </ul>
+          </div>
+          <div>
+            <div className="text-slate-200 font-medium mb-1">Actuar con Radarr</div>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Añadir a Radarr cualquier película que te falte con un clic, con perfil y carpeta configurables.</li>
+              <li>Añadir en bloque toda una lista, saga o el cine venidero de un plazo.</li>
+              <li>Automatizar el día a día: lanzar solo cada noche los estrenos de tus directores favoritos vivos.</li>
+              <li>Pedir upgrades de las películas por debajo de 1080p.</li>
+            </ul>
+          </div>
+          <div>
+            <div className="text-slate-200 font-medium mb-1">Tu gusto y tu historial</div>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Importar tu Letterboxd (zip completo) y su feed RSS para marcar vistas y notas.</li>
+              <li>Ver últimas añadidas a Plex, últimas vistas (Plex + Letterboxd) y últimas peticiones a Radarr.</li>
+              <li>Comparar tus notas con las de la crítica y la comunidad (joyas ocultas, discrepancias).</li>
+              <li>Marcar favoritos (incluidos directores que aún no tienes) y añadir a los españoles o a los del candelero de un vistazo.</li>
+              <li>Elegir de qué webs (IMDb, RT, Metacritic, Letterboxd…) quieres ver las notas.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
       <h2 className="text-lg font-semibold text-slate-100 mb-3">Cómo funciona</h2>
       <div className="card p-5 mb-6 text-sm text-slate-400 leading-relaxed space-y-2">

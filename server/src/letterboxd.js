@@ -101,8 +101,8 @@ export function importLetterboxdCsv(buffer, { list = null, filename = '' } = {})
   }
 
   const insert = db.prepare(
-    `INSERT OR IGNORE INTO lb_entries (list, title, year, rating, watched_date, uri, movie_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT OR IGNORE INTO lb_entries (list, title, year, rating, watched_date, uri, movie_id, tmdb_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const index = getMatcher();
 
@@ -123,7 +123,7 @@ export function importLetterboxdCsv(buffer, { list = null, filename = '' } = {})
       const uri = col(row, 'letterboxd uri') || null;
 
       const movieId = matchMovie({ title, year, tmdbId }, index);
-      const res = insert.run(detected, title, year, ratingNum, watchedDate, uri, movieId);
+      const res = insert.run(detected, title, year, ratingNum, watchedDate, uri, movieId, tmdbId);
       if (res.changes) {
         imported++;
         if (movieId) matched++;
@@ -279,8 +279,8 @@ export async function importLetterboxdRss(username) {
   const items = parseRssItems(await res.text());
 
   const insert = db.prepare(
-    `INSERT OR IGNORE INTO lb_entries (list, title, year, rating, watched_date, uri, movie_id)
-     VALUES ('diary', ?, ?, ?, ?, ?, ?)`
+    `INSERT OR IGNORE INTO lb_entries (list, title, year, rating, watched_date, uri, movie_id, tmdb_id)
+     VALUES ('diary', ?, ?, ?, ?, ?, ?, ?)`
   );
   const index = getMatcher();
   let imported = 0;
@@ -288,7 +288,7 @@ export async function importLetterboxdRss(username) {
   const tx = db.transaction(() => {
     for (const it of items) {
       const movieId = matchMovie({ title: it.title, year: it.year, tmdbId: it.tmdbId }, index);
-      const res2 = insert.run(it.title, it.year, it.rating, it.watchedDate, it.uri, movieId);
+      const res2 = insert.run(it.title, it.year, it.rating, it.watchedDate, it.uri, movieId, it.tmdbId);
       if (res2.changes) { imported++; if (movieId) matched++; }
     }
   });
@@ -345,29 +345,86 @@ export async function importLetterboxdListUrl(url) {
 
 // --- challenge list read APIs ----------------------------------------------
 
+// Everything you've watched: Plex views + Letterboxd diary/watched/ratings.
+// Used for the "watched" completista ring (distinct from "owned" in Plex).
+function watchedIndex() {
+  const keys = new Set();      // normalised "title|year"
+  const tmdbIds = new Set();
+  const movieIds = new Set();  // library rating_keys that are watched
+  for (const m of db.prepare('SELECT rating_key, title, original_title, year, tmdb_id FROM movies WHERE view_count > 0').all()) {
+    movieIds.add(m.rating_key);
+    if (m.tmdb_id) tmdbIds.add(m.tmdb_id);
+    keys.add(`${normTitle(m.title)}|${m.year || ''}`);
+    if (m.original_title) keys.add(`${normTitle(m.original_title)}|${m.year || ''}`);
+  }
+  for (const e of db.prepare(`SELECT title, year, tmdb_id, movie_id FROM lb_entries WHERE list IN ('diary','watched','ratings')`).all()) {
+    if (e.movie_id) movieIds.add(e.movie_id);
+    if (e.tmdb_id) tmdbIds.add(e.tmdb_id);
+    keys.add(`${normTitle(e.title)}|${e.year || ''}`);
+  }
+  return { keys, tmdbIds, movieIds };
+}
+const isWatched = (item, idx) =>
+  (item.movie_id && idx.movieIds.has(item.movie_id)) ||
+  (item.tmdb_id && idx.tmdbIds.has(item.tmdb_id)) ||
+  idx.keys.has(`${normTitle(item.title)}|${item.year || ''}`);
+
 export function challengeLists() {
-  return db
-    .prepare(
-      `SELECT l.id, l.name, l.url, l.source, l.official, l.item_count, l.refreshed_at,
-              COUNT(i.rowid) items,
-              SUM(CASE WHEN i.movie_id IS NOT NULL THEN 1 ELSE 0 END) owned
-       FROM lb_lists l LEFT JOIN lb_list_items i ON i.list_id = l.id
-       GROUP BY l.id ORDER BY l.official DESC, (CAST(owned AS REAL)/NULLIF(l.item_count,0)) DESC, l.name`
-    )
-    .all();
+  const idx = watchedIndex();
+  const lists = db.prepare('SELECT * FROM lb_lists ORDER BY official DESC, name').all();
+  return lists.map((l) => {
+    const items = db.prepare('SELECT title, year, tmdb_id, movie_id FROM lb_list_items WHERE list_id = ?').all(l.id);
+    let owned = 0;
+    let watched = 0;
+    for (const it of items) {
+      if (it.movie_id) owned++;
+      if (isWatched(it, idx)) watched++;
+    }
+    return {
+      id: l.id, name: l.name, url: l.url, source: l.source, official: l.official,
+      hidden: l.hidden, item_count: items.length, owned, watched,
+    };
+  });
 }
 
 export function challengeListDetail(listId) {
   const list = db.prepare('SELECT * FROM lb_lists WHERE id = ?').get(listId);
   if (!list) return null;
+  const idx = watchedIndex();
   const items = db
     .prepare(
-      `SELECT i.position, i.title, i.year, i.uri, i.movie_id, m.view_count, m.thumb
+      `SELECT i.position, i.title, i.year, i.uri, i.tmdb_id, i.movie_id, m.view_count, m.thumb, m.tmdb_id AS lib_tmdb
        FROM lb_list_items i LEFT JOIN movies m ON m.rating_key = i.movie_id
        WHERE i.list_id = ? ORDER BY COALESCE(i.position, 999999), i.title`
     )
-    .all(listId);
+    .all(listId)
+    .map((it) => ({ ...it, tmdb_id: it.lib_tmdb || it.tmdb_id || null, watched: isWatched(it, idx) }));
   return { list, items };
+}
+
+export function setChallengeHidden(listId, hidden) {
+  db.prepare('UPDATE lb_lists SET hidden = ? WHERE id = ?').run(hidden ? 1 : 0, listId);
+}
+
+/** Missing (not-in-Plex) items of a list, resolved to TMDB ids for Radarr (#18). */
+export async function listMissingTmdbIds(listId) {
+  const { searchMovieId } = await import('./tmdb.js');
+  const items = db
+    .prepare('SELECT title, year, tmdb_id, movie_id FROM lb_list_items WHERE list_id = ? AND movie_id IS NULL')
+    .all(listId);
+  const ids = [];
+  let i = 0;
+  async function worker() {
+    for (;;) {
+      const idx = i++;
+      if (idx >= items.length) return;
+      const it = items[idx];
+      const id = it.tmdb_id || (await searchMovieId(it.title, it.year));
+      if (id) ids.push(id);
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, worker));
+  return [...new Set(ids)];
 }
 
 export function deleteChallengeList(listId) {

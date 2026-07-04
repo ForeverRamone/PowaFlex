@@ -36,6 +36,16 @@ function createLimiter(max) {
 
 const tmdbLimit = createLimiter(Number(process.env.TMDB_CONCURRENCY) || 10);
 
+// Shared progress for long TMDB-building pages (calendar, descubrir), polled by
+// the frontend to show a real progress bar instead of a mute spinner (#5).
+export const buildProgress = { active: false, job: '', label: '', done: 0, total: 0 };
+export function setBuildProgress(job, label, done, total) {
+  Object.assign(buildProgress, { active: true, job, label, done, total });
+}
+export function clearBuildProgress(job) {
+  if (buildProgress.job === job) buildProgress.active = false;
+}
+
 export async function tmdbGet(path, params = {}, { cacheKey = null, cacheMs = DAY } = {}) {
   if (cacheKey) {
     const hit = cacheRead(cacheKey, cacheMs);
@@ -112,13 +122,42 @@ export async function personDetails(tmdbPersonId) {
   );
 }
 
-// Persist birthday/deathday for a library person, so "vivos y muertos" logic
-// (calendar, auto-Radarr, favoritos) can work without re-hitting TMDB.
+// Rough country -> continent map for the people filters (film-producing nations).
+const CONTINENTS = {
+  'United States': 'Norteamérica', USA: 'Norteamérica', Canada: 'Norteamérica', Mexico: 'Norteamérica',
+  México: 'Norteamérica',
+  Spain: 'Europa', España: 'Europa', France: 'Europa', Germany: 'Europa', Italy: 'Europa', 'United Kingdom': 'Europa',
+  UK: 'Europa', England: 'Europa', Scotland: 'Europa', Ireland: 'Europa', Sweden: 'Europa', Denmark: 'Europa',
+  Norway: 'Europa', Finland: 'Europa', Netherlands: 'Europa', Belgium: 'Europa', Portugal: 'Europa', Greece: 'Europa',
+  Poland: 'Europa', Russia: 'Europa', 'Soviet Union': 'Europa', 'USSR': 'Europa', Austria: 'Europa', Switzerland: 'Europa',
+  Hungary: 'Europa', 'Czech Republic': 'Europa', Czechoslovakia: 'Europa', Romania: 'Europa', Serbia: 'Europa',
+  Ukraine: 'Europa', Iceland: 'Europa', Croatia: 'Europa', Turkey: 'Europa',
+  Japan: 'Asia', China: 'Asia', 'South Korea': 'Asia', 'Korea': 'Asia', India: 'Asia', 'Hong Kong': 'Asia',
+  Taiwan: 'Asia', Thailand: 'Asia', Iran: 'Asia', Israel: 'Asia', Vietnam: 'Asia', Philippines: 'Asia', Indonesia: 'Asia',
+  Argentina: 'Sudamérica', Brazil: 'Sudamérica', Chile: 'Sudamérica', Colombia: 'Sudamérica', Peru: 'Sudamérica',
+  Uruguay: 'Sudamérica', Venezuela: 'Sudamérica',
+  Egypt: 'África', Nigeria: 'África', 'South Africa': 'África', Morocco: 'África', Senegal: 'África', Algeria: 'África',
+  Australia: 'Oceanía', 'New Zealand': 'Oceanía',
+};
+
+function placeToGeo(place) {
+  if (!place) return { country: null, continent: null };
+  const country = String(place).split(',').map((s) => s.trim()).pop() || null;
+  return { country, continent: country ? CONTINENTS[country] || null : null };
+}
+
+// Persist life status + demographics for a library person, so the people filters
+// and "vivos y muertos" logic work without re-hitting TMDB.
 export function persistLife(dbPersonId, details) {
   if (!dbPersonId || !details) return;
+  const { country, continent } = placeToGeo(details.place_of_birth);
   db.prepare(
-    'UPDATE people SET birthday = ?, deathday = ?, details_fetched_at = ? WHERE id = ?'
-  ).run(details.birthday || null, details.deathday || null, Date.now(), dbPersonId);
+    `UPDATE people SET birthday = ?, deathday = ?, gender = ?, place_of_birth = ?, country = ?, continent = ?,
+     details_fetched_at = ? WHERE id = ?`
+  ).run(
+    details.birthday || null, details.deathday || null, details.gender ?? null,
+    details.place_of_birth || null, country, continent, Date.now(), dbPersonId
+  );
 }
 
 /**
@@ -211,6 +250,42 @@ export async function enrichRuntimes(items, { concurrency = 6 } = {}) {
   }
   await Promise.all(Array.from({ length: concurrency }, worker));
   return items;
+}
+
+/** Resolve a TMDB movie id from title (+year), cached. Null if not found. */
+export async function searchMovieId(title, year = null) {
+  if (!title) return null;
+  const key = `movie_search:${title.toLowerCase()}:${year || ''}`;
+  const cached = cacheRead(key, 30 * DAY);
+  if (cached !== null) return cached?.id ?? null;
+  try {
+    const data = await tmdbGet('/search/movie', year ? { query: title, year } : { query: title }, { cacheKey: null });
+    const hit = (data.results || [])[0] || null;
+    cacheWrite(key, hit ? { id: hit.id } : {});
+    return hit?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Full TMDB movie detail with credits (cached). */
+export async function tmdbMovieDetail(tmdbId) {
+  return tmdbGet(
+    `/movie/${tmdbId}`,
+    { append_to_response: 'credits' },
+    { cacheKey: `movie_cr:${tmdbId}:${lang()}`, cacheMs: 7 * DAY }
+  );
+}
+
+/** Poster path for a TMDB movie id (cached). Null if unknown. */
+export async function tmdbPoster(tmdbId) {
+  if (!tmdbId) return null;
+  try {
+    const det = await tmdbGet(`/movie/${tmdbId}`, {}, { cacheKey: `movie:${tmdbId}:${lang()}`, cacheMs: 30 * DAY });
+    return det.poster_path || null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -324,6 +399,7 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
   );
 
   const list = [...people.values()];
+  setBuildProgress('calendar', 'Analizando filmografías', 0, list.length);
   const CONCURRENCY = 5;
   let idx = 0;
   const errors = [];
@@ -331,6 +407,7 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
     for (;;) {
       const i = idx++;
       if (i >= list.length) return;
+      setBuildProgress('calendar', 'Analizando filmografías', i + 1, list.length);
       const p = list[i];
       try {
         const resolved = await resolvePerson(p.id);
@@ -385,11 +462,13 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
 
   // enrich with runtime + full credits: the film's real director is always shown
   // (even if not a favorite), followed by the single top-billed favorite actor.
+  setBuildProgress('calendar', 'Detallando estrenos', 0, out.length);
   let ei = 0;
   async function enrichWorker() {
     for (;;) {
       const i = ei++;
       if (i >= out.length) return;
+      setBuildProgress('calendar', 'Detallando estrenos', i + 1, out.length);
       const ev = out[i];
       let directors = [];
       try {
@@ -431,6 +510,7 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
     }
   }
   await Promise.all(Array.from({ length: 5 }, enrichWorker));
+  clearBuildProgress('calendar');
 
   out.sort((a, b) => (a.date || '9999-99-99').localeCompare(b.date || '9999-99-99'));
   return {
@@ -453,6 +533,93 @@ export async function getCalendarCached({ refresh = false } = {}) {
   const cal = await buildCalendar({ topDirectors, topActors });
   if (cal.events.length || !cal.errors.length) cacheWrite(key, cal);
   return cal;
+}
+
+// --- suggested people (favorites) -------------------------------------------
+
+// Important/current Spanish directors to surface as favorite suggestions (#1).
+const SPANISH_DIRECTORS = [
+  'Pedro Almodóvar', 'Alejandro Amenábar', 'J. A. Bayona', 'Isabel Coixet', 'Icíar Bollaín',
+  'Rodrigo Sorogoyen', 'Álex de la Iglesia', 'Fernando León de Aranoa', 'Carla Simón', 'Jonás Trueba',
+  'Paco Plaza', 'Albert Serra', 'Carlos Vermut', 'Alauda Ruiz de Azúa', 'Pilar Palomero',
+  'Víctor Erice', 'David Trueba', 'Cesc Gay', 'Fernando Trueba', 'Nacho Vigalondo',
+  'Paula Ortiz', 'Kike Maíllo', 'Oliver Laxe', 'Elena Martín', 'Alberto Rodríguez',
+];
+
+/** Popular directors (TMDB) + important Spanish directors, with a tracked flag. */
+export async function suggestedPeople() {
+  const trackedTmdb = new Set(
+    db.prepare(`SELECT p.tmdb_id FROM tracked_people t JOIN people p ON p.id = t.person_id WHERE p.tmdb_id IS NOT NULL`)
+      .all().map((r) => r.tmdb_id)
+  );
+  const mapP = (p) => ({
+    tmdb_id: p.id,
+    name: p.name,
+    profile_path: p.profile_path || null,
+    tracked: trackedTmdb.has(p.id),
+    knownFor: (p.known_for || []).map((k) => k.title || k.name).filter(Boolean).slice(0, 2),
+  });
+
+  // popular people, filtered to directors ("en el candelero")
+  const popularRaw = [];
+  for (const page of [1, 2, 3, 4]) {
+    const data = await tmdbGet('/person/popular', { page }, { cacheKey: `person_popular:${page}:${lang()}`, cacheMs: DAY });
+    for (const p of data.results || []) if (p.known_for_department === 'Directing') popularRaw.push(p);
+  }
+  const seen = new Set();
+  const popular = [];
+  for (const p of popularRaw.sort((a, b) => (b.popularity || 0) - (a.popularity || 0))) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    popular.push(mapP(p));
+    if (popular.length >= 24) break;
+  }
+
+  // important Spanish directors (resolved + cached)
+  const spanish = [];
+  for (const name of SPANISH_DIRECTORS) {
+    try {
+      const info = await findPersonInfo(name, 'Directing');
+      if (info?.id) spanish.push({ tmdb_id: info.id, name: info.name || name, profile_path: info.profile_path || null, tracked: trackedTmdb.has(info.id) });
+    } catch {}
+  }
+  return { popular, spanish };
+}
+
+/** Search TMDB people (to add anyone to favorites by typing). */
+export async function searchPeople(query) {
+  const data = await tmdbGet('/search/person', { query }, { cacheKey: null });
+  const trackedTmdb = new Set(
+    db.prepare(`SELECT p.tmdb_id FROM tracked_people t JOIN people p ON p.id = t.person_id WHERE p.tmdb_id IS NOT NULL`)
+      .all().map((r) => r.tmdb_id)
+  );
+  return (data.results || []).slice(0, 12).map((p) => ({
+    tmdb_id: p.id,
+    name: p.name,
+    profile_path: p.profile_path || null,
+    dept: p.known_for_department || null,
+    knownFor: (p.known_for || []).map((k) => k.title || k.name).filter(Boolean).slice(0, 2),
+    tracked: trackedTmdb.has(p.id),
+  }));
+}
+
+/** Add someone to favorites by TMDB person id, creating a people row if needed. */
+export function trackByTmdb({ tmdbId, name, profilePath = null }) {
+  if (!tmdbId || !name) throw new Error('Faltan datos de la persona');
+  let row = db.prepare('SELECT id FROM people WHERE tmdb_id = ?').get(tmdbId);
+  if (!row) {
+    const byName = db.prepare('SELECT id, tmdb_id FROM people WHERE name = ?').get(name);
+    if (byName) {
+      if (!byName.tmdb_id) db.prepare('UPDATE people SET tmdb_id = ? WHERE id = ?').run(tmdbId, byName.id);
+      row = byName;
+    } else {
+      const thumb = profilePath ? `https://image.tmdb.org/t/p/w185${profilePath}` : null;
+      const id = db.prepare('INSERT INTO people (name, thumb, tmdb_id) VALUES (?, ?, ?)').run(name, thumb, tmdbId).lastInsertRowid;
+      row = { id };
+    }
+  }
+  db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at) VALUES (?, ?)').run(row.id, Date.now());
+  return { ok: true, personId: row.id };
 }
 
 // --- collections ------------------------------------------------------------

@@ -1,80 +1,93 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import {
-  Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty,
+  Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters,
 } from '../components.jsx';
 
 const TABS = [
-  ['director', 'Tus directores top'],
-  ['actor', 'Tus actores top'],
+  ['favorites', '⭐ Tus favoritos'],
+  ['director', 'Directores top'],
+  ['actor', 'Actores top'],
   ['absent', 'Grandes ausentes'],
 ];
 
-function GapsView({ role, radarrIds, addRadarrId, show, toggle }) {
+function PersonGaps({ p, role, show, radarrIds, addRadarrId }) {
+  const shown = p.missing.filter((f) => matchesTypeFilters(f, show));
+  if (!shown.length) return null;
+  return (
+    <section className="card p-4 mb-5">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+        <Link to={`/personas/${p.id}?role=${p.role || role}`} className="font-semibold text-slate-100 hover:text-gold-400">
+          {p.name} →
+        </Link>
+        <span className="text-xs text-slate-400">
+          Tienes <b className="text-gold-400">{p.owned}</b> de {p.released} estrenadas ({p.pct}%) · {p.missingTotal} te faltan
+        </span>
+      </div>
+      <div className="max-w-sm mb-4"><ProgressBar pct={p.pct} /></div>
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+        {shown.map((f) => (
+          <TmdbCard key={f.tmdb_id} item={f}>
+            {f.mdb?.score != null && (
+              <div className="text-[11px] text-gold-400">Σ {f.mdb.score}{f.mdb.imdb != null ? ` · IMDb ${Number(f.mdb.imdb).toFixed(1)}` : ''}</div>
+            )}
+            <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={radarrIds.has(f.tmdb_id)} onAdded={addRadarrId} />
+          </TmdbCard>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function typeCounts(people) {
+  const all = people.flatMap((p) => p.missing);
+  return {
+    shorts: all.filter((f) => f.isShort).length,
+    docs: all.filter((f) => f.isDocumentary).length,
+    tv: all.filter((f) => f.isTvMovie).length,
+  };
+}
+
+function GapsView({ endpoint, role, radarrIds, addRadarrId, show, toggle, intro }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    setData(null);
+  const load = (refresh = false) => {
     setError(null);
-    api(`/discover/gaps?role=${role}`).then((d) => {
+    if (refresh) setRefreshing(true);
+    else setData(null);
+    api(`${endpoint}${refresh ? (endpoint.includes('?') ? '&' : '?') + 'refresh=1' : ''}`).then((d) => {
+      setRefreshing(false);
       if (d.error) setError(d.error);
       else setData(d);
     });
-  }, [role]);
+  };
+  useEffect(() => { load(); }, [endpoint]);
 
   if (error) return <ErrorBox error={`${error} — comprueba la API key de TMDB en Ajustes.`} />;
-  if (!data) return <Spinner label="Cruzando tus filmografías top con TMDB (la primera vez tarda un poco)…" />;
-  if (data.people.length === 0)
-    return <Empty>Nada que rellenar: tienes completas las filmografías de tus {role === 'director' ? 'directores' : 'actores'} principales. 🏆</Empty>;
-
-  const allMissing = data.people.flatMap((p) => p.missing);
-  const counts = {
-    shorts: allMissing.filter((f) => f.isShort).length,
-    docs: allMissing.filter((f) => f.isDocumentary).length,
-    tv: allMissing.filter((f) => f.isTvMovie).length,
-  };
-  const peopleFiltered = data.people
-    .map((p) => ({ ...p, shown: p.missing.filter((f) => matchesTypeFilters(f, show)) }))
-    .filter((p) => p.shown.length);
+  if (!data) return <BuildProgress label="Cruzando filmografías con TMDB…" />;
 
   return (
     <div>
-      <p className="text-sm text-slate-500 mb-4">
-        Qué te falta (ya estrenado) de las {data.people.length} filmografías más presentes en tu biblioteca,
-        ordenado por relevancia en TMDB. Actualizado {new Date(data.generatedAt).toLocaleString('es-ES')}.
-      </p>
-      {(counts.shorts || counts.docs || counts.tv) > 0 && (
-        <TypeFilterBar show={show} toggle={toggle} counts={counts} />
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+        <p className="text-sm text-slate-500">{intro} Actualizado {new Date(data.generatedAt).toLocaleString('es-ES')}.</p>
+        <button className="btn-ghost !py-1 shrink-0" onClick={() => load(true)} disabled={refreshing}>
+          {refreshing ? 'Actualizando…' : '↻ Actualizar'}
+        </button>
+      </div>
+      {data.people.length === 0 ? (
+        <Empty>Nada que rellenar aquí. 🏆</Empty>
+      ) : (
+        <>
+          <TypeFilterBar show={show} toggle={toggle} counts={typeCounts(data.people)} />
+          {data.people.map((p) => (
+            <PersonGaps key={p.id} p={p} role={role} show={show} radarrIds={radarrIds} addRadarrId={addRadarrId} />
+          ))}
+        </>
       )}
-      {peopleFiltered.map((p) => (
-        <section key={p.id} className="card p-4 mb-5">
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-            <Link to={`/personas/${p.id}?role=${role}`} className="font-semibold text-slate-100 hover:text-gold-400">
-              {p.name} →
-            </Link>
-            <span className="text-xs text-slate-400">
-              Tienes <b className="text-gold-400">{p.owned}</b> de {p.released} estrenadas ({p.pct}%) ·{' '}
-              {p.missingTotal} te faltan
-            </span>
-          </div>
-          <div className="max-w-sm mb-4">
-            <ProgressBar pct={p.pct} />
-          </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-            {p.shown.map((f) => (
-              <TmdbCard key={f.tmdb_id} item={f}>
-                {f.mdb?.score != null && (
-                  <div className="text-[11px] text-gold-400">Σ {f.mdb.score}{f.mdb.imdb != null ? ` · IMDb ${Number(f.mdb.imdb).toFixed(1)}` : ''}</div>
-                )}
-                <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={radarrIds.has(f.tmdb_id)} onAdded={addRadarrId} />
-              </TmdbCard>
-            ))}
-          </div>
-        </section>
-      ))}
     </div>
   );
 }
@@ -82,25 +95,32 @@ function GapsView({ role, radarrIds, addRadarrId, show, toggle }) {
 function AbsentView({ radarrIds, addRadarrId }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    api('/discover/absent').then((d) => {
+  const load = (refresh = false) => {
+    if (refresh) setRefreshing(true);
+    api(`/discover/absent${refresh ? '?refresh=1' : ''}`).then((d) => {
+      setRefreshing(false);
       if (d.error) setError(d.error);
       else setData(d);
     });
-  }, []);
+  };
+  useEffect(() => { load(); }, []);
 
   if (error) return <ErrorBox error={`${error} — comprueba la API key de TMDB en Ajustes.`} />;
-  if (!data)
-    return <Spinner label="Comprobando el canon de grandes directores contra tu Plex (la primera vez tarda un par de minutos)…" />;
+  if (!data) return <Spinner label="Comprobando el canon de grandes directores contra tu Plex…" />;
 
   return (
     <div>
-      <p className="text-sm text-slate-500 mb-5">
-        De un canon de {data.checked} grandes directores del cine mundial,{' '}
-        <b className="text-gold-400">{data.absent.length} no tienen ni una película en tu Plex</b>
-        {' '}({data.present.length} sí están). Sus películas esenciales, listas para Radarr:
-      </p>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+        <p className="text-sm text-slate-500">
+          De un canon de {data.checked} grandes directores del cine mundial,{' '}
+          <b className="text-gold-400">{data.absent.length} no tienen ni una película en tu Plex</b> ({data.present.length} sí están).
+        </p>
+        <button className="btn-ghost !py-1 shrink-0" onClick={() => load(true)} disabled={refreshing}>
+          {refreshing ? 'Actualizando…' : '↻ Actualizar'}
+        </button>
+      </div>
       {data.absent.length === 0 ? (
         <Empty>Están todos. Eres un completista de verdad. 🏆</Empty>
       ) : (
@@ -146,17 +166,28 @@ function AbsentView({ radarrIds, addRadarrId }) {
 }
 
 export default function Discover() {
-  const [tab, setTab] = useState('director');
+  const [tab, setTab] = useState('favorites');
   const [radarrIds, addRadarrId] = useRadarrIds();
   const [show, toggle] = useTypeFilters('discover_type_filters');
+  const [search, setSearch] = useState('');
+  const navigate = useNavigate();
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-100 mb-2">Descubrir huecos</h1>
-      <p className="text-sm text-slate-500 mb-4">
-        Lo que le falta a tu colección: filmografías incompletas de tu propia biblioteca y grandes nombres
-        que aún no han entrado en ella.
+      <p className="text-sm text-slate-500 mb-4 max-w-3xl">
+        Lo que le falta a tu colección. <b>Tus favoritos</b> son los que tú eliges en{' '}
+        <Link to="/favoritos" className="text-gold-400 hover:underline">Favoritos</Link>; los <b>top</b> son los más presentes en tu
+        biblioteca; y <b>grandes ausentes</b> son nombres del canon que aún no tienes. ¿Buscas a alguien concreto? Ve a su ficha:
       </p>
+      <form
+        className="flex gap-2 mb-5 max-w-md"
+        onSubmit={(e) => { e.preventDefault(); if (search.trim()) navigate(`/personas?search=${encodeURIComponent(search.trim())}`); }}
+      >
+        <input className="input" placeholder="Buscar director o actor por nombre…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <button className="btn-ghost shrink-0">Ver ficha</button>
+      </form>
+
       <div className="flex gap-2 mb-6 flex-wrap">
         {TABS.map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} className={tab === t ? 'btn-gold' : 'btn-ghost'}>
@@ -164,10 +195,23 @@ export default function Discover() {
           </button>
         ))}
       </div>
+
       {tab === 'absent' ? (
         <AbsentView radarrIds={radarrIds} addRadarrId={addRadarrId} />
+      ) : tab === 'favorites' ? (
+        <GapsView
+          endpoint="/discover/favorites"
+          radarrIds={radarrIds} addRadarrId={addRadarrId} show={show} toggle={toggle}
+          intro="Qué te falta (ya estrenado) de las filmografías de tus favoritos, ordenado por relevancia."
+        />
       ) : (
-        <GapsView role={tab} radarrIds={radarrIds} addRadarrId={addRadarrId} show={show} toggle={toggle} />
+        <GapsView
+          key={tab}
+          endpoint={`/discover/gaps?role=${tab}`}
+          role={tab}
+          radarrIds={radarrIds} addRadarrId={addRadarrId} show={show} toggle={toggle}
+          intro={`Qué te falta de las filmografías de ${tab === 'director' ? 'directores' : 'actores'} más presentes en tu biblioteca.`}
+        />
       )}
     </div>
   );

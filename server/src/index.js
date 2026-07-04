@@ -13,6 +13,12 @@ import {
   searchCollection,
   collectionDetails,
   enrichPeopleLife,
+  tmdbPoster,
+  tmdbMovieDetail,
+  buildProgress,
+  suggestedPeople,
+  trackByTmdb,
+  searchPeople,
 } from './tmdb.js';
 import {
   radarrTest,
@@ -23,7 +29,7 @@ import {
   radarrOwnedIds,
   radarrRecent,
 } from './radarr.js';
-import { libraryGaps, absentGreats } from './discover.js';
+import { libraryGaps, favoritesGaps, absentGreats } from './discover.js';
 import {
   mdbTest,
   syncRatings,
@@ -43,11 +49,14 @@ import {
   importLetterboxdListUrl,
   challengeLists,
   challengeListDetail,
+  setChallengeHidden,
+  listMissingTmdbIds,
   deleteChallengeList,
   rematchLetterboxd,
   letterboxdSummary,
 } from './letterboxd.js';
 import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
+import { availability, isUpgradeable } from './justwatch.js';
 import { scanSagas, sagaScanStatus, sagaScanState, sagaList, sagaComplete } from './saga.js';
 import * as q from './queries.js';
 
@@ -114,6 +123,8 @@ app.get('/api/setup-state', async () => {
     tmdb: !!s.tmdb_key,
     radarr: !!(s.radarr_url && s.radarr_key),
     movies,
+    newlyAdded: Number(s.last_sync_added || 0),
+    lastSyncAt: Number(s.last_sync_at || 0) || null,
   };
 });
 
@@ -141,6 +152,14 @@ app.get('/api/stats/charts', async () => q.charts());
 app.get('/api/stats/watch', async () => q.watchStats());
 app.get('/api/stats/recent', async () => {
   const base = q.dashboardRecent();
+  // fetch TMDB posters for recent watches not in the Plex library (#9)
+  if (getSetting('tmdb_key')) {
+    await Promise.all(
+      base.recentlyWatched
+        .filter((w) => !w.inLibrary && w.tmdb_id && !w.poster_path)
+        .map(async (w) => { w.poster_path = await tmdbPoster(w.tmdb_id); })
+    );
+  }
   let radarr = [];
   try {
     radarr = radarrRecent(12);
@@ -149,13 +168,14 @@ app.get('/api/stats/recent', async () => {
 });
 
 // enrich birthday/deathday for all tracked/favorite people ("vivos y muertos")
-app.post('/api/people/life-sync', async () => {
+app.post('/api/people/life-sync', async (req) => {
   const ids = db.prepare('SELECT person_id FROM tracked_people').all().map((r) => r.person_id);
+  const limit = Math.min(Number(req?.query?.limit) || 500, 3000);
   const top = db
     .prepare(
-      `SELECT person_id FROM movie_people GROUP BY person_id ORDER BY COUNT(*) DESC LIMIT 200`
+      `SELECT person_id FROM movie_people GROUP BY person_id ORDER BY COUNT(*) DESC LIMIT ?`
     )
-    .all()
+    .all(limit)
     .map((r) => r.person_id);
   return await enrichPeopleLife([...new Set([...ids, ...top])]);
 });
@@ -179,13 +199,58 @@ app.get('/api/movies/:id', async (req, reply) => {
 
 app.get('/api/filters', async () => q.filterOptions());
 
+app.get('/api/search', async (req) => {
+  const term = String(req.query.q || '').trim();
+  if (term.length < 2) return { movies: [], people: [] };
+  return q.globalSearch(term);
+});
+
 app.get('/api/people', async (req) => {
   return q.topPeople({
     role: req.query.role || 'director',
     limit: Math.min(Number(req.query.limit) || 30, 200),
     offset: Number(req.query.offset) || 0,
     search: req.query.search || '',
+    gender: req.query.gender || '',
+    life: req.query.life || '',
+    continent: req.query.continent || '',
+    country: req.query.country || '',
   });
+});
+
+app.get('/api/people/filter-options', async () => q.peopleFilterOptions());
+
+// favorite suggestions: popular + Spanish directors (#1)
+app.get('/api/people/suggestions', async (req, reply) => {
+  try {
+    return await suggestedPeople();
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.get('/api/people/search-tmdb', async (req, reply) => {
+  try {
+    const query = String(req.query.q || '').trim();
+    if (!query) return [];
+    return await searchPeople(query);
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// add to favorites by TMDB person (may not be in the library yet) (#1/#3)
+app.post('/api/tracked/tmdb', async (req, reply) => {
+  try {
+    const r = trackByTmdb(req.body || {});
+    db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
+    return r;
+  } catch (err) {
+    reply.code(400);
+    return { error: String(err.message || err) };
+  }
 });
 
 // --- tmdb-powered ------------------------------------------------------------------
@@ -194,6 +259,75 @@ app.get('/api/people/:id/filmography', async (req, reply) => {
   try {
     const role = req.query.role || 'director';
     return await filmography(Number(req.params.id), role);
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// unified movie "ficha" for any TMDB id — owned or not (#7)
+app.get('/api/media/:tmdbId', async (req, reply) => {
+  try {
+    const tmdbId = Number(req.params.tmdbId);
+    const det = await tmdbMovieDetail(tmdbId);
+    const owned = db.prepare('SELECT * FROM movies WHERE tmdb_id = ? LIMIT 1').get(tmdbId) || null;
+    const ratings = q.filterRatings(
+      db.prepare('SELECT imdb, imdb_votes, rt_critic, rt_audience, metacritic, letterboxd, trakt, score FROM mdb_ratings WHERE tmdb_id = ?').get(tmdbId) || null
+    );
+    const inRadarr = !!db.prepare('SELECT 1 FROM radarr_movies WHERE tmdb_id = ?').get(tmdbId);
+    // map TMDB person ids to our library people, so cast/crew link to their pages
+    const peopleByTmdb = new Map(
+      db.prepare('SELECT id, tmdb_id FROM people WHERE tmdb_id IS NOT NULL').all().map((r) => [r.tmdb_id, r.id])
+    );
+    const mapPerson = (c) => ({ id: peopleByTmdb.get(c.id) ?? null, tmdb_id: c.id, name: c.name, character: c.character || null });
+    const directors = (det.credits?.crew || []).filter((c) => c.job === 'Director').map(mapPerson);
+    const cast = (det.credits?.cast || []).slice(0, 14).map(mapPerson);
+    return {
+      tmdb_id: tmdbId,
+      title: det.title,
+      original_title: det.original_title,
+      year: det.release_date ? Number(det.release_date.slice(0, 4)) : null,
+      overview: det.overview,
+      poster_path: det.poster_path,
+      runtime: det.runtime,
+      genres: (det.genres || []).map((g) => g.name),
+      imdb_id: owned?.imdb_id || det.imdb_id || null,
+      directors,
+      cast,
+      ratings,
+      inRadarr,
+      owned: owned
+        ? {
+            rating_key: owned.rating_key, resolution: owned.resolution, hdr: owned.hdr,
+            video_codec: owned.video_codec, user_rating: owned.user_rating,
+            view_count: owned.view_count, file_path: owned.file_path,
+          }
+        : null,
+    };
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// progress for long TMDB-building pages, polled by the frontend (#5)
+app.get('/api/build-progress', async () => buildProgress);
+
+// JustWatch: best available digital quality in the market, to confirm an upgrade
+// is actually possible before queuing it (#2/#3). Unofficial API, best-effort.
+app.get('/api/justwatch/:tmdbId', async (req, reply) => {
+  try {
+    const tmdbId = Number(req.params.tmdbId);
+    const m = db.prepare('SELECT title, original_title, year, resolution FROM movies WHERE tmdb_id = ? LIMIT 1').get(tmdbId);
+    let title = m?.original_title || m?.title;
+    let year = m?.year || null;
+    if (!title) {
+      const det = await tmdbMovieDetail(tmdbId);
+      title = det.original_title || det.title;
+      year = det.release_date ? Number(det.release_date.slice(0, 4)) : null;
+    }
+    const av = await availability(title, year);
+    return { ...av, ownedResolution: m?.resolution || null, upgradeable: isUpgradeable(m?.resolution, av.maxQuality) };
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -224,7 +358,7 @@ app.post('/api/tracked/bulk', async (req, reply) => {
       `SELECT p.id FROM movie_people mp JOIN people p ON p.id = mp.person_id
        WHERE mp.role = ? GROUP BY p.id ORDER BY COUNT(*) DESC, p.name LIMIT ?`
     )
-    .all(role, Math.min(Number(top), 200));
+    .all(role, Math.min(Number(top), 1000));
   const ins = db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at) VALUES (?, ?)');
   let added = 0;
   const tx = db.transaction(() => {
@@ -255,7 +389,7 @@ app.delete('/api/tracked/:personId', async (req) => {
 app.get('/api/tracked', async () =>
   db
     .prepare(
-      `SELECT p.id, p.name, p.thumb, p.deathday,
+      `SELECT p.id, p.name, p.thumb, p.deathday, p.tmdb_id,
               SUM(CASE WHEN mp.role = 'director' THEN 1 ELSE 0 END) directed,
               SUM(CASE WHEN mp.role = 'actor' THEN 1 ELSE 0 END) acted,
               COUNT(DISTINCT mp.movie_id) movies
@@ -283,9 +417,19 @@ app.get('/api/discover/gaps', async (req, reply) => {
   try {
     return await libraryGaps({
       role: ['director', 'actor', 'writer'].includes(req.query.role) ? req.query.role : 'director',
-      people: Math.min(Number(req.query.people) || 20, 40),
+      people: Math.min(Number(req.query.people) || 20, 60),
       perPerson: Math.min(Number(req.query.perPerson) || 8, 20),
+      refresh: req.query.refresh === '1',
     });
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.get('/api/discover/favorites', async (req, reply) => {
+  try {
+    return await favoritesGaps({ perPerson: Math.min(Number(req.query.perPerson) || 8, 20), refresh: req.query.refresh === '1' });
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -294,7 +438,7 @@ app.get('/api/discover/gaps', async (req, reply) => {
 
 app.get('/api/discover/absent', async (req, reply) => {
   try {
-    return await absentGreats({ perPerson: Math.min(Number(req.query.perPerson) || 6, 12) });
+    return await absentGreats({ perPerson: Math.min(Number(req.query.perPerson) || 6, 12), refresh: req.query.refresh === '1' });
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -307,7 +451,9 @@ app.get('/api/sagas', async () => ({ state: sagaScanState(), sagas: sagaList() }
 app.get('/api/sagas/status', async () => sagaScanState());
 app.post('/api/sagas/scan', async (req) => {
   const force = !!req.body?.force;
-  if (!sagaScanStatus.running) scanSagas({ force }).catch(() => {});
+  // scan everything by default; the nightly job is the one that batches
+  const budget = req.body?.budget === undefined ? Infinity : Number(req.body.budget) || Infinity;
+  if (!sagaScanStatus.running) scanSagas({ force, budget }).catch(() => {});
   return sagaScanState();
 });
 app.get('/api/sagas/:id', async (req, reply) => {
@@ -549,6 +695,21 @@ app.get('/api/letterboxd/lists/:id', async (req, reply) => {
 app.post('/api/letterboxd/lists', async (req, reply) => {
   try {
     return await importLetterboxdListUrl(req.body?.url || '');
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+app.post('/api/letterboxd/lists/:id/hide', async (req) => {
+  setChallengeHidden(Number(req.params.id), !!req.body?.hidden);
+  return { ok: true };
+});
+// resolve the list's missing films to TMDB and queue them in Radarr (#18)
+app.post('/api/letterboxd/lists/:id/radarr', async (req, reply) => {
+  try {
+    const ids = await listMissingTmdbIds(Number(req.params.id));
+    if (!ids.length) return { added: 0, alreadyInRadarr: 0, failed: 0, results: [] };
+    return await radarrAddBulk(ids.slice(0, 300));
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };

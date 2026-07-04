@@ -1,6 +1,12 @@
 import { db, cacheRead, cacheWrite, getSetting } from './db.js';
-import { personCredits, findPersonInfo, resolvePerson, enrichRuntimes } from './tmdb.js';
+import { personCredits, findPersonInfo, resolvePerson, enrichRuntimes, setBuildProgress, clearBuildProgress } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
+import { matchMovie } from './letterboxd.js';
+
+// A TMDB film counts as owned if its id is in the library OR a title+year match
+// exists — Plex sometimes stores a different TMDB id for the same film, which
+// otherwise makes owned films show up as "missing" (#15).
+const ownsFilm = (c, inLib) => inLib.has(c.id) || !!matchMovie({ title: c.title, year: c.release_date ? Number(c.release_date.slice(0, 4)) : null, tmdbId: c.id });
 
 const genreFlags = (ids = []) => ({
   genre_ids: ids,
@@ -69,10 +75,12 @@ function today() {
  * For the library's top people of a role, aggregate their missing (released,
  * not-owned) films, ranked by TMDB vote count.
  */
-export async function libraryGaps({ role = 'director', people = 20, perPerson = 8 } = {}) {
+export async function libraryGaps({ role = 'director', people = 20, perPerson = 8, refresh = false } = {}) {
   const cacheKey = `discover_gaps:${role}:${people}:${perPerson}`;
-  const hit = cacheRead(cacheKey, 12 * HOUR);
-  if (hit) return hit;
+  if (!refresh) {
+    const hit = cacheRead(cacheKey, 12 * HOUR);
+    if (hit) return hit;
+  }
 
   const minVotes = role === 'actor' ? 100 : 20; // filter cameo/obscure noise
   const tops = db
@@ -88,11 +96,13 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
   const out = [];
   const errors = [];
 
+  setBuildProgress('discover', 'Cruzando filmografías', 0, tops.length);
   let idx = 0;
   async function worker() {
     for (;;) {
       const i = idx++;
       if (i >= tops.length) return;
+      setBuildProgress('discover', 'Cruzando filmografías', i + 1, tops.length);
       const p = tops[i];
       try {
         const resolved = await resolvePerson(p.id);
@@ -114,7 +124,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
           const isReleased = !!c.release_date && c.release_date <= now;
           if (!isReleased) continue;
           released++;
-          if (inLib.has(c.id)) {
+          if (ownsFilm(c, inLib)) {
             owned++;
             continue;
           }
@@ -156,7 +166,91 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
   await applyScores(out, perPerson);
   // runtime pass so shorts can be hidden alongside docs/TV
   await enrichRuntimes(out.flatMap((p) => p.missing));
+  clearBuildProgress('discover');
   const result = { generatedAt: Date.now(), role, people: out, errors: errors.slice(0, 5) };
+  if (out.length || !errors.length) cacheWrite(cacheKey, result);
+  return result;
+}
+
+/**
+ * Gaps for the people YOU chose as favorites (#17) — clearer than an arbitrary
+ * "top by count". Uses each person's dominant role.
+ */
+export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
+  const cacheKey = `discover_favorites:${perPerson}`;
+  if (!refresh) {
+    const hit = cacheRead(cacheKey, 6 * HOUR);
+    if (hit) return hit;
+  }
+  const tracked = db
+    .prepare(
+      `SELECT p.id, p.name,
+              SUM(CASE WHEN mp.role='director' THEN 1 ELSE 0 END) directed,
+              SUM(CASE WHEN mp.role='actor' THEN 1 ELSE 0 END) acted
+       FROM tracked_people t JOIN people p ON p.id = t.person_id
+       LEFT JOIN movie_people mp ON mp.person_id = p.id
+       GROUP BY p.id ORDER BY p.name`
+    )
+    .all();
+
+  const inLib = libraryTmdbIds();
+  const now = today();
+  const out = [];
+  const errors = [];
+  setBuildProgress('discover', 'Cruzando filmografías de tus favoritos', 0, tracked.length);
+  let idx = 0;
+  async function worker() {
+    for (;;) {
+      const i = idx++;
+      if (i >= tracked.length) return;
+      setBuildProgress('discover', 'Cruzando filmografías de tus favoritos', i + 1, tracked.length);
+      const p = tracked[i];
+      const role = (p.directed || 0) >= (p.acted || 0) ? 'director' : 'actor';
+      try {
+        const resolved = await resolvePerson(p.id);
+        if (!resolved?.tmdb_id) continue;
+        const credits = await personCredits(resolved.tmdb_id);
+        const raw =
+          role === 'director'
+            ? (credits.crew || []).filter((c) => c.job === 'Director')
+            : credits.cast || [];
+        const seen = new Set();
+        let released = 0;
+        let owned = 0;
+        const missing = [];
+        const minVotes = role === 'actor' ? 100 : 20;
+        for (const c of raw) {
+          if (c.video || seen.has(c.id)) continue;
+          seen.add(c.id);
+          if (!c.release_date || c.release_date > now) continue;
+          released++;
+          if (ownsFilm(c, inLib)) { owned++; continue; }
+          if ((c.vote_count || 0) < minVotes) continue;
+          missing.push({
+            tmdb_id: c.id, title: c.title, date: c.release_date, poster_path: c.poster_path,
+            vote: c.vote_average, votes: c.vote_count, released: true, owned: false,
+            ...genreFlags(c.genre_ids),
+          });
+        }
+        missing.sort((a, b) => (b.votes || 0) - (a.votes || 0));
+        if (missing.length)
+          out.push({
+            id: p.id, name: p.name, role, released, owned,
+            pct: released ? Math.round((owned / released) * 100) : 0,
+            missingTotal: missing.length, missing: missing.slice(0, perPerson * 2),
+          });
+      } catch (err) {
+        errors.push(`${p.name}: ${err.message}`);
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: 5 }, worker));
+
+  out.sort((a, b) => b.missingTotal - a.missingTotal);
+  await applyScores(out, perPerson);
+  await enrichRuntimes(out.flatMap((pp) => pp.missing));
+  clearBuildProgress('discover');
+  const result = { generatedAt: Date.now(), people: out, tracked: tracked.length, errors: errors.slice(0, 5) };
   if (out.length || !errors.length) cacheWrite(cacheKey, result);
   return result;
 }
@@ -165,10 +259,12 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
  * Great directors with ZERO films in the library, with their essential
  * (most-voted) films as suggestions.
  */
-export async function absentGreats({ perPerson = 6 } = {}) {
+export async function absentGreats({ perPerson = 6, refresh = false } = {}) {
   const cacheKey = `discover_absent:${perPerson}`;
-  const hit = cacheRead(cacheKey, 24 * HOUR);
-  if (hit) return hit;
+  if (!refresh) {
+    const hit = cacheRead(cacheKey, 24 * HOUR);
+    if (hit) return hit;
+  }
 
   const countStmt = db.prepare(
     `SELECT COUNT(*) n FROM movie_people mp JOIN people p ON p.id = mp.person_id
@@ -209,7 +305,7 @@ export async function absentGreats({ perPerson = 6 } = {}) {
             vote: c.vote_average,
             votes: c.vote_count,
             released: true,
-            owned: inLib.has(c.id),
+            owned: ownsFilm(c, inLib),
             ...genreFlags(c.genre_ids),
           });
         }
