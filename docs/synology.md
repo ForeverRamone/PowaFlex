@@ -69,3 +69,6 @@ Tus datos están en `docker/powaflex/data` y **no se tocan** al actualizar.
   contenedores y hacia el puerto 32400.
 - **La imagen no se descarga** → asegúrate de escribir bien
   `ghcr.io/foreverramone/powaflex:latest` (GitHub Container Registry, no Docker Hub).
+- **El contenedor sale con icono «?»** → Container Manager solo muestra logos de imágenes de
+  Docker Hub; para imágenes de GHCR no permite personalizarlo. El icono de PowaFlex sí aparece
+  en la pestaña del navegador y al anclar la web a favoritos o a la pantalla de inicio.

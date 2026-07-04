@@ -12,3 +12,5 @@ services:
       - ./data:/data
     environment:
       - TZ=Europe/Madrid
+    labels:
+      - net.unraid.docker.icon=https://raw.githubusercontent.com/ForeverRamone/PowaFlex/main/assets/icon.png

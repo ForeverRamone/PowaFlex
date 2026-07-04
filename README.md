@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/icon.png" width="128" alt="PowaFlex"></p>
+
 # 🎬 PowaFlex
 
 > **Alpha 0.1** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo

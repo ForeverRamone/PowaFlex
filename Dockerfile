@@ -10,6 +10,12 @@ RUN npm run build --workspace=web
 
 # ---- runtime ----
 FROM node:24-slim
+LABEL org.opencontainers.image.title="PowaFlex" \
+      org.opencontainers.image.description="Dashboard de gestión de cine para Plex: estadísticas, completismo de filmografías (TMDB), calendario de estrenos y envío a Radarr." \
+      org.opencontainers.image.source="https://github.com/ForeverRamone/PowaFlex" \
+      org.opencontainers.image.licenses="MIT" \
+      net.unraid.docker.icon="https://raw.githubusercontent.com/ForeverRamone/PowaFlex/main/assets/icon.png" \
+      net.unraid.docker.webui="http://[IP]:[PORT:3860]"
 WORKDIR /app
 ENV NODE_ENV=production DATA_DIR=/data PORT=3860
 COPY package.json ./

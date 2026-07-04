@@ -14,6 +14,7 @@ contenedor manual apuntando a la imagen pública de GitHub.
 | **Repository** | `ghcr.io/foreverramone/powaflex:latest` |
 | **Network Type** | `bridge` |
 | **WebUI** | `http://[IP]:[PORT:3860]` |
+| **Icon URL** | `https://raw.githubusercontent.com/ForeverRamone/PowaFlex/main/assets/icon.png` |
 
 3. **Add another Path, Port, Variable…** → **Port**:
    - Container Port: `3860` · Host Port: `3860` (o el que prefieras)
