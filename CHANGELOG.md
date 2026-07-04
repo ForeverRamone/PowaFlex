@@ -1,6 +1,6 @@
 # Changelog
 
-## Sin publicar
+## Alpha 0.2 (0.2.0-alpha) — 2026-07-04
 
 - **Integración MDBList**: notas de IMDb, Rotten Tomatoes (crítica y público), Metacritic,
   Letterboxd y Trakt para toda la biblioteca, con sync por lotes que respeta el límite diario
