@@ -240,8 +240,18 @@ export async function runSync({ force = false } = {}) {
     .run(Date.now(), 'running').lastInsertRowid;
 
   try {
-    const sections = await movieSections();
+    let sections = await movieSections();
     if (!sections.length) throw new Error('No hay bibliotecas de películas en este servidor Plex');
+
+    // optional user selection (settings.plex_sections = csv of section ids; empty = all)
+    const selected = (getSetting('plex_sections') || '')
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter(Boolean);
+    if (selected.length) {
+      const filtered = sections.filter((s) => selected.includes(s.id));
+      if (filtered.length) sections = filtered;
+    }
 
     const seen = new Set();
     const PAGE = 240;

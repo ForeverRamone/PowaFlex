@@ -29,9 +29,16 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [sync, setSync] = useState(null);
   const [radarrCtx, setRadarrCtx] = useState(null);
+  const [sections, setSections] = useState(null);
+
+  const loadSections = () =>
+    api('/plex/sections').then((r) => Array.isArray(r) && setSections(r)).catch(() => {});
 
   useEffect(() => {
-    api('/settings').then(setS);
+    api('/settings').then((st) => {
+      setS(st);
+      if (st.plex_url && st.plex_token_set) loadSections();
+    });
     api('/sync/status').then(setSync);
   }, []);
 
@@ -53,6 +60,7 @@ export default function Settings() {
     setTests((t) => ({ ...t, [service]: { pending: true } }));
     const res = await api(`/settings/test/${service}`, { method: 'POST' });
     setTests((t) => ({ ...t, [service]: res }));
+    if (service === 'plex' && res.ok) loadSections();
     if (service === 'radarr' && res.ok) {
       const ctx = await api('/radarr/context');
       if (!ctx.error) setRadarrCtx(ctx);
@@ -98,6 +106,46 @@ export default function Settings() {
         <div className="mt-3 flex gap-2">
           <button className="btn-ghost" onClick={() => test('plex')}>Probar conexión</button>
         </div>
+        {sections?.length > 0 && (() => {
+          const selectedCsv = (s.plex_sections || '').split(',').map((x) => x.trim()).filter(Boolean);
+          const isChecked = (id) => selectedCsv.length === 0 || selectedCsv.includes(String(id));
+          const toggleSection = (id) => {
+            let next = sections.filter((sec) => isChecked(sec.id)).map((sec) => String(sec.id));
+            next = next.includes(String(id)) ? next.filter((x) => x !== String(id)) : [...next, String(id)];
+            if (next.length === 0) return; // at least one library
+            setS({ ...s, plex_sections: next.length === sections.length ? '' : next.join(',') });
+          };
+          return (
+            <div className="mt-4">
+              <div className="text-xs text-slate-400 mb-2">
+                Bibliotecas de películas a sincronizar
+                <span className="text-slate-600"> (las de series no aparecen: PowaFlex solo gestiona cine)</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {sections.map((sec) => (
+                  <label
+                    key={sec.id}
+                    className={`btn-ghost !py-1.5 flex items-center gap-2 select-none ${
+                      isChecked(sec.id) ? '!border-gold-400 text-gold-400' : 'opacity-60'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-[#e8b53a]"
+                      checked={isChecked(sec.id)}
+                      onChange={() => toggleSection(sec.id)}
+                    />
+                    {sec.title}
+                  </label>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2">
+                Guarda los ajustes y sincroniza: las películas de bibliotecas desmarcadas se retiran de
+                PowaFlex en la siguiente sincronización (en Plex no se toca nada).
+              </p>
+            </div>
+          );
+        })()}
         <Guide title="¿Cómo consigo mi X-Plex-Token?">
           <p>1. Abre <b>app.plex.tv</b> en el navegador y entra en tu servidor.</p>
           <p>2. Abre cualquier película y pulsa en <b>⋯ → Obtener información → Ver XML</b>.</p>
