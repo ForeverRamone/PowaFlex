@@ -28,12 +28,15 @@ COPY web/package.json web/
 RUN npm ci --omit=dev --workspace=server --no-audit --no-fund
 COPY server server
 COPY --from=build /app/web/dist web/dist
-# el proceso no corre como root; solo DATA_DIR necesita ser escribible, /app se
-# lee tal cual (con un bind mount manda el propietario del host: ver compose)
-RUN mkdir -p /data && chown -R node:node /data
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN mkdir -p /data && chmod +x /usr/local/bin/docker-entrypoint.sh
 VOLUME /data
 EXPOSE 3860
-USER node
+# Sin USER: el contenedor entra como root SOLO para dejar /data escribible y
+# baja privilegios en el entrypoint (patrón habitual en imágenes con volumen).
+# Así actualizar nunca exige un chown a mano, ni en unRAID ni en compose, y el
+# servidor acaba corriendo igualmente sin privilegios.
+ENTRYPOINT ["docker-entrypoint.sh"]
 # endpoint sin credenciales (queda fuera de POWAFLEX_AUTH a propósito)
 HEALTHCHECK --interval=60s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3860)+'/api/version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

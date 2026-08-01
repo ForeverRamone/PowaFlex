@@ -1,5 +1,14 @@
 # Changelog
 
+## Alpha 0.8.1 (0.8.1-alpha) — 2026-08-01
+
+- **Actualizar vuelve a ser solo «pull y arriba»**: PowaFlex ajusta por su cuenta los permisos de su
+  carpeta de datos al arrancar y luego sigue corriendo sin privilegios, así que ya no hace falta
+  ningún `chown` a mano —ni en unRAID ni con Docker Compose—. Si vienes de la 0.8 y ya lo hiciste,
+  no tienes que deshacer nada.
+- Respeta el dueño que la carpeta ya tenga (en unRAID, `nobody:users`), y puedes forzarlo con las
+  variables **`PUID`/`PGID`** como en el resto de contenedores de unRAID.
+
 ## Alpha 0.8 (0.8.0-alpha) — 2026-08-01
 
 ### Aspecto
@@ -42,7 +51,7 @@
 ### Instalación
 
 - **Imagen Docker más segura y reproducible**: se construye con el lockfile, corre como usuario sin
-  privilegios y trae healthcheck. ⚠️ Al actualizar, una vez: `sudo chown -R 1000:1000 ./data`.
+  privilegios y trae healthcheck.
 - **Contraseña opcional** para todo el panel con la variable `POWAFLEX_AUTH="usuario:contraseña"`.
   Sin ella, todo funciona exactamente igual que antes.
 

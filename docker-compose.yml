@@ -9,12 +9,16 @@ services:
     ports:
       - '3860:3860'
     volumes:
-      # El contenedor NO corre como root (usuario "node", uid 1000). Si vienes de
-      # una versión anterior, da permisos a la carpeta una vez:
-      #   sudo chown -R 1000:1000 ./data
+      # PowaFlex ajusta solo los permisos de esta carpeta al arrancar y luego
+      # corre sin privilegios: no hace falta tocar nada a mano al actualizar.
       - ./data:/data
     environment:
       - TZ=Europe/Madrid
+      # Opcional: usuario con el que correr y al que pertenecerán los datos.
+      # Sin esto se respeta el dueño que ya tenga la carpeta (en unRAID,
+      # nobody:users) y, si es de root, se usa 1000:1000.
+      # - PUID=99
+      # - PGID=100
       # Cifra las credenciales (Plex/TMDB/Radarr) en disco. Pon una frase larga y
       # secreta; si la pierdes tendrás que volver a introducir las claves en Ajustes.
       # - POWAFLEX_SECRET=cambia-esto-por-una-frase-larga-y-secreta
