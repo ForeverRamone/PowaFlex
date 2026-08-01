@@ -1,5 +1,17 @@
 # Changelog
 
+## Alpha 0.8.2 (0.8.2-alpha) — 2026-08-01
+
+- **Arreglado el arranque en unRAID** («attempt to write a readonly database»). La 0.8.1 miraba
+  quién era el dueño de la carpeta de datos, pero en unRAID esa carpeta pertenece a `nobody:users`
+  mientras que `powaflex.db` lo había creado root: PowaFlex daba la situación por buena y luego no
+  podía escribir. Ahora **comprueba que puede escribir de verdad** en la carpeta y en la base de
+  datos, y corrige los permisos si no es así.
+- **Y si aun así no lo consigue, arranca igualmente** (con privilegios, como todas las versiones
+  hasta la 0.8) en vez de quedarse sin levantar. Un problema de permisos no debería dejarte sin app.
+- El registro dice ahora con qué usuario arranca, para que un fallo así se diagnostique de un
+  vistazo.
+
 ## Alpha 0.8.1 (0.8.1-alpha) — 2026-08-01
 
 - **Actualizar vuelve a ser solo «pull y arriba»**: PowaFlex ajusta por su cuenta los permisos de su
