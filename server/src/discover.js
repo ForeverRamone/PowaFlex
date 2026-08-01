@@ -27,13 +27,41 @@ const genreFlags = (ids = []) => ({
 // prefer the mdblist multi-platform score; fall back to TMDB vote volume
 const rankKey = (i) => (i.mdb?.score != null ? i.mdb.score * 10000 : Math.min(9999, i.votes || 0));
 
-async function applyScores(people, perPerson) {
+async function applyScores(people) {
   if (!getSetting('mdblist_key')) return;
   const all = people.flatMap((p) => p.missing);
   await enrichWithScores(all, { maxFetch: 300 });
+  for (const p of people) p.missing.sort((a, b) => rankKey(b) - rankKey(a));
+}
+
+// Actor credits: a billing order deep in the credits or a "Self"-style
+// character is a cameo, not a role a completist needs to fill.
+const CAMEO_RE = /^(self|himself|herself|uncredited|cameo|archive)/i;
+const isCameoCredit = (c) => (c.order ?? 99) >= 15 || CAMEO_RE.test(c.character || '');
+
+// user-configurable noise thresholds (Ajustes), with the historical defaults
+const minVotesFor = (role) =>
+  Number(getSetting(role === 'actor' ? 'gaps_min_votes_actor' : 'gaps_min_votes_director')) ||
+  (role === 'actor' ? 100 : 20);
+
+const dismissedIds = () =>
+  new Set(db.prepare('SELECT tmdb_id FROM dismissed_movies').all().map((r) => r.tmdb_id));
+
+const isNoise = (m) => !!(m.isShort || m.isDocumentary || m.isTvMovie || m.isCameo);
+
+// Noise (shorts/docs/TV/cameos) used to eat the per-person quota BEFORE the
+// client-side filters hid it, leaving "12 te faltan" over 3 visible cards.
+// Resolve runtimes before the cut, fill the quota with features, and keep the
+// noise alongside (capped) so the client toggles still have data to reveal.
+async function finishMissing(people, perPerson) {
+  await applyScores(people);
+  const all = people.flatMap((p) => p.missing);
+  await enrichRuntimes(all);
+  applyWatched(all);
   for (const p of people) {
-    p.missing.sort((a, b) => rankKey(b) - rankKey(a));
-    p.missing = p.missing.slice(0, perPerson);
+    const features = p.missing.filter((m) => !isNoise(m));
+    const noise = p.missing.filter(isNoise);
+    p.missing = [...features.slice(0, perPerson), ...noise.slice(0, perPerson)];
   }
 }
 
@@ -65,13 +93,14 @@ function today() {
  * not-owned) films, ranked by TMDB vote count.
  */
 export async function libraryGaps({ role = 'director', people = 20, perPerson = 8, refresh = false } = {}) {
-  const cacheKey = `discover_gaps:${role}:${people}:${perPerson}`;
+  const cacheKey = `discover_gaps:v2:${role}:${people}:${perPerson}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 12 * HOUR);
     if (hit) return hit;
   }
 
-  const minVotes = role === 'actor' ? 100 : 20; // filter cameo/obscure noise
+  const minVotes = minVotesFor(role);
+  const dismissed = dismissedIds();
   const tops = db
     .prepare(
       `SELECT p.id, p.name, COUNT(*) n FROM movie_people mp
@@ -106,6 +135,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
         const seen = new Set();
         let released = 0;
         let owned = 0;
+        let dismissedN = 0;
         const missing = [];
         for (const c of raw) {
           if (c.video || seen.has(c.id)) continue;
@@ -115,6 +145,10 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
           released++;
           if (ownsFilm(c, inLib)) {
             owned++;
+            continue;
+          }
+          if (dismissed.has(c.id)) {
+            dismissedN++;
             continue;
           }
           if ((c.vote_count || 0) < minVotes) continue;
@@ -127,6 +161,8 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
             votes: c.vote_count,
             released: true,
             owned: false,
+            character: role === 'actor' ? c.character || null : null,
+            isCameo: role === 'actor' ? isCameoCredit(c) : false,
             ...genreFlags(c.genre_ids),
           });
         }
@@ -140,8 +176,10 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
             owned,
             pct: released ? Math.round((owned / released) * 100) : 0,
             missingTotal: missing.length,
-            // keep a few extra so the mdblist re-rank can promote better films
-            missing: missing.slice(0, perPerson * 2),
+            noiseTotal: missing.filter(isNoise).length,
+            dismissed: dismissedN,
+            // keep a few extra so the score re-rank + noise partition can refill
+            missing: missing.slice(0, perPerson * 3),
           });
         }
       } catch (err) {
@@ -152,10 +190,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
   await Promise.all(Array.from({ length: 5 }, worker));
 
   out.sort((a, b) => b.inLibrary - a.inLibrary);
-  await applyScores(out, perPerson);
-  // runtime pass so shorts can be hidden alongside docs/TV
-  await enrichRuntimes(out.flatMap((p) => p.missing));
-  applyWatched(out.flatMap((p) => p.missing));
+  await finishMissing(out, perPerson);
   clearBuildProgress('discover');
   const result = { generatedAt: Date.now(), role, people: out, errors: errors.slice(0, 5) };
   if (out.length || !errors.length) cacheWrite(cacheKey, result);
@@ -167,7 +202,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
  * "top by count". Uses each person's dominant role.
  */
 export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
-  const cacheKey = `discover_favorites:${perPerson}`;
+  const cacheKey = `discover_favorites:v2:${perPerson}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 6 * HOUR);
     if (hit) return hit;
@@ -185,6 +220,7 @@ export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
 
   const inLib = libraryTmdbIds();
   const now = today();
+  const dismissed = dismissedIds();
   const out = [];
   const errors = [];
   setBuildProgress('discover', 'Cruzando filmografías de tus favoritos', 0, tracked.length);
@@ -195,30 +231,41 @@ export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
       if (i >= tracked.length) return;
       setBuildProgress('discover', 'Cruzando filmografías de tus favoritos', i + 1, tracked.length);
       const p = tracked[i];
-      const role = (p.directed || 0) >= (p.acted || 0) ? 'director' : 'actor';
+      let role = (p.directed || 0) >= (p.acted || 0) ? 'director' : 'actor';
       try {
         const resolved = await resolvePerson(p.id);
         if (!resolved?.tmdb_id) continue;
         const credits = await personCredits(resolved.tmdb_id);
-        const raw =
-          role === 'director'
+        const pickRaw = (r) =>
+          r === 'director'
             ? (credits.crew || []).filter((c) => c.job === 'Director')
             : credits.cast || [];
+        let raw = pickRaw(role);
+        // a TMDB-added favorite with no library titles has 0/0 counts and used
+        // to default to 'director': an actor favorite then vanished silently
+        if (!raw.length && (p.directed || 0) === 0 && (p.acted || 0) === 0) {
+          role = role === 'director' ? 'actor' : 'director';
+          raw = pickRaw(role);
+        }
         const seen = new Set();
         let released = 0;
         let owned = 0;
+        let dismissedN = 0;
         const missing = [];
-        const minVotes = role === 'actor' ? 100 : 20;
+        const minVotes = minVotesFor(role);
         for (const c of raw) {
           if (c.video || seen.has(c.id)) continue;
           seen.add(c.id);
           if (!c.release_date || c.release_date > now) continue;
           released++;
           if (ownsFilm(c, inLib)) { owned++; continue; }
+          if (dismissed.has(c.id)) { dismissedN++; continue; }
           if ((c.vote_count || 0) < minVotes) continue;
           missing.push({
             tmdb_id: c.id, title: c.title, date: c.release_date, poster_path: c.poster_path,
             vote: c.vote_average, votes: c.vote_count, released: true, owned: false,
+            character: role === 'actor' ? c.character || null : null,
+            isCameo: role === 'actor' ? isCameoCredit(c) : false,
             ...genreFlags(c.genre_ids),
           });
         }
@@ -227,7 +274,10 @@ export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
           out.push({
             id: p.id, name: p.name, role, released, owned,
             pct: released ? Math.round((owned / released) * 100) : 0,
-            missingTotal: missing.length, missing: missing.slice(0, perPerson * 2),
+            missingTotal: missing.length,
+            noiseTotal: missing.filter(isNoise).length,
+            dismissed: dismissedN,
+            missing: missing.slice(0, perPerson * 3),
           });
       } catch (err) {
         errors.push(`${p.name}: ${err.message}`);
@@ -237,9 +287,7 @@ export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
   await Promise.all(Array.from({ length: 5 }, worker));
 
   out.sort((a, b) => b.missingTotal - a.missingTotal);
-  await applyScores(out, perPerson);
-  await enrichRuntimes(out.flatMap((pp) => pp.missing));
-  applyWatched(out.flatMap((pp) => pp.missing));
+  await finishMissing(out, perPerson);
   clearBuildProgress('discover');
   const result = { generatedAt: Date.now(), people: out, tracked: tracked.length, errors: errors.slice(0, 5) };
   if (out.length || !errors.length) cacheWrite(cacheKey, result);
@@ -252,12 +300,13 @@ export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
  */
 export async function absentGreats({ perPerson = 6, refresh = false, canon = 'alltime' } = {}) {
   const names = (CANONS[canon] || CANONS.alltime).names;
-  const cacheKey = `discover_absent:${canon}:${perPerson}`;
+  const cacheKey = `discover_absent:v2:${canon}:${perPerson}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 24 * HOUR);
     if (hit) return hit;
   }
 
+  const dismissed = dismissedIds();
   const inLib = libraryTmdbIds();
   const now = today();
   const absent = [];
@@ -303,7 +352,14 @@ export async function absentGreats({ perPerson = 6, refresh = false, canon = 'al
           continue;
         }
         films.sort((a, b) => (b.votes || 0) - (a.votes || 0));
-        const top = films.filter((f) => !f.owned).slice(0, perPerson);
+        // runtime pass (≤ perPerson films, cached) so a much-voted short can't
+        // sneak in as an "essential"; docs/TV are already flagged by genre
+        const cands = films.filter((f) => !f.owned && !dismissed.has(f.tmdb_id)).slice(0, perPerson * 2);
+        await enrichRuntimes(cands);
+        const top = [
+          ...cands.filter((f) => !isNoise(f)),
+          ...cands.filter(isNoise),
+        ].slice(0, perPerson);
         applyWatched(top);
         if (top.length) {
           absent.push({

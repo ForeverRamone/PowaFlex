@@ -41,7 +41,17 @@ export default function WatchStats() {
     setResolveMsg('Buscando en TMDB las vistas sin emparejar…');
     const r = await api('/letterboxd/resolve', { method: 'POST' });
     setResolving(false);
-    setResolveMsg(r.error ? `✗ ${r.error}` : `✓ ${r.matched} vistas emparejadas con tu biblioteca`);
+    if (r.error) {
+      setResolveMsg(`✗ ${r.error}`);
+    } else {
+      const bits = [`✓ ${r.matched} emparejadas`];
+      if (r.library?.resolved) bits.push(`${r.library.resolved} películas de Plex ganaron ficha TMDB`);
+      if (r.unmatched?.sinTmdb) bits.push(`${r.unmatched.sinTmdb} sin ficha en TMDB`);
+      if (r.unmatched?.noEnBiblioteca) bits.push(`${r.unmatched.noEnBiblioteca} vistas fuera de tu colección`);
+      if (r.englishPending)
+        bits.push(`completando ${r.englishPending.toLocaleString('es-ES')} títulos en inglés en segundo plano — reintenta en unos minutos`);
+      setResolveMsg(bits.join(' · '));
+    }
     load();
   };
 

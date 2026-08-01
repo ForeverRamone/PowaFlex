@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
-import { Spinner, ErrorBox, RadarrButton, Empty, useRadarrIds, MediaModal, BuildProgress } from '../components.jsx';
+import {
+  Spinner, ErrorBox, RadarrButton, Empty, useRadarrIds, MediaModal, BuildProgress,
+  useTypeFilters, matchesTypeFilters, TypeFilterBar,
+} from '../components.jsx';
 
 function monthLabel(ym) {
   const [y, m] = ym.split('-');
@@ -75,28 +78,15 @@ function EventCard({ ev, radarrIds, onAdded }) {
   );
 }
 
-const DEFAULT_FILTERS = { shorts: false, docs: true, tv: false };
-
 export default function Calendar() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [radarrIds, addRadarrId] = useRadarrIds();
-  const [show, setShow] = useState(() => {
-    try {
-      return { ...DEFAULT_FILTERS, ...JSON.parse(localStorage.getItem('cal_filters') || '{}') };
-    } catch {
-      return DEFAULT_FILTERS;
-    }
-  });
+  // same persisted filters as Descubrir/fichas: decide "sin cortos" once, applies everywhere
+  const [show, toggleFilter] = useTypeFilters();
   const [horizon, setHorizon] = useState('6');
   const [bulk, setBulk] = useState({ running: false, summary: null });
-
-  const toggleFilter = (key) => {
-    const next = { ...show, [key]: !show[key] };
-    setShow(next);
-    localStorage.setItem('cal_filters', JSON.stringify(next));
-  };
 
   const load = (refresh = false) => {
     setError(null);
@@ -128,10 +118,10 @@ export default function Calendar() {
     shorts: data.events.filter((e) => e.isShort).length,
     docs: data.events.filter((e) => e.isDocumentary).length,
     tv: data.events.filter((e) => e.isTvMovie).length,
+    coral: data.events.filter((e) => e.isCoral).length,
+    cameos: 0, // calendar events aren't actor credits: the toggle doesn't apply
   };
-  const visible = data.events.filter(
-    (e) => (show.shorts || !e.isShort) && (show.docs || !e.isDocumentary) && (show.tv || !e.isTvMovie)
-  );
+  const visible = data.events.filter((e) => matchesTypeFilters(e, show));
   const hiddenCount = data.events.length - visible.length;
 
   const upcoming = visible.filter((e) => e.date && e.date >= today);
@@ -185,28 +175,10 @@ export default function Calendar() {
         Generado {new Date(data.generatedAt).toLocaleString('es-ES')}.
       </p>
 
-      <div className="card p-3 mb-6 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-slate-500 text-xs mr-1">Mostrar:</span>
-        {[
-          ['shorts', 'Cortos', counts.shorts],
-          ['docs', 'Documentales', counts.docs],
-          ['tv', 'Películas de TV', counts.tv],
-        ].map(([key, label, n]) => (
-          <button
-            key={key}
-            onClick={() => toggleFilter(key)}
-            title={show[key] ? `Ocultar ${label.toLowerCase()}` : `Mostrar ${label.toLowerCase()}`}
-            className={`btn-ghost !py-1 ${show[key] ? '!border-gold-400 text-gold-400' : 'line-through opacity-60'}`}
-          >
-            {show[key] ? '👁 ' : '🚫 '}{label} ({n})
-          </button>
-        ))}
-        {hiddenCount > 0 && (
-          <span className="text-xs text-slate-500 ml-auto">
-            {hiddenCount} ocultas — solo cine largometraje
-          </span>
-        )}
-      </div>
+      <TypeFilterBar show={show} toggle={toggleFilter} counts={counts} />
+      {hiddenCount > 0 && (
+        <p className="text-xs text-slate-500 -mt-2 mb-6">{hiddenCount} ocultas por tus filtros — solo cine largometraje</p>
+      )}
 
       <div className="card p-3 mb-6 flex flex-wrap items-center gap-2 text-sm">
         <span className="text-slate-400">Monitorizar en bloque lo visible de los próximos</span>

@@ -24,7 +24,9 @@ export function normTitle(s) {
 
 let matcherCache = { builtAt: 0, index: null };
 
-// Map of normalised title -> [{ year, rating_key }] across title + original_title.
+// Map of normalised title -> [{ year, rating_key }] across title +
+// original_title + english_title (the TMDB English title, backfilled), so
+// Spanish, original-language and English-titled sources all match.
 function buildMatcher() {
   const index = new Map();
   const add = (title, year, ratingKey) => {
@@ -33,9 +35,11 @@ function buildMatcher() {
     if (!index.has(n)) index.set(n, []);
     index.get(n).push({ year, rating_key: ratingKey });
   };
-  for (const m of db.prepare('SELECT rating_key, title, original_title, year FROM movies').all()) {
+  for (const m of db.prepare('SELECT rating_key, title, original_title, english_title, year FROM movies').all()) {
     add(m.title, m.year, m.rating_key);
     if (m.original_title && m.original_title !== m.title) add(m.original_title, m.year, m.rating_key);
+    if (m.english_title && m.english_title !== m.title && m.english_title !== m.original_title)
+      add(m.english_title, m.year, m.rating_key);
   }
   matcherCache = { builtAt: Date.now(), index };
   return index;
@@ -251,7 +255,9 @@ export function parseRssItems(xml) {
   for (const b of blocks) {
     const title = tag(b, 'letterboxd:filmTitle');
     if (!title) continue; // skip list/review items without a film
-    const rating = Number(tag(b, 'letterboxd:memberRating'));
+    // watched-without-rating items carry no tag; Number(null) would be 0
+    const rawRating = tag(b, 'letterboxd:memberRating');
+    const rating = rawRating != null && rawRating !== '' ? Number(rawRating) : NaN;
     out.push({
       title,
       year: Number(tag(b, 'letterboxd:filmYear')) || null,
@@ -325,12 +331,14 @@ export async function importLetterboxdListUrl(url) {
         (chunk.match(/data-film-name="([^"]+)"/i) || [])[1] ||
         (chunk.match(/<img[^>]*\balt="([^"]+)"/i) || [])[1] ||
         decodeURIComponent(slug).replace(/-/g, ' ');
-      const year = (chunk.match(/data-film-release-year="(\d{4})"/i) || chunk.match(/\b(19|20)\d{2}\b/) || [])[0];
+      const year =
+        (chunk.match(/data-film-release-year="(\d{4})"/i) || [])[1] ||
+        (chunk.match(/\b(19|20)\d{2}\b/) || [])[0];
       seen.add(slug);
       items.push({
         position: items.length + 1,
         title: name,
-        year: year ? Number(String(year).slice(-4)) : null,
+        year: year ? Number(year) : null,
         uri: `https://letterboxd.com/film/${slug}/`,
       });
       found++;
@@ -351,11 +359,12 @@ export function watchedIndex() {
   const keys = new Set();      // normalised "title|year"
   const tmdbIds = new Set();
   const movieIds = new Set();  // library rating_keys that are watched
-  for (const m of db.prepare('SELECT rating_key, title, original_title, year, tmdb_id FROM movies WHERE view_count > 0').all()) {
+  for (const m of db.prepare('SELECT rating_key, title, original_title, english_title, year, tmdb_id FROM movies WHERE view_count > 0').all()) {
     movieIds.add(m.rating_key);
     if (m.tmdb_id) tmdbIds.add(m.tmdb_id);
     keys.add(`${normTitle(m.title)}|${m.year || ''}`);
     if (m.original_title) keys.add(`${normTitle(m.original_title)}|${m.year || ''}`);
+    if (m.english_title) keys.add(`${normTitle(m.english_title)}|${m.year || ''}`);
   }
   for (const e of db.prepare(`SELECT title, year, tmdb_id, movie_id FROM lb_entries WHERE list IN ('diary','watched','ratings')`).all()) {
     if (e.movie_id) movieIds.add(e.movie_id);
@@ -460,8 +469,14 @@ export function rematchLetterboxd() {
  * unmatched watched entry to a TMDB id (search by title+year, cached) and then
  * links it to a library film by that id. Returns counts. (#1)
  */
+let englishBackfillRunning = false;
+
 export async function resolveUnmatchedLb() {
-  const { searchMovieId } = await import('./tmdb.js');
+  const { searchMovieId, backfillMovieTmdbIds, backfillEnglishTitles } = await import('./tmdb.js');
+
+  // first make sure every library row has a TMDB id (IMDb guid → title search),
+  // otherwise the id-link below can never land for those films
+  const library = await backfillMovieTmdbIds();
   // unique (title, year) of watched entries with no TMDB id yet
   const groups = db
     .prepare(
@@ -514,7 +529,7 @@ export async function resolveUnmatchedLb() {
   await Promise.all(Array.from({ length: 6 }, listWorker));
 
   // now link any still-unmatched entry / list item to a library film via TMDB id
-  const index = getMatcher();
+  const index = buildMatcher(); // fresh: the backfill above may have added ids
   let matched = 0;
   const tx = db.transaction(() => {
     const upd = db.prepare('UPDATE lb_entries SET movie_id = ? WHERE id = ?');
@@ -533,7 +548,38 @@ export async function resolveUnmatchedLb() {
     }
   });
   tx();
-  return { groups: groups.length + listGroups.length, resolved, matched };
+
+  // breakdown of what is still unmatched, so the UI can say WHY
+  const unmatched = db
+    .prepare(
+      `SELECT SUM(CASE WHEN tmdb_id IS NULL THEN 1 ELSE 0 END) sinTmdb,
+              SUM(CASE WHEN tmdb_id IS NOT NULL THEN 1 ELSE 0 END) noEnBiblioteca
+       FROM lb_entries WHERE movie_id IS NULL AND list IN ('diary','watched','ratings')`
+    )
+    .get();
+
+  // English titles unlock pure-title matching for third-language films; the
+  // backfill is heavy (one TMDB call per film) so it advances in the background
+  // and relinks everything when done
+  const englishPending = db
+    .prepare('SELECT COUNT(*) n FROM movies WHERE tmdb_id IS NOT NULL AND english_title IS NULL')
+    .get().n;
+  if (englishPending && !englishBackfillRunning) {
+    englishBackfillRunning = true;
+    backfillEnglishTitles({ budget: 15000 })
+      .then(() => rematchLetterboxd())
+      .catch(() => {})
+      .finally(() => { englishBackfillRunning = false; });
+  }
+
+  return {
+    groups: groups.length + listGroups.length,
+    resolved,
+    matched,
+    library,
+    unmatched: { sinTmdb: unmatched.sinTmdb || 0, noEnBiblioteca: unmatched.noEnBiblioteca || 0 },
+    englishPending,
+  };
 }
 
 export function letterboxdSummary() {

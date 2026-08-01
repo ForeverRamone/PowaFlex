@@ -1,5 +1,5 @@
 import { db, getSetting, cacheRead, cacheWrite } from './db.js';
-import { watchedIndex, isWatched } from './letterboxd.js';
+import { watchedIndex, isWatched, normTitle } from './letterboxd.js';
 
 const DAY = 24 * 3600 * 1000;
 
@@ -265,20 +265,122 @@ export async function enrichRuntimes(items, { concurrency = 6, withCredits = fal
   return items;
 }
 
-/** Resolve a TMDB movie id from title (+year), cached. Null if not found. */
+/** Pick the best /search/movie result for (title, year): exact normalised
+ *  title/original-title match first, then year proximity (±1); with a year and
+ *  nothing close, better no match than a wrong film. */
+export function pickSearchResult(results, title, year = null) {
+  const list = (results || []).filter(Boolean);
+  if (!list.length) return null;
+  const wanted = normTitle(title);
+  const resYear = (r) => (r.release_date ? Number(r.release_date.slice(0, 4)) : null);
+  const yearOk = (r) => !year || (resYear(r) != null && Math.abs(resYear(r) - year) <= 1);
+  const exact = list.filter((r) => yearOk(r) && (normTitle(r.title) === wanted || normTitle(r.original_title) === wanted));
+  if (exact.length) return exact[0];
+  const inYear = list.filter(yearOk);
+  if (inYear.length) return inYear[0];
+  return year ? null : list[0];
+}
+
+/** Resolve a TMDB movie id from title (+year), cached. Null if not found.
+ *  Hits cache 30 days; misses only 1 day, so a transient failure can't stick. */
 export async function searchMovieId(title, year = null) {
   if (!title) return null;
   const key = `movie_search:${title.toLowerCase()}:${year || ''}`;
   const cached = cacheRead(key, 30 * DAY);
-  if (cached !== null) return cached?.id ?? null;
+  if (cached?.id) return cached.id;
+  if (cached && cacheRead(key, DAY)) return null; // fresh miss
   try {
-    const data = await tmdbGet('/search/movie', year ? { query: title, year } : { query: title }, { cacheKey: null });
-    const hit = (data.results || [])[0] || null;
+    let data = await tmdbGet('/search/movie', year ? { query: title, primary_release_year: year } : { query: title }, { cacheKey: null });
+    let hit = pickSearchResult(data.results, title, year);
+    if (!hit && year) {
+      // the year filter can be too strict (festival vs. release year): retry open
+      data = await tmdbGet('/search/movie', { query: title }, { cacheKey: null });
+      hit = pickSearchResult(data.results, title, year);
+    }
     cacheWrite(key, hit ? { id: hit.id } : {});
     return hit?.id ?? null;
   } catch {
     return null;
   }
+}
+
+/** Deterministic TMDB id from an IMDb id (Plex guids carry it), cached. */
+export async function findByImdbId(imdbId) {
+  if (!imdbId) return null;
+  const key = `imdb_find:${imdbId}`;
+  const cached = cacheRead(key, 30 * DAY);
+  if (cached) return cached.id ?? null;
+  try {
+    const data = await tmdbGet(`/find/${imdbId}`, { external_source: 'imdb_id' }, { cacheKey: null });
+    const id = data.movie_results?.[0]?.id ?? null;
+    cacheWrite(key, { id });
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+// --- library unification ------------------------------------------------------
+// Some Plex rows lack a TMDB guid, and the library only knows the Spanish +
+// original titles. These backfills give every film a TMDB id (IMDb id first,
+// title search as fallback) and the TMDB English title, so any source —
+// Letterboxd lists, CSVs, watched entries — can match by id or by title in
+// es/original/en.
+
+export async function backfillMovieTmdbIds() {
+  const rows = db
+    .prepare('SELECT rating_key, title, original_title, year, imdb_id FROM movies WHERE tmdb_id IS NULL')
+    .all();
+  const upd = db.prepare('UPDATE movies SET tmdb_id = ? WHERE rating_key = ?');
+  let resolved = 0;
+  let i = 0;
+  async function worker() {
+    for (;;) {
+      const idx = i++;
+      if (idx >= rows.length) return;
+      const m = rows[idx];
+      const id =
+        (await findByImdbId(m.imdb_id)) ||
+        (m.original_title ? await searchMovieId(m.original_title, m.year) : null) ||
+        (await searchMovieId(m.title, m.year));
+      if (id) { upd.run(id, m.rating_key); resolved++; }
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, worker));
+  return { pending: rows.length, resolved };
+}
+
+export async function backfillEnglishTitles({ budget = 3000 } = {}) {
+  const rows = db
+    .prepare('SELECT rating_key, tmdb_id FROM movies WHERE tmdb_id IS NOT NULL AND english_title IS NULL LIMIT ?')
+    .all(budget);
+  const pending = db
+    .prepare('SELECT COUNT(*) n FROM movies WHERE tmdb_id IS NOT NULL AND english_title IS NULL')
+    .get().n;
+  // '' when TMDB has no English title, so the row is not retried forever
+  const upd = db.prepare('UPDATE movies SET english_title = ? WHERE rating_key = ?');
+  let done = 0;
+  let i = 0;
+  async function worker() {
+    for (;;) {
+      const idx = i++;
+      if (idx >= rows.length) return;
+      const m = rows[idx];
+      try {
+        const data = await tmdbGet(
+          `/movie/${m.tmdb_id}`,
+          { language: 'en-US' },
+          { cacheKey: `movie_en:${m.tmdb_id}`, cacheMs: 30 * DAY }
+        );
+        upd.run(data.title || '', m.rating_key);
+        done++;
+        setBuildProgress('english_titles', 'Completando títulos en inglés…', done, rows.length);
+      } catch {}
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, worker));
+  clearBuildProgress('english_titles');
+  return { done, remaining: pending - done };
 }
 
 /** Full TMDB movie detail with credits (cached). */

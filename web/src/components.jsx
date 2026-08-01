@@ -492,9 +492,10 @@ export function useRadarrIds() {
   return [ids, add];
 }
 
-// Shorts / documentaries / TV-movie visibility toggles, persisted. Defaults to
-// hidden (the completist wants features first). `key` scopes the storage.
-const TYPE_DEFAULTS = { shorts: false, docs: false, tv: false, coral: false };
+// Shorts / documentaries / TV-movie / cameo visibility toggles, persisted.
+// Defaults to hidden (the completist wants features first). All pages share the
+// default 'type_filters' key so a preference set once applies everywhere.
+const TYPE_DEFAULTS = { shorts: false, docs: false, tv: false, coral: false, cameos: false };
 
 export function useTypeFilters(key = 'type_filters') {
   const [show, setShow] = useState(() => {
@@ -514,7 +515,8 @@ export function useTypeFilters(key = 'type_filters') {
 
 export const matchesTypeFilters = (item, show) =>
   (show.shorts || !item.isShort) && (show.docs || !item.isDocumentary) &&
-  (show.tv || !item.isTvMovie) && (show.coral || !item.isCoral);
+  (show.tv || !item.isTvMovie) && (show.coral || !item.isCoral) &&
+  (show.cameos || !item.isCameo);
 
 export function TypeFilterBar({ show, toggle, counts }) {
   return (
@@ -525,6 +527,7 @@ export function TypeFilterBar({ show, toggle, counts }) {
         ['docs', 'Documentales', counts?.docs],
         ['tv', 'Películas de TV', counts?.tv],
         ['coral', 'Dirección coral', counts?.coral],
+        ['cameos', 'Cameos', counts?.cameos],
       ].filter(([, , n]) => n == null || n > 0).map(([k, label, n]) => (
         <button
           key={k}

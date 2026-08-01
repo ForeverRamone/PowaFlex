@@ -252,6 +252,22 @@ ensureColumn('lb_entries', 'poster_path', 'poster_path TEXT');
 // challenge lists can be hidden by the user without deleting them
 ensureColumn('lb_lists', 'hidden', 'hidden INTEGER DEFAULT 0');
 
+// TMDB English title: Plex only knows the Spanish + original titles, so
+// English-titled sources (Letterboxd lists/CSVs) miss third-language films
+ensureColumn('movies', 'english_title', 'english_title TEXT');
+
+// One-time repair: the RSS import used to store rating 0 for watched-without-
+// rating entries (Letterboxd's minimum is 0.5, so 0 can only be that bug)
+db.exec("UPDATE lb_entries SET rating = NULL WHERE rating = 0");
+
+// Films explicitly marked "no me interesa" in the gaps flow: excluded from
+// missing counts and suggestions until un-dismissed.
+db.exec(`CREATE TABLE IF NOT EXISTS dismissed_movies (
+  tmdb_id INTEGER PRIMARY KEY,
+  title TEXT,
+  at INTEGER
+);`);
+
 // --- settings helpers -------------------------------------------------------
 
 const getStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
@@ -262,7 +278,7 @@ const setStmt = db.prepare(
 // Optional encryption-at-rest for credentials. When POWAFLEX_SECRET is set,
 // these keys are stored as AES-256-GCM blobs; without it they stay plaintext
 // (backward compatible) and we warn once. Reads are transparent either way.
-const SECRET_SETTING_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key']);
+const SECRET_SETTING_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key', 'mdblist_key']);
 const secretKey = process.env.POWAFLEX_SECRET
   ? crypto.createHash('sha256').update(process.env.POWAFLEX_SECRET).digest()
   : null;

@@ -9,7 +9,7 @@ const Library = lazy(() => import('./pages/Library.jsx'));
 const People = lazy(() => import('./pages/People.jsx'));
 const PersonDetail = lazy(() => import('./pages/PersonDetail.jsx'));
 const Calendar = lazy(() => import('./pages/Calendar.jsx'));
-const Collections = lazy(() => import('./pages/Collections.jsx'));
+const Sagas = lazy(() => import('./pages/Sagas.jsx'));
 const Letterboxd = lazy(() => import('./pages/Letterboxd.jsx'));
 const Quality = lazy(() => import('./pages/Quality.jsx'));
 const WatchStats = lazy(() => import('./pages/WatchStats.jsx'));
@@ -123,7 +123,7 @@ function Shell() {
           <Route path="/personas" element={<People />} />
           <Route path="/personas/:id" element={<PersonDetail />} />
           <Route path="/calendario" element={<Calendar />} />
-          <Route path="/colecciones" element={<Collections />} />
+          <Route path="/colecciones" element={<Sagas />} />
           <Route path="/visionado" element={<WatchStats />} />
           <Route path="/descubrir" element={<Discover />} />
           <Route path="/favoritos" element={<Favorites />} />

@@ -54,7 +54,7 @@ function SagaDetail({ id, radarrIds, addRadarrId }) {
   );
 }
 
-export default function Collections() {
+export default function Sagas() {
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(null);
   const [scan, setScan] = useState(null);

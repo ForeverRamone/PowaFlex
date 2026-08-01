@@ -288,7 +288,17 @@ export default function Settings() {
               value={s.auto_radarr_months ?? '6'}
               onChange={set('auto_radarr_months')}
             />
-            <span className="text-xs text-slate-400">meses</span>
+            <span className="text-xs text-slate-400">meses, mirando también</span>
+            <input
+              type="number"
+              min="0"
+              max="365"
+              className="input !w-20 text-center"
+              value={s.auto_radarr_lookback_days ?? '0'}
+              onChange={set('auto_radarr_lookback_days')}
+              title="TMDB a veces pone fecha a las películas pequeñas después del estreno; con 0 esas se pierden"
+            />
+            <span className="text-xs text-slate-400">días hacia atrás</span>
             <button
               className="btn-ghost !py-1"
               onClick={async () => {
@@ -312,6 +322,15 @@ export default function Settings() {
               Ejecutar ahora
             </button>
           </div>
+          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer mt-2 ml-6">
+            <input
+              type="checkbox"
+              className="accent-[#e8b53a]"
+              checked={s.auto_radarr_include_docs === '1'}
+              onChange={(e) => setS({ ...s, auto_radarr_include_docs: e.target.checked ? '1' : '0' })}
+            />
+            Incluir documentales (por defecto, cortos, documentales y películas de TV se descartan)
+          </label>
           {auto && (auto.considered != null || auto.added != null) && (
             <div className="ml-6 mt-2 text-xs text-slate-400">
               {auto.preview
@@ -475,6 +494,27 @@ export default function Settings() {
         <p className="text-[11px] text-slate-500 mt-2">
           Marca quién ha fallecido para no vigilar sus estrenos ni incluirlos en el auto-Radarr. En Favoritos puedes
           quitar de golpe a los fallecidos.
+        </p>
+      </section>
+
+      <section className="card p-5 mb-5">
+        <h2 className="font-semibold text-slate-100">6 · Descubrir huecos: umbral de ruido</h2>
+        <p className="text-xs text-slate-500 mt-1 mb-3 max-w-2xl">
+          Una película con menos votos en TMDB que el umbral no cuenta como hueco. Sube el listón si los huecos
+          te traen demasiada morralla; baja a 0 para el completismo absoluto.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-slate-400">Votos mínimos · huecos de directores/as</label>
+            <input className="input mt-1" type="number" min="0" max="5000" placeholder="20" value={s.gaps_min_votes_director || ''} onChange={set('gaps_min_votes_director')} />
+          </div>
+          <div>
+            <label className="text-xs text-slate-400">Votos mínimos · huecos de actores/actrices</label>
+            <input className="input mt-1" type="number" min="0" max="5000" placeholder="100" value={s.gaps_min_votes_actor || ''} onChange={set('gaps_min_votes_actor')} />
+          </div>
+        </div>
+        <p className="text-[11px] text-slate-500 mt-2">
+          La nota mínima Σ y los filtros de cortos/documentales/TV/cameos se ajustan directamente en la página de Descubrir.
         </p>
       </section>
 

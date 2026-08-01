@@ -10,8 +10,6 @@ import {
   tmdbTest,
   filmographyProfile,
   getCalendarCached,
-  searchCollection,
-  collectionDetails,
   enrichPeopleLife,
   tmdbPoster,
   searchMovieId,
@@ -77,7 +75,7 @@ await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } });
 
 // --- settings ----------------------------------------------------------------
 
-const SECRET_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key']);
+const SECRET_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key', 'mdblist_key']);
 
 app.get('/api/settings', async () => {
   const all = getAllSettings();
@@ -292,7 +290,7 @@ app.post('/api/tracked/by-names', async (req, reply) => {
         if (after > before) added++;
       } catch { notFound.push(name); }
     }
-    if (added) db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
+    if (added) invalidateFavoritesCaches();
     return { ok: true, added, total: names.length, notFound };
   } catch (err) {
     reply.code(400);
@@ -314,8 +312,10 @@ app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
     let skipped = 0;
     for (const p of people.slice(0, 200)) {
       const tmdbId = p.tmdbId ?? p.tmdb_id;
-      // if this person is already known and blocked, don't re-add automatically
-      const existing = db.prepare('SELECT id FROM people WHERE tmdb_id = ?').get(tmdbId);
+      // if this person is already known and blocked, don't re-add automatically.
+      // Plex-synced people are born without tmdb_id, so check by name too —
+      // otherwise trackByTmdb finds them by name and re-follows past the block
+      const existing = db.prepare('SELECT id FROM people WHERE tmdb_id = ? OR name = ?').get(tmdbId, p.name || '');
       if (existing && blocked.has(existing.id)) { skipped++; continue; }
       try {
         const before = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
@@ -324,7 +324,7 @@ app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
         if (after > before) added++;
       } catch {}
     }
-    if (added) db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
+    if (added) invalidateFavoritesCaches();
     return { ok: true, added, skipped, total: people.length };
   } catch (err) {
     reply.code(400);
@@ -422,31 +422,141 @@ app.get('/api/calendar', async (req, reply) => {
   }
 });
 
-// favorites feed the upcoming-releases calendar; invalidate its cache on change
-const invalidateCalendar = () =>
-  db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
+// favorites feed the upcoming-releases calendar AND the favorites-gaps cache;
+// invalidate both on change so new/removed favorites show up right away
+const invalidateFavoritesCaches = () =>
+  db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%' OR key LIKE 'discover_favorites:%'`).run();
 
 app.post('/api/tracked/bulk', async (req, reply) => {
-  const { role, top } = req.body || {};
-  if (!['director', 'actor', 'writer'].includes(role) || !Number(top)) {
+  const { role, top, personIds, preview } = req.body || {};
+  const ins = db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at) VALUES (?, ?)');
+
+  // confirmed selection coming back from the preview dialog
+  if (Array.isArray(personIds) && personIds.length) {
+    let added = 0;
+    const tx = db.transaction(() => {
+      for (const id of personIds.slice(0, 1000)) added += ins.run(Number(id), Date.now()).changes;
+    });
+    tx();
+    if (added) invalidateFavoritesCaches();
+    return { ok: true, added, total: personIds.length };
+  }
+
+  if (!['director', 'actor'].includes(role) || !Number(top)) {
     reply.code(400);
-    return { error: 'Parámetros: role (director|actor|writer) y top (número)' };
+    return { error: 'Parámetros: role (director|actor) y top (número), o personIds' };
   }
   const candidates = db
     .prepare(
-      `SELECT p.id FROM movie_people mp JOIN people p ON p.id = mp.person_id
+      `SELECT p.id, p.name, p.deathday, COUNT(*) n FROM movie_people mp JOIN people p ON p.id = mp.person_id
        WHERE mp.role = ? AND p.id NOT IN (SELECT person_id FROM unfollowed_people)
-       GROUP BY p.id ORDER BY COUNT(*) DESC, p.name LIMIT ?`
+         AND p.id NOT IN (SELECT person_id FROM tracked_people)
+       GROUP BY p.id ORDER BY n DESC, p.name LIMIT ?`
     )
     .all(role, Math.min(Number(top), 1000));
-  const ins = db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at) VALUES (?, ?)');
+  // with preview the client shows the candidates first: no more blind top-N adds
+  if (preview) return { candidates };
   let added = 0;
   const tx = db.transaction(() => {
     for (const c of candidates) added += ins.run(c.id, Date.now()).changes;
   });
   tx();
-  if (added) invalidateCalendar();
+  if (added) invalidateFavoritesCaches();
   return { ok: true, added, total: candidates.length };
+});
+
+// prune several favorites at once, blocking auto re-adds like the single ✕ (poda)
+app.delete('/api/tracked/batch', async (req, reply) => {
+  const ids = Array.isArray(req.body?.personIds) ? req.body.personIds.map(Number).filter(Boolean) : [];
+  if (!ids.length) {
+    reply.code(400);
+    return { error: 'Faltan personIds' };
+  }
+  const del = db.prepare('DELETE FROM tracked_people WHERE person_id = ?');
+  const block = db.prepare('INSERT OR IGNORE INTO unfollowed_people (person_id, at) VALUES (?, ?)');
+  let removed = 0;
+  const tx = db.transaction(() => {
+    for (const id of ids) {
+      removed += del.run(id).changes;
+      block.run(id, Date.now());
+    }
+  });
+  tx();
+  if (removed) invalidateFavoritesCaches();
+  return { ok: true, removed };
+});
+
+// who still contributes to the hunt: gaps from the favorites cache, upcoming
+// projects from the calendar cache — no fresh TMDB calls, just cross-reference
+app.get('/api/tracked/health', async () => {
+  const favs = db
+    .prepare(
+      `SELECT p.id, p.name, p.thumb, p.deathday, p.tmdb_id,
+              SUM(CASE WHEN mp.role = 'director' THEN 1 ELSE 0 END) directed,
+              SUM(CASE WHEN mp.role = 'actor' THEN 1 ELSE 0 END) acted,
+              COUNT(DISTINCT mp.movie_id) movies
+       FROM tracked_people t
+       JOIN people p ON p.id = t.person_id
+       LEFT JOIN movie_people mp ON mp.person_id = p.id
+       GROUP BY p.id ORDER BY movies DESC, p.name`
+    )
+    .all();
+  const gapsRow = db
+    .prepare(`SELECT json FROM tmdb_cache WHERE key LIKE 'discover_favorites:%' ORDER BY fetched_at DESC LIMIT 1`)
+    .get();
+  const calRow = db
+    .prepare(`SELECT json FROM tmdb_cache WHERE key LIKE 'calendar:%' ORDER BY fetched_at DESC LIMIT 1`)
+    .get();
+  const gapsBy = new Map();
+  try {
+    for (const p of (JSON.parse(gapsRow?.json || '{}').people || [])) gapsBy.set(p.id, p);
+  } catch {}
+  const upcomingBy = new Map();
+  try {
+    const now = new Date().toISOString().slice(0, 10);
+    for (const ev of (JSON.parse(calRow?.json || '{}').events || [])) {
+      if (ev.date && ev.date < now) continue; // future or still-undated (announced)
+      for (const per of [...(ev.followedDirectors || []), ...(ev.followedActors || [])])
+        upcomingBy.set(per.id, (upcomingBy.get(per.id) || 0) + 1);
+    }
+  } catch {}
+  return {
+    cached: { gaps: !!gapsRow, calendar: !!calRow },
+    people: favs.map((f) => {
+      const g = gapsBy.get(f.id);
+      return {
+        ...f,
+        // favoritesGaps only lists people WITH missing films, so absent = 0 gaps
+        gaps: gapsRow ? (g?.missingTotal ?? 0) : null,
+        pct: g?.pct ?? null,
+        gapRole: g?.role ?? null,
+        upcoming: calRow ? (upcomingBy.get(f.id) || 0) : null,
+      };
+    }),
+  };
+});
+
+// permanent per-film "no me interesa" for the gaps flow: excluded from missing
+// counts at the next cache rebuild; clients hide it instantly on their side
+app.get('/api/discover/dismissed', async () =>
+  db.prepare('SELECT tmdb_id, title, at FROM dismissed_movies ORDER BY at DESC').all()
+);
+app.post('/api/discover/dismiss', async (req, reply) => {
+  const tmdbId = Number(req.body?.tmdbId);
+  if (!tmdbId) {
+    reply.code(400);
+    return { error: 'Falta tmdbId' };
+  }
+  db.prepare('INSERT OR REPLACE INTO dismissed_movies (tmdb_id, title, at) VALUES (?, ?, ?)').run(
+    tmdbId,
+    req.body?.title || null,
+    Date.now()
+  );
+  return { ok: true };
+});
+app.delete('/api/discover/dismiss/:tmdbId', async (req) => {
+  db.prepare('DELETE FROM dismissed_movies WHERE tmdb_id = ?').run(Number(req.params.tmdbId));
+  return { ok: true };
 });
 
 app.post('/api/tracked/:personId', async (req) => {
@@ -456,12 +566,12 @@ app.post('/api/tracked/:personId', async (req) => {
   const r = db
     .prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at) VALUES (?, ?)')
     .run(id, Date.now());
-  if (r.changes) invalidateCalendar();
+  if (r.changes) invalidateFavoritesCaches();
   return { ok: true };
 });
 app.delete('/api/tracked/all', async () => {
   db.prepare('DELETE FROM tracked_people').run();
-  invalidateCalendar();
+  invalidateFavoritesCaches();
   return { ok: true };
 });
 app.delete('/api/tracked/:personId', async (req) => {
@@ -469,7 +579,7 @@ app.delete('/api/tracked/:personId', async (req) => {
   const r = db.prepare('DELETE FROM tracked_people WHERE person_id = ?').run(id);
   // remember the explicit ✕ so bulk/automatic adds skip this person (C)
   db.prepare('INSERT OR IGNORE INTO unfollowed_people (person_id, at) VALUES (?, ?)').run(id, Date.now());
-  if (r.changes) invalidateCalendar();
+  if (r.changes) invalidateFavoritesCaches();
   return { ok: true };
 });
 app.get('/api/tracked', async () =>
@@ -567,51 +677,6 @@ app.get('/api/sagas/:id', async (req, reply) => {
   }
 });
 
-app.get('/api/collections', async () => {
-  return db
-    .prepare(
-      `SELECT t.id, t.name, COUNT(*) n FROM tags t JOIN movie_tags mt ON mt.tag_id = t.id
-       WHERE t.type = 'collection' GROUP BY t.id ORDER BY n DESC`
-    )
-    .all();
-});
-
-app.get('/api/collections/complete', async (req, reply) => {
-  try {
-    const name = String(req.query.name || '');
-    const clean = name.replace(/\b(colecci[oó]n|collection)\b/gi, '').trim() || name;
-    const found = await searchCollection(clean);
-    if (!found) return { matched: false, name };
-    const det = await collectionDetails(found.id);
-    const inLib = new Set(
-      db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((r) => r.tmdb_id)
-    );
-    const today = new Date().toISOString().slice(0, 10);
-    const parts = (det.parts || []).map((p) => ({
-      tmdb_id: p.id,
-      title: p.title,
-      date: p.release_date || null,
-      released: !!p.release_date && p.release_date <= today,
-      owned: inLib.has(p.id),
-      poster_path: p.poster_path,
-    }));
-    return {
-      matched: true,
-      name: det.name,
-      tmdb_id: det.id,
-      poster_path: det.poster_path,
-      parts,
-      stats: {
-        released: parts.filter((p) => p.released).length,
-        owned: parts.filter((p) => p.owned && p.released).length,
-      },
-    };
-  } catch (err) {
-    reply.code(502);
-    return { error: String(err.message || err) };
-  }
-});
-
 // --- radarr --------------------------------------------------------------------------
 
 app.get('/api/radarr/context', async (req, reply) => {
@@ -637,9 +702,11 @@ app.post('/api/radarr/sync', async (req, reply) => {
 // daily auto-add of upcoming films from favorite LIVING directors (#3)
 app.get('/api/radarr/auto', async () => ({ ...autoRadarrConfig(), status: autoRadarrStatus }));
 app.post('/api/radarr/auto/run', async (req) => {
-  const months = Number(req.body?.months) || autoRadarrConfig().months;
+  const cfg = autoRadarrConfig();
+  const months = Number(req.body?.months) || cfg.months;
+  const lookbackDays = req.body?.lookbackDays != null ? Number(req.body.lookbackDays) || 0 : cfg.lookbackDays;
   const dryRun = !!req.body?.dryRun;
-  return await runAutoRadarr({ months, dryRun });
+  return await runAutoRadarr({ months, lookbackDays, dryRun });
 });
 
 app.post('/api/radarr/add', async (req, reply) => {
@@ -765,6 +832,8 @@ app.post('/api/letterboxd/import', async (req, reply) => {
     reply.code(400);
     return { error: 'No se recibió ningún archivo' };
   }
+  // resolve cross-language matches right away instead of waiting for the nightly
+  if (getSetting('tmdb_key')) resolveUnmatchedLb().catch(() => {});
   return { results, lists };
 });
 
@@ -796,7 +865,10 @@ app.get('/api/letterboxd/lists/:id', async (req, reply) => {
 });
 app.post('/api/letterboxd/lists', async (req, reply) => {
   try {
-    return await importLetterboxdListUrl(req.body?.url || '');
+    const out = await importLetterboxdListUrl(req.body?.url || '');
+    // resolve cross-language matches right away instead of waiting for the nightly
+    if (getSetting('tmdb_key')) resolveUnmatchedLb().catch(() => {});
+    return out;
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -943,11 +1015,21 @@ setInterval(() => {
       // pull recent watches from the Letterboxd RSS feed, if configured
       .then(() => (getSetting('letterboxd_rss') ? importLetterboxdRss(getSetting('letterboxd_rss')) : null))
       .catch(() => {})
+      // refresh alive/dead among favorites so the auto-add "living" filter and
+      // the prune helpers don't work on frozen data
+      .then(() =>
+        getSetting('tmdb_key')
+          ? enrichPeopleLife(db.prepare('SELECT person_id FROM tracked_people').all().map((r) => r.person_id))
+          : null
+      )
       // refresh Radarr snapshot, then run the daily auto-add for living favorites
       .then(() => (getSetting('radarr_url') && getSetting('radarr_key') ? radarrSyncMovies() : null))
       .then(() =>
         getSetting('auto_radarr_enabled') === '1'
-          ? runAutoRadarr({ months: Number(getSetting('auto_radarr_months') || 6) })
+          ? runAutoRadarr({
+              months: Number(getSetting('auto_radarr_months') || 6),
+              lookbackDays: Number(getSetting('auto_radarr_lookback_days') || 0),
+            })
           : null
       )
       // keep the saga scan advancing a batch each night

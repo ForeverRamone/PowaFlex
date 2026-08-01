@@ -26,11 +26,6 @@ export const LB_WATCHED_KEYS =
 export const WATCHED = `(m.view_count > 0 OR m.rating_key IN ${LB_WATCHED_KEYS})`;
 export const UNWATCHED = `(m.view_count = 0 AND m.rating_key NOT IN ${LB_WATCHED_KEYS})`;
 
-// The user's own rating no longer comes from Plex (removed in v0.5) — it lives on
-// Letterboxd. "Tu nota" is the max Letterboxd rating (0–5) scaled to 0–10.
-export const MY_RATING =
-  `(SELECT MAX(rating) * 2 FROM lb_entries WHERE movie_id = m.rating_key AND rating IS NOT NULL)`;
-
 // Columns every small poster card needs: the three external ratings (for the
 // configurable headline chip, #5) plus a watched flag (for the status system, #3).
 export const CARD_JOIN = `LEFT JOIN mdb_ratings rc ON rc.tmdb_id = m.tmdb_id`;
@@ -219,9 +214,12 @@ const SORTS = {
 };
 
 export function listMovies(q) {
+  // placeholders bind by position: JOIN args must come before WHERE args,
+  // whatever order the filters were parsed in
   const where = [];
   const args = [];
   const joins = [];
+  const joinArgs = [];
 
   if (q.search) {
     where.push('(m.title LIKE ? OR m.original_title LIKE ?)');
@@ -233,7 +231,7 @@ export function listMovies(q) {
       `JOIN movie_tags ${alias} ON ${alias}.movie_id = m.rating_key AND ${alias}.tag_id IN (
          SELECT id FROM tags WHERE type = '${type}' AND name IN (${values.map(() => '?').join(',')}))`
     );
-    args.push(...values);
+    joinArgs.push(...values);
   };
   if (q.genres?.length) tagFilter('genre', q.genres, 1);
   if (q.countries?.length) tagFilter('country', q.countries, 2);
@@ -241,10 +239,10 @@ export function listMovies(q) {
 
   if (q.personId) {
     joins.push('JOIN movie_people mpf ON mpf.movie_id = m.rating_key AND mpf.person_id = ?');
-    args.push(Number(q.personId));
+    joinArgs.push(Number(q.personId));
     if (q.personRole) {
       joins[joins.length - 1] += ' AND mpf.role = ?';
-      args.push(q.personRole);
+      joinArgs.push(q.personRole);
     }
   }
   if (q.decade) {
@@ -274,10 +272,11 @@ export function listMovies(q) {
   const order = SORTS[q.sort] || SORTS.added;
   const limit = Math.min(Number(q.limit) || 60, 200);
   const offset = Number(q.offset) || 0;
+  const bound = [...joinArgs, ...args];
 
   const total = db
     .prepare(`SELECT COUNT(DISTINCT m.rating_key) n FROM movies m ${joinSql} ${whereSql}`)
-    .get(...args).n;
+    .get(...bound).n;
 
   const rows = db
     .prepare(
@@ -286,7 +285,7 @@ export function listMovies(q) {
               r.imdb, r.rt_critic, r.letterboxd, r.score AS mdb_score, (${WATCHED}) AS watched
        FROM movies m ${joinSql} ${whereSql} ORDER BY ${order} LIMIT ? OFFSET ?`
     )
-    .all(...args, limit, offset);
+    .all(...bound, limit, offset);
 
   return { total, offset, limit, movies: rows };
 }

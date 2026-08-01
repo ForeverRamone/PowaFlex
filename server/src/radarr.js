@@ -1,4 +1,5 @@
 import { db, getSetting, setSetting } from './db.js';
+import { setBuildProgress, clearBuildProgress } from './tmdb.js';
 
 function radarrConfig() {
   const url = (getSetting('radarr_url') || '').replace(/\/+$/, '');
@@ -149,6 +150,9 @@ export async function radarrAdd(tmdbId, { qualityProfileId = null, rootFolderPat
 export async function radarrAddBulk(tmdbIds) {
   const results = [];
   let i = 0;
+  // large batches take minutes at concurrency 2: publish progress instead of
+  // leaving the client on a mute spinner (same channel the TMDB builds use)
+  setBuildProgress('radarr-bulk', 'Añadiendo a Radarr', 0, tmdbIds.length);
   async function worker() {
     for (;;) {
       const idx = i++;
@@ -161,9 +165,11 @@ export async function radarrAddBulk(tmdbIds) {
         const msg = String(err.message || err);
         results.push({ tmdbId, ok: false, alreadyExists: /already/i.test(msg), error: msg });
       }
+      setBuildProgress('radarr-bulk', 'Añadiendo a Radarr', results.length, tmdbIds.length);
     }
   }
   await Promise.all(Array.from({ length: 2 }, worker));
+  clearBuildProgress('radarr-bulk');
   return {
     added: results.filter((r) => r.ok).length,
     alreadyInRadarr: results.filter((r) => r.alreadyExists).length,

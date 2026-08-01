@@ -34,10 +34,11 @@ function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
   );
 }
 
+// 'writer' removed: the rest of the flow (gaps, auto-Radarr) never supported
+// it, so offering it here was a promise the product didn't keep
 const ROLES = [
   ['director', 'Directores/as'],
   ['actor', 'Actores/actrices'],
-  ['writer', 'Guionistas'],
 ];
 
 // accent palette per curated pack (#9)
@@ -70,8 +71,23 @@ export default function Favorites() {
   const [bulkRole, setBulkRole] = useState('');
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
+  const [health, setHealth] = useState({ gaps: false, calendar: false });
+  const [favSearch, setFavSearch] = useState('');
+  const [favSort, setFavSort] = useState('titulos');
+  const [pruneMode, setPruneMode] = useState(false);
+  const [selected, setSelected] = useState(new Set());
+  const [preview, setPreview] = useState(null); // top-N candidates awaiting confirmation
+  const [confirmClear, setConfirmClear] = useState(false);
 
-  const loadTracked = () => api('/tracked').then((r) => setTracked(Array.isArray(r) ? r : []));
+  // /tracked/health = the /tracked list enriched with gaps + upcoming from the
+  // caches, so the list itself shows who still contributes
+  const loadTracked = () =>
+    api('/tracked/health').then((r) => {
+      if (Array.isArray(r?.people)) {
+        setTracked(r.people);
+        setHealth(r.cached || {});
+      } else if (Array.isArray(r)) setTracked(r);
+    });
   useEffect(() => {
     loadTracked();
     api('/people/suggestions').then((s) => !s.error && setSuggest(s));
@@ -143,23 +159,65 @@ export default function Favorites() {
 
   const trackedIds = new Set((tracked || []).map((t) => t.id));
 
+  // the old blind top-N add was the factory of favorite noise: preview first
   const bulkAdd = async () => {
-    const res = await api('/tracked/bulk', { method: 'POST', body: { role, top: Number(topN) } });
-    if (res.ok) {
-      setFlash(`✓ ${res.added} añadidos (${res.total - res.added} ya estaban)`);
+    const res = await api('/tracked/bulk', { method: 'POST', body: { role, top: Number(topN), preview: true } });
+    if (res.error) { toast(`⚠️ ${res.error}`, 'error'); return; }
+    const candidates = res.candidates || [];
+    if (!candidates.length) {
+      setFlash('Nadie nuevo que añadir con ese criterio');
       setTimeout(() => setFlash(''), 4000);
-      loadTracked();
+      return;
     }
+    setPreview({ candidates, checked: new Set(candidates.map((c) => c.id)) });
+  };
+  const togglePreview = (id) => {
+    setPreview((p) => {
+      const checked = new Set(p.checked);
+      checked.has(id) ? checked.delete(id) : checked.add(id);
+      return { ...p, checked };
+    });
+  };
+  const confirmBulkAdd = async () => {
+    const ids = preview.candidates.filter((c) => preview.checked.has(c.id)).map((c) => c.id);
+    setPreview(null);
+    if (!ids.length) return;
+    const res = await api('/tracked/bulk', { method: 'POST', body: { personIds: ids } });
+    if (res.ok) { toast(`⭐ ${res.added} añadidos a favoritos`, 'success'); loadTracked(); }
+    else toast(`⚠️ ${res.error || 'error'}`, 'error');
   };
 
-  const toggle = async (id) => {
-    await api(`/tracked/${id}`, { method: trackedIds.has(id) ? 'DELETE' : 'POST' });
+  const toggle = async (id, name) => {
+    const wasFav = trackedIds.has(id);
+    if (wasFav) setTracked((prev) => prev.filter((t) => t.id !== id)); // optimistic, no flicker
+    await api(`/tracked/${id}`, { method: wasFav ? 'DELETE' : 'POST' });
+    toast(wasFav ? `${name || 'Quitado'} fuera de favoritos` : `⭐ ${name || 'Añadido'} a favoritos`, wasFav ? 'info' : 'success');
     loadTracked();
   };
 
+  // two-step confirmation: one accidental click used to wipe a curated list
   const clearAll = async () => {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      setTimeout(() => setConfirmClear(false), 4000);
+      return;
+    }
+    setConfirmClear(false);
+    const n = tracked?.length || 0;
     await api('/tracked/all', { method: 'DELETE' });
+    toast(`Lista de favoritos vaciada (${n})`);
     loadTracked();
+  };
+
+  const pruneSelected = async () => {
+    const ids = [...selected];
+    const r = await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids } });
+    if (r.ok) {
+      toast(`✂️ ${r.removed} favoritos quitados`);
+      setSelected(new Set());
+      setPruneMode(false);
+      loadTracked();
+    } else toast(`⚠️ ${r.error || 'error'}`, 'error');
   };
 
   const clearDeceased = async () => {
@@ -179,12 +237,29 @@ export default function Favorites() {
   const isDir = (t) => (t.directed || 0) > 0 || (t.acted || 0) === 0;
   const isAct = (t) => (t.acted || 0) > 0;
   const favRole = (t) => (favView === 'actor' ? 'actor' : favView === 'director' ? 'director' : primaryRole(t));
-  const shownFavs = tracked.filter((t) => (favView === 'all' ? true : favView === 'director' ? isDir(t) : isAct(t)));
+  const FAV_SORTS = {
+    titulos: { label: 'Más títulos', fn: (a, b) => (b.movies || 0) - (a.movies || 0) },
+    huecos: { label: 'Más huecos', fn: (a, b) => (b.gaps ?? -1) - (a.gaps ?? -1) },
+    aporte: { label: 'Menos aporte primero', fn: (a, b) => ((a.gaps ?? 0) + (a.upcoming ?? 0)) - ((b.gaps ?? 0) + (b.upcoming ?? 0)) },
+    nombre: { label: 'Nombre', fn: (a, b) => a.name.localeCompare(b.name) },
+  };
+  const shownFavs = tracked
+    .filter((t) => (favView === 'all' ? true : favView === 'director' ? isDir(t) : isAct(t)))
+    .filter((t) => !favSearch.trim() || t.name.toLowerCase().includes(favSearch.trim().toLowerCase()))
+    .sort(FAV_SORTS[favSort]?.fn || FAV_SORTS.titulos.fn);
   const favCounts = {
     all: tracked.length,
     director: tracked.filter(isDir).length,
     actor: tracked.filter(isAct).length,
   };
+  // safe-to-prune: no pending gaps and no announced projects (per the caches)
+  const noContribution = (t) => t.gaps === 0 && (t.upcoming ?? 0) === 0;
+  const toggleSelected = (id) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   return (
     <div>
@@ -221,10 +296,37 @@ export default function Favorites() {
             onChange={(e) => setTopN(e.target.value)}
           />
           <span className="text-sm text-slate-400">primeros</span>
-          <button className="btn-gold" onClick={bulkAdd}>⭐ Añadir</button>
+          <button className="btn-gold" onClick={bulkAdd}>⭐ Revisar y añadir</button>
         </div>
         {flash && <span className="text-emerald-400 text-sm w-full">{flash}</span>}
       </div>
+      )}
+
+      {/* top-N preview: see who you're about to follow before confirming */}
+      {tab === 'mine' && preview && (
+        <div className="card p-4 mb-6">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+            <h3 className="font-semibold text-slate-100">
+              Vas a añadir {preview.checked.size} de {preview.candidates.length} — desmarca a quien no te interese
+            </h3>
+            <div className="flex gap-2">
+              <button className="btn-gold !py-1" onClick={confirmBulkAdd} disabled={!preview.checked.size}>
+                ⭐ Confirmar ({preview.checked.size})
+              </button>
+              <button className="btn-ghost !py-1" onClick={() => setPreview(null)}>Cancelar</button>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 max-h-72 overflow-y-auto">
+            {preview.candidates.map((c) => (
+              <label key={c.id} className="flex items-center gap-2 text-sm text-slate-300 py-0.5 cursor-pointer min-w-0">
+                <input type="checkbox" checked={preview.checked.has(c.id)} onChange={() => togglePreview(c.id)} />
+                <span className="truncate">{c.name}</span>
+                <DeathBadge deathday={c.deathday} />
+                <span className="text-[11px] text-slate-500 shrink-0 ml-auto">{c.n} títulos</span>
+              </label>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* add a whole pasted list of names at once */}
@@ -348,7 +450,7 @@ export default function Favorites() {
                   </Link>
                   <span className="text-xs text-slate-500 shrink-0">{p.n} títulos</span>
                   <button
-                    onClick={() => toggle(p.id)}
+                    onClick={() => toggle(p.id, p.name)}
                     title={trackedIds.has(p.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                     className={`text-lg cursor-pointer transition-colors shrink-0 ${
                       trackedIds.has(p.id) ? 'text-gold-400' : 'text-ink-600 hover:text-slate-400'
@@ -382,7 +484,7 @@ export default function Favorites() {
                   </button>
                 )}
                 <button className="text-xs text-red-400 hover:underline cursor-pointer" onClick={clearAll}>
-                  Vaciar todos
+                  {confirmClear ? `¿Seguro? Vaciar ${tracked.length}` : 'Vaciar todos'}
                 </button>
               </div>
             )
@@ -395,20 +497,72 @@ export default function Favorites() {
             </Empty>
           ) : (
             <>
-            <div className="flex gap-2 mb-2">
+            <div className="flex gap-2 mb-2 flex-wrap items-center">
               {[['all', 'Todos'], ['director', 'Directores/as'], ['actor', 'Actores/actrices']].map(([v, label]) => (
                 <button key={v} onClick={() => setFavView(v)} className={`btn-ghost !py-1 text-xs ${favView === v ? '!border-gold-400 text-gold-400' : ''}`}>
                   {label} ({favCounts[v]})
                 </button>
               ))}
+              <select className="input !w-auto !py-1 text-xs" value={favSort} onChange={(e) => setFavSort(e.target.value)} title="Ordenar">
+                {Object.entries(FAV_SORTS).map(([k, s]) => (
+                  <option key={k} value={k}>{s.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => { setPruneMode((v) => !v); setSelected(new Set()); }}
+                className={`btn-ghost !py-1 text-xs ${pruneMode ? '!border-gold-400 text-gold-400' : ''}`}
+              >
+                ✂️ Podar
+              </button>
             </div>
+            <input
+              className="input !py-1.5 text-sm mb-2"
+              placeholder="Filtrar por nombre…"
+              value={favSearch}
+              onChange={(e) => setFavSearch(e.target.value)}
+            />
+            {pruneMode && (
+              <div className="flex gap-2 mb-2 flex-wrap items-center text-xs">
+                <button
+                  className="btn-ghost !py-1 text-xs"
+                  onClick={() => setSelected(new Set(shownFavs.filter((t) => t.deathday && noContribution(t)).map((t) => t.id)))}
+                >
+                  Marcar fallecidos completos
+                </button>
+                <button
+                  className="btn-ghost !py-1 text-xs"
+                  onClick={() => setSelected(new Set(shownFavs.filter(noContribution).map((t) => t.id)))}
+                >
+                  Marcar sin aporte
+                </button>
+                <button className="btn-gold !py-1 text-xs" onClick={pruneSelected} disabled={!selected.size}>
+                  Quitar seleccionados ({selected.size})
+                </button>
+              </div>
+            )}
+            {!health.gaps && (
+              <p className="text-[11px] text-slate-500 mb-2">
+                Los huecos por favorito se calculan al visitar <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir → Tus favoritos</Link>.
+              </p>
+            )}
             <div className="card divide-y divide-ink-800 max-h-[70vh] overflow-y-auto">
               {shownFavs.map((t) => {
                 const r = favRole(t);
                 const count = r === 'director' ? t.directed : t.acted;
                 return (
-                <div key={t.id} className="flex items-center gap-3 px-4 py-2">
-                  <span className="text-gold-400">★</span>
+                <div key={t.id} className="group flex items-center gap-3 px-4 py-1.5 hover:bg-ink-800/60">
+                  {pruneMode ? (
+                    <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelected(t.id)} />
+                  ) : (
+                    <span className="text-gold-400">★</span>
+                  )}
+                  {t.thumb ? (
+                    <img src={`/img/person/${t.id}`} alt="" loading="lazy" className="w-7 h-7 rounded-full object-cover bg-ink-700 shrink-0" />
+                  ) : (
+                    <span className="w-7 h-7 rounded-full bg-ink-700 text-slate-500 text-[11px] flex items-center justify-center shrink-0">
+                      {t.name.slice(0, 1)}
+                    </span>
+                  )}
                   <Link
                     to={`/personas/${t.id}?role=${r}`}
                     className="text-sm text-slate-200 hover:text-gold-400 truncate flex-1 flex items-center gap-1.5 min-w-0"
@@ -416,16 +570,25 @@ export default function Favorites() {
                     <span className="truncate">{t.name}</span>
                     <DeathBadge deathday={t.deathday} />
                   </Link>
-                  <span className="text-xs text-slate-500 shrink-0">
+                  <span className="text-[11px] text-slate-500 shrink-0 text-right">
                     {count > 0 ? `${count} ${r === 'director' ? 'dirigidas' : 'actuadas'}` : ''}
+                    {t.gaps != null && (
+                      <span className={t.gaps === 0 ? 'text-emerald-400' : ''}>{count > 0 ? ' · ' : ''}{t.gaps === 0 ? '✓ completo' : `${t.gaps} huecos`}</span>
+                    )}
+                    {t.upcoming != null && t.upcoming > 0 && <span className="text-sky-300"> · {t.upcoming} próximas</span>}
+                    {t.gaps === 0 && (t.upcoming ?? 0) === 0 && t.upcoming != null && (
+                      <span className="text-slate-600"> · sin aporte</span>
+                    )}
                   </span>
-                  <button
-                    onClick={() => toggle(t.id)}
-                    title="Quitar de favoritos"
-                    className="text-slate-500 hover:text-red-400 cursor-pointer shrink-0"
-                  >
-                    ✕
-                  </button>
+                  {!pruneMode && (
+                    <button
+                      onClick={() => toggle(t.id, t.name)}
+                      title="Quitar de favoritos"
+                      className="text-slate-500 hover:text-red-400 cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
                 );
               })}

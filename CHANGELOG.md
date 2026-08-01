@@ -1,5 +1,40 @@
 # Changelog
 
+## Alpha 0.6 (0.6.0-alpha) — 2026-08-01
+
+- **Títulos en cualquier idioma**: cada película de la biblioteca gana el título en inglés de TMDB y
+  un TMDB id garantizado (vía IMDb id), así que las listas y vistas de Letterboxd con título inglés
+  («Parasite», «Come and See») ya emparejan con tu Plex en español. El botón de Visionado desglosa
+  el porqué de cada no-emparejada, y el emparejado corre solo tras cada importación.
+- **Búsqueda TMDB más fiable**: prefiere el título exacto dentro de ±1 año en vez del primer
+  resultado a ciegas, y los fallos ya no se cachean 30 días. Arreglado además el año corrupto al
+  importar listas de Letterboxd por URL.
+- **Arreglado buscar + filtrar a la vez**: combinar búsqueda con género, país, saga o persona
+  devolvía siempre vacío por un cruce de parámetros SQL.
+- **Auto-Radarr más listo**: incluye a favoritos aún sin películas en tu Plex (los directores
+  emergentes de los packs), descarta cortos, documentales y películas de TV (con opción de incluir
+  documentales), y una ventana configurable de días hacia atrás caza los estrenos que TMDB fecha
+  tarde.
+- **Añadido masivo por todas partes**: «➕ Añadir las N visibles a Radarr» por persona en Descubrir,
+  en Grandes ausentes y en la ficha de persona («Te faltan»), respetando los filtros activos y con
+  progreso visible en los lotes grandes.
+- **Menos ruido en los huecos**: el filtrado de cortos/docs/TV ocurre ahora en el servidor antes del
+  recorte (los largometrajes rellenan el cupo), los cameos de actores se detectan y ocultan por
+  defecto, el umbral de votos es configurable en Ajustes y hay nota mínima Σ en Descubrir.
+  «✕ No me interesa» descarta una película para siempre. Si tus filtros ocultan todo lo de una
+  persona, lo dice en una fila compacta en vez de desaparecer.
+- **Poda de favoritos**: la lista muestra por favorito sus huecos, próximos proyectos y
+  «✓ completo · sin aporte»; con buscador, orden por aporte, avatares y un modo Podar con selección
+  múltiple y atajos («fallecidos completos», «sin aporte»). «Vaciar todos» pide confirmación en dos
+  pasos y el «añadir los N primeros» previsualiza los candidatos antes de confirmar.
+- **Favoritos al día**: las cachés de huecos se invalidan al añadir o quitar favoritos (antes
+  tardaban hasta 6 h en reflejarlo), la ✕ ya no se puede saltar desde los packs, y el estado
+  vivo/fallecido se refresca cada noche para el auto-Radarr.
+- **Otros arreglos**: las vistas del RSS sin valorar ya no cuentan como «nota 0»; la clave de
+  MDBList se enmascara y se cifra como las demás; los filtros de tipo son una sola preferencia
+  compartida entre Descubrir, fichas y Calendario; fuera las rutas muertas de colecciones, la
+  pestaña de Guionistas (sin soporte real) y el buscador duplicado de Descubrir.
+
 ## Alpha 0.5 (0.5.0-alpha) — 2026-07-05
 
 - **Fuera las notas de Plex**: se retiran de toda la app la nota de audiencia (★) y tu nota personal

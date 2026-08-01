@@ -5,6 +5,7 @@ import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, StatusLegend,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge,
 } from '../components.jsx';
+import { toast } from '../toast.js';
 
 const VIEWS = [
   ['all', 'Todas'],
@@ -26,7 +27,8 @@ export default function PersonDetail() {
   const [view, setView] = useState('all');
   const [tracked, setTracked] = useState(false);
   const [radarrIds, addRadarrId] = useRadarrIds();
-  const [show, toggle] = useTypeFilters('person_type_filters');
+  const [show, toggle] = useTypeFilters();
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
     setData(null);
@@ -82,6 +84,24 @@ export default function PersonDetail() {
     if (view === 'upcoming') return !i.released;
     return true;
   });
+
+  // bulk-add what's visible in "Te faltan" instead of one click per film
+  const missingPendingIds = items
+    .filter((i) => matchesTypeFilters(i, show) && i.released && !i.owned && !radarrIds.has(i.tmdb_id))
+    .map((i) => i.tmdb_id);
+  const bulkAddMissing = async () => {
+    setBulkBusy(true);
+    const res = await api('/radarr/add-bulk', { method: 'POST', body: { tmdbIds: missingPendingIds.slice(0, 300) } });
+    setBulkBusy(false);
+    if (res.error) {
+      toast(`⚠️ ${res.error}`, 'error');
+      return;
+    }
+    for (const r of res.results || []) if (r.ok || r.alreadyExists) addRadarrId(r.tmdbId);
+    toast(
+      `✓ ${res.added} añadidas a Radarr${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''}`
+    );
+  };
 
   return (
     <div>
@@ -163,6 +183,11 @@ export default function PersonDetail() {
             {v === 'upcoming' && ` (${stats.upcoming})`}
           </button>
         ))}
+        {view === 'missing' && missingPendingIds.length > 1 && (
+          <button className="btn-ghost !py-1 text-xs" disabled={bulkBusy} onClick={bulkAddMissing}>
+            {bulkBusy ? 'Añadiendo…' : `➕ Añadir las ${missingPendingIds.length} visibles a Radarr`}
+          </button>
+        )}
         <StatusLegend className="ml-auto" />
       </div>
 
