@@ -260,6 +260,31 @@ ensureColumn('movies', 'english_title', 'english_title TEXT');
 // rating entries (Letterboxd's minimum is 0.5, so 0 can only be that bug)
 db.exec("UPDATE lb_entries SET rating = NULL WHERE rating = 0");
 
+// Which role you follow someone FOR. Until now this was inferred from library
+// counts, so a director who had also acted got their acting credits mixed into
+// gaps, calendar and stats. Existing rows are backfilled once with the old
+// inference; from here on it is explicit and editable.
+ensureColumn('tracked_people', 'role', "role TEXT");
+db.exec(`
+  UPDATE tracked_people SET role = (
+    SELECT CASE WHEN COALESCE(SUM(CASE WHEN mp.role = 'director' THEN 1 END), 0)
+                   >= COALESCE(SUM(CASE WHEN mp.role = 'actor' THEN 1 END), 0)
+                THEN 'director' ELSE 'actor' END
+    FROM movie_people mp WHERE mp.person_id = tracked_people.person_id
+  ) WHERE role IS NULL;
+  UPDATE tracked_people SET role = 'director' WHERE role IS NULL;
+`);
+
+// Drop caches built under superseded rules on boot: the pre-v4 calendar mixed
+// in library-top people and both facets of every favorite, so upgrading used to
+// leave "ghost" entries from people you no longer follow.
+db.prepare(
+  `DELETE FROM tmdb_cache
+   WHERE key LIKE 'calendar:v_' AND key <> 'calendar:v4'
+      OR (key LIKE 'discover_favorites:%' AND key NOT LIKE 'discover_favorites:v3:%')
+      OR (key LIKE 'discover_gaps:%' AND key NOT LIKE 'discover_gaps:v3:%')`
+).run();
+
 // Films explicitly marked "no me interesa" in the gaps flow: excluded from
 // missing counts and suggestions until un-dismissed.
 db.exec(`CREATE TABLE IF NOT EXISTS dismissed_movies (

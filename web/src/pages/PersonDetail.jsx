@@ -45,7 +45,11 @@ export default function PersonDetail() {
   }, [id, wantRole]);
 
   const toggleTrack = async () => {
-    await api(`/tracked/${id}`, { method: tracked ? 'DELETE' : 'POST' });
+    // follow them for the facet you're looking at, not a guess from the library
+    await api(`/tracked/${id}`, {
+      method: tracked ? 'DELETE' : 'POST',
+      body: tracked ? undefined : { role: role === 'actor' ? 'actor' : 'director' },
+    });
     setTracked(!tracked);
   };
 

@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Spinner, Section, Empty, DeathBadge } from '../components.jsx';
+import { Spinner, Section, Empty, DeathBadge, ProgressBar } from '../components.jsx';
 import { toast } from '../toast.js';
+
+// The whole page is scoped to ONE role at a time: a director you follow is
+// never counted, sorted or shown together with their acting work.
+const ROLES = [
+  ['director', 'Directores/as', 'dirigidas'],
+  ['actor', 'Actores/actrices', 'interpretadas'],
+];
+const roleLabel = (r) => ROLES.find(([k]) => k === r)?.[1] || r;
+const roleVerb = (r) => ROLES.find(([k]) => k === r)?.[2] || 'películas';
 
 // A TMDB person tile with a star to add/remove from favorites.
 function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
@@ -34,12 +43,72 @@ function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
   );
 }
 
-// 'writer' removed: the rest of the flow (gaps, auto-Radarr) never supported
-// it, so offering it here was a promise the product didn't keep
-const ROLES = [
-  ['director', 'Directores/as'],
-  ['actor', 'Actores/actrices'],
-];
+const Avatar = ({ person, size = 'w-12 h-12' }) =>
+  person.thumb ? (
+    <img src={`/img/person/${person.id}`} alt="" loading="lazy" className={`${size} rounded-full object-cover bg-ink-700 shrink-0`} />
+  ) : (
+    <span className={`${size} rounded-full bg-ink-700 text-slate-500 flex items-center justify-center shrink-0 text-sm`}>
+      {person.name.slice(0, 1)}
+    </span>
+  );
+
+/** One favorite: who they are, what you have of theirs, and what you're missing. */
+function FavoriteCard({ p, role, selectable, selected, onSelect, onRemove, onSwitchRole }) {
+  const gaps = p.gaps;
+  const complete = gaps === 0;
+  return (
+    <div className={`card p-3 flex gap-3 items-start ${selected ? '!border-gold-400' : ''}`}>
+      {selectable && (
+        <input type="checkbox" checked={selected} onChange={() => onSelect(p.id)} className="mt-1 shrink-0" />
+      )}
+      <Link to={`/personas/${p.id}?role=${role}`} className="shrink-0">
+        <Avatar person={p} />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          <Link to={`/personas/${p.id}?role=${role}`} className="text-sm font-medium text-slate-100 hover:text-gold-400 truncate">
+            {p.name}
+          </Link>
+          <DeathBadge deathday={p.deathday} />
+        </div>
+        <div className="text-[11px] text-slate-500 mt-0.5">
+          <b className="text-slate-300">{p.movies || 0}</b> {roleVerb(role)} en tu Plex
+          {p.upcoming > 0 && <span className="text-sky-300"> · {p.upcoming} por venir</span>}
+        </div>
+
+        {p.pct != null ? (
+          <div className="mt-2">
+            <ProgressBar pct={p.pct} />
+            <div className="flex justify-between text-[11px] mt-1">
+              <span className="text-slate-500">{p.pct}% de su filmografía</span>
+              {complete ? (
+                <span className="text-emerald-400">✓ completa</span>
+              ) : (
+                <Link to="/descubrir" className="text-gold-400 hover:underline">te faltan {gaps}</Link>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-[11px] text-slate-600 mt-2">
+            Huecos sin calcular · <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir</Link>
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col gap-1 shrink-0">
+        <button onClick={() => onRemove(p)} title="Quitar de favoritos" className="text-slate-600 hover:text-red-400 text-sm">
+          ✕
+        </button>
+        <button
+          onClick={() => onSwitchRole(p)}
+          title={`Seguirle como ${role === 'director' ? 'actor/actriz' : 'director/a'} en su lugar`}
+          className="text-slate-600 hover:text-gold-400 text-sm"
+        >
+          ⇄
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // accent palette per curated pack (#9)
 const ACCENTS = {
@@ -52,7 +121,9 @@ const ACCENTS = {
 
 export default function Favorites() {
   const [tracked, setTracked] = useState(null);
-  const [role, setRole] = useState('director');
+  const [role, setRole] = useState('director'); // scopes the entire page
+  const [tab, setTab] = useState('mine'); // mine | discover
+  const [health, setHealth] = useState({ gaps: false, calendar: false });
   const [rankItems, setRankItems] = useState(null);
   const [rankMore, setRankMore] = useState(false);
   const [hideDead, setHideDead] = useState(false);
@@ -60,27 +131,21 @@ export default function Favorites() {
   const [updatingLife, setUpdatingLife] = useState(false);
   const [topN, setTopN] = useState(10);
   const [flash, setFlash] = useState('');
-  const [favView, setFavView] = useState('all'); // all | director | actor
-  const [tab, setTab] = useState('mine'); // mine | discover
   const [suggest, setSuggest] = useState(null);
   const [pq, setPq] = useState('');
   const [presults, setPresults] = useState(null);
   const [searching, setSearching] = useState(false);
   const [packBusy, setPackBusy] = useState(null);
   const [bulkNames, setBulkNames] = useState('');
-  const [bulkRole, setBulkRole] = useState('');
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
-  const [health, setHealth] = useState({ gaps: false, calendar: false });
   const [favSearch, setFavSearch] = useState('');
   const [favSort, setFavSort] = useState('titulos');
   const [pruneMode, setPruneMode] = useState(false);
   const [selected, setSelected] = useState(new Set());
-  const [preview, setPreview] = useState(null); // top-N candidates awaiting confirmation
+  const [preview, setPreview] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
-  // /tracked/health = the /tracked list enriched with gaps + upcoming from the
-  // caches, so the list itself shows who still contributes
   const loadTracked = () =>
     api('/tracked/health').then((r) => {
       if (Array.isArray(r?.people)) {
@@ -88,15 +153,18 @@ export default function Favorites() {
         setHealth(r.cached || {});
       } else if (Array.isArray(r)) setTracked(r);
     });
+
   useEffect(() => {
     loadTracked();
     api('/people/suggestions').then((s) => !s.error && setSuggest(s));
   }, []);
 
   const trackedTmdb = new Set((tracked || []).map((t) => t.tmdb_id).filter(Boolean));
+  const trackedIds = new Set((tracked || []).map((t) => t.id));
+
   const addTmdb = async (p) => {
-    await api('/tracked/tmdb', { method: 'POST', body: { tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path } });
-    toast(`⭐ ${p.name} añadido a favoritos`, 'success');
+    await api('/tracked/tmdb', { method: 'POST', body: { tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path, role } });
+    toast(`⭐ ${p.name} añadido como ${role === 'director' ? 'director/a' : 'actor/actriz'}`, 'success');
     loadTracked();
   };
   const removeTmdb = async (p) => {
@@ -107,11 +175,11 @@ export default function Favorites() {
     if (!bulkNames.trim()) return;
     setBulkBusy(true);
     setBulkResult(null);
-    const res = await api('/tracked/by-names', { method: 'POST', body: { names: bulkNames, role: bulkRole || null } });
+    const res = await api('/tracked/by-names', { method: 'POST', body: { names: bulkNames, role } });
     setBulkBusy(false);
     if (res.ok) {
       setBulkResult(res);
-      toast(`⭐ ${res.added} añadidos a favoritos`, 'success');
+      toast(`⭐ ${res.added} añadidos a ${roleLabel(role).toLowerCase()}`, 'success');
       setBulkNames('');
       loadTracked();
     } else toast(`⚠️ ${res.error || 'error'}`, 'error');
@@ -120,10 +188,10 @@ export default function Favorites() {
     setPackBusy(pack.key);
     const res = await api('/tracked/tmdb-bulk', {
       method: 'POST',
-      body: { people: pack.people.map((p) => ({ tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path })) },
+      body: { role, people: pack.people.map((p) => ({ tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path })) },
     });
     setPackBusy(null);
-    if (res.ok) { toast(`⭐ ${res.added} de «${pack.title}» añadidos a favoritos`, 'success'); loadTracked(); }
+    if (res.ok) { toast(`⭐ ${res.added} de «${pack.title}» añadidos`, 'success'); loadTracked(); }
     else toast(`⚠️ ${res.error || 'error'}`, 'error');
   };
   const searchPeople = async (e) => {
@@ -146,18 +214,17 @@ export default function Favorites() {
     });
   };
   useEffect(() => { loadRanking(true); }, [role, hideDead]);
+  useEffect(() => { setSelected(new Set()); setPruneMode(false); }, [role]);
 
   const updateLife = async () => {
     setUpdatingLife(true);
     setLifeMsg('Consultando fechas de nacimiento/fallecimiento en TMDB…');
     const r = await api('/people/life-sync', { method: 'POST' });
     setUpdatingLife(false);
-    setLifeMsg(r.error ? `✗ ${r.error}` : `✓ ${r.done} actualizadas · ${r.deceased} fallecidos/as detectados/as`);
+    setLifeMsg(r.error ? `✗ ${r.error}` : `✓ ${r.done} actualizadas · ${r.deceased} fallecidos/as`);
     loadRanking(true);
     loadTracked();
   };
-
-  const trackedIds = new Set((tracked || []).map((t) => t.id));
 
   // the old blind top-N add was the factory of favorite noise: preview first
   const bulkAdd = async () => {
@@ -171,31 +238,52 @@ export default function Favorites() {
     }
     setPreview({ candidates, checked: new Set(candidates.map((c) => c.id)) });
   };
-  const togglePreview = (id) => {
+  const togglePreview = (id) =>
     setPreview((p) => {
       const checked = new Set(p.checked);
       checked.has(id) ? checked.delete(id) : checked.add(id);
       return { ...p, checked };
     });
-  };
   const confirmBulkAdd = async () => {
     const ids = preview.candidates.filter((c) => preview.checked.has(c.id)).map((c) => c.id);
     setPreview(null);
     if (!ids.length) return;
-    const res = await api('/tracked/bulk', { method: 'POST', body: { personIds: ids } });
-    if (res.ok) { toast(`⭐ ${res.added} añadidos a favoritos`, 'success'); loadTracked(); }
+    const res = await api('/tracked/bulk', { method: 'POST', body: { personIds: ids, role } });
+    if (res.ok) { toast(`⭐ ${res.added} añadidos a ${roleLabel(role).toLowerCase()}`, 'success'); loadTracked(); }
     else toast(`⚠️ ${res.error || 'error'}`, 'error');
   };
 
+  // the star reflects THIS facet: following someone you already follow in the
+  // other facet moves them here rather than silently doing nothing
   const toggle = async (id, name) => {
-    const wasFav = trackedIds.has(id);
-    if (wasFav) setTracked((prev) => prev.filter((t) => t.id !== id)); // optimistic, no flicker
-    await api(`/tracked/${id}`, { method: wasFav ? 'DELETE' : 'POST' });
-    toast(wasFav ? `${name || 'Quitado'} fuera de favoritos` : `⭐ ${name || 'Añadido'} a favoritos`, wasFav ? 'info' : 'success');
+    const fav = (tracked || []).find((t) => t.id === id);
+    const followedHere = fav && (fav.role || 'director') === role;
+    if (followedHere) {
+      setTracked((prev) => prev.filter((t) => t.id !== id));
+      await api(`/tracked/${id}`, { method: 'DELETE' });
+      toast(`${name || 'Quitado'} fuera de ${roleLabel(role).toLowerCase()}`);
+    } else if (fav) {
+      await api(`/tracked/${id}/role`, { method: 'PATCH', body: { role } });
+      toast(`⇄ ${name} pasa a ${roleLabel(role).toLowerCase()}`, 'success');
+    } else {
+      await api(`/tracked/${id}`, { method: 'POST', body: { role } });
+      toast(`⭐ ${name || 'Añadido'} a ${roleLabel(role).toLowerCase()}`, 'success');
+    }
+    loadTracked();
+  };
+  const removeFav = async (p) => {
+    setTracked((prev) => prev.filter((t) => t.id !== p.id));
+    await api(`/tracked/${p.id}`, { method: 'DELETE' });
+    toast(`${p.name} fuera de favoritos`);
+    loadTracked();
+  };
+  const switchRole = async (p) => {
+    const next = p.role === 'director' ? 'actor' : 'director';
+    await api(`/tracked/${p.id}/role`, { method: 'PATCH', body: { role: next } });
+    toast(`${p.name} pasa a ${next === 'director' ? 'directores/as' : 'actores/actrices'}`);
     loadTracked();
   };
 
-  // two-step confirmation: one accidental click used to wipe a curated list
   const clearAll = async () => {
     if (!confirmClear) {
       setConfirmClear(true);
@@ -203,15 +291,21 @@ export default function Favorites() {
       return;
     }
     setConfirmClear(false);
-    const n = tracked?.length || 0;
-    await api('/tracked/all', { method: 'DELETE' });
-    toast(`Lista de favoritos vaciada (${n})`);
+    const ids = shownFavs.map((t) => t.id);
+    await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids } });
+    toast(`Vaciados los ${ids.length} favoritos de ${roleLabel(role).toLowerCase()}`);
     loadTracked();
   };
 
-  const pruneSelected = async () => {
-    const ids = [...selected];
+  const clearDeceased = async () => {
+    const ids = shownFavs.filter((t) => t.deathday).map((t) => t.id);
+    if (!ids.length) return;
     const r = await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids } });
+    if (r.ok) { toast(`✝ ${r.removed} fallecidos/as retirados/as`); loadTracked(); }
+  };
+
+  const pruneSelected = async () => {
+    const r = await api('/tracked/batch', { method: 'DELETE', body: { personIds: [...selected] } });
     if (r.ok) {
       toast(`✂️ ${r.removed} favoritos quitados`);
       setSelected(new Set());
@@ -219,41 +313,6 @@ export default function Favorites() {
       loadTracked();
     } else toast(`⚠️ ${r.error || 'error'}`, 'error');
   };
-
-  const clearDeceased = async () => {
-    const r = await api('/tracked/deceased', { method: 'DELETE' });
-    if (r.ok) {
-      setFlash(`✓ ${r.removed} fallecidos retirados de favoritos`);
-      setTimeout(() => setFlash(''), 4000);
-      loadTracked();
-    }
-  };
-
-  if (!tracked) return <Spinner />;
-  const deceasedCount = tracked.filter((t) => t.deathday).length;
-  const primaryRole = (t) => ((t.directed || 0) >= (t.acted || 0) ? 'director' : 'actor');
-  // don't mix roles (D): each tab shows only the matching role's films/count.
-  // People with no library titles yet (added from TMDB) are treated as directors.
-  const isDir = (t) => (t.directed || 0) > 0 || (t.acted || 0) === 0;
-  const isAct = (t) => (t.acted || 0) > 0;
-  const favRole = (t) => (favView === 'actor' ? 'actor' : favView === 'director' ? 'director' : primaryRole(t));
-  const FAV_SORTS = {
-    titulos: { label: 'Más títulos', fn: (a, b) => (b.movies || 0) - (a.movies || 0) },
-    huecos: { label: 'Más huecos', fn: (a, b) => (b.gaps ?? -1) - (a.gaps ?? -1) },
-    aporte: { label: 'Menos aporte primero', fn: (a, b) => ((a.gaps ?? 0) + (a.upcoming ?? 0)) - ((b.gaps ?? 0) + (b.upcoming ?? 0)) },
-    nombre: { label: 'Nombre', fn: (a, b) => a.name.localeCompare(b.name) },
-  };
-  const shownFavs = tracked
-    .filter((t) => (favView === 'all' ? true : favView === 'director' ? isDir(t) : isAct(t)))
-    .filter((t) => !favSearch.trim() || t.name.toLowerCase().includes(favSearch.trim().toLowerCase()))
-    .sort(FAV_SORTS[favSort]?.fn || FAV_SORTS.titulos.fn);
-  const favCounts = {
-    all: tracked.length,
-    director: tracked.filter(isDir).length,
-    actor: tracked.filter(isAct).length,
-  };
-  // safe-to-prune: no pending gaps and no announced projects (per the caches)
-  const noContribution = (t) => t.gaps === 0 && (t.upcoming ?? 0) === 0;
   const toggleSelected = (id) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -261,342 +320,345 @@ export default function Favorites() {
       return next;
     });
 
+  if (!tracked) return <Spinner />;
+
+  // everything below is scoped to the active role — no mixed counts, ever
+  const roleFavs = tracked.filter((t) => (t.role || 'director') === role);
+  const counts = {
+    director: tracked.filter((t) => (t.role || 'director') === 'director').length,
+    actor: tracked.filter((t) => (t.role || 'director') === 'actor').length,
+  };
+  const FAV_SORTS = {
+    titulos: { label: `Más ${roleVerb(role)} en tu Plex`, fn: (a, b) => (b.movies || 0) - (a.movies || 0) },
+    huecos: { label: 'Más huecos', fn: (a, b) => (b.gaps ?? -1) - (a.gaps ?? -1) },
+    completismo: { label: 'Menos completos', fn: (a, b) => (a.pct ?? 101) - (b.pct ?? 101) },
+    aporte: { label: 'Menos aporte', fn: (a, b) => ((a.gaps ?? 0) + (a.upcoming ?? 0)) - ((b.gaps ?? 0) + (b.upcoming ?? 0)) },
+    nombre: { label: 'Nombre (A-Z)', fn: (a, b) => a.name.localeCompare(b.name) },
+  };
+  const shownFavs = roleFavs
+    .filter((t) => !favSearch.trim() || t.name.toLowerCase().includes(favSearch.trim().toLowerCase()))
+    .sort(FAV_SORTS[favSort]?.fn || FAV_SORTS.titulos.fn);
+  const noContribution = (t) => t.gaps === 0 && (t.upcoming ?? 0) === 0;
+  const deceasedCount = roleFavs.filter((t) => t.deathday).length;
+  const totalGaps = roleFavs.reduce((n, t) => n + (t.gaps || 0), 0);
+  const completeCount = roleFavs.filter((t) => t.gaps === 0).length;
+  // "calculado" per facet: the other facet's cache says nothing about this one
+  const anyComputed = roleFavs.some((t) => t.gaps != null);
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-100 mb-2">Favoritos</h1>
       <p className="text-sm text-slate-500 mb-4 max-w-3xl">
-        Tus directores/as y actores/actrices de cabecera. Todos los favoritos entran <b>siempre</b> en el calendario de{' '}
-        <Link to="/calendario" className="text-gold-400 hover:underline">Cine venidero</Link> (además del top
-        automático que configures en Ajustes).
+        La gente que sigues, <b>separada por faceta</b>: a quien sigues como director/a solo cuenta por lo que dirige,
+        y a quien sigues como actor/actriz solo por lo que interpreta. Todos entran en{' '}
+        <Link to="/calendario" className="text-gold-400 hover:underline">Cine venidero</Link> y en{' '}
+        <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir huecos</Link>.
       </p>
 
-      <div className="flex gap-2 mb-6">
-        <button onClick={() => setTab('mine')} className={tab === 'mine' ? 'btn-gold' : 'btn-ghost'}>⭐ Mis favoritos ({tracked.length})</button>
-        <button onClick={() => setTab('discover')} className={tab === 'discover' ? 'btn-gold' : 'btn-ghost'}>🔍 Descubrir a quién seguir</button>
-      </div>
-
-      {/* bulk controls */}
-      {tab === 'mine' && (
-      <div className="card p-4 mb-6 flex flex-wrap items-center gap-3">
-        <div className="flex gap-2">
-          {ROLES.map(([r, label]) => (
-            <button key={r} onClick={() => setRole(r)} className={role === r ? 'btn-gold' : 'btn-ghost'}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 ml-auto">
-          <span className="text-sm text-slate-400">Añadir los</span>
-          <input
-            type="number"
-            min="1"
-            max="1000"
-            className="input !w-24 text-center"
-            value={topN}
-            onChange={(e) => setTopN(e.target.value)}
-          />
-          <span className="text-sm text-slate-400">primeros</span>
-          <button className="btn-gold" onClick={bulkAdd}>⭐ Revisar y añadir</button>
-        </div>
-        {flash && <span className="text-emerald-400 text-sm w-full">{flash}</span>}
-      </div>
-      )}
-
-      {/* top-N preview: see who you're about to follow before confirming */}
-      {tab === 'mine' && preview && (
-        <div className="card p-4 mb-6">
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-            <h3 className="font-semibold text-slate-100">
-              Vas a añadir {preview.checked.size} de {preview.candidates.length} — desmarca a quien no te interese
-            </h3>
-            <div className="flex gap-2">
-              <button className="btn-gold !py-1" onClick={confirmBulkAdd} disabled={!preview.checked.size}>
-                ⭐ Confirmar ({preview.checked.size})
-              </button>
-              <button className="btn-ghost !py-1" onClick={() => setPreview(null)}>Cancelar</button>
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 max-h-72 overflow-y-auto">
-            {preview.candidates.map((c) => (
-              <label key={c.id} className="flex items-center gap-2 text-sm text-slate-300 py-0.5 cursor-pointer min-w-0">
-                <input type="checkbox" checked={preview.checked.has(c.id)} onChange={() => togglePreview(c.id)} />
-                <span className="truncate">{c.name}</span>
-                <DeathBadge deathday={c.deathday} />
-                <span className="text-[11px] text-slate-500 shrink-0 ml-auto">{c.n} títulos</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* add a whole pasted list of names at once */}
-      {tab === 'discover' && (
-      <div className="card p-4 mb-6">
-        <h2 className="font-semibold text-slate-100 mb-1">Añadir una lista de nombres</h2>
-        <p className="text-xs text-slate-500 mb-3 max-w-2xl">
-          Pega directores/as y/o actores/actrices, <b>separados por comas o uno por línea</b>. PowaFlex los busca en
-          TMDB y los añade todos de una vez a tus favoritos.
-        </p>
-        <textarea
-          className="input !h-28 font-mono text-xs leading-relaxed"
-          placeholder={'Pedro Almodóvar, Céline Sciamma\nHirokazu Kore-eda\nGreta Gerwig'}
-          value={bulkNames}
-          onChange={(e) => setBulkNames(e.target.value)}
-        />
-        <div className="flex flex-wrap items-center gap-2 mt-2">
-          <span className="text-xs text-slate-400">Si hay ambigüedad, priorizar:</span>
-          <select className="input !w-auto !py-1 text-sm" value={bulkRole} onChange={(e) => setBulkRole(e.target.value)}>
-            <option value="">Automático</option>
-            <option value="director">Dirección</option>
-            <option value="actor">Interpretación</option>
-          </select>
-          <button className="btn-gold shrink-0" onClick={addByNames} disabled={bulkBusy || !bulkNames.trim()}>
-            {bulkBusy ? 'Añadiendo…' : '⭐ Añadir todos'}
+      {/* role scope: the whole page follows this switch */}
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
+        {ROLES.map(([r, label]) => (
+          <button key={r} onClick={() => setRole(r)} className={role === r ? 'btn-gold' : 'btn-ghost'}>
+            {r === 'director' ? '🎬' : '🎭'} {label} ({counts[r]})
           </button>
-        </div>
-        {bulkResult && (
-          <div className="text-xs text-slate-400 mt-2">
-            ✓ {bulkResult.added} añadidos de {bulkResult.total}.
-            {bulkResult.notFound?.length > 0 && (
-              <span className="text-orange-300"> No encontrados en TMDB: {bulkResult.notFound.join(', ')}.</span>
-            )}
-          </div>
-        )}
+        ))}
+        <span className="text-xs text-slate-600 ml-2">Cada faceta se gestiona por separado</span>
       </div>
-      )}
 
-      {/* add anyone by typing (#3) */}
-      {tab === 'discover' && (
-      <div className="card p-4 mb-6">
-        <form onSubmit={searchPeople} className="flex gap-2 max-w-xl">
-          <input className="input" placeholder="Añadir a favoritos por nombre (cualquier director o actor de TMDB)…" value={pq} onChange={(e) => setPq(e.target.value)} />
-          <button className="btn-gold shrink-0" disabled={searching}>{searching ? 'Buscando…' : 'Buscar'}</button>
-          {presults && <button type="button" className="btn-ghost shrink-0" onClick={() => { setPresults(null); setPq(''); }}>✕</button>}
-        </form>
-        {presults && (
-          presults.length === 0 ? (
-            <div className="text-sm text-slate-500 mt-3">Nadie con ese nombre en TMDB.</div>
-          ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">
-              {presults.map((p) => <SuggestionCard key={p.tmdb_id} person={p} trackedIds={trackedTmdb} onAdd={addTmdb} onRemove={removeTmdb} />)}
-            </div>
-          )
-        )}
+      <div className="flex gap-2 mb-6">
+        <button onClick={() => setTab('mine')} className={tab === 'mine' ? 'btn-gold' : 'btn-ghost'}>
+          ⭐ Mis {roleLabel(role).toLowerCase()} ({counts[role]})
+        </button>
+        <button onClick={() => setTab('discover')} className={tab === 'discover' ? 'btn-gold' : 'btn-ghost'}>
+          🔍 Añadir {roleLabel(role).toLowerCase()}
+        </button>
       </div>
-      )}
-
-      {/* curated director packs (#9) */}
-      {tab === 'discover' && suggest?.packs && (
-        <div className="mb-8 space-y-5">
-          {suggest.packs.map((pack) => {
-            const pending = pack.people.filter((p) => !p.tracked && !trackedTmdb.has(p.tmdb_id)).length;
-            const accent = ACCENTS[pack.accent] || ACCENTS.gold;
-            return (
-              <section key={pack.key} className={`card p-0 overflow-hidden border-l-4 ${accent.border}`}>
-                <div className="flex items-start gap-3 p-4 pb-3 flex-wrap">
-                  <div className={`text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${accent.bg}`}>{pack.emoji}</div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-slate-100">{pack.title}</h3>
-                    <p className="text-xs text-slate-500">{pack.description}</p>
-                  </div>
-                  <button
-                    className={`btn-ghost !py-1 shrink-0 ${pending ? `!border-current ${accent.text}` : 'opacity-50'}`}
-                    disabled={!pending || packBusy === pack.key}
-                    onClick={() => addPack(pack)}
-                    title={pending ? `Añade los ${pending} que aún no sigues` : 'Ya los sigues a todos'}
-                  >
-                    {packBusy === pack.key ? 'Añadiendo…' : pending ? `⭐ Añadir todos (${pending})` : '✓ Todos añadidos'}
-                  </button>
-                </div>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 p-4 pt-0">
-                  {pack.people.map((p) => <SuggestionCard key={p.tmdb_id} person={p} trackedIds={trackedTmdb} onAdd={addTmdb} onRemove={removeTmdb} />)}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      )}
 
       {tab === 'mine' && (
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* ranking */}
-        <Section title={`Ranking de ${ROLES.find(([r]) => r === role)[1].toLowerCase()} por títulos en tu Plex`}>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <button
-              onClick={() => setHideDead((v) => !v)}
-              className={`btn-ghost !py-1 text-xs ${hideDead ? '!border-gold-400 text-gold-400' : ''}`}
-              title="Oculta a quienes ya han fallecido (a quienes se les conoce la fecha)"
-            >
-              {hideDead ? '✓ Ocultando fallecidos/as' : '✝ Ocultar fallecidos/as'}
-            </button>
-            <button className="btn-ghost !py-1 text-xs" onClick={updateLife} disabled={updatingLife}>
-              {updatingLife ? 'Actualizando…' : '↻ Actualizar vivos/muertos'}
-            </button>
-            {lifeMsg && <span className="text-[11px] text-slate-400">{lifeMsg}</span>}
-          </div>
-          {!rankItems ? (
-            <Spinner />
-          ) : (
-            <div className="card divide-y divide-ink-800 max-h-[70vh] overflow-y-auto">
-              {rankItems.map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3 px-4 py-2">
-                  <span className="text-slate-600 text-sm w-8 text-right shrink-0">{i + 1}.</span>
-                  <Link
-                    to={`/personas/${p.id}?role=${role}`}
-                    className="text-sm text-slate-200 hover:text-gold-400 truncate flex-1 flex items-center gap-1.5 min-w-0"
-                  >
-                    <span className="truncate">{p.name}</span>
-                    <DeathBadge deathday={p.deathday} />
-                  </Link>
-                  <span className="text-xs text-slate-500 shrink-0">{p.n} títulos</span>
-                  <button
-                    onClick={() => toggle(p.id, p.name)}
-                    title={trackedIds.has(p.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-                    className={`text-lg cursor-pointer transition-colors shrink-0 ${
-                      trackedIds.has(p.id) ? 'text-gold-400' : 'text-ink-600 hover:text-slate-400'
-                    }`}
-                  >
-                    ★
-                  </button>
-                </div>
-              ))}
-              {rankMore && (
-                <button
-                  className="w-full py-2 text-xs text-slate-400 hover:text-gold-400 cursor-pointer"
-                  onClick={() => loadRanking(false)}
-                >
-                  Ver más
-                </button>
-              )}
+        <>
+          {/* headline numbers for this facet */}
+          {roleFavs.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <div className="card p-3">
+                <div className="text-xl font-bold text-gold-400">{counts[role]}</div>
+                <div className="text-xs text-slate-500">{roleLabel(role).toLowerCase()} que sigues</div>
+              </div>
+              <div className="card p-3">
+                <div className="text-xl font-bold text-slate-200">{roleFavs.reduce((n, t) => n + (t.movies || 0), 0)}</div>
+                <div className="text-xs text-slate-500">{roleVerb(role)} suyas en tu Plex</div>
+              </div>
+              <div className="card p-3">
+                <div className="text-xl font-bold text-orange-300">{anyComputed ? totalGaps : '—'}</div>
+                <div className="text-xs text-slate-500">huecos por rellenar</div>
+              </div>
+              <div className="card p-3">
+                <div className="text-xl font-bold text-emerald-400">{anyComputed ? completeCount : '—'}</div>
+                <div className="text-xs text-slate-500">filmografías completas</div>
+              </div>
             </div>
           )}
-        </Section>
 
-        {/* current favorites */}
-        <Section
-          title={`Tus favoritos (${tracked.length})`}
-          action={
-            tracked.length > 0 && (
-              <div className="flex items-center gap-3">
-                {deceasedCount > 0 && (
-                  <button className="text-xs text-slate-400 hover:text-gold-400 cursor-pointer" onClick={clearDeceased}>
-                    ✝ Quitar fallecidos ({deceasedCount})
-                  </button>
-                )}
-                <button className="text-xs text-red-400 hover:underline cursor-pointer" onClick={clearAll}>
-                  {confirmClear ? `¿Seguro? Vaciar ${tracked.length}` : 'Vaciar todos'}
-                </button>
-              </div>
-            )
-          }
-        >
-          {tracked.length === 0 ? (
+          {roleFavs.length === 0 ? (
             <Empty>
-              Aún no tienes favoritos. Añade los primeros del ranking de la izquierda, o marca «☆ Seguir» en la
-              ficha de cualquier persona.
+              Aún no sigues a nadie como {role === 'director' ? 'director/a' : 'actor/actriz'}. Usa{' '}
+              <button className="text-gold-400 hover:underline" onClick={() => setTab('discover')}>Añadir {roleLabel(role).toLowerCase()}</button>.
             </Empty>
           ) : (
             <>
-            <div className="flex gap-2 mb-2 flex-wrap items-center">
-              {[['all', 'Todos'], ['director', 'Directores/as'], ['actor', 'Actores/actrices']].map(([v, label]) => (
-                <button key={v} onClick={() => setFavView(v)} className={`btn-ghost !py-1 text-xs ${favView === v ? '!border-gold-400 text-gold-400' : ''}`}>
-                  {label} ({favCounts[v]})
-                </button>
-              ))}
-              <select className="input !w-auto !py-1 text-xs" value={favSort} onChange={(e) => setFavSort(e.target.value)} title="Ordenar">
-                {Object.entries(FAV_SORTS).map(([k, s]) => (
-                  <option key={k} value={k}>{s.label}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => { setPruneMode((v) => !v); setSelected(new Set()); }}
-                className={`btn-ghost !py-1 text-xs ${pruneMode ? '!border-gold-400 text-gold-400' : ''}`}
-              >
-                ✂️ Podar
-              </button>
-            </div>
-            <input
-              className="input !py-1.5 text-sm mb-2"
-              placeholder="Filtrar por nombre…"
-              value={favSearch}
-              onChange={(e) => setFavSearch(e.target.value)}
-            />
-            {pruneMode && (
-              <div className="flex gap-2 mb-2 flex-wrap items-center text-xs">
+              <div className="flex gap-2 mb-3 flex-wrap items-center">
+                <input
+                  className="input !py-1.5 text-sm !w-auto flex-1 min-w-48"
+                  placeholder={`Filtrar ${roleLabel(role).toLowerCase()}…`}
+                  value={favSearch}
+                  onChange={(e) => setFavSearch(e.target.value)}
+                />
+                <select className="input !w-auto !py-1.5 text-xs" value={favSort} onChange={(e) => setFavSort(e.target.value)}>
+                  {Object.entries(FAV_SORTS).map(([k, s]) => (
+                    <option key={k} value={k}>{s.label}</option>
+                  ))}
+                </select>
                 <button
-                  className="btn-ghost !py-1 text-xs"
-                  onClick={() => setSelected(new Set(shownFavs.filter((t) => t.deathday && noContribution(t)).map((t) => t.id)))}
+                  onClick={() => { setPruneMode((v) => !v); setSelected(new Set()); }}
+                  className={`btn-ghost !py-1.5 text-xs ${pruneMode ? '!border-gold-400 text-gold-400' : ''}`}
                 >
-                  Marcar fallecidos completos
+                  ✂️ Podar
                 </button>
-                <button
-                  className="btn-ghost !py-1 text-xs"
-                  onClick={() => setSelected(new Set(shownFavs.filter(noContribution).map((t) => t.id)))}
-                >
-                  Marcar sin aporte
-                </button>
-                <button className="btn-gold !py-1 text-xs" onClick={pruneSelected} disabled={!selected.size}>
-                  Quitar seleccionados ({selected.size})
+                {deceasedCount > 0 && (
+                  <button className="btn-ghost !py-1.5 text-xs" onClick={clearDeceased}>
+                    ✝ Quitar fallecidos/as ({deceasedCount})
+                  </button>
+                )}
+                <button className="btn-ghost !py-1.5 text-xs !border-red-500/40 text-red-400" onClick={clearAll}>
+                  {confirmClear ? `¿Seguro? Vaciar ${shownFavs.length}` : 'Vaciar'}
                 </button>
               </div>
-            )}
-            {!health.gaps && (
-              <p className="text-[11px] text-slate-500 mb-2">
-                Los huecos por favorito se calculan al visitar <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir → Tus favoritos</Link>.
-              </p>
-            )}
-            <div className="card divide-y divide-ink-800 max-h-[70vh] overflow-y-auto">
-              {shownFavs.map((t) => {
-                const r = favRole(t);
-                const count = r === 'director' ? t.directed : t.acted;
-                return (
-                <div key={t.id} className="group flex items-center gap-3 px-4 py-1.5 hover:bg-ink-800/60">
-                  {pruneMode ? (
-                    <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelected(t.id)} />
-                  ) : (
-                    <span className="text-gold-400">★</span>
-                  )}
-                  {t.thumb ? (
-                    <img src={`/img/person/${t.id}`} alt="" loading="lazy" className="w-7 h-7 rounded-full object-cover bg-ink-700 shrink-0" />
-                  ) : (
-                    <span className="w-7 h-7 rounded-full bg-ink-700 text-slate-500 text-[11px] flex items-center justify-center shrink-0">
-                      {t.name.slice(0, 1)}
-                    </span>
-                  )}
-                  <Link
-                    to={`/personas/${t.id}?role=${r}`}
-                    className="text-sm text-slate-200 hover:text-gold-400 truncate flex-1 flex items-center gap-1.5 min-w-0"
+
+              {pruneMode && (
+                <div className="card p-3 mb-3 flex gap-2 flex-wrap items-center text-xs">
+                  <span className="text-slate-400">Poda rápida:</span>
+                  <button
+                    className="btn-ghost !py-1 text-xs"
+                    onClick={() => setSelected(new Set(shownFavs.filter((t) => t.deathday && noContribution(t)).map((t) => t.id)))}
                   >
-                    <span className="truncate">{t.name}</span>
-                    <DeathBadge deathday={t.deathday} />
-                  </Link>
-                  <span className="text-[11px] text-slate-500 shrink-0 text-right">
-                    {count > 0 ? `${count} ${r === 'director' ? 'dirigidas' : 'actuadas'}` : ''}
-                    {t.gaps != null && (
-                      <span className={t.gaps === 0 ? 'text-emerald-400' : ''}>{count > 0 ? ' · ' : ''}{t.gaps === 0 ? '✓ completo' : `${t.gaps} huecos`}</span>
-                    )}
-                    {t.upcoming != null && t.upcoming > 0 && <span className="text-sky-300"> · {t.upcoming} próximas</span>}
-                    {t.gaps === 0 && (t.upcoming ?? 0) === 0 && t.upcoming != null && (
-                      <span className="text-slate-600"> · sin aporte</span>
-                    )}
-                  </span>
-                  {!pruneMode && (
-                    <button
-                      onClick={() => toggle(t.id, t.name)}
-                      title="Quitar de favoritos"
-                      className="text-slate-500 hover:text-red-400 cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      ✕
-                    </button>
-                  )}
+                    Fallecidos/as con filmografía completa
+                  </button>
+                  <button
+                    className="btn-ghost !py-1 text-xs"
+                    onClick={() => setSelected(new Set(shownFavs.filter(noContribution).map((t) => t.id)))}
+                  >
+                    Sin huecos ni proyectos
+                  </button>
+                  <button className="btn-gold !py-1 text-xs ml-auto" onClick={pruneSelected} disabled={!selected.size}>
+                    Quitar seleccionados ({selected.size})
+                  </button>
                 </div>
+              )}
+
+              {!anyComputed && (
+                <p className="text-[11px] text-slate-500 mb-3">
+                  Los huecos y el completismo se calculan al visitar{' '}
+                  <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir huecos</Link>, o con
+                  «Actualizar todo» en <Link to="/ajustes" className="text-gold-400 hover:underline">Ajustes</Link>.
+                </p>
+              )}
+
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-8">
+                {shownFavs.map((p) => (
+                  <FavoriteCard
+                    key={p.id}
+                    p={p}
+                    role={role}
+                    selectable={pruneMode}
+                    selected={selected.has(p.id)}
+                    onSelect={toggleSelected}
+                    onRemove={removeFav}
+                    onSwitchRole={switchRole}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ranking of the library, scoped to this role, to add more */}
+          <Section title={`Ranking de ${roleLabel(role).toLowerCase()} por títulos en tu Plex`}>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <button
+                onClick={() => setHideDead((v) => !v)}
+                className={`btn-ghost !py-1 text-xs ${hideDead ? '!border-gold-400 text-gold-400' : ''}`}
+              >
+                {hideDead ? '✓ Ocultando fallecidos/as' : '✝ Ocultar fallecidos/as'}
+              </button>
+              <button className="btn-ghost !py-1 text-xs" onClick={updateLife} disabled={updatingLife}>
+                {updatingLife ? 'Actualizando…' : '↻ Actualizar vivos/muertos'}
+              </button>
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-xs text-slate-400">Añadir los</span>
+                <input type="number" min="1" max="1000" className="input !w-20 text-center !py-1" value={topN} onChange={(e) => setTopN(e.target.value)} />
+                <span className="text-xs text-slate-400">primeros</span>
+                <button className="btn-gold !py-1 text-xs" onClick={bulkAdd}>⭐ Revisar y añadir</button>
+              </div>
+              {lifeMsg && <span className="text-[11px] text-slate-400 w-full">{lifeMsg}</span>}
+              {flash && <span className="text-emerald-400 text-xs w-full">{flash}</span>}
+            </div>
+
+            {preview && (
+              <div className="card p-4 mb-3">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                  <h3 className="font-semibold text-slate-100 text-sm">
+                    Vas a seguir a {preview.checked.size} de {preview.candidates.length} como {role === 'director' ? 'director/a' : 'actor/actriz'}
+                  </h3>
+                  <div className="flex gap-2">
+                    <button className="btn-gold !py-1 text-xs" onClick={confirmBulkAdd} disabled={!preview.checked.size}>
+                      ⭐ Confirmar ({preview.checked.size})
+                    </button>
+                    <button className="btn-ghost !py-1 text-xs" onClick={() => setPreview(null)}>Cancelar</button>
+                  </div>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 max-h-72 overflow-y-auto">
+                  {preview.candidates.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 text-sm text-slate-300 py-0.5 cursor-pointer min-w-0">
+                      <input type="checkbox" checked={preview.checked.has(c.id)} onChange={() => togglePreview(c.id)} />
+                      <span className="truncate">{c.name}</span>
+                      <DeathBadge deathday={c.deathday} />
+                      <span className="text-[11px] text-slate-500 shrink-0 ml-auto">{c.n} títulos</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!rankItems ? (
+              <Spinner />
+            ) : (
+              <div className="card divide-y divide-ink-800 max-h-[60vh] overflow-y-auto">
+                {rankItems.map((p, i) => {
+                  const fav = tracked.find((t) => t.id === p.id);
+                  const here = fav && (fav.role || 'director') === role;
+                  const elsewhere = fav && !here;
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 px-4 py-2">
+                      <span className="text-slate-600 text-sm w-8 text-right shrink-0">{i + 1}.</span>
+                      <Link to={`/personas/${p.id}?role=${role}`} className="text-sm text-slate-200 hover:text-gold-400 truncate flex-1 flex items-center gap-1.5 min-w-0">
+                        <span className="truncate">{p.name}</span>
+                        <DeathBadge deathday={p.deathday} />
+                        {elsewhere && (
+                          <span className="text-[10px] text-slate-500 shrink-0" title={`Le sigues como ${fav.role === 'director' ? 'director/a' : 'actor/actriz'}`}>
+                            {fav.role === 'director' ? '🎬' : '🎭'}
+                          </span>
+                        )}
+                      </Link>
+                      <span className="text-xs text-slate-500 shrink-0">{p.n} títulos</span>
+                      <button
+                        onClick={() => toggle(p.id, p.name)}
+                        title={
+                          here
+                            ? `Quitar de ${roleLabel(role).toLowerCase()}`
+                            : elsewhere
+                              ? `Le sigues como ${fav.role === 'director' ? 'director/a' : 'actor/actriz'}: pásale a ${roleLabel(role).toLowerCase()}`
+                              : `Seguir como ${role === 'director' ? 'director/a' : 'actor/actriz'}`
+                        }
+                        className={`text-lg cursor-pointer transition-colors shrink-0 ${
+                          here ? 'text-gold-400' : elsewhere ? 'text-gold-400/30 hover:text-gold-400' : 'text-ink-600 hover:text-slate-400'
+                        }`}
+                      >
+                        {elsewhere ? '⇄' : '★'}
+                      </button>
+                    </div>
+                  );
+                })}
+                {rankMore && (
+                  <button className="w-full py-2 text-xs text-slate-400 hover:text-gold-400 cursor-pointer" onClick={() => loadRanking(false)}>
+                    Ver más
+                  </button>
+                )}
+              </div>
+            )}
+          </Section>
+        </>
+      )}
+
+      {tab === 'discover' && (
+        <>
+          <p className="text-xs text-slate-500 mb-4">
+            Lo que añadas aquí se sigue como <b>{role === 'director' ? 'director/a' : 'actor/actriz'}</b>. Cambia la
+            faceta arriba si quieres seguir a alguien por la otra.
+          </p>
+
+          <div className="card p-4 mb-6">
+            <h2 className="font-semibold text-slate-100 mb-1">Añadir una lista de nombres</h2>
+            <p className="text-xs text-slate-500 mb-3 max-w-2xl">
+              Pega nombres <b>separados por comas o uno por línea</b>. PowaFlex los busca en TMDB y los añade a{' '}
+              {roleLabel(role).toLowerCase()}.
+            </p>
+            <textarea
+              className="input !h-28 font-mono text-xs leading-relaxed"
+              placeholder={'Pedro Almodóvar, Céline Sciamma\nHirokazu Kore-eda\nGreta Gerwig'}
+              value={bulkNames}
+              onChange={(e) => setBulkNames(e.target.value)}
+            />
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <button className="btn-gold shrink-0" onClick={addByNames} disabled={bulkBusy || !bulkNames.trim()}>
+                {bulkBusy ? 'Añadiendo…' : `⭐ Añadir a ${roleLabel(role).toLowerCase()}`}
+              </button>
+            </div>
+            {bulkResult && (
+              <div className="text-xs text-slate-400 mt-2">
+                ✓ {bulkResult.added} añadidos de {bulkResult.total}.
+                {bulkResult.notFound?.length > 0 && (
+                  <span className="text-orange-300"> No encontrados en TMDB: {bulkResult.notFound.join(', ')}.</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="card p-4 mb-6">
+            <form onSubmit={searchPeople} className="flex gap-2 max-w-xl">
+              <input className="input" placeholder="Buscar por nombre en TMDB…" value={pq} onChange={(e) => setPq(e.target.value)} />
+              <button className="btn-gold shrink-0" disabled={searching}>{searching ? 'Buscando…' : 'Buscar'}</button>
+              {presults && <button type="button" className="btn-ghost shrink-0" onClick={() => { setPresults(null); setPq(''); }}>✕</button>}
+            </form>
+            {presults && (
+              presults.length === 0 ? (
+                <div className="text-sm text-slate-500 mt-3">Nadie con ese nombre en TMDB.</div>
+              ) : (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">
+                  {presults.map((p) => <SuggestionCard key={p.tmdb_id} person={p} trackedIds={trackedTmdb} onAdd={addTmdb} onRemove={removeTmdb} />)}
+                </div>
+              )
+            )}
+          </div>
+
+          {suggest?.packs && (
+            <div className="mb-8 space-y-5">
+              {suggest.packs.map((pack) => {
+                const pending = pack.people.filter((p) => !p.tracked && !trackedTmdb.has(p.tmdb_id)).length;
+                const accent = ACCENTS[pack.accent] || ACCENTS.gold;
+                return (
+                  <section key={pack.key} className={`card p-0 overflow-hidden border-l-4 ${accent.border}`}>
+                    <div className="flex items-start gap-3 p-4 pb-3 flex-wrap">
+                      <div className={`text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${accent.bg}`}>{pack.emoji}</div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-slate-100">{pack.title}</h3>
+                        <p className="text-xs text-slate-500">{pack.description}</p>
+                      </div>
+                      <button
+                        className={`btn-ghost !py-1 shrink-0 ${pending ? `!border-current ${accent.text}` : 'opacity-50'}`}
+                        disabled={!pending || packBusy === pack.key}
+                        onClick={() => addPack(pack)}
+                        title={pending ? `Añade los ${pending} que aún no sigues` : 'Ya los sigues a todos'}
+                      >
+                        {packBusy === pack.key ? 'Añadiendo…' : pending ? `⭐ Añadir todos (${pending})` : '✓ Todos añadidos'}
+                      </button>
+                    </div>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 p-4 pt-0">
+                      {pack.people.map((p) => <SuggestionCard key={p.tmdb_id} person={p} trackedIds={trackedTmdb} onAdd={addTmdb} onRemove={removeTmdb} />)}
+                    </div>
+                  </section>
                 );
               })}
             </div>
-            </>
           )}
-        </Section>
-      </div>
+        </>
       )}
     </div>
   );

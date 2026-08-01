@@ -34,6 +34,7 @@ export default function Settings() {
   const [radarrSync, setRadarrSync] = useState(null);
   const [auto, setAuto] = useState(null);
   const [lifeMsg, setLifeMsg] = useState(null);
+  const [refresh, setRefresh] = useState(null);
 
   const loadSections = () =>
     api('/plex/sections').then((r) => Array.isArray(r) && setSections(r)).catch(() => {});
@@ -47,6 +48,7 @@ export default function Settings() {
     api('/mdblist/status').then((st) => st && !st.error && st.total != null && setMdbStatus(st));
     api('/radarr/ids').then((r) => r.tmdbIds && setRadarrSync({ count: r.tmdbIds.length, syncedAt: r.syncedAt }));
     api('/radarr/auto').then((a) => !a.error && setAuto(a));
+    api('/refresh-all').then((r) => !r.error && setRefresh(r));
   }, []);
 
   // poll sync status while running
@@ -55,6 +57,22 @@ export default function Settings() {
     const t = setInterval(() => api('/sync/status').then(setSync), 1500);
     return () => clearInterval(t);
   }, [sync?.running]);
+
+  // poll the full-refresh routine while it runs (it drives the Plex sync too)
+  useEffect(() => {
+    if (!refresh?.running) return;
+    const t = setInterval(() => {
+      api('/refresh-all').then((r) => !r.error && setRefresh(r));
+      api('/sync/status').then(setSync);
+    }, 1500);
+    return () => clearInterval(t);
+  }, [refresh?.running]);
+
+  const startFullRefresh = async () => {
+    const r = await api('/refresh-all', { method: 'POST' });
+    if (r.error && !r.started) return;
+    setRefresh({ ...(refresh || {}), running: true, steps: [], step: 'Preparando…' });
+  };
 
   const save = async () => {
     await api('/settings', { method: 'PUT', body: s });
@@ -465,19 +483,21 @@ export default function Settings() {
       {/* CALENDAR */}
       <section className="card p-5 mb-5">
         <h2 className="font-semibold text-slate-100">5 · Calendario de cine venidero</h2>
-        <div className="grid sm:grid-cols-2 gap-3 mt-3">
+        <p className="text-xs text-slate-500 mt-1 mb-3 max-w-2xl">
+          El calendario lo mandan <b>tus favoritos</b>, cada uno en la faceta por la que le sigues: de un director/a
+          se vigila lo que dirige, de un actor/actriz lo que interpreta. Si además quieres vigilar a los más
+          presentes en tu biblioteca aunque no les sigas, sube estos números (0 = solo tus favoritos).
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-slate-400">Nº de directores/as top a vigilar</label>
-            <input className="input mt-1" type="number" min="5" max="100" placeholder="25" value={s.cal_top_directors || ''} onChange={set('cal_top_directors')} />
+            <label className="text-xs text-slate-400">Extra: directores/as top de tu biblioteca</label>
+            <input className="input mt-1" type="number" min="0" max="100" placeholder="0" value={s.cal_top_directors || ''} onChange={set('cal_top_directors')} />
           </div>
           <div>
-            <label className="text-xs text-slate-400">Nº de actores/actrices top a vigilar</label>
-            <input className="input mt-1" type="number" min="0" max="100" placeholder="15" value={s.cal_top_actors || ''} onChange={set('cal_top_actors')} />
+            <label className="text-xs text-slate-400">Extra: actores/actrices top de tu biblioteca</label>
+            <input className="input mt-1" type="number" min="0" max="100" placeholder="0" value={s.cal_top_actors || ''} onChange={set('cal_top_actors')} />
           </div>
         </div>
-        <p className="text-xs text-slate-500 mt-2">
-          Además, cualquier persona que marques con «☆ Seguir» en su ficha entra siempre en el calendario.
-        </p>
         <div className="mt-4 pt-4 border-t border-ink-700 flex flex-wrap items-center gap-3">
           <button
             className="btn-ghost"
@@ -522,6 +542,74 @@ export default function Settings() {
         <button className="btn-gold" onClick={save}>Guardar ajustes</button>
         {saved && <span className="text-emerald-400 text-sm">✓ Guardado</span>}
       </div>
+
+      {/* ACTUALIZAR TODO */}
+      <section className="card p-5 mb-5 border-l-4 border-gold-400">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold text-slate-100">Actualizar todo</h2>
+            <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+              Una sola rutina con todo lo que PowaFlex necesita, en orden: biblioteca de Plex, emparejado de
+              Letterboxd, títulos en otros idiomas, notas de MDBList, lo que ya tienes en Radarr, calendario, huecos
+              de tus favoritos y sagas. Es exactamente lo mismo que se ejecuta solo cada noche. Lo que no tengas
+              configurado se salta.
+            </p>
+          </div>
+          <button className="btn-gold shrink-0" onClick={startFullRefresh} disabled={refresh?.running}>
+            {refresh?.running ? 'Actualizando…' : '↻ Actualizar todo'}
+          </button>
+        </div>
+
+        {refresh?.steps?.length > 0 && (
+          <div className="mt-4 space-y-1">
+            {refresh.steps.map((st) => {
+              const icon = { done: '✓', running: '⟳', error: '✗', skipped: '·', pending: '○' }[st.state] || '○';
+              const color = {
+                done: 'text-emerald-400', running: 'text-gold-400 animate-pulse',
+                error: 'text-red-400', skipped: 'text-slate-600', pending: 'text-slate-600',
+              }[st.state];
+              return (
+                <div key={st.key} className="flex items-baseline gap-2 text-sm">
+                  <span className={`${color} w-4 shrink-0`}>{icon}</span>
+                  <span className={st.state === 'skipped' ? 'text-slate-600' : 'text-slate-300'}>{st.label}</span>
+                  {st.detail && (
+                    <span className={`text-xs ${st.state === 'error' ? 'text-red-400' : 'text-slate-500'}`}>
+                      — {st.detail}
+                    </span>
+                  )}
+                  {st.ms > 1000 && st.state === 'done' && (
+                    <span className="text-[11px] text-slate-600 ml-auto shrink-0">{Math.round(st.ms / 1000)}s</span>
+                  )}
+                </div>
+              );
+            })}
+            {/* the Plex step drives the sync, so show its inner progress */}
+            {refresh.running && sync?.running && (
+              <div className="pt-2 max-w-md">
+                <ProgressBar pct={syncPct} />
+                <div className="text-[11px] text-slate-500 mt-1">
+                  {sync.phase === 'listing' && `Listando «${sync.section || ''}»… ${sync.done}`}
+                  {sync.phase === 'details' && `Detalles ${sync.detailDone} / ${sync.detailTotal}`}
+                  {sync.phase === 'cleanup' && 'Limpiando eliminadas…'}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!refresh?.running && refresh?.finishedAt && (
+          <p className={`text-xs mt-3 ${refresh.lastError ? 'text-red-400' : 'text-emerald-400'}`}>
+            {refresh.lastError
+              ? `Terminada con avisos: ${refresh.lastError}`
+              : `✓ Todo actualizado · ${new Date(refresh.finishedAt).toLocaleString('es-ES')}`}
+          </p>
+        )}
+        {!refresh?.running && !refresh?.finishedAt && refresh?.lastRun && (
+          <p className="text-xs text-slate-500 mt-3">
+            Última actualización completa: {new Date(refresh.lastRun).toLocaleString('es-ES')}
+          </p>
+        )}
+      </section>
 
       {/* SYNC */}
       <section className="card p-5 mb-5">

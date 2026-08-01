@@ -57,6 +57,7 @@ import {
   letterboxdSummary,
 } from './letterboxd.js';
 import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
+import { runFullRefresh, refreshStatus } from './refresh.js';
 import { availability, isUpgradeable } from './justwatch.js';
 import { scanSagas, sagaScanStatus, sagaScanState, sagaList, sagaComplete, enrichSagaStats, sagaStatsStatus } from './saga.js';
 import * as q from './queries.js';
@@ -255,7 +256,7 @@ app.post('/api/tracked/tmdb', async (req, reply) => {
     const r = trackByTmdb(req.body || {});
     // manual add re-allows automatic re-adds later (clears the ✕ block) (C)
     if (r.personId) db.prepare('DELETE FROM unfollowed_people WHERE person_id = ?').run(r.personId);
-    db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
+    invalidateFavoritesCaches();
     return r;
   } catch (err) {
     reply.code(400);
@@ -284,7 +285,7 @@ app.post('/api/tracked/by-names', async (req, reply) => {
         const info = await findPersonInfo(name, hint);
         if (!info?.id) { notFound.push(name); continue; }
         const before = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
-        const r = trackByTmdb({ tmdbId: info.id, name: info.name || name, profilePath: info.profile_path });
+        const r = trackByTmdb({ tmdbId: info.id, name: info.name || name, profilePath: info.profile_path, role: role || 'director' });
         if (r.personId) db.prepare('DELETE FROM unfollowed_people WHERE person_id = ?').run(r.personId);
         const after = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
         if (after > before) added++;
@@ -307,6 +308,7 @@ app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
       reply.code(400);
       return { error: 'Faltan personas' };
     }
+    const packRole = ['director', 'actor'].includes(req.body?.role) ? req.body.role : 'director';
     const blocked = new Set(db.prepare('SELECT person_id FROM unfollowed_people').all().map((r) => r.person_id));
     let added = 0;
     let skipped = 0;
@@ -319,7 +321,7 @@ app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
       if (existing && blocked.has(existing.id)) { skipped++; continue; }
       try {
         const before = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
-        trackByTmdb({ tmdbId, name: p.name, profilePath: p.profilePath ?? p.profile_path });
+        trackByTmdb({ tmdbId, name: p.name, profilePath: p.profilePath ?? p.profile_path, role: packRole });
         const after = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
         if (after > before) added++;
       } catch {}
@@ -392,6 +394,23 @@ app.get('/api/media/:tmdbId', async (req, reply) => {
 // progress for long TMDB-building pages, polled by the frontend (#5)
 app.get('/api/build-progress', async () => buildProgress);
 
+// "Actualizar todo": one button for the whole routine (same code as the nightly)
+app.get('/api/refresh-all', async () => ({
+  ...refreshStatus,
+  lastRun: Number(getSetting('full_refresh_last_run') || 0) || null,
+}));
+app.post('/api/refresh-all', async (req, reply) => {
+  if (refreshStatus.running) {
+    reply.code(409);
+    return { error: 'Ya hay una actualización en marcha', ...refreshStatus };
+  }
+  // fire and forget: the client polls GET /api/refresh-all for progress
+  runFullRefresh({ trigger: 'manual', includeAutoRadarr: req.body?.includeAutoRadarr !== false }).catch((err) =>
+    app.log.error({ err }, 'refresh-all')
+  );
+  return { ok: true, started: true };
+});
+
 // JustWatch: best available digital quality in the market, to confirm an upgrade
 // is actually possible before queuing it (#2/#3). Unofficial API, best-effort.
 app.get('/api/justwatch/:tmdbId', async (req, reply) => {
@@ -429,13 +448,14 @@ const invalidateFavoritesCaches = () =>
 
 app.post('/api/tracked/bulk', async (req, reply) => {
   const { role, top, personIds, preview } = req.body || {};
-  const ins = db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at) VALUES (?, ?)');
+  const ins = db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at, role) VALUES (?, ?, ?)');
+  const followRole = role === 'actor' ? 'actor' : 'director';
 
   // confirmed selection coming back from the preview dialog
   if (Array.isArray(personIds) && personIds.length) {
     let added = 0;
     const tx = db.transaction(() => {
-      for (const id of personIds.slice(0, 1000)) added += ins.run(Number(id), Date.now()).changes;
+      for (const id of personIds.slice(0, 1000)) added += ins.run(Number(id), Date.now(), followRole).changes;
     });
     tx();
     if (added) invalidateFavoritesCaches();
@@ -458,7 +478,7 @@ app.post('/api/tracked/bulk', async (req, reply) => {
   if (preview) return { candidates };
   let added = 0;
   const tx = db.transaction(() => {
-    for (const c of candidates) added += ins.run(c.id, Date.now()).changes;
+    for (const c of candidates) added += ins.run(c.id, Date.now(), followRole).changes;
   });
   tx();
   if (added) invalidateFavoritesCaches();
@@ -492,25 +512,30 @@ app.get('/api/tracked/health', async () => {
   const favs = db
     .prepare(
       `SELECT p.id, p.name, p.thumb, p.deathday, p.tmdb_id,
+              COALESCE(t.role, 'director') AS role,
               SUM(CASE WHEN mp.role = 'director' THEN 1 ELSE 0 END) directed,
               SUM(CASE WHEN mp.role = 'actor' THEN 1 ELSE 0 END) acted,
-              COUNT(DISTINCT mp.movie_id) movies
+              SUM(CASE WHEN mp.role = COALESCE(t.role, 'director') THEN 1 ELSE 0 END) movies
        FROM tracked_people t
        JOIN people p ON p.id = t.person_id
        LEFT JOIN movie_people mp ON mp.person_id = p.id
        GROUP BY p.id ORDER BY movies DESC, p.name`
     )
     .all();
-  const gapsRow = db
-    .prepare(`SELECT json FROM tmdb_cache WHERE key LIKE 'discover_favorites:%' ORDER BY fetched_at DESC LIMIT 1`)
-    .get();
+  // one cache per facet now, so merge them all; a favorite missing from every
+  // cache is "not calculated yet", which is NOT the same as "complete"
+  const gapsRows = db
+    .prepare(`SELECT json FROM tmdb_cache WHERE key LIKE 'discover_favorites:%' ORDER BY fetched_at DESC`)
+    .all();
   const calRow = db
     .prepare(`SELECT json FROM tmdb_cache WHERE key LIKE 'calendar:%' ORDER BY fetched_at DESC LIMIT 1`)
     .get();
   const gapsBy = new Map();
-  try {
-    for (const p of (JSON.parse(gapsRow?.json || '{}').people || [])) gapsBy.set(p.id, p);
-  } catch {}
+  for (const row of gapsRows) {
+    try {
+      for (const p of (JSON.parse(row.json || '{}').people || [])) if (!gapsBy.has(p.id)) gapsBy.set(p.id, p);
+    } catch {}
+  }
   const upcomingBy = new Map();
   try {
     const now = new Date().toISOString().slice(0, 10);
@@ -521,13 +546,13 @@ app.get('/api/tracked/health', async () => {
     }
   } catch {}
   return {
-    cached: { gaps: !!gapsRow, calendar: !!calRow },
+    cached: { gaps: gapsBy.size > 0, calendar: !!calRow },
     people: favs.map((f) => {
       const g = gapsBy.get(f.id);
       return {
         ...f,
-        // favoritesGaps only lists people WITH missing films, so absent = 0 gaps
-        gaps: gapsRow ? (g?.missingTotal ?? 0) : null,
+        // null = still unknown; only a person present in a cache has a real number
+        gaps: g ? g.missingTotal : null,
         pct: g?.pct ?? null,
         gapRole: g?.role ?? null,
         upcoming: calRow ? (upcomingBy.get(f.id) || 0) : null,
@@ -561,13 +586,27 @@ app.delete('/api/discover/dismiss/:tmdbId', async (req) => {
 
 app.post('/api/tracked/:personId', async (req) => {
   const id = Number(req.params.personId);
+  const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : null;
   // a manual, explicit add clears any ✕ block (C)
   db.prepare('DELETE FROM unfollowed_people WHERE person_id = ?').run(id);
+  // without an explicit role, follow them for whatever they do most in your library
+  const guessed =
+    role ||
+    (db
+      .prepare(
+        `SELECT CASE WHEN SUM(CASE WHEN role = 'director' THEN 1 ELSE 0 END)
+                          >= SUM(CASE WHEN role = 'actor' THEN 1 ELSE 0 END)
+                     THEN 'director' ELSE 'actor' END AS r
+         FROM movie_people WHERE person_id = ?`
+      )
+      .get(id)?.r || 'director');
   const r = db
-    .prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at) VALUES (?, ?)')
-    .run(id, Date.now());
-  if (r.changes) invalidateFavoritesCaches();
-  return { ok: true };
+    .prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at, role) VALUES (?, ?, ?)')
+    .run(id, Date.now(), guessed);
+  // an explicit role on an existing favorite switches which facet you follow
+  if (!r.changes && role) db.prepare('UPDATE tracked_people SET role = ? WHERE person_id = ?').run(role, id);
+  invalidateFavoritesCaches();
+  return { ok: true, role: guessed };
 });
 app.delete('/api/tracked/all', async () => {
   db.prepare('DELETE FROM tracked_people').run();
@@ -582,20 +621,36 @@ app.delete('/api/tracked/:personId', async (req) => {
   if (r.changes) invalidateFavoritesCaches();
   return { ok: true };
 });
-app.get('/api/tracked', async () =>
-  db
+app.get('/api/tracked', async (req) => {
+  const role = ['director', 'actor'].includes(req.query.role) ? req.query.role : null;
+  return db
     .prepare(
       `SELECT p.id, p.name, p.thumb, p.deathday, p.tmdb_id,
+              COALESCE(t.role, 'director') AS role,
               SUM(CASE WHEN mp.role = 'director' THEN 1 ELSE 0 END) directed,
               SUM(CASE WHEN mp.role = 'actor' THEN 1 ELSE 0 END) acted,
-              COUNT(DISTINCT mp.movie_id) movies
+              -- titles in the role you follow them for: no mixing the two counts
+              SUM(CASE WHEN mp.role = COALESCE(t.role, 'director') THEN 1 ELSE 0 END) movies
        FROM tracked_people t
        JOIN people p ON p.id = t.person_id
        LEFT JOIN movie_people mp ON mp.person_id = p.id
+       WHERE (? IS NULL OR COALESCE(t.role, 'director') = ?)
        GROUP BY p.id ORDER BY movies DESC, p.name`
     )
-    .all()
-);
+    .all(role, role);
+});
+
+// switch which facet of a person you follow (director <-> actor)
+app.patch('/api/tracked/:personId/role', async (req, reply) => {
+  const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : null;
+  if (!role) {
+    reply.code(400);
+    return { error: 'role debe ser director o actor' };
+  }
+  const r = db.prepare('UPDATE tracked_people SET role = ? WHERE person_id = ?').run(role, Number(req.params.personId));
+  if (r.changes) invalidateFavoritesCaches();
+  return { ok: true, role };
+});
 
 // remove every deceased person from favorites in one go ("vivos y muertos")
 app.delete('/api/tracked/deceased', async () => {
@@ -618,9 +673,11 @@ app.delete('/api/tracked/deceased', async () => {
 app.get('/api/discover/gaps', async (req, reply) => {
   try {
     return await libraryGaps({
-      role: ['director', 'actor', 'writer'].includes(req.query.role) ? req.query.role : 'director',
+      role: ['director', 'actor'].includes(req.query.role) ? req.query.role : 'director',
       people: Math.min(Number(req.query.people) || 20, 60),
       perPerson: Math.min(Number(req.query.perPerson) || 8, 20),
+      // the ranking can be walked down to the first 500 people
+      offset: Math.min(Math.max(Number(req.query.offset) || 0, 0), 500),
       refresh: req.query.refresh === '1',
     });
   } catch (err) {
@@ -631,7 +688,11 @@ app.get('/api/discover/gaps', async (req, reply) => {
 
 app.get('/api/discover/favorites', async (req, reply) => {
   try {
-    return await favoritesGaps({ perPerson: Math.min(Number(req.query.perPerson) || 8, 20), refresh: req.query.refresh === '1' });
+    return await favoritesGaps({
+      perPerson: Math.min(Number(req.query.perPerson) || 8, 20),
+      role: ['director', 'actor'].includes(req.query.role) ? req.query.role : null,
+      refresh: req.query.refresh === '1',
+    });
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -1007,34 +1068,19 @@ setInterval(() => {
     !syncStatus.running && getSetting('plex_url') && getSetting('plex_token')
   ) {
     setSetting('nightly_last_run', todayStr);
-    runSync()
-      .then(() => rematchLetterboxd())
-      .then(() => (getSetting('tmdb_key') ? resolveUnmatchedLb() : null))
-      .then(() => getCalendarCached({ refresh: true }))
-      .then(() => (getSetting('mdblist_key') ? syncRatings() : null))
-      // pull recent watches from the Letterboxd RSS feed, if configured
-      .then(() => (getSetting('letterboxd_rss') ? importLetterboxdRss(getSetting('letterboxd_rss')) : null))
-      .catch(() => {})
-      // refresh alive/dead among favorites so the auto-add "living" filter and
-      // the prune helpers don't work on frozen data
-      .then(() =>
-        getSetting('tmdb_key')
-          ? enrichPeopleLife(db.prepare('SELECT person_id FROM tracked_people').all().map((r) => r.person_id))
-          : null
-      )
-      // refresh Radarr snapshot, then run the daily auto-add for living favorites
-      .then(() => (getSetting('radarr_url') && getSetting('radarr_key') ? radarrSyncMovies() : null))
-      .then(() =>
-        getSetting('auto_radarr_enabled') === '1'
-          ? runAutoRadarr({
-              months: Number(getSetting('auto_radarr_months') || 6),
-              lookbackDays: Number(getSetting('auto_radarr_lookback_days') || 0),
-            })
-          : null
-      )
-      // keep the saga scan advancing a batch each night
-      .then(() => (getSetting('tmdb_key') ? scanSagas({ budget: 800 }) : null))
-      .catch(() => {});
+    // exactly the same routine as the "Actualizar todo" button; each step logs
+    // its own failure instead of the whole chain dying silently
+    runFullRefresh({ trigger: 'nightly' })
+      .then((r) => {
+        const failed = (r.steps || []).filter((s) => s.state === 'error');
+        for (const s of failed) app.log.error({ step: s.key, detail: s.detail }, 'nightly');
+        setSetting('nightly_last_result', JSON.stringify({
+          at: Date.now(),
+          ok: (r.steps || []).filter((s) => s.state === 'done').length,
+          failed: failed.map((s) => ({ key: s.key, detail: s.detail })),
+        }));
+      })
+      .catch((err) => app.log.error({ err }, 'nightly'));
   }
 }, 5 * 60 * 1000);
 

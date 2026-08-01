@@ -521,18 +521,22 @@ export async function filmographyProfile(personId, wantRole = null) {
 /**
  * Build calendar of upcoming/recent releases for the library's top + tracked people.
  */
-export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDays = 60 } = {}) {
+export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays = 60 } = {}) {
+  // Favorites drive the calendar, each in the ONE role you follow them for: a
+  // tracked director contributes what they direct, never what they act in.
+  // The library "top" lists are opt-in extras (0 = only your favorites).
   const tops = db
     .prepare(
-      `SELECT p.id, p.name, mp.role, COUNT(*) AS n FROM movie_people mp
+      `SELECT p.id, p.name, ? AS role, COUNT(*) AS n FROM movie_people mp
        JOIN people p ON p.id = mp.person_id
        WHERE mp.role = ? GROUP BY p.id ORDER BY n DESC LIMIT ?`
     );
-  const directors = tops.all('director', topDirectors);
-  const actors = tops.all('actor', topActors);
+  const directors = topDirectors > 0 ? tops.all('director', 'director', topDirectors) : [];
+  const actors = topActors > 0 ? tops.all('actor', 'actor', topActors) : [];
   const tracked = db
     .prepare(
-      `SELECT p.id, p.name, 'tracked' AS role, 0 AS n FROM tracked_people t JOIN people p ON p.id = t.person_id`
+      `SELECT p.id, p.name, COALESCE(t.role, 'director') AS role, 0 AS n
+       FROM tracked_people t JOIN people p ON p.id = t.person_id`
     )
     .all();
 
@@ -568,8 +572,8 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
         const resolved = await resolvePerson(p.id);
         if (!resolved?.tmdb_id) continue;
         const credits = await personCredits(resolved.tmdb_id);
-        const wantDirector = p.roles.has('director') || p.roles.has('tracked');
-        const wantActor = p.roles.has('actor') || p.roles.has('tracked');
+        const wantDirector = p.roles.has('director');
+        const wantActor = p.roles.has('actor');
         const candidates = [];
         if (wantDirector)
           candidates.push(
@@ -678,13 +682,15 @@ export async function buildCalendar({ topDirectors = 25, topActors = 15, pastDay
 }
 
 export async function getCalendarCached({ refresh = false } = {}) {
-  const key = 'calendar:v3';
+  // v4: favorites-only by default and one role per person, so any calendar
+  // built under the old rules is discarded instead of showing ghost people
+  const key = 'calendar:v4';
   if (!refresh) {
     const hit = cacheRead(key, 12 * 3600 * 1000);
     if (hit) return hit;
   }
-  const topDirectors = Number(getSetting('cal_top_directors') || 25);
-  const topActors = Number(getSetting('cal_top_actors') || 15);
+  const topDirectors = Number(getSetting('cal_top_directors') || 0);
+  const topActors = Number(getSetting('cal_top_actors') || 0);
   const cal = await buildCalendar({ topDirectors, topActors });
   if (cal.events.length || !cal.errors.length) cacheWrite(key, cal);
   return cal;
@@ -808,7 +814,7 @@ export async function searchPeople(query) {
 }
 
 /** Add someone to favorites by TMDB person id, creating a people row if needed. */
-export function trackByTmdb({ tmdbId, name, profilePath = null }) {
+export function trackByTmdb({ tmdbId, name, profilePath = null, role = 'director' }) {
   if (!tmdbId || !name) throw new Error('Faltan datos de la persona');
   let row = db.prepare('SELECT id FROM people WHERE tmdb_id = ?').get(tmdbId);
   if (!row) {
@@ -822,8 +828,10 @@ export function trackByTmdb({ tmdbId, name, profilePath = null }) {
       row = { id };
     }
   }
-  db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at) VALUES (?, ?)').run(row.id, Date.now());
-  return { ok: true, personId: row.id };
+  const followRole = role === 'actor' ? 'actor' : 'director';
+  db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at, role) VALUES (?, ?, ?)')
+    .run(row.id, Date.now(), followRole);
+  return { ok: true, personId: row.id, role: followRole };
 }
 
 // --- collections ------------------------------------------------------------

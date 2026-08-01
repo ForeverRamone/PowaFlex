@@ -92,8 +92,8 @@ function today() {
  * For the library's top people of a role, aggregate their missing (released,
  * not-owned) films, ranked by TMDB vote count.
  */
-export async function libraryGaps({ role = 'director', people = 20, perPerson = 8, refresh = false } = {}) {
-  const cacheKey = `discover_gaps:v2:${role}:${people}:${perPerson}`;
+export async function libraryGaps({ role = 'director', people = 20, perPerson = 8, offset = 0, refresh = false } = {}) {
+  const cacheKey = `discover_gaps:v3:${role}:${people}:${perPerson}:${offset}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 12 * HOUR);
     if (hit) return hit;
@@ -101,13 +101,17 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
 
   const minVotes = minVotesFor(role);
   const dismissed = dismissedIds();
+  // paginated so "ver más" can walk the ranking down to the first 500
   const tops = db
     .prepare(
-      `SELECT p.id, p.name, COUNT(*) n FROM movie_people mp
+      `SELECT p.id, p.name, p.thumb, p.deathday, COUNT(*) n FROM movie_people mp
        JOIN people p ON p.id = mp.person_id
-       WHERE mp.role = ? GROUP BY p.id ORDER BY n DESC LIMIT ?`
+       WHERE mp.role = ? GROUP BY p.id ORDER BY n DESC, p.name LIMIT ? OFFSET ?`
     )
-    .all(role, people);
+    .all(role, people, offset);
+  const totalPeople = db
+    .prepare(`SELECT COUNT(DISTINCT person_id) n FROM movie_people WHERE role = ?`)
+    .get(role).n;
 
   const inLib = libraryTmdbIds();
   const now = today();
@@ -171,6 +175,9 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
           out.push({
             id: p.id,
             name: p.name,
+            thumb: p.thumb,
+            deathday: p.deathday,
+            role,
             inLibrary: p.n,
             released,
             owned,
@@ -192,31 +199,38 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
   out.sort((a, b) => b.inLibrary - a.inLibrary);
   await finishMissing(out, perPerson);
   clearBuildProgress('discover');
-  const result = { generatedAt: Date.now(), role, people: out, errors: errors.slice(0, 5) };
+  const result = {
+    generatedAt: Date.now(), role, people: out,
+    offset, pageSize: people, totalPeople,
+    hasMore: offset + tops.length < Math.min(totalPeople, 500),
+    errors: errors.slice(0, 5),
+  };
   if (out.length || !errors.length) cacheWrite(cacheKey, result);
   return result;
 }
 
 /**
  * Gaps for the people YOU chose as favorites (#17) — clearer than an arbitrary
- * "top by count". Uses each person's dominant role.
+ * "top by count", and strictly in the role you follow them for.
  */
-export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
-  const cacheKey = `discover_favorites:v2:${perPerson}`;
+export async function favoritesGaps({ perPerson = 8, refresh = false, role: onlyRole = null } = {}) {
+  const cacheKey = `discover_favorites:v3:${onlyRole || 'all'}:${perPerson}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 6 * HOUR);
     if (hit) return hit;
   }
+  // the role you follow them FOR is explicit now: a favorite director never
+  // brings in their acting credits, which is what mixed up the gaps before
   const tracked = db
     .prepare(
-      `SELECT p.id, p.name,
-              SUM(CASE WHEN mp.role='director' THEN 1 ELSE 0 END) directed,
-              SUM(CASE WHEN mp.role='actor' THEN 1 ELSE 0 END) acted
+      `SELECT p.id, p.name, p.thumb, p.deathday, COALESCE(t.role, 'director') AS role,
+              SUM(CASE WHEN mp.role = COALESCE(t.role, 'director') THEN 1 ELSE 0 END) inLibrary
        FROM tracked_people t JOIN people p ON p.id = t.person_id
        LEFT JOIN movie_people mp ON mp.person_id = p.id
+       WHERE (? IS NULL OR COALESCE(t.role, 'director') = ?)
        GROUP BY p.id ORDER BY p.name`
     )
-    .all();
+    .all(onlyRole, onlyRole);
 
   const inLib = libraryTmdbIds();
   const now = today();
@@ -231,22 +245,15 @@ export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
       if (i >= tracked.length) return;
       setBuildProgress('discover', 'Cruzando filmografías de tus favoritos', i + 1, tracked.length);
       const p = tracked[i];
-      let role = (p.directed || 0) >= (p.acted || 0) ? 'director' : 'actor';
+      const role = p.role === 'actor' ? 'actor' : 'director';
       try {
         const resolved = await resolvePerson(p.id);
         if (!resolved?.tmdb_id) continue;
         const credits = await personCredits(resolved.tmdb_id);
-        const pickRaw = (r) =>
-          r === 'director'
+        const raw =
+          role === 'director'
             ? (credits.crew || []).filter((c) => c.job === 'Director')
             : credits.cast || [];
-        let raw = pickRaw(role);
-        // a TMDB-added favorite with no library titles has 0/0 counts and used
-        // to default to 'director': an actor favorite then vanished silently
-        if (!raw.length && (p.directed || 0) === 0 && (p.acted || 0) === 0) {
-          role = role === 'director' ? 'actor' : 'director';
-          raw = pickRaw(role);
-        }
         const seen = new Set();
         let released = 0;
         let owned = 0;
@@ -270,15 +277,17 @@ export async function favoritesGaps({ perPerson = 8, refresh = false } = {}) {
           });
         }
         missing.sort((a, b) => (b.votes || 0) - (a.votes || 0));
-        if (missing.length)
-          out.push({
-            id: p.id, name: p.name, role, released, owned,
-            pct: released ? Math.round((owned / released) * 100) : 0,
-            missingTotal: missing.length,
-            noiseTotal: missing.filter(isNoise).length,
-            dismissed: dismissedN,
-            missing: missing.slice(0, perPerson * 3),
-          });
+        // everyone is returned, including complete filmographies (missing: []),
+        // so Favoritos can show "✓ completo" instead of just dropping them
+        out.push({
+          id: p.id, name: p.name, thumb: p.thumb, deathday: p.deathday,
+          role, released, owned, inLibrary: p.inLibrary || 0,
+          pct: released ? Math.round((owned / released) * 100) : 0,
+          missingTotal: missing.length,
+          noiseTotal: missing.filter(isNoise).length,
+          dismissed: dismissedN,
+          missing: missing.slice(0, perPerson * 3),
+        });
       } catch (err) {
         errors.push(`${p.name}: ${err.message}`);
       }

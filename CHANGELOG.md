@@ -1,5 +1,33 @@
 # Changelog
 
+## Alpha 0.7 (0.7.0-alpha) — 2026-08-01
+
+- **Actualizar todo, con un botón**: nueva sección en Ajustes que lanza la rutina completa —biblioteca de
+  Plex, emparejado de Letterboxd, títulos en otros idiomas, estado vital de tus favoritos, notas de
+  MDBList, lo que ya tienes en Radarr, calendario, huecos y sagas— mostrando cada paso en vivo con su
+  resultado. Lo que no tengas configurado se salta, y un paso que falle **no corta el resto**. El pase
+  nocturno ejecuta ahora exactamente esta misma rutina, y sus fallos quedan registrados en vez de
+  desaparecer en silencio.
+- **Directores y actores, separados de verdad**: PowaFlex ya no adivina la faceta contando películas;
+  ahora guarda **con qué rol sigues a cada persona**. Un director/a favorito/a solo cuenta y solo
+  sugiere lo que dirige, aunque también haya actuado. Puedes cambiar la faceta de cualquiera con el
+  botón ⇄. Tus favoritos actuales se migran automáticamente.
+- **Cine venidero solo con quien sigues**: el calendario lo mandan tus favoritos, cada uno en su
+  faceta. El «top automático» de tu biblioteca pasa a ser opcional (0 por defecto) en vez de colarse
+  siempre. Al actualizar se descartan los calendarios construidos con las reglas antiguas, que era lo
+  que dejaba estrenos de gente que ya no sigues.
+- **Favoritos, rehecha**: un selector de faceta gobierna toda la página, sin mezclar nunca los números
+  de director y actor. Cada favorito es una tarjeta con su foto, cuántas suyas tienes en tu Plex, barra
+  de completismo y cuántas te faltan. Con buscador, cinco ordenaciones, poda en lote y cuatro
+  indicadores de cabecera por faceta.
+- **Descubrir huecos, rehecha**: además de la vista por persona (ahora ordenable por huecos, películas
+  en tu Plex, completismo o alfabéticamente), llega la vista de **todas las películas juntas** en
+  cuadrícula, ordenable por nota media Σ, votos, año o título, con envío del lote entero a Radarr. En
+  las pestañas top puedes seguir bajando por el ranking hasta los primeros 500.
+- **Arreglado «consenso crítico que tienes sin ver»**: solo miraba las reproducciones de Plex, así que
+  las películas vistas (y hasta valoradas) en Letterboxd aparecían como pendientes. Ahora usa el mismo
+  criterio de «vista» que el resto de la aplicación.
+
 ## Alpha 0.6 (0.6.0-alpha) — 2026-08-01
 
 - **Títulos en cualquier idioma**: cada película de la biblioteca gana el título en inglés de TMDB y

@@ -23,8 +23,8 @@ export function filterRatings(ratings) {
 // Letterboxd (import or RSS). Used everywhere the app talks about "vistas" (#1).
 export const LB_WATCHED_KEYS =
   `(SELECT movie_id FROM lb_entries WHERE movie_id IS NOT NULL AND list IN ('diary','watched','ratings'))`;
-export const WATCHED = `(m.view_count > 0 OR m.rating_key IN ${LB_WATCHED_KEYS})`;
-export const UNWATCHED = `(m.view_count = 0 AND m.rating_key NOT IN ${LB_WATCHED_KEYS})`;
+export const WATCHED = `(COALESCE(m.view_count, 0) > 0 OR m.rating_key IN ${LB_WATCHED_KEYS})`;
+export const UNWATCHED = `(COALESCE(m.view_count, 0) = 0 AND m.rating_key NOT IN ${LB_WATCHED_KEYS})`;
 
 // Columns every small poster card needs: the three external ratings (for the
 // configurable headline chip, #5) plus a watched flag (for the status system, #3).

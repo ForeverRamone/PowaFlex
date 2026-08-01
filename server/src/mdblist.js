@@ -1,4 +1,5 @@
 import { db, getSetting, setSetting } from './db.js';
+import { UNWATCHED } from './queries.js';
 
 const BASE = process.env.MDBLIST_BASE || 'https://api.mdblist.com';
 const WEEK = 7 * 24 * 3600 * 1000;
@@ -229,11 +230,12 @@ export function insights() {
        WHERE ${MINE} >= 8 AND r.rt_critic IS NOT NULL AND r.rt_critic <= 55
        ORDER BY my_rating DESC, r.rt_critic ASC LIMIT 24`
     ),
-    // critical consensus you haven't watched
+    // critical consensus you haven't watched — "watched" means Plex views OR a
+    // Letterboxd diary/watched/ratings entry, same as everywhere else in the app
     consensusUnwatched: all(
       `SELECT m.rating_key, m.title, m.year, m.thumb, r.rt_critic, r.metacritic, r.imdb, r.letterboxd, r.score AS mdb_score, r.score
        FROM movies m JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
-       WHERE (m.view_count IS NULL OR m.view_count = 0) AND r.score IS NOT NULL
+       WHERE ${UNWATCHED} AND r.score IS NOT NULL
        ORDER BY r.score DESC LIMIT 24`
     ),
     // the world loves them, you don't
