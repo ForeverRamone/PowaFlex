@@ -1,5 +1,51 @@
 # Changelog
 
+## Alpha 0.8 (0.8.0-alpha) — 2026-08-01
+
+### Aspecto
+
+- **Nuevo diseño «Cartelera»**, inspirado en el cartel de cine español de los setenta: papel crema,
+  rojo y ocre, titulares en Archivo Black, bordes gruesos con sombra dura y la barra lateral como un
+  bloque rojo impreso.
+- **Elige el aspecto en Ajustes**: además de Cartelera están **Cinemateca** (carbón neutro con
+  titulares en Bodoni) y **Clásico** (la paleta y la tipografía anteriores al rediseño, conservadas
+  tal cual). Se cambia al instante y se guarda en el servidor, así que te sigue en cualquier
+  navegador.
+- Menú lateral agrupado (Tu colección · La caza · Cuenta) con iconos de verdad en lugar de emojis,
+  cabeceras de página con la misma estructura, carátulas sin marco de color (lo que está en tu Plex
+  se marca con un punto), buscador ⌘K con miniaturas y fichas con fondo desenfocado.
+
+### Candidatas a upgrade
+
+- **«¿Cuáles tienen mejor versión?»**: consulta JustWatch para todas las candidatas de una vez, con
+  barra de progreso, y luego permite **filtrar solo las que sí tienen una versión mejor** en el
+  mercado (o las que no).
+- **Botón para pedirlas todas a Radarr** de una tacada, respetando el filtro activo.
+
+### Correcciones
+
+- **Favoritos y la ficha ya no se contradicen**: la tarjeta de cada favorito contaba todos los
+  créditos estrenados (cortos, documentales, telefilmes) mientras que su ficha contaba solo
+  largometrajes, así que un director con toda su filmografía aparecía al 95 % en una pantalla y al
+  100 % en la otra. Ahora ambas usan exactamente el mismo cálculo.
+- **Homónimos**: dos personas distintas con el mismo nombre se fusionaban en una sola, mezclando sus
+  filmografías. La identidad pasa a tomarse del identificador estable que da Plex.
+- **Letterboxd**: reimportar ya no duplica entradas, y los enlaces a películas borradas de Plex se
+  limpian solos.
+- La página «¿Qué es PowaFlex?» dejó de cargar durante el rediseño; arreglada.
+- La barra de progreso de la sincronización ya no se queda clavada a mitad.
+- JustWatch ya no recuerda sus propios errores durante tres días como «sin oferta digital», y
+  MDBList avisa cuando alcanza su límite de peticiones en vez de fingir que todo fue bien.
+- Buscar personas ya no lanza una petición por tecla, y subir un CSV que falla ya no deja el
+  indicador girando para siempre. El feed RSS de Letterboxd se puede desactivar desde la interfaz.
+
+### Instalación
+
+- **Imagen Docker más segura y reproducible**: se construye con el lockfile, corre como usuario sin
+  privilegios y trae healthcheck. ⚠️ Al actualizar, una vez: `sudo chown -R 1000:1000 ./data`.
+- **Contraseña opcional** para todo el panel con la variable `POWAFLEX_AUTH="usuario:contraseña"`.
+  Sin ella, todo funciona exactamente igual que antes.
+
 ## Alpha 0.7 (0.7.0-alpha) — 2026-08-01
 
 - **Actualizar todo, con un botón**: nueva sección en Ajustes que lanza la rutina completa —biblioteca de

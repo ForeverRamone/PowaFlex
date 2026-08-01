@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmtDate } from '../api.js';
 import {
-  Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, useRadarrIds,
-} from '../components.jsx';
+  Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, useRadarrIds, PageHeader } from '../components.jsx';
 
 function SagaDetail({ id, radarrIds, addRadarrId }) {
   const [detail, setDetail] = useState(null);
@@ -20,7 +19,7 @@ function SagaDetail({ id, radarrIds, addRadarrId }) {
   return (
     <div className="card p-5 mt-4">
       <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-        <h2 className="text-lg font-semibold text-slate-100">{detail.name}</h2>
+        <h2 className="text-lg font-semibold text-zinc-100">{detail.name}</h2>
         <span className="text-gold-400 font-semibold text-sm">
           {detail.stats.owned} / {detail.stats.released} estrenadas
           {detail.stats.upcoming > 0 && <span className="text-sky-300"> · {detail.stats.upcoming} por estrenar</span>}
@@ -36,9 +35,9 @@ function SagaDetail({ id, radarrIds, addRadarrId }) {
             item={p}
             badge={
               p.owned ? (
-                <span className="absolute top-1.5 right-1.5 bg-emerald-600/90 text-white text-[10px] px-1.5 py-0.5 rounded">✓</span>
+                <span className="absolute top-1.5 right-1.5 bg-emerald-600/90 text-white text-[11px] px-1.5 py-0.5 rounded">✓</span>
               ) : !p.released ? (
-                <span className="absolute top-1.5 right-1.5 bg-sky-600/90 text-white text-[10px] px-1.5 py-0.5 rounded">
+                <span className="absolute top-1.5 right-1.5 bg-sky-600/90 text-white text-[11px] px-1.5 py-0.5 rounded">
                   {p.date ? fmtDate(p.date) : 'Anunciada'}
                 </span>
               ) : null
@@ -106,8 +105,8 @@ export default function Sagas() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-2">Sagas</h1>
-      <p className="text-sm text-slate-500 mb-5 max-w-3xl">
+      <PageHeader eyebrow="Colección" title="Sagas" />
+      <p className="text-sm text-zinc-500 mb-5 max-w-3xl">
         Franquicias detectadas cruzando cada película de tu biblioteca con su colección real de TMDB (no con las
         etiquetas manuales de Plex). Abre cualquiera para ver qué partes te faltan y mandarlas a Radarr.
       </p>
@@ -116,14 +115,14 @@ export default function Sagas() {
       <div className="card p-4 mb-6 flex flex-wrap items-center gap-3 text-sm">
         {scan?.running || state.running ? (
           <div className="w-full">
-            <div className="text-slate-300 mb-2">
+            <div className="text-zinc-300 mb-2">
               Escaneando colecciones en TMDB… {scan?.done ?? state.done} de {scan?.total ?? state.total}
             </div>
             <ProgressBar pct={(scan?.total ?? state.total) ? ((scan?.done ?? state.done) / (scan?.total ?? state.total)) * 100 : 0} />
           </div>
         ) : (
           <>
-            <span className="text-slate-400">
+            <span className="text-zinc-400">
               {state.scanned.toLocaleString('es-ES')} / {state.totalMovies.toLocaleString('es-ES')} películas
               analizadas · <b className="text-gold-400">{state.collections}</b> franquicias
             </span>
@@ -151,7 +150,7 @@ export default function Sagas() {
           {/* compute what's missing per franchise (#H) */}
           {sagas.some((s) => s.missing == null) && (
             <div className="card p-3 mb-3 flex flex-wrap items-center gap-3 text-sm">
-              <span className="text-slate-400">Calcula cuántas partes te faltan en cada saga (consulta TMDB):</span>
+              <span className="text-zinc-400">Calcula cuántas partes te faltan en cada saga (consulta TMDB):</span>
               <button className="btn-gold !py-1 shrink-0" onClick={computeStats} disabled={statsBusy}>
                 {statsBusy ? 'Calculando…' : 'Calcular lo que falta'}
               </button>
@@ -164,10 +163,10 @@ export default function Sagas() {
                   className="flex items-center justify-between w-full gap-3 text-left"
                   onClick={() => setOpen(open === s.collection_id ? null : s.collection_id)}
                 >
-                  <span className="font-semibold text-slate-100 hover:text-gold-400">
+                  <span className="font-semibold text-zinc-100 hover:text-gold-400">
                     {open === s.collection_id ? '▾' : '▸'} {s.name}
                   </span>
-                  <span className="text-xs text-slate-400 shrink-0 flex items-center gap-2">
+                  <span className="text-xs text-zinc-400 shrink-0 flex items-center gap-2">
                     <span><b className="text-gold-400">{s.owned}</b> {s.owned === 1 ? 'tuya' : 'tuyas'}</span>
                     {s.missing != null && s.missing > 0 && (
                       <span className="text-orange-300">· te faltan {s.missing}</span>
@@ -180,12 +179,12 @@ export default function Sagas() {
                 {open !== s.collection_id && s.missingTitles?.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {s.missingTitles.slice(0, 8).map((m, i) => (
-                      <span key={i} className="text-[11px] bg-ink-800 border border-ink-700 rounded-full px-2 py-0.5 text-slate-400">
+                      <span key={i} className="text-[11px] bg-ink-800 border border-ink-700 rounded-full px-2 py-0.5 text-zinc-400">
                         {m.title}{m.year ? ` (${m.year})` : ''}
                       </span>
                     ))}
                     {s.missingTitles.length > 8 && (
-                      <span className="text-[11px] text-slate-500 px-1 py-0.5">+{s.missingTitles.length - 8} más</span>
+                      <span className="text-[11px] text-zinc-500 px-1 py-0.5">+{s.missingTitles.length - 8} más</span>
                     )}
                   </div>
                 )}

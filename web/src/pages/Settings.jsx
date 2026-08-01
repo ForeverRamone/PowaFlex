@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api.js';
-import { Spinner, ProgressBar } from '../components.jsx';
+import { api, UI_THEMES, applyTheme, currentTheme } from '../api.js';
+import { Spinner, ProgressBar, PageHeader } from '../components.jsx';
 
 function Guide({ title, children }) {
   const [open, setOpen] = useState(false);
@@ -9,7 +9,7 @@ function Guide({ title, children }) {
       <button type="button" onClick={() => setOpen(!open)} className="text-gold-400 hover:underline text-xs">
         {open ? '▾' : '▸'} {title}
       </button>
-      {open && <div className="mt-2 text-slate-400 text-xs leading-relaxed space-y-1">{children}</div>}
+      {open && <div className="mt-2 text-zinc-400 text-xs leading-relaxed space-y-1">{children}</div>}
     </div>
   );
 }
@@ -35,6 +35,7 @@ export default function Settings() {
   const [auto, setAuto] = useState(null);
   const [lifeMsg, setLifeMsg] = useState(null);
   const [refresh, setRefresh] = useState(null);
+  const [theme, setThemeState] = useState(currentTheme);
 
   const loadSections = () =>
     api('/plex/sections').then((r) => Array.isArray(r) && setSections(r)).catch(() => {});
@@ -112,21 +113,21 @@ export default function Settings() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-6">Ajustes</h1>
+      <PageHeader eyebrow="Cuenta" title="Ajustes" />
 
       {/* PLEX */}
       <section className="card p-5 mb-5">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-slate-100">1 · Plex</h2>
+          <h2 className="font-semibold text-zinc-100">1 · Plex</h2>
           <TestBadge result={tests.plex} />
         </div>
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           <div>
-            <label className="text-xs text-slate-400">URL del servidor (con puerto)</label>
+            <label className="text-xs text-zinc-400">URL del servidor (con puerto)</label>
             <input className="input mt-1" placeholder="http://192.168.1.50:32400" value={s.plex_url || ''} onChange={set('plex_url')} />
           </div>
           <div>
-            <label className="text-xs text-slate-400">X-Plex-Token</label>
+            <label className="text-xs text-zinc-400">X-Plex-Token</label>
             <input className="input mt-1" placeholder="Pega aquí tu token" value={s.plex_token || ''} onChange={set('plex_token')} />
           </div>
         </div>
@@ -144,9 +145,9 @@ export default function Settings() {
           };
           return (
             <div className="mt-4">
-              <div className="text-xs text-slate-400 mb-2">
+              <div className="text-xs text-zinc-400 mb-2">
                 Bibliotecas de películas a sincronizar
-                <span className="text-slate-600"> (las de series no aparecen: PowaFlex solo gestiona cine)</span>
+                <span className="text-zinc-600"> (las de series no aparecen: PowaFlex solo gestiona cine)</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {sections.map((sec) => (
@@ -166,7 +167,7 @@ export default function Settings() {
                   </label>
                 ))}
               </div>
-              <p className="text-[11px] text-slate-500 mt-2">
+              <p className="text-[11px] text-zinc-500 mt-2">
                 Guarda los ajustes y sincroniza: las películas de bibliotecas desmarcadas se retiran de
                 PowaFlex en la siguiente sincronización (en Plex no se toca nada).
               </p>
@@ -184,11 +185,11 @@ export default function Settings() {
       {/* TMDB */}
       <section className="card p-5 mb-5">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-slate-100">2 · TMDB</h2>
+          <h2 className="font-semibold text-zinc-100">2 · TMDB</h2>
           <TestBadge result={tests.tmdb} />
         </div>
         <div className="mt-3">
-          <label className="text-xs text-slate-400">API key (v3) o token de lectura (v4)</label>
+          <label className="text-xs text-zinc-400">API key (v3) o token de lectura (v4)</label>
           <input className="input mt-1" placeholder="Pega aquí tu API key de TMDB" value={s.tmdb_key || ''} onChange={set('tmdb_key')} />
         </div>
         <div className="mt-3 flex gap-2">
@@ -204,29 +205,29 @@ export default function Settings() {
       {/* RADARR */}
       <section className="card p-5 mb-5">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-slate-100">3 · Radarr</h2>
+          <h2 className="font-semibold text-zinc-100">3 · Radarr</h2>
           <TestBadge result={tests.radarr} />
         </div>
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           <div>
-            <label className="text-xs text-slate-400">URL de Radarr</label>
+            <label className="text-xs text-zinc-400">URL de Radarr</label>
             <input className="input mt-1" placeholder="http://192.168.1.50:7878" value={s.radarr_url || ''} onChange={set('radarr_url')} />
           </div>
           <div>
-            <label className="text-xs text-slate-400">API key</label>
+            <label className="text-xs text-zinc-400">API key</label>
             <input className="input mt-1" placeholder="Radarr → Settings → General" value={s.radarr_key || ''} onChange={set('radarr_key')} />
           </div>
         </div>
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           <div>
-            <label className="text-xs text-slate-400">Etiqueta para lo añadido desde PowaFlex</label>
+            <label className="text-xs text-zinc-400">Etiqueta para lo añadido desde PowaFlex</label>
             <input
               className="input mt-1"
               placeholder="PowaFlex"
               value={s.radarr_tag ?? 'PowaFlex'}
               onChange={set('radarr_tag')}
             />
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[11px] text-zinc-500 mt-1">
               Se crea en Radarr si no existe y se aplica a cada película añadida. Déjalo vacío para no etiquetar.
             </p>
           </div>
@@ -237,7 +238,7 @@ export default function Settings() {
         {radarrCtx && (
           <div className="grid sm:grid-cols-2 gap-3 mt-3">
             <div>
-              <label className="text-xs text-slate-400">Perfil de calidad al añadir</label>
+              <label className="text-xs text-zinc-400">Perfil de calidad al añadir</label>
               <select className="input mt-1" value={s.radarr_quality_profile || ''} onChange={set('radarr_quality_profile')}>
                 <option value="">— elige —</option>
                 {radarrCtx.profiles.map((p) => (
@@ -246,7 +247,7 @@ export default function Settings() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-400">Carpeta raíz</label>
+              <label className="text-xs text-zinc-400">Carpeta raíz</label>
               <select className="input mt-1" value={s.radarr_root_folder || ''} onChange={set('radarr_root_folder')}>
                 <option value="">— elige —</option>
                 {radarrCtx.rootFolders.map((r) => (
@@ -270,16 +271,16 @@ export default function Settings() {
             >
               Sincronizar lo ya añadido a Radarr
             </button>
-            {radarrSync?.busy && <span className="text-xs text-slate-400">Sincronizando…</span>}
+            {radarrSync?.busy && <span className="text-xs text-zinc-400">Sincronizando…</span>}
             {radarrSync?.error && <span className="text-xs text-red-400">✗ {radarrSync.error}</span>}
             {radarrSync?.count != null && !radarrSync.busy && (
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-zinc-400">
                 {radarrSync.count.toLocaleString('es-ES')} películas en Radarr
                 {radarrSync.syncedAt ? ` · ${new Date(radarrSync.syncedAt).toLocaleString('es-ES')}` : ''}
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">
+          <p className="text-[11px] text-zinc-500 mt-1">
             Guarda un listado local de lo que ya tienes en Radarr para que las fichas muestren el recuadro verde
             «✓ en Radarr» en vez de intentar añadirlo y fallar con «ya existe».
           </p>
@@ -287,7 +288,7 @@ export default function Settings() {
 
         {/* daily auto-add for living favorite directors (#3) */}
         <div className="mt-4 pt-4 border-t border-ink-700">
-          <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-zinc-200 cursor-pointer">
             <input
               type="checkbox"
               className="accent-[#e8b53a]"
@@ -297,7 +298,7 @@ export default function Settings() {
             Lanzar a Radarr automáticamente cada noche los estrenos de mis directores/as favoritos/as vivos
           </label>
           <div className="flex flex-wrap items-center gap-2 mt-2 ml-6">
-            <span className="text-xs text-slate-400">de los próximos</span>
+            <span className="text-xs text-zinc-400">de los próximos</span>
             <input
               type="number"
               min="1"
@@ -306,7 +307,7 @@ export default function Settings() {
               value={s.auto_radarr_months ?? '6'}
               onChange={set('auto_radarr_months')}
             />
-            <span className="text-xs text-slate-400">meses, mirando también</span>
+            <span className="text-xs text-zinc-400">meses, mirando también</span>
             <input
               type="number"
               min="0"
@@ -316,7 +317,7 @@ export default function Settings() {
               onChange={set('auto_radarr_lookback_days')}
               title="TMDB a veces pone fecha a las películas pequeñas después del estreno; con 0 esas se pierden"
             />
-            <span className="text-xs text-slate-400">días hacia atrás</span>
+            <span className="text-xs text-zinc-400">días hacia atrás</span>
             <button
               className="btn-ghost !py-1"
               onClick={async () => {
@@ -340,7 +341,7 @@ export default function Settings() {
               Ejecutar ahora
             </button>
           </div>
-          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer mt-2 ml-6">
+          <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer mt-2 ml-6">
             <input
               type="checkbox"
               className="accent-[#e8b53a]"
@@ -350,14 +351,14 @@ export default function Settings() {
             Incluir documentales (por defecto, cortos, documentales y películas de TV se descartan)
           </label>
           {auto && (auto.considered != null || auto.added != null) && (
-            <div className="ml-6 mt-2 text-xs text-slate-400">
+            <div className="ml-6 mt-2 text-xs text-zinc-400">
               {auto.preview
                 ? `${auto.considered} estrenos entrarían en Radarr`
                 : `✓ ${auto.added} añadidas de ${auto.considered} candidatas`}
               {auto.error && <span className="text-red-400"> · {auto.error}</span>}
               {auto.log?.length > 0 && (
                 <details className="mt-1">
-                  <summary className="cursor-pointer hover:text-slate-200">ver detalle</summary>
+                  <summary className="cursor-pointer hover:text-zinc-200">ver detalle</summary>
                   <div className="mt-1 max-h-40 overflow-y-auto space-y-0.5">
                     {auto.log.map((l, i) => <div key={i}>{l}</div>)}
                   </div>
@@ -365,7 +366,7 @@ export default function Settings() {
               )}
             </div>
           )}
-          <p className="text-[11px] text-slate-500 mt-2 ml-6">
+          <p className="text-[11px] text-zinc-500 mt-2 ml-6">
             Solo directores/as <b>vivos</b> marcados como favoritos. Los fallecidos se ignoran (no tendrán estrenos).
           </p>
         </div>
@@ -379,22 +380,22 @@ export default function Settings() {
       {/* MDBLIST */}
       <section className="card p-5 mb-5">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-slate-100">4 · MDBList <span className="text-slate-500 text-xs font-normal">(opcional: notas multi-plataforma y listas)</span></h2>
+          <h2 className="font-semibold text-zinc-100">4 · MDBList <span className="text-zinc-500 text-xs font-normal">(opcional: notas multi-plataforma y listas)</span></h2>
           <TestBadge result={tests.mdblist} />
         </div>
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           <div>
-            <label className="text-xs text-slate-400">API key</label>
+            <label className="text-xs text-zinc-400">API key</label>
             <input className="input mt-1" placeholder="mdblist.com → Preferences → API Access" value={s.mdblist_key || ''} onChange={set('mdblist_key')} />
           </div>
           <div>
-            <label className="text-xs text-slate-400">Tipo de cuenta</label>
+            <label className="text-xs text-zinc-400">Tipo de cuenta</label>
             <select className="input mt-1" value={s.mdblist_tier || 'auto'} onChange={set('mdblist_tier')}>
               <option value="auto">Detectar automáticamente</option>
               <option value="free">Gratuita (1.000 peticiones/día)</option>
               <option value="supporter">Supporter (25.000/día)</option>
             </select>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[11px] text-zinc-500 mt-1">
               Define cuántas notas se refrescan al día: con cuenta gratuita el llenado inicial se reparte en
               varios días; con Supporter cabe la biblioteca entera de una tanda.
             </p>
@@ -403,7 +404,7 @@ export default function Settings() {
         <div className="mt-3 flex gap-2 items-center flex-wrap">
           <button className="btn-ghost" onClick={() => test('mdblist')}>Probar conexión</button>
           {tests.mdblist?.ok && tests.mdblist.limit != null && (
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-zinc-400">
               Límite {Number(tests.mdblist.limit).toLocaleString('es-ES')}/día
               {tests.mdblist.usedToday != null && ` · usadas hoy ${tests.mdblist.usedToday}`}
             </span>
@@ -423,7 +424,7 @@ export default function Settings() {
             Sincronizar notas ahora
           </button>
           {mdbStatus && (
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-zinc-400">
               {mdbStatus.running
                 ? `Notas ${mdbStatus.done} / ${mdbStatus.total}…`
                 : mdbStatus.error
@@ -439,6 +440,33 @@ export default function Settings() {
         </Guide>
       </section>
 
+      {/* LOOK */}
+      <section className="card p-5 mb-5">
+        <h2 className="font-semibold text-zinc-100 mb-1">Aspecto</h2>
+        <p className="text-xs text-zinc-500 mb-3 max-w-2xl">
+          Cambia el lenguaje visual de toda la app. Se aplica al instante y se guarda en el servidor, así que te sigue
+          en cualquier navegador.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {UI_THEMES.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => { setThemeState(applyTheme(t.key)); setS({ ...s, ui_theme: t.key }); }}
+              className={`btn-ghost !py-2 text-left ${theme === t.key ? '!border-gold-400' : ''}`}
+            >
+              <span className={`block text-sm ${theme === t.key ? 'text-gold-400' : 'text-zinc-200'}`}>
+                {theme === t.key ? '✓ ' : ''}{t.label}
+              </span>
+              <span className="block text-[11px] text-zinc-500 mt-0.5">{t.hint}</span>
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-zinc-500 mt-2">
+          «Clásico» recupera la paleta y la tipografía anteriores al rediseño. Los iconos y la agrupación del menú son
+          comunes a los dos.
+        </p>
+      </section>
+
       {/* RATINGS SOURCES */}
       {(() => {
         const ALL = [
@@ -452,8 +480,8 @@ export default function Settings() {
         };
         return (
           <section className="card p-5 mb-5">
-            <h2 className="font-semibold text-slate-100 mb-1">Notas y puntuaciones que mostrar</h2>
-            <p className="text-xs text-slate-500 mb-3">
+            <h2 className="font-semibold text-zinc-100 mb-1">Notas y puntuaciones que mostrar</h2>
+            <p className="text-xs text-zinc-500 mb-3">
               Elige de qué webs aparecen las notas en las fichas de película (necesita MDBList para tenerlas). Desmarca las que no te interesen.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -465,13 +493,13 @@ export default function Settings() {
               ))}
             </div>
             <div className="mt-4 pt-4 border-t border-ink-700">
-              <label className="text-xs text-slate-400">Nota principal en las portadas (junto al título)</label>
+              <label className="text-xs text-zinc-400">Nota principal en las portadas (junto al título)</label>
               <select className="input mt-1 !w-auto" value={s.primary_rating || 'score'} onChange={set('primary_rating')}>
                 <option value="score">Nota combinada MDBList (Σ)</option>
                 <option value="imdb">IMDb</option>
                 <option value="letterboxd">Letterboxd</option>
               </select>
-              <p className="text-[11px] text-slate-500 mt-1">
+              <p className="text-[11px] text-zinc-500 mt-1">
                 Es la nota que aparece en la vista de portada pequeña. Si una película no tiene esa nota, se usa la
                 primera disponible. Necesita MDBList sincronizado.
               </p>
@@ -482,19 +510,19 @@ export default function Settings() {
 
       {/* CALENDAR */}
       <section className="card p-5 mb-5">
-        <h2 className="font-semibold text-slate-100">5 · Calendario de cine venidero</h2>
-        <p className="text-xs text-slate-500 mt-1 mb-3 max-w-2xl">
+        <h2 className="font-semibold text-zinc-100">5 · Calendario de cine venidero</h2>
+        <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-2xl">
           El calendario lo mandan <b>tus favoritos</b>, cada uno en la faceta por la que le sigues: de un director/a
           se vigila lo que dirige, de un actor/actriz lo que interpreta. Si además quieres vigilar a los más
           presentes en tu biblioteca aunque no les sigas, sube estos números (0 = solo tus favoritos).
         </p>
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-slate-400">Extra: directores/as top de tu biblioteca</label>
+            <label className="text-xs text-zinc-400">Extra: directores/as top de tu biblioteca</label>
             <input className="input mt-1" type="number" min="0" max="100" placeholder="0" value={s.cal_top_directors || ''} onChange={set('cal_top_directors')} />
           </div>
           <div>
-            <label className="text-xs text-slate-400">Extra: actores/actrices top de tu biblioteca</label>
+            <label className="text-xs text-zinc-400">Extra: actores/actrices top de tu biblioteca</label>
             <input className="input mt-1" type="number" min="0" max="100" placeholder="0" value={s.cal_top_actors || ''} onChange={set('cal_top_actors')} />
           </div>
         </div>
@@ -509,31 +537,31 @@ export default function Settings() {
           >
             Actualizar estado vital (vivos/muertos)
           </button>
-          {lifeMsg && <span className="text-xs text-slate-400">{lifeMsg}</span>}
+          {lifeMsg && <span className="text-xs text-zinc-400">{lifeMsg}</span>}
         </div>
-        <p className="text-[11px] text-slate-500 mt-2">
+        <p className="text-[11px] text-zinc-500 mt-2">
           Marca quién ha fallecido para no vigilar sus estrenos ni incluirlos en el auto-Radarr. En Favoritos puedes
           quitar de golpe a los fallecidos.
         </p>
       </section>
 
       <section className="card p-5 mb-5">
-        <h2 className="font-semibold text-slate-100">6 · Descubrir huecos: umbral de ruido</h2>
-        <p className="text-xs text-slate-500 mt-1 mb-3 max-w-2xl">
+        <h2 className="font-semibold text-zinc-100">6 · Descubrir huecos: umbral de ruido</h2>
+        <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-2xl">
           Una película con menos votos en TMDB que el umbral no cuenta como hueco. Sube el listón si los huecos
           te traen demasiada morralla; baja a 0 para el completismo absoluto.
         </p>
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-slate-400">Votos mínimos · huecos de directores/as</label>
+            <label className="text-xs text-zinc-400">Votos mínimos · huecos de directores/as</label>
             <input className="input mt-1" type="number" min="0" max="5000" placeholder="20" value={s.gaps_min_votes_director || ''} onChange={set('gaps_min_votes_director')} />
           </div>
           <div>
-            <label className="text-xs text-slate-400">Votos mínimos · huecos de actores/actrices</label>
+            <label className="text-xs text-zinc-400">Votos mínimos · huecos de actores/actrices</label>
             <input className="input mt-1" type="number" min="0" max="5000" placeholder="100" value={s.gaps_min_votes_actor || ''} onChange={set('gaps_min_votes_actor')} />
           </div>
         </div>
-        <p className="text-[11px] text-slate-500 mt-2">
+        <p className="text-[11px] text-zinc-500 mt-2">
           La nota mínima Σ y los filtros de cortos/documentales/TV/cameos se ajustan directamente en la página de Descubrir.
         </p>
       </section>
@@ -547,8 +575,8 @@ export default function Settings() {
       <section className="card p-5 mb-5 border-l-4 border-gold-400">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-slate-100">Actualizar todo</h2>
-            <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+            <h2 className="font-semibold text-zinc-100">Actualizar todo</h2>
+            <p className="text-xs text-zinc-500 mt-1 max-w-2xl">
               Una sola rutina con todo lo que PowaFlex necesita, en orden: biblioteca de Plex, emparejado de
               Letterboxd, títulos en otros idiomas, notas de MDBList, lo que ya tienes en Radarr, calendario, huecos
               de tus favoritos y sagas. Es exactamente lo mismo que se ejecuta solo cada noche. Lo que no tengas
@@ -566,19 +594,19 @@ export default function Settings() {
               const icon = { done: '✓', running: '⟳', error: '✗', skipped: '·', pending: '○' }[st.state] || '○';
               const color = {
                 done: 'text-emerald-400', running: 'text-gold-400 animate-pulse',
-                error: 'text-red-400', skipped: 'text-slate-600', pending: 'text-slate-600',
+                error: 'text-red-400', skipped: 'text-zinc-600', pending: 'text-zinc-600',
               }[st.state];
               return (
                 <div key={st.key} className="flex items-baseline gap-2 text-sm">
                   <span className={`${color} w-4 shrink-0`}>{icon}</span>
-                  <span className={st.state === 'skipped' ? 'text-slate-600' : 'text-slate-300'}>{st.label}</span>
+                  <span className={st.state === 'skipped' ? 'text-zinc-600' : 'text-zinc-300'}>{st.label}</span>
                   {st.detail && (
-                    <span className={`text-xs ${st.state === 'error' ? 'text-red-400' : 'text-slate-500'}`}>
+                    <span className={`text-xs ${st.state === 'error' ? 'text-red-400' : 'text-zinc-500'}`}>
                       — {st.detail}
                     </span>
                   )}
                   {st.ms > 1000 && st.state === 'done' && (
-                    <span className="text-[11px] text-slate-600 ml-auto shrink-0">{Math.round(st.ms / 1000)}s</span>
+                    <span className="text-[11px] text-zinc-600 ml-auto shrink-0">{Math.round(st.ms / 1000)}s</span>
                   )}
                 </div>
               );
@@ -587,7 +615,7 @@ export default function Settings() {
             {refresh.running && sync?.running && (
               <div className="pt-2 max-w-md">
                 <ProgressBar pct={syncPct} />
-                <div className="text-[11px] text-slate-500 mt-1">
+                <div className="text-[11px] text-zinc-500 mt-1">
                   {sync.phase === 'listing' && `Listando «${sync.section || ''}»… ${sync.done}`}
                   {sync.phase === 'details' && `Detalles ${sync.detailDone} / ${sync.detailTotal}`}
                   {sync.phase === 'cleanup' && 'Limpiando eliminadas…'}
@@ -605,7 +633,7 @@ export default function Settings() {
           </p>
         )}
         {!refresh?.running && !refresh?.finishedAt && refresh?.lastRun && (
-          <p className="text-xs text-slate-500 mt-3">
+          <p className="text-xs text-zinc-500 mt-3">
             Última actualización completa: {new Date(refresh.lastRun).toLocaleString('es-ES')}
           </p>
         )}
@@ -613,15 +641,15 @@ export default function Settings() {
 
       {/* SYNC */}
       <section className="card p-5 mb-5">
-        <h2 className="font-semibold text-slate-100 mb-2">Sincronización con Plex</h2>
-        <p className="text-xs text-slate-500 mb-3">
+        <h2 className="font-semibold text-zinc-100 mb-2">Sincronización con Plex</h2>
+        <p className="text-xs text-zinc-500 mb-3">
           La primera sincronización descarga los detalles de cada película (reparto completo, pistas de vídeo, HDR…):
           con ~12.000 películas puede tardar varios minutos. Después es incremental y además se ejecuta sola cada
           noche a las 03:30.
         </p>
         {sync?.running ? (
           <div>
-            <div className="text-sm text-slate-300 mb-2">
+            <div className="text-sm text-zinc-300 mb-2">
               {sync.phase === 'listing' && `Listando biblioteca «${sync.section || ''}»… ${sync.done}`}
               {sync.phase === 'details' && `Detalles ${sync.detailDone} / ${sync.detailTotal}`}
               {sync.phase === 'cleanup' && 'Limpiando eliminadas…'}
@@ -636,7 +664,7 @@ export default function Settings() {
             </button>
             {sync?.phase === 'error' && <span className="text-red-400 text-sm">✗ {sync.error}</span>}
             {sync?.last?.status === 'ok' && (
-              <span className="text-slate-500 text-xs">
+              <span className="text-zinc-500 text-xs">
                 Última: {new Date(sync.last.finished_at).toLocaleString('es-ES')}
               </span>
             )}

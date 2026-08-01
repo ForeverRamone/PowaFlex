@@ -9,11 +9,18 @@ services:
     ports:
       - '3860:3860'
     volumes:
+      # El contenedor NO corre como root (usuario "node", uid 1000). Si vienes de
+      # una versión anterior, da permisos a la carpeta una vez:
+      #   sudo chown -R 1000:1000 ./data
       - ./data:/data
     environment:
       - TZ=Europe/Madrid
       # Cifra las credenciales (Plex/TMDB/Radarr) en disco. Pon una frase larga y
       # secreta; si la pierdes tendrás que volver a introducir las claves en Ajustes.
       # - POWAFLEX_SECRET=cambia-esto-por-una-frase-larga-y-secreta
+      # Autenticación del panel (HTTP Basic, "usuario:contraseña"). Sin ella
+      # cualquiera en la red local puede leer y cambiar los ajustes, así que es
+      # muy recomendable si el puerto queda expuesto.
+      # - POWAFLEX_AUTH=usuario:contraseña
     labels:
       - net.unraid.docker.icon=https://raw.githubusercontent.com/ForeverRamone/PowaFlex/main/assets/icon.png

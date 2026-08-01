@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../components.jsx';
 
 function Block({ icon, title, to, children }) {
   return (
     <section className="card p-5">
-      <h2 className="font-semibold text-slate-100 mb-2">
+      <h2 className="font-semibold text-zinc-100 mb-2">
         <span className="mr-2">{icon}</span>
         {to ? <Link to={to} className="hover:text-gold-400">{title} →</Link> : title}
       </h2>
-      <div className="text-sm text-slate-400 leading-relaxed space-y-2">{children}</div>
+      <div className="text-sm text-zinc-400 leading-relaxed space-y-2">{children}</div>
     </section>
   );
 }
@@ -15,22 +16,22 @@ function Block({ icon, title, to, children }) {
 export default function About() {
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-2">¿Qué es PowaFlex?</h1>
-      <p className="text-slate-300 leading-relaxed mb-6 max-w-5xl">
+      <PageHeader eyebrow="Cuenta" title="¿Qué es PowaFlex?" />
+      <p className="text-zinc-300 leading-relaxed mb-6 max-w-5xl">
         PowaFlex es tu centro de mando cinéfilo: una aplicación que vive junto a tu servidor Plex, lee tu
         biblioteca de películas directamente por la API (sin exports ni CSV), la cruza con{' '}
-        <b className="text-slate-100">TMDB</b> (la base de datos abierta de cine) y con{' '}
-        <b className="text-slate-100">Radarr</b> (tu gestor de descargas monitorizadas), y convierte todo eso en
+        <b className="text-zinc-100">TMDB</b> (la base de datos abierta de cine) y con{' '}
+        <b className="text-zinc-100">Radarr</b> (tu gestor de descargas monitorizadas), y convierte todo eso en
         dos cosas: <b className="text-gold-400">conocer a fondo el cine que tienes</b> y{' '}
         <b className="text-gold-400">cazar el cine que te falta o que está por venir</b>. Todo se guarda en local,
         en tu propia máquina; nada sale de tu red salvo las consultas a TMDB.
       </p>
 
-      <h2 className="text-lg font-semibold text-slate-100 mb-3">¿Qué puedo hacer con PowaFlex?</h2>
-      <div className="card p-5 mb-6 text-sm text-slate-400 leading-relaxed">
+      <h2 className="text-lg font-semibold text-zinc-100 mb-3">¿Qué puedo hacer con PowaFlex?</h2>
+      <div className="card p-5 mb-6 text-sm text-zinc-400 leading-relaxed">
         <div className="grid md:grid-cols-2 gap-x-8 gap-y-4">
           <div>
-            <div className="text-slate-200 font-medium mb-1">Conocer tu colección</div>
+            <div className="text-zinc-200 font-medium mb-1">Conocer tu colección</div>
             <ul className="list-disc pl-5 space-y-1">
               <li>Ver totales: cuántas películas, horas de cine, disco ocupado y % visto.</li>
               <li>Explorar gráficas por década, género, país y resolución.</li>
@@ -40,7 +41,7 @@ export default function About() {
             </ul>
           </div>
           <div>
-            <div className="text-slate-200 font-medium mb-1">Cazar lo que te falta</div>
+            <div className="text-zinc-200 font-medium mb-1">Cazar lo que te falta</div>
             <ul className="list-disc pl-5 space-y-1">
               <li>Ver el % de completismo de cada director/a o actor/actriz (solo largometrajes) y lo que te falta de su filmografía.</li>
               <li>Seguir un calendario de estrenos y proyectos anunciados de tus cineastas.</li>
@@ -51,7 +52,7 @@ export default function About() {
             </ul>
           </div>
           <div>
-            <div className="text-slate-200 font-medium mb-1">Actuar con Radarr</div>
+            <div className="text-zinc-200 font-medium mb-1">Actuar con Radarr</div>
             <ul className="list-disc pl-5 space-y-1">
               <li>Añadir a Radarr cualquier película que te falte con un clic, con perfil y carpeta configurables.</li>
               <li>Añadir en bloque toda una lista, saga o el cine venidero de un plazo.</li>
@@ -60,7 +61,7 @@ export default function About() {
             </ul>
           </div>
           <div>
-            <div className="text-slate-200 font-medium mb-1">Tu gusto y tu historial</div>
+            <div className="text-zinc-200 font-medium mb-1">Tu gusto y tu historial</div>
             <ul className="list-disc pl-5 space-y-1">
               <li>Importar tu Letterboxd (zip completo) y su feed RSS para marcar vistas y notas.</li>
               <li>Ver últimas añadidas a Plex, últimas vistas (Plex + Letterboxd) y últimas peticiones a Radarr.</li>
@@ -72,27 +73,27 @@ export default function About() {
         </div>
       </div>
 
-      <h2 className="text-lg font-semibold text-slate-100 mb-3">Cómo funciona</h2>
-      <div className="card p-5 mb-6 text-sm text-slate-400 leading-relaxed space-y-2">
+      <h2 className="text-lg font-semibold text-zinc-100 mb-3">Cómo funciona</h2>
+      <div className="card p-5 mb-6 text-sm text-zinc-400 leading-relaxed space-y-2">
         <p>
-          <b className="text-slate-200">1. Sincronización con Plex.</b> Con tu X-Plex-Token, PowaFlex recorre tu
+          <b className="text-zinc-200">1. Sincronización con Plex.</b> Con tu X-Plex-Token, PowaFlex recorre tu
           biblioteca y descarga de cada película el reparto completo, dirección, guion, géneros, países,
           colecciones, visionados, y los datos técnicos del archivo (resolución, códec, HDR/Dolby
           Vision, tamaño). La primera vez tarda unos minutos; después es incremental y se repite sola cada noche.
         </p>
         <p>
-          <b className="text-slate-200">2. Cruce con TMDB.</b> Cada película de Plex trae su identificador TMDB,
+          <b className="text-zinc-200">2. Cruce con TMDB.</b> Cada película de Plex trae su identificador TMDB,
           así que el emparejado es exacto. Con él, PowaFlex consulta filmografías completas, estrenos futuros y
           sagas, y lo cachea para no repetir llamadas.
         </p>
         <p>
-          <b className="text-slate-200">3. Acción con Radarr.</b> Cualquier película que te falte —de una
+          <b className="text-zinc-200">3. Acción con Radarr.</b> Cualquier película que te falte —de una
           filmografía, del calendario, de una saga o de tu watchlist— se añade a Radarr con un clic, monitorizada
           y con búsqueda automática, usando el perfil de calidad y carpeta que elijas en Ajustes.
         </p>
       </div>
 
-      <h2 className="text-lg font-semibold text-slate-100 mb-3">Las secciones, una a una</h2>
+      <h2 className="text-lg font-semibold text-zinc-100 mb-3">Las secciones, una a una</h2>
       <div className="grid md:grid-cols-2 gap-4 mb-6">
         <Block icon="📊" title="Dashboard" to="/">
           <p>
@@ -184,17 +185,17 @@ export default function About() {
         </Block>
       </div>
 
-      <div className="card p-5 text-xs text-slate-500 leading-relaxed">
+      <div className="card p-5 text-xs text-zinc-500 leading-relaxed">
         <p>
           PowaFlex corre en Docker (pensado para un mini-PC junto a Plex y Radarr), guarda sus datos en SQLite en
-          la carpeta <code className="text-slate-300">data/</code> y no tiene cuentas ni telemetría. Datos de cine
+          la carpeta <code className="text-zinc-300">data/</code> y no tiene cuentas ni telemetría. Datos de cine
           por cortesía de{' '}
           <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer" className="text-gold-400 hover:underline">
             TMDB
           </a>
           . No expongas la app a internet sin un proxy con autenticación: está diseñada para tu red local.
           Las credenciales de Plex, TMDB y Radarr se guardan en SQLite; define la variable de entorno{' '}
-          <code className="text-slate-300">POWAFLEX_SECRET</code> para cifrarlas en disco.
+          <code className="text-zinc-300">POWAFLEX_SECRET</code> para cifrarlas en disco.
         </p>
         <p className="mt-2">
           Proyecto de código abierto:{' '}

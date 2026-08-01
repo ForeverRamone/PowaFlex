@@ -4,16 +4,16 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend,
 } from 'recharts';
 import { api, fmtBytes, fmtDate, tmdbImg } from '../api.js';
-import { Spinner, StatCard, Section, PersonCard, Empty, MovieModal, LetterboxdLogo } from '../components.jsx';
+import { Spinner, StatCard, Section, PersonCard, Empty, MovieModal, LetterboxdLogo, PageHeader } from '../components.jsx';
 
 const GOLD = '#e8b53a';
-const COLORS = ['#e8b53a', '#38bdf8', '#34d399', '#f472b6', '#a78bfa', '#fb923c', '#f87171', '#94a3b8'];
+const COLORS = ['#e8b53a', '#c9932c', '#a87c1e', '#7d5f1c', '#57493a', '#3a3a42', '#52525b', '#71717a'];
 
 const tooltipStyle = {
-  backgroundColor: '#1a2030',
-  border: '1px solid #35405c',
+  backgroundColor: 'var(--color-ink-800)',
+  border: '1px solid var(--color-ink-600)',
   borderRadius: 8,
-  color: '#e2e8f0',
+  color: '#e4e4e7',
   fontSize: 12,
 };
 
@@ -33,12 +33,12 @@ function PosterTile({ item, onClick, badge, sub }) {
         {src && !err ? (
           <img src={src} alt="" loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover" />
         ) : (
-          <span className="text-[11px] text-slate-400 text-center p-2">{item.title}</span>
+          <span className="text-[11px] text-zinc-400 text-center p-2">{item.title}</span>
         )}
         {badge}
       </div>
-      <div className="mt-1 text-[11px] text-slate-300 truncate">{item.title}</div>
-      <div className="text-[10px] text-slate-500">{sub}</div>
+      <div className="mt-1 text-[11px] text-zinc-300 truncate">{item.title}</div>
+      <div className="text-[11px] text-zinc-500">{sub}</div>
     </button>
   );
 }
@@ -56,7 +56,7 @@ function RecentStrip({ items, onSelect, kind }) {
             kind === 'watched' && m.source === 'letterboxd' ? (
               <span className="absolute top-1 right-1 bg-black/70 px-1 py-1 rounded" title="Vista en Letterboxd"><LetterboxdLogo size={9} /></span>
             ) : kind === 'watched' && m.source === 'plex' ? (
-              <span className="absolute top-1 right-1 bg-emerald-600/90 text-white text-[9px] px-1 py-0.5 rounded">Plex</span>
+              <span className="absolute top-1 right-1 bg-emerald-600/90 text-white text-[11px] px-1 py-0.5 rounded">Plex</span>
             ) : null
           }
           sub={
@@ -105,7 +105,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-6">Tu cinemateca</h1>
+      <PageHeader eyebrow="Colección" title="Tu cinemateca" />
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
         <StatCard label="Películas" value={ov.movies.toLocaleString('es-ES')} />
@@ -134,9 +134,9 @@ export default function Dashboard() {
               <div className="card divide-y divide-ink-800 max-h-[420px] overflow-y-auto">
                 {recent.radarrRecent.map((m, i) => (
                   <div key={i} className="flex items-center gap-2 px-3 py-2 text-sm">
-                    <span className={m.has_file ? 'text-emerald-400' : 'text-slate-500'}>{m.has_file ? '✓' : '⏳'}</span>
-                    <span className="text-slate-200 truncate flex-1">{m.title} <span className="text-slate-500">({m.year ?? '¿?'})</span></span>
-                    <span className="text-[11px] text-slate-500 shrink-0">{fmtDate(m.added)}</span>
+                    <span className={m.has_file ? 'text-emerald-400' : 'text-zinc-500'}>{m.has_file ? '✓' : '⏳'}</span>
+                    <span className="text-zinc-200 truncate flex-1">{m.title} <span className="text-zinc-500">({m.year ?? '¿?'})</span></span>
+                    <span className="text-[11px] text-zinc-500 shrink-0">{fmtDate(m.added)}</span>
                   </div>
                 ))}
               </div>
@@ -152,9 +152,9 @@ export default function Dashboard() {
           <div className="card p-4 h-72">
             <ResponsiveContainer>
               <BarChart data={charts.byDecade} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
-                <XAxis dataKey="decade" stroke="#64748b" fontSize={12} tickMargin={6} />
-                <YAxis stroke="#64748b" fontSize={12} width={38} />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#252d4266' }} />
+                <XAxis dataKey="decade" stroke="#71717a" fontSize={12} tickMargin={6} />
+                <YAxis stroke="#71717a" fontSize={12} width={38} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#26262b66' }} />
                 <Bar dataKey="n" name="Películas" fill={GOLD} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -164,10 +164,10 @@ export default function Dashboard() {
           <div className="card p-4 h-72">
             <ResponsiveContainer>
               <BarChart data={charts.byGenre.slice(0, 12)} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
-                <XAxis type="number" stroke="#64748b" fontSize={12} />
-                <YAxis type="category" dataKey="name" width={130} stroke="#94a3b8" fontSize={11} interval={0} tickMargin={4} />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#252d4266' }} />
-                <Bar dataKey="n" name="Películas" fill="#38bdf8" radius={[0, 4, 4, 0]} />
+                <XAxis type="number" stroke="#71717a" fontSize={12} />
+                <YAxis type="category" dataKey="name" width={130} stroke="#a1a1aa" fontSize={11} interval={0} tickMargin={4} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#26262b66' }} />
+                <Bar dataKey="n" name="Películas" fill="#a1a1aa" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -176,37 +176,11 @@ export default function Dashboard() {
           <div className="card p-4 h-72">
             <ResponsiveContainer>
               <LineChart data={charts.addedByMonth} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-                <XAxis dataKey="month" stroke="#64748b" fontSize={10} tickMargin={6} minTickGap={24} />
-                <YAxis stroke="#64748b" fontSize={12} width={38} />
+                <XAxis dataKey="month" stroke="#71717a" fontSize={10} tickMargin={6} minTickGap={24} />
+                <YAxis stroke="#71717a" fontSize={12} width={38} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Line type="monotone" dataKey="n" name="Añadidas" stroke={GOLD} dot={false} strokeWidth={2} />
               </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
-        <Section title="Resoluciones" action={<span className="text-xs text-slate-500">clic para filtrar la biblioteca</span>}>
-          <div className="card p-4 h-72">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie
-                  data={charts.byResolution}
-                  dataKey="n"
-                  nameKey="name"
-                  innerRadius={48}
-                  outerRadius={80}
-                  onClick={(d) => openResolution(d?.name || d?.payload?.name)}
-                  className="cursor-pointer"
-                >
-                  {charts.byResolution.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v, n, p) => [`${v} películas`, p.payload.name]} />
-                <Legend
-                  onClick={(e) => openResolution(e?.value)}
-                  formatter={(v) => <span className="text-xs text-slate-300 cursor-pointer hover:text-gold-400">{v}</span>}
-                />
-              </PieChart>
             </ResponsiveContainer>
           </div>
         </Section>

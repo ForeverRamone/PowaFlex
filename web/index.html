@@ -10,6 +10,13 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- apply the saved look before first paint, or the app flashes the default -->
+    <script>
+      try {
+        var t = localStorage.getItem('ui_theme');
+        if (t && t !== 'cartelera') document.documentElement.dataset.ui = t;
+      } catch (e) {}
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

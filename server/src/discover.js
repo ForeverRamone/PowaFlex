@@ -1,5 +1,8 @@
 import { db, cacheRead, cacheWrite, getSetting } from './db.js';
-import { personCredits, findPersonInfo, resolvePerson, enrichRuntimes, setBuildProgress, clearBuildProgress } from './tmdb.js';
+import {
+  personCredits, findPersonInfo, resolvePerson, enrichRuntimes, setBuildProgress, clearBuildProgress,
+  buildRoleItems, roleStats,
+} from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { matchMovie, watchedIndex, isWatched } from './letterboxd.js';
 import { TSPDT_DIRECTORS, TSPDT_21C_DIRECTORS } from './data/tspdt-directors.js';
@@ -17,7 +20,7 @@ function applyWatched(items) {
 // otherwise makes owned films show up as "missing" (#15).
 const ownsFilm = (c, inLib) => inLib.has(c.id) || !!matchMovie({ title: c.title, year: c.release_date ? Number(c.release_date.slice(0, 4)) : null, tmdbId: c.id });
 
-const genreFlags = (ids = []) => ({
+export const genreFlags = (ids = []) => ({
   genre_ids: ids,
   isDocumentary: ids.includes(99),
   isTvMovie: ids.includes(10770),
@@ -37,7 +40,7 @@ async function applyScores(people) {
 // Actor credits: a billing order deep in the credits or a "Self"-style
 // character is a cameo, not a role a completist needs to fill.
 const CAMEO_RE = /^(self|himself|herself|uncredited|cameo|archive)/i;
-const isCameoCredit = (c) => (c.order ?? 99) >= 15 || CAMEO_RE.test(c.character || '');
+export const isCameoCredit = (c) => (c.order ?? 99) >= 15 || CAMEO_RE.test(c.character || '');
 
 // user-configurable noise thresholds (Ajustes), with the historical defaults
 const minVotesFor = (role) =>
@@ -47,7 +50,17 @@ const minVotesFor = (role) =>
 const dismissedIds = () =>
   new Set(db.prepare('SELECT tmdb_id FROM dismissed_movies').all().map((r) => r.tmdb_id));
 
-const isNoise = (m) => !!(m.isShort || m.isDocumentary || m.isTvMovie || m.isCameo);
+// Shorts, documentaries, TV movies and cameos are not gaps a completist has to
+// fill: they never take a slot in the per-person quota.
+export const isNoise = (m) => !!(m.isShort || m.isDocumentary || m.isTvMovie || m.isCameo);
+
+/** Features first (up to `perPerson`), then the same number of noise items at
+ *  most, so the client-side toggles still have something to reveal. */
+export function splitNoise(missing, perPerson) {
+  const features = missing.filter((m) => !isNoise(m));
+  const noise = missing.filter(isNoise);
+  return { features, noise, list: [...features.slice(0, perPerson), ...noise.slice(0, perPerson)] };
+}
 
 // Noise (shorts/docs/TV/cameos) used to eat the per-person quota BEFORE the
 // client-side filters hid it, leaving "12 te faltan" over 3 visible cards.
@@ -58,11 +71,7 @@ async function finishMissing(people, perPerson) {
   const all = people.flatMap((p) => p.missing);
   await enrichRuntimes(all);
   applyWatched(all);
-  for (const p of people) {
-    const features = p.missing.filter((m) => !isNoise(m));
-    const noise = p.missing.filter(isNoise);
-    p.missing = [...features.slice(0, perPerson), ...noise.slice(0, perPerson)];
-  }
+  for (const p of people) p.missing = splitNoise(p.missing, perPerson).list;
 }
 
 const HOUR = 3600 * 1000;
@@ -214,7 +223,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
  * "top by count", and strictly in the role you follow them for.
  */
 export async function favoritesGaps({ perPerson = 8, refresh = false, role: onlyRole = null } = {}) {
-  const cacheKey = `discover_favorites:v3:${onlyRole || 'all'}:${perPerson}`;
+  const cacheKey = `discover_favorites:v4:${onlyRole || 'all'}:${perPerson}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 6 * HOUR);
     if (hit) return hit;
@@ -233,7 +242,7 @@ export async function favoritesGaps({ perPerson = 8, refresh = false, role: only
     .all(onlyRole, onlyRole);
 
   const inLib = libraryTmdbIds();
-  const now = today();
+  const widx = watchedIndex();
   const dismissed = dismissedIds();
   const out = [];
   const errors = [];
@@ -250,40 +259,40 @@ export async function favoritesGaps({ perPerson = 8, refresh = false, role: only
         const resolved = await resolvePerson(p.id);
         if (!resolved?.tmdb_id) continue;
         const credits = await personCredits(resolved.tmdb_id);
-        const raw =
-          role === 'director'
-            ? (credits.crew || []).filter((c) => c.job === 'Director')
-            : credits.cast || [];
-        const seen = new Set();
-        let released = 0;
-        let owned = 0;
+        // Build and score the filmography with the SAME helpers the person page
+        // uses, so "te faltan N" here can never contradict the bar over there
+        // (directors count features only: no shorts, TV, coral or — unless they
+        // are documentarians — documentaries).
+        const items = buildRoleItems(credits, role, inLib, widx);
+        await enrichRuntimes(items, { withCredits: role === 'director' });
+        // ownsFilm also catches library films stored under a different TMDB id
+        for (const it of items) {
+          if (!it.owned && ownsFilm({ id: it.tmdb_id, title: it.title, release_date: it.date }, inLib)) it.owned = true;
+        }
+        const stats = roleStats(items, role);
+
+        const minVotes = minVotesFor(role);
         let dismissedN = 0;
         const missing = [];
-        const minVotes = minVotesFor(role);
-        for (const c of raw) {
-          if (c.video || seen.has(c.id)) continue;
-          seen.add(c.id);
-          if (!c.release_date || c.release_date > now) continue;
-          released++;
-          if (ownsFilm(c, inLib)) { owned++; continue; }
-          if (dismissed.has(c.id)) { dismissedN++; continue; }
-          if ((c.vote_count || 0) < minVotes) continue;
-          missing.push({
-            tmdb_id: c.id, title: c.title, date: c.release_date, poster_path: c.poster_path,
-            vote: c.vote_average, votes: c.vote_count, released: true, owned: false,
-            character: role === 'actor' ? c.character || null : null,
-            isCameo: role === 'actor' ? isCameoCredit(c) : false,
-            ...genreFlags(c.genre_ids),
-          });
+        for (const it of items) {
+          if (!it.released || it.owned) continue;
+          if (dismissed.has(it.tmdb_id)) { dismissedN++; continue; }
+          if ((it.votes || 0) < minVotes) continue;
+          missing.push({ ...it, owned: false });
         }
         missing.sort((a, b) => (b.votes || 0) - (a.votes || 0));
+
         // everyone is returned, including complete filmographies (missing: []),
         // so Favoritos can show "✓ completo" instead of just dropping them
         out.push({
           id: p.id, name: p.name, thumb: p.thumb, deathday: p.deathday,
-          role, released, owned, inLibrary: p.inLibrary || 0,
-          pct: released ? Math.round((owned / released) * 100) : 0,
-          missingTotal: missing.length,
+          role, inLibrary: p.inLibrary || 0,
+          released: stats.released, owned: stats.owned, pct: stats.pct,
+          upcoming: stats.upcoming,
+          documentarian: stats.documentarian ?? false,
+          excludedFromCompletion: stats.excludedFromCompletion ?? 0,
+          // the headline count is the completeness gap, exactly like the ficha
+          missingTotal: Math.max(0, stats.released - stats.owned),
           noiseTotal: missing.filter(isNoise).length,
           dismissed: dismissedN,
           missing: missing.slice(0, perPerson * 3),

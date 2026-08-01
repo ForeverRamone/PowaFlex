@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid, StatusLegend } from '../components.jsx';
+import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid, StatusLegend, PageHeader } from '../components.jsx';
 
 const SORT_OPTIONS = [
   ['added', 'Añadida (reciente)'],
@@ -97,7 +97,7 @@ export default function Library() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-4">Biblioteca</h1>
+      <PageHeader eyebrow="Colección" title="Biblioteca" />
 
       <div className="flex flex-wrap gap-2 items-center mb-3">
         <form onSubmit={(e) => { e.preventDefault(); set('search', search); }}>
@@ -110,19 +110,19 @@ export default function Library() {
         {[...params.keys()].length > 0 && (
           <button className="btn-ghost" onClick={() => { setSearch(''); setParams({}, { replace: true }); setShowFilters(false); }}>✕ Limpiar</button>
         )}
-        {data && <span className="text-sm text-slate-400 ml-auto">{data.total.toLocaleString('es-ES')} películas</span>}
+        {data && <span className="text-sm text-zinc-400 ml-auto">{data.total.toLocaleString('es-ES')} películas</span>}
       </div>
       <StatusLegend className="mb-3" />
 
       {(activeKeys.length > 0 || q.search) && (
         <div className="flex flex-wrap gap-1.5 mb-3">
           {q.search && (
-            <button className="text-xs bg-ink-800 border border-ink-600 rounded-full px-2.5 py-1 text-slate-300 hover:border-red-400" onClick={() => { setSearch(''); set('search', ''); }}>
+            <button className="text-xs bg-ink-800 border border-ink-600 rounded-full px-2.5 py-1 text-zinc-300 hover:border-red-400" onClick={() => { setSearch(''); set('search', ''); }}>
               «{q.search}» ✕
             </button>
           )}
           {activeKeys.map((k) => (
-            <button key={k} className="text-xs bg-ink-800 border border-ink-600 rounded-full px-2.5 py-1 text-slate-300 hover:border-red-400" onClick={() => set(k, '')}>
+            <button key={k} className="text-xs bg-ink-800 border border-ink-600 rounded-full px-2.5 py-1 text-zinc-300 hover:border-red-400" onClick={() => set(k, '')}>
               {FILTER_LABELS[k]}: {VALUE_LABELS[q[k]] || q[k]} ✕
             </button>
           ))}

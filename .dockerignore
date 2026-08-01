@@ -1,0 +1,13 @@
+# Contexto de build mínimo: todo lo que se instala viene del lock, no del host.
+**/node_modules
+/data
+.git
+.github
+server/test
+web/dist
+**/*.db
+**/*.db-wal
+**/*.db-shm
+.DS_Store
+docs
+assets

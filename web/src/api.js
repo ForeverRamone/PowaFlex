@@ -42,6 +42,23 @@ export const tmdbImg = (path, size = 'w342') => (path ? `https://image.tmdb.org/
 // synchronously. Values: 'score' (MDBList Σ, default) | 'imdb' | 'letterboxd'.
 export const primaryRating = () => localStorage.getItem('primary_rating') || 'score';
 
+// Selectable look (Ajustes). Mirrored to localStorage so index.html can apply it
+// before the first paint; the server setting keeps it across browsers.
+export const UI_THEMES = [
+  { key: 'cartelera', label: 'Cartelera', hint: 'Cartel de cine de los setenta: crema, rojo y ocre, palo seco pesado' },
+  { key: 'cinemateca', label: 'Cinemateca', hint: 'Carbón neutro, titulares en Bodoni, oro reservado' },
+  { key: 'clasico', label: 'Clásico', hint: 'El aspecto anterior al rediseño: carbón azulado y fuente del sistema' },
+];
+export const applyTheme = (key) => {
+  const t = UI_THEMES.some((x) => x.key === key) ? key : 'cartelera';
+  // cartelera is the default: it lives in :root, so it needs no attribute
+  if (t === 'cartelera') delete document.documentElement.dataset.ui;
+  else document.documentElement.dataset.ui = t;
+  localStorage.setItem('ui_theme', t);
+  return t;
+};
+export const currentTheme = () => localStorage.getItem('ui_theme') || 'cartelera';
+
 // External links per rating source, so a score chip opens that film on its site.
 export const ratingLinks = ({ imdb_id, tmdb_id, title } = {}) => ({
   imdb: imdb_id

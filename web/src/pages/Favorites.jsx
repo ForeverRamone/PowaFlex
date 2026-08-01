@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Spinner, Section, Empty, DeathBadge, ProgressBar } from '../components.jsx';
+import { Star, Clapperboard, Drama, Search, Scissors, RotateCw, ArrowLeftRight, X, Cross } from 'lucide-react';
+import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader } from '../components.jsx';
 import { toast } from '../toast.js';
 
 // The whole page is scoped to ONE role at a time: a director you follow is
@@ -22,12 +23,12 @@ function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
         {person.profile_path ? (
           <img src={tmdbImg(person.profile_path, 'w185')} alt="" loading="lazy" className="w-full h-full object-cover" />
         ) : (
-          <span className="text-lg">🎬</span>
+          <Clapperboard size={18} className="text-zinc-500" />
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-slate-200 truncate">{person.name}</div>
-        <div className="text-[11px] text-slate-500 truncate">
+        <div className="text-sm font-medium text-zinc-200 truncate">{person.name}</div>
+        <div className="text-[11px] text-zinc-500 truncate">
           {person.dept ? `${person.dept === 'Directing' ? 'Dirección' : person.dept === 'Acting' ? 'Interpretación' : person.dept} · ` : ''}
           {(person.knownFor || []).join(', ')}
         </div>
@@ -35,7 +36,7 @@ function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
       <button
         onClick={() => (isTracked ? onRemove(person) : onAdd(person))}
         title={isTracked ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-        className={`text-lg cursor-pointer shrink-0 ${isTracked ? 'text-gold-400' : 'text-ink-600 hover:text-slate-400'}`}
+        className={`text-lg cursor-pointer shrink-0 ${isTracked ? 'text-gold-400' : 'text-ink-600 hover:text-zinc-400'}`}
       >
         ★
       </button>
@@ -47,7 +48,7 @@ const Avatar = ({ person, size = 'w-12 h-12' }) =>
   person.thumb ? (
     <img src={`/img/person/${person.id}`} alt="" loading="lazy" className={`${size} rounded-full object-cover bg-ink-700 shrink-0`} />
   ) : (
-    <span className={`${size} rounded-full bg-ink-700 text-slate-500 flex items-center justify-center shrink-0 text-sm`}>
+    <span className={`${size} rounded-full bg-ink-700 text-zinc-500 flex items-center justify-center shrink-0 text-sm`}>
       {person.name.slice(0, 1)}
     </span>
   );
@@ -66,13 +67,13 @@ function FavoriteCard({ p, role, selectable, selected, onSelect, onRemove, onSwi
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1.5 min-w-0">
-          <Link to={`/personas/${p.id}?role=${role}`} className="text-sm font-medium text-slate-100 hover:text-gold-400 truncate">
+          <Link to={`/personas/${p.id}?role=${role}`} className="text-sm font-medium text-zinc-100 hover:text-gold-400 truncate">
             {p.name}
           </Link>
           <DeathBadge deathday={p.deathday} />
         </div>
-        <div className="text-[11px] text-slate-500 mt-0.5">
-          <b className="text-slate-300">{p.movies || 0}</b> {roleVerb(role)} en tu Plex
+        <div className="text-[11px] text-zinc-500 mt-0.5">
+          <b className="text-zinc-300">{p.movies || 0}</b> {roleVerb(role)} en tu Plex
           {p.upcoming > 0 && <span className="text-sky-300"> · {p.upcoming} por venir</span>}
         </div>
 
@@ -80,7 +81,7 @@ function FavoriteCard({ p, role, selectable, selected, onSelect, onRemove, onSwi
           <div className="mt-2">
             <ProgressBar pct={p.pct} />
             <div className="flex justify-between text-[11px] mt-1">
-              <span className="text-slate-500">{p.pct}% de su filmografía</span>
+              <span className="text-zinc-500">{p.pct}% de su filmografía</span>
               {complete ? (
                 <span className="text-emerald-400">✓ completa</span>
               ) : (
@@ -89,21 +90,21 @@ function FavoriteCard({ p, role, selectable, selected, onSelect, onRemove, onSwi
             </div>
           </div>
         ) : (
-          <div className="text-[11px] text-slate-600 mt-2">
+          <div className="text-[11px] text-zinc-600 mt-2">
             Huecos sin calcular · <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir</Link>
           </div>
         )}
       </div>
       <div className="flex flex-col gap-1 shrink-0">
-        <button onClick={() => onRemove(p)} title="Quitar de favoritos" className="text-slate-600 hover:text-red-400 text-sm">
-          ✕
+        <button onClick={() => onRemove(p)} title="Quitar de favoritos" className="text-zinc-600 hover:text-red-400">
+          <X size={15} />
         </button>
         <button
           onClick={() => onSwitchRole(p)}
           title={`Seguirle como ${role === 'director' ? 'actor/actriz' : 'director/a'} en su lugar`}
-          className="text-slate-600 hover:text-gold-400 text-sm"
+          className="text-zinc-600 hover:text-gold-400"
         >
-          ⇄
+          <ArrowLeftRight size={15} />
         </button>
       </div>
     </div>
@@ -347,8 +348,8 @@ export default function Favorites() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-2">Favoritos</h1>
-      <p className="text-sm text-slate-500 mb-4 max-w-3xl">
+      <PageHeader eyebrow="La caza" title="Favoritos" />
+      <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
         La gente que sigues, <b>separada por faceta</b>: a quien sigues como director/a solo cuenta por lo que dirige,
         y a quien sigues como actor/actriz solo por lo que interpreta. Todos entran en{' '}
         <Link to="/calendario" className="text-gold-400 hover:underline">Cine venidero</Link> y en{' '}
@@ -358,19 +359,24 @@ export default function Favorites() {
       {/* role scope: the whole page follows this switch */}
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         {ROLES.map(([r, label]) => (
-          <button key={r} onClick={() => setRole(r)} className={role === r ? 'btn-gold' : 'btn-ghost'}>
-            {r === 'director' ? '🎬' : '🎭'} {label} ({counts[r]})
+          <button
+            key={r}
+            onClick={() => setRole(r)}
+            className={`${role === r ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}
+          >
+            {r === 'director' ? <Clapperboard size={15} strokeWidth={1.75} /> : <Drama size={15} strokeWidth={1.75} />}
+            {label} ({counts[r]})
           </button>
         ))}
-        <span className="text-xs text-slate-600 ml-2">Cada faceta se gestiona por separado</span>
+        <span className="text-xs text-zinc-600 ml-2">Cada faceta se gestiona por separado</span>
       </div>
 
       <div className="flex gap-2 mb-6">
-        <button onClick={() => setTab('mine')} className={tab === 'mine' ? 'btn-gold' : 'btn-ghost'}>
-          ⭐ Mis {roleLabel(role).toLowerCase()} ({counts[role]})
+        <button onClick={() => setTab('mine')} className={`${tab === 'mine' ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
+          <Star size={15} strokeWidth={1.75} /> Mis {roleLabel(role).toLowerCase()} ({counts[role]})
         </button>
-        <button onClick={() => setTab('discover')} className={tab === 'discover' ? 'btn-gold' : 'btn-ghost'}>
-          🔍 Añadir {roleLabel(role).toLowerCase()}
+        <button onClick={() => setTab('discover')} className={`${tab === 'discover' ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
+          <Search size={15} strokeWidth={1.75} /> Añadir {roleLabel(role).toLowerCase()}
         </button>
       </div>
 
@@ -381,19 +387,19 @@ export default function Favorites() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <div className="card p-3">
                 <div className="text-xl font-bold text-gold-400">{counts[role]}</div>
-                <div className="text-xs text-slate-500">{roleLabel(role).toLowerCase()} que sigues</div>
+                <div className="text-xs text-zinc-500">{roleLabel(role).toLowerCase()} que sigues</div>
               </div>
               <div className="card p-3">
-                <div className="text-xl font-bold text-slate-200">{roleFavs.reduce((n, t) => n + (t.movies || 0), 0)}</div>
-                <div className="text-xs text-slate-500">{roleVerb(role)} suyas en tu Plex</div>
+                <div className="text-xl font-bold text-zinc-200">{roleFavs.reduce((n, t) => n + (t.movies || 0), 0)}</div>
+                <div className="text-xs text-zinc-500">{roleVerb(role)} suyas en tu Plex</div>
               </div>
               <div className="card p-3">
                 <div className="text-xl font-bold text-orange-300">{anyComputed ? totalGaps : '—'}</div>
-                <div className="text-xs text-slate-500">huecos por rellenar</div>
+                <div className="text-xs text-zinc-500">huecos por rellenar</div>
               </div>
               <div className="card p-3">
                 <div className="text-xl font-bold text-emerald-400">{anyComputed ? completeCount : '—'}</div>
-                <div className="text-xs text-slate-500">filmografías completas</div>
+                <div className="text-xs text-zinc-500">filmografías completas</div>
               </div>
             </div>
           )}
@@ -419,13 +425,13 @@ export default function Favorites() {
                 </select>
                 <button
                   onClick={() => { setPruneMode((v) => !v); setSelected(new Set()); }}
-                  className={`btn-ghost !py-1.5 text-xs ${pruneMode ? '!border-gold-400 text-gold-400' : ''}`}
+                  className={`btn-ghost !py-1.5 text-xs inline-flex items-center gap-1.5 ${pruneMode ? '!border-gold-400 text-gold-400' : ''}`}
                 >
-                  ✂️ Podar
+                  <Scissors size={13} strokeWidth={2} /> Podar
                 </button>
                 {deceasedCount > 0 && (
                   <button className="btn-ghost !py-1.5 text-xs" onClick={clearDeceased}>
-                    ✝ Quitar fallecidos/as ({deceasedCount})
+                    † Quitar fallecidos/as ({deceasedCount})
                   </button>
                 )}
                 <button className="btn-ghost !py-1.5 text-xs !border-red-500/40 text-red-400" onClick={clearAll}>
@@ -435,7 +441,7 @@ export default function Favorites() {
 
               {pruneMode && (
                 <div className="card p-3 mb-3 flex gap-2 flex-wrap items-center text-xs">
-                  <span className="text-slate-400">Poda rápida:</span>
+                  <span className="text-zinc-400">Poda rápida:</span>
                   <button
                     className="btn-ghost !py-1 text-xs"
                     onClick={() => setSelected(new Set(shownFavs.filter((t) => t.deathday && noContribution(t)).map((t) => t.id)))}
@@ -455,7 +461,7 @@ export default function Favorites() {
               )}
 
               {!anyComputed && (
-                <p className="text-[11px] text-slate-500 mb-3">
+                <p className="text-[11px] text-zinc-500 mb-3">
                   Los huecos y el completismo se calculan al visitar{' '}
                   <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir huecos</Link>, o con
                   «Actualizar todo» en <Link to="/ajustes" className="text-gold-400 hover:underline">Ajustes</Link>.
@@ -486,41 +492,41 @@ export default function Favorites() {
                 onClick={() => setHideDead((v) => !v)}
                 className={`btn-ghost !py-1 text-xs ${hideDead ? '!border-gold-400 text-gold-400' : ''}`}
               >
-                {hideDead ? '✓ Ocultando fallecidos/as' : '✝ Ocultar fallecidos/as'}
+                {hideDead ? '✓ Ocultando fallecidos/as' : '† Ocultar fallecidos/as'}
               </button>
-              <button className="btn-ghost !py-1 text-xs" onClick={updateLife} disabled={updatingLife}>
-                {updatingLife ? 'Actualizando…' : '↻ Actualizar vivos/muertos'}
+              <button className="btn-ghost !py-1 text-xs inline-flex items-center gap-1.5" onClick={updateLife} disabled={updatingLife}>
+                {updatingLife ? 'Actualizando…' : <><RotateCw size={12} strokeWidth={2} /> Actualizar vivos/muertos</>}
               </button>
               <div className="flex items-center gap-2 ml-auto">
-                <span className="text-xs text-slate-400">Añadir los</span>
+                <span className="text-xs text-zinc-400">Añadir los</span>
                 <input type="number" min="1" max="1000" className="input !w-20 text-center !py-1" value={topN} onChange={(e) => setTopN(e.target.value)} />
-                <span className="text-xs text-slate-400">primeros</span>
-                <button className="btn-gold !py-1 text-xs" onClick={bulkAdd}>⭐ Revisar y añadir</button>
+                <span className="text-xs text-zinc-400">primeros</span>
+                <button className="btn-gold !py-1 text-xs inline-flex items-center gap-1.5" onClick={bulkAdd}><Star size={12} strokeWidth={2} /> Revisar y añadir</button>
               </div>
-              {lifeMsg && <span className="text-[11px] text-slate-400 w-full">{lifeMsg}</span>}
+              {lifeMsg && <span className="text-[11px] text-zinc-400 w-full">{lifeMsg}</span>}
               {flash && <span className="text-emerald-400 text-xs w-full">{flash}</span>}
             </div>
 
             {preview && (
               <div className="card p-4 mb-3">
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                  <h3 className="font-semibold text-slate-100 text-sm">
+                  <h3 className="font-semibold text-zinc-100 text-sm">
                     Vas a seguir a {preview.checked.size} de {preview.candidates.length} como {role === 'director' ? 'director/a' : 'actor/actriz'}
                   </h3>
                   <div className="flex gap-2">
-                    <button className="btn-gold !py-1 text-xs" onClick={confirmBulkAdd} disabled={!preview.checked.size}>
-                      ⭐ Confirmar ({preview.checked.size})
+                    <button className="btn-gold !py-1 text-xs inline-flex items-center gap-1.5" onClick={confirmBulkAdd} disabled={!preview.checked.size}>
+<Star size={12} strokeWidth={2} /> Confirmar ({preview.checked.size})
                     </button>
                     <button className="btn-ghost !py-1 text-xs" onClick={() => setPreview(null)}>Cancelar</button>
                   </div>
                 </div>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 max-h-72 overflow-y-auto">
                   {preview.candidates.map((c) => (
-                    <label key={c.id} className="flex items-center gap-2 text-sm text-slate-300 py-0.5 cursor-pointer min-w-0">
+                    <label key={c.id} className="flex items-center gap-2 text-sm text-zinc-300 py-0.5 cursor-pointer min-w-0">
                       <input type="checkbox" checked={preview.checked.has(c.id)} onChange={() => togglePreview(c.id)} />
                       <span className="truncate">{c.name}</span>
                       <DeathBadge deathday={c.deathday} />
-                      <span className="text-[11px] text-slate-500 shrink-0 ml-auto">{c.n} títulos</span>
+                      <span className="text-[11px] text-zinc-500 shrink-0 ml-auto">{c.n} títulos</span>
                     </label>
                   ))}
                 </div>
@@ -537,17 +543,17 @@ export default function Favorites() {
                   const elsewhere = fav && !here;
                   return (
                     <div key={p.id} className="flex items-center gap-3 px-4 py-2">
-                      <span className="text-slate-600 text-sm w-8 text-right shrink-0">{i + 1}.</span>
-                      <Link to={`/personas/${p.id}?role=${role}`} className="text-sm text-slate-200 hover:text-gold-400 truncate flex-1 flex items-center gap-1.5 min-w-0">
+                      <span className="text-zinc-600 text-sm w-8 text-right shrink-0">{i + 1}.</span>
+                      <Link to={`/personas/${p.id}?role=${role}`} className="text-sm text-zinc-200 hover:text-gold-400 truncate flex-1 flex items-center gap-1.5 min-w-0">
                         <span className="truncate">{p.name}</span>
                         <DeathBadge deathday={p.deathday} />
                         {elsewhere && (
-                          <span className="text-[10px] text-slate-500 shrink-0" title={`Le sigues como ${fav.role === 'director' ? 'director/a' : 'actor/actriz'}`}>
-                            {fav.role === 'director' ? '🎬' : '🎭'}
+                          <span className="text-[11px] text-zinc-500 shrink-0" title={`Le sigues como ${fav.role === 'director' ? 'director/a' : 'actor/actriz'}`}>
+                            {fav.role === 'director' ? <Clapperboard size={11} /> : <Drama size={11} />}
                           </span>
                         )}
                       </Link>
-                      <span className="text-xs text-slate-500 shrink-0">{p.n} títulos</span>
+                      <span className="text-xs text-zinc-500 shrink-0">{p.n} títulos</span>
                       <button
                         onClick={() => toggle(p.id, p.name)}
                         title={
@@ -558,16 +564,16 @@ export default function Favorites() {
                               : `Seguir como ${role === 'director' ? 'director/a' : 'actor/actriz'}`
                         }
                         className={`text-lg cursor-pointer transition-colors shrink-0 ${
-                          here ? 'text-gold-400' : elsewhere ? 'text-gold-400/30 hover:text-gold-400' : 'text-ink-600 hover:text-slate-400'
+                          here ? 'text-gold-400' : elsewhere ? 'text-gold-400/30 hover:text-gold-400' : 'text-ink-600 hover:text-zinc-400'
                         }`}
                       >
-                        {elsewhere ? '⇄' : '★'}
+                        {elsewhere ? <ArrowLeftRight size={15} /> : '★'}
                       </button>
                     </div>
                   );
                 })}
                 {rankMore && (
-                  <button className="w-full py-2 text-xs text-slate-400 hover:text-gold-400 cursor-pointer" onClick={() => loadRanking(false)}>
+                  <button className="w-full py-2 text-xs text-zinc-400 hover:text-gold-400 cursor-pointer" onClick={() => loadRanking(false)}>
                     Ver más
                   </button>
                 )}
@@ -579,14 +585,14 @@ export default function Favorites() {
 
       {tab === 'discover' && (
         <>
-          <p className="text-xs text-slate-500 mb-4">
+          <p className="text-xs text-zinc-500 mb-4">
             Lo que añadas aquí se sigue como <b>{role === 'director' ? 'director/a' : 'actor/actriz'}</b>. Cambia la
             faceta arriba si quieres seguir a alguien por la otra.
           </p>
 
           <div className="card p-4 mb-6">
-            <h2 className="font-semibold text-slate-100 mb-1">Añadir una lista de nombres</h2>
-            <p className="text-xs text-slate-500 mb-3 max-w-2xl">
+            <h2 className="font-semibold text-zinc-100 mb-1">Añadir una lista de nombres</h2>
+            <p className="text-xs text-zinc-500 mb-3 max-w-2xl">
               Pega nombres <b>separados por comas o uno por línea</b>. PowaFlex los busca en TMDB y los añade a{' '}
               {roleLabel(role).toLowerCase()}.
             </p>
@@ -597,12 +603,12 @@ export default function Favorites() {
               onChange={(e) => setBulkNames(e.target.value)}
             />
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              <button className="btn-gold shrink-0" onClick={addByNames} disabled={bulkBusy || !bulkNames.trim()}>
-                {bulkBusy ? 'Añadiendo…' : `⭐ Añadir a ${roleLabel(role).toLowerCase()}`}
+              <button className="btn-gold shrink-0 inline-flex items-center gap-2" onClick={addByNames} disabled={bulkBusy || !bulkNames.trim()}>
+                {bulkBusy ? 'Añadiendo…' : <><Star size={13} strokeWidth={2} /> Añadir a {roleLabel(role).toLowerCase()}</>}
               </button>
             </div>
             {bulkResult && (
-              <div className="text-xs text-slate-400 mt-2">
+              <div className="text-xs text-zinc-400 mt-2">
                 ✓ {bulkResult.added} añadidos de {bulkResult.total}.
                 {bulkResult.notFound?.length > 0 && (
                   <span className="text-orange-300"> No encontrados en TMDB: {bulkResult.notFound.join(', ')}.</span>
@@ -619,7 +625,7 @@ export default function Favorites() {
             </form>
             {presults && (
               presults.length === 0 ? (
-                <div className="text-sm text-slate-500 mt-3">Nadie con ese nombre en TMDB.</div>
+                <div className="text-sm text-zinc-500 mt-3">Nadie con ese nombre en TMDB.</div>
               ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">
                   {presults.map((p) => <SuggestionCard key={p.tmdb_id} person={p} trackedIds={trackedTmdb} onAdd={addTmdb} onRemove={removeTmdb} />)}
@@ -638,16 +644,16 @@ export default function Favorites() {
                     <div className="flex items-start gap-3 p-4 pb-3 flex-wrap">
                       <div className={`text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${accent.bg}`}>{pack.emoji}</div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-slate-100">{pack.title}</h3>
-                        <p className="text-xs text-slate-500">{pack.description}</p>
+                        <h3 className="font-semibold text-zinc-100">{pack.title}</h3>
+                        <p className="text-xs text-zinc-500">{pack.description}</p>
                       </div>
                       <button
-                        className={`btn-ghost !py-1 shrink-0 ${pending ? `!border-current ${accent.text}` : 'opacity-50'}`}
+                        className={`btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5 ${pending ? `!border-current ${accent.text}` : 'opacity-50'}`}
                         disabled={!pending || packBusy === pack.key}
                         onClick={() => addPack(pack)}
                         title={pending ? `Añade los ${pending} que aún no sigues` : 'Ya los sigues a todos'}
                       >
-                        {packBusy === pack.key ? 'Añadiendo…' : pending ? `⭐ Añadir todos (${pending})` : '✓ Todos añadidos'}
+                        {packBusy === pack.key ? 'Añadiendo…' : pending ? <><Star size={12} strokeWidth={2} /> Añadir todos ({pending})</> : '✓ Todos añadidos'}
                       </button>
                     </div>
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 p-4 pt-0">

@@ -59,9 +59,12 @@ CREATE INDEX IF NOT EXISTS idx_movies_tmdb ON movies(tmdb_id);
 CREATE INDEX IF NOT EXISTS idx_movies_year ON movies(year);
 CREATE INDEX IF NOT EXISTS idx_movies_added ON movies(added_at);
 
+-- name is deliberately NOT unique: two different people share a name more often
+-- than you'd think, and merging them mixes their filmographies. Identity comes
+-- from plex_tag_id (Plex's stable per-person tag key) when Plex provides it.
 CREATE TABLE IF NOT EXISTS people (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT UNIQUE,
+  name TEXT,
   thumb TEXT,
   tmdb_id INTEGER
 );
@@ -244,10 +247,70 @@ ensureColumn('people', 'place_of_birth', 'place_of_birth TEXT');
 ensureColumn('people', 'country', 'country TEXT');
 ensureColumn('people', 'continent', 'continent TEXT');
 
+// --- people identity: Plex tag key instead of the name -----------------------
+// Every Director/Writer/Role tag in a Plex metadata response carries a tagKey
+// that identifies the *person* (same key across roles), so homonyms stop
+// collapsing into one row. The old schema had name UNIQUE, which made two
+// distinct people with the same name impossible, so the table is rebuilt
+// without it (SQLite cannot drop a constraint in place).
+ensureColumn('people', 'plex_tag_id', 'plex_tag_id TEXT');
+
+function dropPeopleNameUnique() {
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'people'").get()?.sql || '';
+  if (!/\bname\s+TEXT\s+UNIQUE\b/i.test(sql)) return;
+  const cols = db.prepare('PRAGMA table_info(people)').all();
+  const defs = cols.map((c) => {
+    if (c.pk) return `${c.name} INTEGER PRIMARY KEY AUTOINCREMENT`;
+    let d = `${c.name} ${c.type || 'TEXT'}`;
+    if (c.notnull) d += ' NOT NULL';
+    if (c.dflt_value != null) d += ` DEFAULT ${c.dflt_value}`;
+    return d;
+  });
+  const names = cols.map((c) => c.name).join(', ');
+  // ids must survive: movie_people/tracked_people reference them by value
+  db.exec(`
+    BEGIN;
+    CREATE TABLE people_new (${defs.join(', ')});
+    INSERT INTO people_new (${names}) SELECT ${names} FROM people;
+    DROP TABLE people;
+    ALTER TABLE people_new RENAME TO people;
+    COMMIT;
+  `);
+}
+dropPeopleNameUnique();
+
+db.exec(`
+CREATE INDEX IF NOT EXISTS idx_people_name ON people(name);
+CREATE INDEX IF NOT EXISTS idx_people_tmdb ON people(tmdb_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_people_tag ON people(plex_tag_id) WHERE plex_tag_id IS NOT NULL;
+`);
+
 // letterboxd entries: keep the TMDB id + poster so non-library watches still
 // show artwork on the dashboard
 ensureColumn('lb_entries', 'tmdb_id', 'tmdb_id INTEGER');
 ensureColumn('lb_entries', 'poster_path', 'poster_path TEXT');
+
+// The table-level UNIQUE (list, title, year, watched_date, uri) never fired for
+// rows with a NULL in any of those columns — SQLite considers two NULLs
+// distinct in an index — so every re-import of watchlist/ratings CSVs (no date,
+// no uri) inserted the whole file again. An expression index over COALESCE'd
+// columns is the equivalent that does fire; the old constraint stays (it is
+// harmless and cannot be dropped without rebuilding the table).
+if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_lb_unique'").get()) {
+  const KEY = `list, title, COALESCE(year, -1), COALESCE(watched_date, ''), COALESCE(uri, '')`;
+  // keep the richest row of each group (matched to a film, with rating) before
+  // the index can be created
+  db.exec(`
+    DELETE FROM lb_entries WHERE id NOT IN (
+      SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (
+          PARTITION BY ${KEY} ORDER BY (movie_id IS NULL), (rating IS NULL), id
+        ) rn FROM lb_entries
+      ) WHERE rn = 1
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_lb_unique ON lb_entries (${KEY});
+  `);
+}
 
 // challenge lists can be hidden by the user without deleting them
 ensureColumn('lb_lists', 'hidden', 'hidden INTEGER DEFAULT 0');
@@ -281,7 +344,7 @@ db.exec(`
 db.prepare(
   `DELETE FROM tmdb_cache
    WHERE key LIKE 'calendar:v_' AND key <> 'calendar:v4'
-      OR (key LIKE 'discover_favorites:%' AND key NOT LIKE 'discover_favorites:v3:%')
+      OR (key LIKE 'discover_favorites:%' AND key NOT LIKE 'discover_favorites:v4:%')
       OR (key LIKE 'discover_gaps:%' AND key NOT LIKE 'discover_gaps:v3:%')`
 ).run();
 

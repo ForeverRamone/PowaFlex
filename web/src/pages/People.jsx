@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Spinner, PersonCard, Empty } from '../components.jsx';
+import { Spinner, PersonCard, Empty, PageHeader } from '../components.jsx';
 
 const ROLES = [
   ['director', 'Directores/as'],
@@ -31,17 +31,21 @@ export default function People() {
     api('/people/filter-options').then((o) => !o.error && setOpts(o));
   }, []);
 
+  // debounced, and the grid keeps the previous results while refetching so
+  // typing a name doesn't flash the whole page to a spinner per keystroke
   useEffect(() => {
-    setPeople(null);
-    const qs = new URLSearchParams({ role, limit: String(limit), search, ...f });
-    api(`/people?${qs}`).then((r) => setPeople(Array.isArray(r) ? r : []));
+    const t = setTimeout(() => {
+      const qs = new URLSearchParams({ role, limit: String(limit), search, ...f });
+      api(`/people?${qs}`).then((r) => setPeople(Array.isArray(r) ? r : []));
+    }, search ? 250 : 0);
+    return () => clearTimeout(t);
   }, [role, search, limit, f]);
 
   const setFilter = (k) => (v) => setF((prev) => ({ ...prev, [k]: v }));
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-4">Directores/as y actores/actrices</h1>
+      <PageHeader eyebrow="Tu gente" title="Directores/as y actores/actrices" />
       <div className="flex flex-wrap gap-2 mb-3 items-center">
         {ROLES.map(([r, label]) => (
           <button
@@ -72,7 +76,7 @@ export default function People() {
           <button className="btn-ghost" onClick={() => setF({ gender: '', life: '', continent: '', country: '' })}>✕ Limpiar</button>
         )}
         {opts && (
-          <span className="text-xs text-slate-500 ml-auto">
+          <span className="text-xs text-zinc-500 ml-auto">
             Datos demográficos de {opts.enriched.toLocaleString('es-ES')} personas · amplíalos en Ajustes → «Actualizar estado vital»
           </span>
         )}

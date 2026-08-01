@@ -443,23 +443,37 @@ export function deleteChallengeList(listId) {
 
 // --- rematch after a Plex sync ----------------------------------------------
 
+/**
+ * Relink Letterboxd entries and challenge-list items to the library after a
+ * Plex sync. Entries with no year are included (title-only matching still
+ * works) and the TMDB id is used when we have it. A film deleted from Plex
+ * clears movie_id instead of keeping a dangling one, which used to make the
+ * "lo tengo" rings overcount.
+ */
 export function rematchLetterboxd() {
   const index = buildMatcher(); // fresh after a sync
   let matched = 0;
+  let cleared = 0;
   const tx = db.transaction(() => {
     const upd = db.prepare('UPDATE lb_entries SET movie_id = ? WHERE id = ?');
-    for (const e of db.prepare('SELECT id, title, year, movie_id FROM lb_entries WHERE year IS NOT NULL').all()) {
-      const mid = matchMovie({ title: e.title, year: e.year }, index);
-      if (mid && mid !== e.movie_id) { upd.run(mid, e.id); matched++; }
+    for (const e of db.prepare('SELECT id, title, year, tmdb_id, movie_id FROM lb_entries').all()) {
+      const mid = matchMovie({ title: e.title, year: e.year, tmdbId: e.tmdb_id }, index) || null;
+      if (mid === (e.movie_id ?? null)) continue;
+      upd.run(mid, e.id);
+      if (mid) matched++;
+      else cleared++;
     }
     const updL = db.prepare('UPDATE lb_list_items SET movie_id = ? WHERE rowid = ?');
     for (const it of db.prepare('SELECT rowid, title, year, tmdb_id, movie_id FROM lb_list_items').all()) {
-      const mid = matchMovie({ title: it.title, year: it.year, tmdbId: it.tmdb_id }, index);
-      if (mid && mid !== it.movie_id) { updL.run(mid, it.rowid); matched++; }
+      const mid = matchMovie({ title: it.title, year: it.year, tmdbId: it.tmdb_id }, index) || null;
+      if (mid === (it.movie_id ?? null)) continue;
+      updL.run(mid, it.rowid);
+      if (mid) matched++;
+      else cleared++;
     }
   });
   tx();
-  return { rematched: matched };
+  return { rematched: matched, cleared };
 }
 
 /**

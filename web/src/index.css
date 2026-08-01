@@ -1,22 +1,136 @@
 @import 'tailwindcss';
 
 @theme {
+  /* DEFAULT LOOK — «Cartelera»: cartel de cine español de los setenta. Crema
+     impresa, rojo y ocre, palo seco pesadísimo, bordes gruesos y sombra dura.
+     Los tokens ink-* van de claro (fondo) a oscuro (tinta), al revés que en los
+     temas oscuros: por eso todo el color pasa por variables y ningún componente
+     escribe un color fijo. */
+  --color-ink-950: #e9dcc3; /* papel */
+  --color-ink-900: #f6ecd8; /* tarjeta */
+  --color-ink-800: #e0d0b0; /* campo / relleno */
+  --color-ink-700: #241c14; /* tinta: filetes y bordes */
+  --color-ink-600: #241c14;
+  --color-gold-400: #c8442a; /* rojo de cartel: acción y acento */
+  --color-gold-500: #c8442a;
+
+  /* el texto se escribe con la escala zinc-*, aquí reinterpretada como tintas */
+  --color-zinc-100: #241c14;
+  --color-zinc-200: #241c14;
+  --color-zinc-300: #3a2e23;
+  --color-zinc-400: #6b594a;
+  --color-zinc-500: #6b594a;
+  --color-zinc-600: #8a7862;
+
+  --font-sans: 'Archivo Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Archivo Black', 'Archivo Variable', Impact, sans-serif;
+
+  /* esquinas casi rectas: el cartel es tinta sobre papel, no una tarjeta blanda */
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 3px;
+
+  /* estados: sobre papel hacen falta tintas, no los pasteles del modo oscuro */
+  --color-emerald-400: #2f7d4f;
+  --color-emerald-500: #2f7d4f;
+  --color-orange-300: #a75a12;
+  --color-orange-400: #a75a12;
+  --color-sky-300: #1f6b87;
+  --color-red-400: #a5241b;
+  --color-yellow-500: #8a6410;
+}
+
+/* Fino ajuste por tema: aro del arte, sombra dura y color-scheme */
+:root {
+  --ring-art: rgba(36, 28, 20, 0.9);
+  --shadow-hard: 3px 3px 0 #241c14;
+  --border-w: 2px;
+  color-scheme: light;
+}
+
+/* --- Aspecto conmutable (Ajustes) ------------------------------------------
+   Tailwind 4 compila `bg-ink-900` a `var(--color-ink-900)`, así que redefinir
+   las variables bajo un selector cambia toda la app en caliente, sin duplicar
+   componentes. Cada tema toca paleta, tipografía y radios; la estructura
+   (iconos, agrupación de la navegación) es común. */
+
+/* «Cinemateca»: carbón neutro, titulares en Bodoni y oro reservado. */
+:root[data-ui='cinemateca'] {
+  --color-ink-950: #0c0c0e;
+  --color-ink-900: #141416;
+  --color-ink-800: #1c1c1f;
+  --color-ink-700: #26262b;
+  --color-ink-600: #3a3a42;
+  --color-gold-400: #e8b53a;
+  --color-gold-500: #d9a021;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Bodoni Moda Variable', 'Didot', Georgia, serif;
+  --radius-sm: 2px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px; --radius-2xl: 16px;
+  --ring-art: rgba(255, 255, 255, 0.1);
+  --shadow-hard: none;
+  --border-w: 1px;
+  color-scheme: dark;
+}
+
+/* «Clásico»: la paleta y la tipografía de PowaFlex antes del rediseño —
+   carbón azulado, texto slate y la pila de fuentes del sistema. */
+:root[data-ui='clasico'] {
+  --color-gold-400: #e8b53a;
+  --color-gold-500: #d9a021;
+  --radius-sm: 2px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px; --radius-2xl: 16px;
+  --ring-art: rgba(255, 255, 255, 0.1);
+  --shadow-hard: none;
+  --border-w: 1px;
+  color-scheme: dark;
   --color-ink-950: #0b0e14;
   --color-ink-900: #11151f;
   --color-ink-800: #1a2030;
   --color-ink-700: #252d42;
   --color-ink-600: #35405c;
-  --color-gold-400: #e8b53a;
-  --color-gold-500: #d9a021;
+  /* el texto se barrió a zinc-*; en clásico esos tonos vuelven a ser slate-* */
+  --color-zinc-100: #f1f5f9;
+  --color-zinc-200: #e2e8f0;
+  --color-zinc-300: #cbd5e1;
+  --color-zinc-400: #94a3b8;
+  --color-zinc-500: #64748b;
+  --color-zinc-600: #475569;
+  /* sin fuente de titulares: todo en la del sistema, como estaba */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: var(--font-sans);
+}
+:root[data-ui='clasico'] .font-display {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+/* el marco esmeralda de las fichas era parte del look antiguo */
+:root[data-ui='clasico'] .poster {
+  --tw-ring-color: rgba(5, 150, 105, 0.7);
 }
 
-html {
-  color-scheme: dark;
-}
 
 body {
-  @apply bg-ink-950 text-slate-200 antialiased;
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  @apply bg-ink-950 text-zinc-200 antialiased;
+  font-family: var(--font-sans);
+}
+
+/* Page titles and the wordmark. Bodoni is beautiful large and spindly small,
+   so it never goes below ~24px. */
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+}
+
+/* Digits that line up in columns (stats, counters, tables) */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 ::-webkit-scrollbar {
@@ -24,19 +138,32 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #35405c;
+  background: var(--color-ink-600);
   border-radius: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
+/* Surfaces. The border (not a ring) is deliberate: active states across the app
+   mark themselves with `!border-gold-400`, which needs a border to paint. */
 .card {
-  @apply bg-ink-900 border border-ink-700 rounded-xl;
+  @apply bg-ink-900 rounded-xl;
+  border: var(--border-w) solid var(--color-ink-700);
+}
+.card-raised {
+  @apply bg-ink-900 rounded-xl;
+  border: var(--border-w) solid var(--color-ink-700);
+  box-shadow: var(--shadow-hard, 0 10px 20px rgba(0, 0, 0, 0.3));
+}
+.card-float {
+  @apply bg-ink-900 rounded-2xl shadow-2xl shadow-black/60;
+  border: var(--border-w) solid var(--color-ink-700);
 }
 
 .input {
-  @apply bg-ink-800 border border-ink-600 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-gold-400 w-full;
+  @apply bg-ink-800 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-400 w-full;
+  border: var(--border-w) solid var(--color-ink-600);
 }
 
 .btn,
@@ -47,6 +174,135 @@ body {
 .btn-gold {
   @apply bg-gold-500 text-ink-950 hover:bg-gold-400;
 }
+/* hover stays neutral so gold keeps meaning "primary action / selected" */
 .btn-ghost {
-  @apply bg-ink-800 border border-ink-600 text-slate-300 hover:border-gold-400;
+  @apply bg-ink-800 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100;
+  border: var(--border-w) solid var(--color-ink-600);
+}
+
+/* Poster tiles: quiet by default, lift on hover. Used by every grid. */
+.poster {
+  @apply aspect-[2/3] rounded-lg overflow-hidden bg-ink-800 relative transition duration-200
+         group-hover:ring-gold-400/70 group-hover:shadow-xl group-hover:shadow-black/50;
+  box-shadow: 0 0 0 var(--border-w) var(--ring-art);
+}
+/* artwork thumbnails share the poster's edge treatment */
+.ring-art {
+  box-shadow: 0 0 0 var(--border-w) var(--ring-art);
+}
+
+/* Filter chips: pill in the dark looks, stamped rectangle on paper. */
+.chip {
+  @apply rounded-full px-3 py-1 text-xs cursor-pointer transition-colors text-zinc-500;
+  border: var(--border-w) solid var(--color-ink-600);
+}
+.chip:hover {
+  @apply text-zinc-300;
+}
+.chip-on {
+  @apply text-gold-400;
+  border-color: var(--color-gold-400);
+  background: color-mix(in srgb, var(--color-gold-400) 12%, transparent);
+}
+.poster img {
+  @apply w-full h-full object-cover transition duration-300 group-hover:scale-105;
+}
+
+/* --- «Cartelera»: los gestos que hacen que parezca impreso ------------------ */
+:root:not([data-ui]) .font-display,
+:root[data-ui='cartelera'] .font-display {
+  text-transform: uppercase;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+}
+:root:not([data-ui]) .card,
+:root[data-ui='cartelera'] .card,
+:root:not([data-ui]) .card-raised,
+:root[data-ui='cartelera'] .card-raised {
+  box-shadow: var(--shadow-hard);
+}
+:root:not([data-ui]) .btn-gold,
+:root[data-ui='cartelera'] .btn-gold {
+  color: #f6ecd8;
+  border: 2px solid #241c14;
+  box-shadow: 2px 2px 0 #241c14;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+:root:not([data-ui]) .btn-ghost,
+:root[data-ui='cartelera'] .btn-ghost {
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 12px;
+}
+:root:not([data-ui]) .chip,
+:root[data-ui='cartelera'] .chip {
+  border-radius: 2px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+:root:not([data-ui]) .chip-on,
+:root[data-ui='cartelera'] .chip-on {
+  background: #241c14;
+  color: #e9dcc3;
+  border-color: #241c14;
+}
+
+/* La seña de identidad de «Cartelera»: la navegación es un bloque rojo impreso,
+   no una columna del mismo papel que el resto. */
+:root:not([data-ui]) .app-nav,
+:root[data-ui='cartelera'] .app-nav {
+  background: #c8442a;
+  border-color: #241c14;
+}
+:root:not([data-ui]) .app-nav .nav-item,
+:root[data-ui='cartelera'] .app-nav .nav-item {
+  color: #f3d9ce;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 12.5px;
+  border-left-color: transparent;
+}
+:root:not([data-ui]) .app-nav .nav-item:hover,
+:root[data-ui='cartelera'] .app-nav .nav-item:hover {
+  background: rgba(36, 28, 20, 0.16);
+  color: #fff;
+}
+:root:not([data-ui]) .app-nav .nav-item-on,
+:root[data-ui='cartelera'] .app-nav .nav-item-on {
+  background: #f0c04a;
+  color: #7a2114;
+  border-left-color: #241c14;
+}
+:root:not([data-ui]) .app-nav .nav-group,
+:root[data-ui='cartelera'] .app-nav .nav-group {
+  color: rgba(246, 236, 216, 0.65);
+}
+/* el buscador y el contador viven sobre el rojo */
+:root:not([data-ui]) .app-nav button,
+:root[data-ui='cartelera'] .app-nav button {
+  color: #f3d9ce;
+}
+:root:not([data-ui]) .app-nav .bg-ink-800,
+:root[data-ui='cartelera'] .app-nav .bg-ink-800 {
+  background: rgba(36, 28, 20, 0.18);
+  border-color: rgba(246, 236, 216, 0.35);
+  color: #f6ecd8;
+}
+:root:not([data-ui]) .app-nav .text-zinc-500,
+:root:not([data-ui]) .app-nav .text-zinc-600,
+:root[data-ui='cartelera'] .app-nav .text-zinc-500,
+:root[data-ui='cartelera'] .app-nav .text-zinc-600 {
+  color: rgba(246, 236, 216, 0.7);
+}
+/* el wordmark invierte: crema sobre rojo, con el remate en ocre */
+:root:not([data-ui]) .app-nav .font-display,
+:root[data-ui='cartelera'] .app-nav .font-display {
+  color: #f6ecd8;
+}
+:root:not([data-ui]) .app-nav .font-display .text-gold-400,
+:root[data-ui='cartelera'] .app-nav .font-display .text-gold-400 {
+  color: #f0c04a;
 }

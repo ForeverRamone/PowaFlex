@@ -115,7 +115,7 @@ export default function PersonDetail() {
         )}
         <div className="flex-1 min-w-60">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-slate-100">{person.name}</h1>
+            <h1 className="text-2xl font-bold text-zinc-100">{person.name}</h1>
             <DeathBadge deathday={person.deathday} />
             <button
               onClick={toggleTrack}
@@ -133,7 +133,7 @@ export default function PersonDetail() {
             </Link>
           </div>
           {person.birthday && (
-            <div className="text-sm text-slate-500 mt-1">
+            <div className="text-sm text-zinc-500 mt-1">
               {fmtDate(person.birthday)}
               {person.deathday && ` — ${fmtDate(person.deathday)}`}
             </div>
@@ -156,14 +156,14 @@ export default function PersonDetail() {
 
           <div className="mt-3 max-w-md">
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-slate-300">Completismo (como {ROLE_LABEL[active] || active})</span>
+              <span className="text-zinc-300">Completismo (como {ROLE_LABEL[active] || active})</span>
               <span className="text-gold-400 font-semibold">
                 {stats.owned} / {stats.released} · {stats.pct}%
               </span>
             </div>
             <ProgressBar pct={stats.pct} />
             {active === 'director' && (
-              <div className="text-[11px] text-slate-500 mt-1">
+              <div className="text-[11px] text-zinc-500 mt-1">
                 Solo largometrajes
                 {stats.documentarian ? ' (incluye documentales: es documentalista)' : ''}
                 {stats.excludedFromCompletion > 0 && ` · ${stats.excludedFromCompletion} fuera del cómputo (cortos, TV, docs o dirección coral)`}
@@ -174,7 +174,7 @@ export default function PersonDetail() {
             )}
           </div>
           {person.biography && (
-            <p className="text-sm text-slate-400 mt-3 leading-relaxed max-w-3xl line-clamp-4">{person.biography}</p>
+            <p className="text-sm text-zinc-400 mt-3 leading-relaxed max-w-3xl line-clamp-4">{person.biography}</p>
           )}
         </div>
       </div>
@@ -209,9 +209,9 @@ export default function PersonDetail() {
               item={item}
               badge={
                 item.owned ? (
-                  <span className="absolute top-1.5 right-1.5 bg-emerald-600/90 text-white text-[10px] px-1.5 py-0.5 rounded">✓ La tienes</span>
+                  <span className="absolute top-1.5 right-1.5 bg-emerald-600/90 text-white text-[11px] px-1.5 py-0.5 rounded">✓ La tienes</span>
                 ) : !item.released ? (
-                  <span className="absolute top-1.5 right-1.5 bg-sky-600/90 text-white text-[10px] px-1.5 py-0.5 rounded">
+                  <span className="absolute top-1.5 right-1.5 bg-sky-600/90 text-white text-[11px] px-1.5 py-0.5 rounded">
                     {item.date ? fmtDate(item.date) : 'Anunciada'}
                   </span>
                 ) : null

@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
+import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid } from 'lucide-react';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
-  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge,
-} from '../components.jsx';
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge, PageHeader } from '../components.jsx';
 import { toast } from '../toast.js';
 
 const TABS = [
-  ['favorites', '⭐ Tus favoritos'],
-  ['director', '🎬 Directores/as top'],
-  ['actor', '🎭 Actores/actrices top'],
-  ['absent', '🏛 Grandes ausentes'],
+  ['favorites', 'Tus favoritos', Star],
+  ['director', 'Directores/as top', Clapperboard],
+  ['actor', 'Actores/actrices top', Drama],
+  ['absent', 'Grandes ausentes', Landmark],
 ];
 
 // send a visible batch to Radarr in one go
@@ -38,7 +38,7 @@ function GapCard({ f, radarrIds, addRadarrId, onDismiss, person }) {
   return (
     <TmdbCard item={f}>
       {person && (
-        <Link to={`/personas/${person.id}?role=${person.role || 'director'}`} className="text-[11px] text-slate-500 hover:text-gold-400 truncate block">
+        <Link to={`/personas/${person.id}?role=${person.role || 'director'}`} className="text-[11px] text-zinc-500 hover:text-gold-400 truncate block">
           {person.name}
         </Link>
       )}
@@ -52,7 +52,7 @@ function GapCard({ f, radarrIds, addRadarrId, onDismiss, person }) {
         <button
           title="No me interesa: no volverá a aparecer en los huecos"
           onClick={() => onDismiss(f)}
-          className="text-slate-500 hover:text-red-400 text-xs px-1 shrink-0"
+          className="text-zinc-500 hover:text-red-400 text-xs px-1 shrink-0"
         >
           ✕
         </button>
@@ -72,10 +72,10 @@ function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, 
   if (!shown.length) {
     return (
       <section className="card p-3 mb-3 flex items-center justify-between flex-wrap gap-2 text-sm">
-        <Link to={`/personas/${p.id}?role=${p.role || role}`} className="font-semibold text-slate-300 hover:text-gold-400">
+        <Link to={`/personas/${p.id}?role=${p.role || role}`} className="font-semibold text-zinc-300 hover:text-gold-400">
           {p.name} →
         </Link>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-zinc-500">
           {p.missingTotal === 0 ? '✓ filmografía completa' : `${p.missingTotal} te faltan · todas ocultas por tus filtros`}
         </span>
       </section>
@@ -85,17 +85,17 @@ function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, 
   return (
     <section className="card p-4 mb-5">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-        <Link to={`/personas/${p.id}?role=${p.role || role}`} className="font-semibold text-slate-100 hover:text-gold-400">
+        <Link to={`/personas/${p.id}?role=${p.role || role}`} className="font-semibold text-zinc-100 hover:text-gold-400">
           {p.name} →
         </Link>
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-zinc-400">
             Tienes <b className="text-gold-400">{p.owned}</b> de {p.released} estrenadas ({p.pct}%) · {p.missingTotal} te faltan
             {hidden > 0 ? ` · ${hidden} ocultas por filtros` : ''}
           </span>
           {pendingIds.length > 1 && (
-            <button className="btn-ghost !py-1 text-xs shrink-0" onClick={() => sendBulk(pendingIds, addRadarrId)}>
-              ➕ Añadir las {pendingIds.length} visibles a Radarr
+            <button className="btn-ghost !py-1 text-xs shrink-0 inline-flex items-center gap-1.5" onClick={() => sendBulk(pendingIds, addRadarrId)}>
+<Plus size={13} strokeWidth={2.5} /> Añadir las {pendingIds.length} visibles a Radarr
             </button>
           )}
         </div>
@@ -124,7 +124,7 @@ function typeCounts(people) {
 function MinScoreBar({ minScore, setMinScore }) {
   return (
     <div className="flex items-center gap-2 flex-wrap text-sm">
-      <span className="text-xs text-slate-500">Nota mínima Σ:</span>
+      <span className="text-xs text-zinc-500">Nota mínima Σ:</span>
       {[0, 40, 50, 60, 70].map((v) => (
         <button
           key={v}
@@ -134,7 +134,7 @@ function MinScoreBar({ minScore, setMinScore }) {
           {v === 0 ? 'Todas' : `Σ ≥ ${v}`}
         </button>
       ))}
-      <span className="text-xs text-slate-600">(las sin nota no se ocultan)</span>
+      <span className="text-xs text-zinc-600">(las sin nota no se ocultan)</span>
     </div>
   );
 }
@@ -168,12 +168,12 @@ function FilmGrid({ people, show, minScore, dismissed, onDismiss, radarrIds, add
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-        <span className="text-sm text-slate-400">
+        <span className="text-sm text-zinc-400">
           <b className="text-gold-400">{films.length}</b> películas te faltan en total
         </span>
         {pendingIds.length > 1 && (
-          <button className="btn-gold !py-1 text-xs" onClick={() => sendBulk(pendingIds.slice(0, 300), addRadarrId)}>
-            ➕ Añadir {Math.min(pendingIds.length, 300)} a Radarr
+          <button className="btn-gold !py-1 text-xs inline-flex items-center gap-1.5" onClick={() => sendBulk(pendingIds.slice(0, 300), addRadarrId)}>
+<Plus size={13} strokeWidth={2.5} /> Añadir {Math.min(pendingIds.length, 300)} a Radarr
           </button>
         )}
       </div>
@@ -243,35 +243,35 @@ function GapsView({
   return (
     <div>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-zinc-500">
           {intro} Actualizado {new Date(data.generatedAt).toLocaleString('es-ES')}.
           {complete > 0 && <span className="text-emerald-400"> · {complete} con filmografía completa</span>}
         </p>
-        <button className="btn-ghost !py-1 shrink-0" onClick={() => load(true)} disabled={refreshing}>
-          {refreshing ? 'Actualizando…' : '↻ Actualizar'}
+        <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={() => load(true)} disabled={refreshing}>
+          {refreshing ? 'Actualizando…' : <><RotateCw size={13} strokeWidth={2} /> Actualizar</>}
         </button>
       </div>
 
       {data.people.length === 0 ? (
-        <Empty>Nada que rellenar aquí. 🏆</Empty>
+        <Empty>Nada que rellenar aquí: filmografías completas.</Empty>
       ) : (
         <>
           <div className="card p-3 mb-4 space-y-3">
             <div className="flex items-center gap-2 flex-wrap text-sm">
-              <span className="text-xs text-slate-500">Vista:</span>
+              <span className="text-xs text-zinc-500">Vista:</span>
               <button
                 onClick={() => setViewPref('person')}
-                className={`btn-ghost !py-1 text-xs ${view === 'person' ? '!border-gold-400 text-gold-400' : ''}`}
+                className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${view === 'person' ? '!border-gold-400 text-gold-400' : ''}`}
               >
-                👤 Por persona
+<User size={13} strokeWidth={2} /> Por persona
               </button>
               <button
                 onClick={() => setViewPref('grid')}
-                className={`btn-ghost !py-1 text-xs ${view === 'grid' ? '!border-gold-400 text-gold-400' : ''}`}
+                className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${view === 'grid' ? '!border-gold-400 text-gold-400' : ''}`}
               >
-                ▦ Todas las películas juntas
+<LayoutGrid size={13} strokeWidth={2} /> Todas las películas juntas
               </button>
-              <span className="text-xs text-slate-500 ml-2">Ordenar:</span>
+              <span className="text-xs text-zinc-500 ml-2">Ordenar:</span>
               {view === 'person' ? (
                 <select className="input !w-auto !py-1 text-xs" value={personSort} onChange={(e) => setPersonSortPref(e.target.value)}>
                   {Object.entries(PERSON_SORTS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}
@@ -359,17 +359,17 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
       ) : (
       <>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-zinc-500">
           Del canon de {data.checked} grandes directores/as de{' '}
           <a href={canonUrl} target="_blank" rel="noreferrer" className="underline hover:text-gold-400">They Shoot Pictures</a>,{' '}
           <b className="text-gold-400">{data.absent.length} no tienen ni una película en tu Plex</b> ({data.present.length} sí están).
         </p>
-        <button className="btn-ghost !py-1 shrink-0" onClick={() => load(true)} disabled={refreshing}>
-          {refreshing ? 'Actualizando…' : '↻ Actualizar'}
+        <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={() => load(true)} disabled={refreshing}>
+          {refreshing ? 'Actualizando…' : <><RotateCw size={13} strokeWidth={2} /> Actualizar</>}
         </button>
       </div>
       {data.absent.length === 0 ? (
-        <Empty>Están todos. Eres un completista de verdad. 🏆</Empty>
+        <Empty>Están todos. Eres un completista de verdad.</Empty>
       ) : (
         data.absent.map((d) => {
           const top = d.top.filter((f) => !dismissed.has(f.tmdb_id));
@@ -381,15 +381,15 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
               {d.profile_path ? (
                 <img src={tmdbImg(d.profile_path, 'w185')} alt="" className="w-12 h-12 rounded-full object-cover" />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-ink-700 flex items-center justify-center">🎬</div>
+                <div className="w-12 h-12 rounded-full bg-ink-700 flex items-center justify-center text-zinc-500"><Clapperboard size={18} /></div>
               )}
               <div className="flex-1">
-                <div className="font-semibold text-slate-100">{d.name}</div>
-                <div className="text-xs text-slate-500">{d.filmCount} películas dirigidas · 0 en tu Plex</div>
+                <div className="font-semibold text-zinc-100">{d.name}</div>
+                <div className="text-xs text-zinc-500">{d.filmCount} películas dirigidas · 0 en tu Plex</div>
               </div>
               {pendingIds.length > 1 && (
-                <button className="btn-ghost !py-1 text-xs shrink-0" onClick={() => sendBulk(pendingIds, addRadarrId)}>
-                  ➕ Añadir las {pendingIds.length} a Radarr
+                <button className="btn-ghost !py-1 text-xs shrink-0 inline-flex items-center gap-1.5" onClick={() => sendBulk(pendingIds, addRadarrId)}>
+<Plus size={13} strokeWidth={2.5} /> Añadir las {pendingIds.length} a Radarr
                 </button>
               )}
             </div>
@@ -404,12 +404,12 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
       )}
       {data.present.length > 0 && (
         <details className="mt-6">
-          <summary className="text-sm text-slate-400 cursor-pointer hover:text-slate-200">
+          <summary className="text-sm text-zinc-400 cursor-pointer hover:text-zinc-200">
             Ver los {data.present.length} del canon que sí tienes
           </summary>
           <div className="flex flex-wrap gap-2 mt-3">
             {data.present.map((p) => (
-              <span key={p.name} className="text-xs bg-ink-800 border border-ink-600 rounded-full px-3 py-1 text-slate-300">
+              <span key={p.name} className="text-xs bg-ink-800 border border-ink-600 rounded-full px-3 py-1 text-zinc-300">
                 {p.name} <span className="text-gold-400">({p.inLibrary})</span>
               </span>
             ))}
@@ -447,8 +447,8 @@ export default function Discover() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-2">Descubrir huecos</h1>
-      <p className="text-sm text-slate-500 mb-4 max-w-3xl">
+      <PageHeader eyebrow="La caza" title="Descubrir huecos" />
+      <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
         Lo que le falta a tu colección. <b>Tus favoritos</b> son los que tú eliges en{' '}
         <Link to="/favoritos" className="text-gold-400 hover:underline">Favoritos</Link>, cada uno en la faceta por la
         que le sigues; los <b>top</b> son los más presentes en tu biblioteca; y <b>grandes ausentes</b> son nombres del
@@ -457,23 +457,23 @@ export default function Discover() {
       </p>
 
       <div className="flex gap-2 mb-4 flex-wrap">
-        {TABS.map(([t, label]) => (
-          <button key={t} onClick={() => setTab(t)} className={tab === t ? 'btn-gold' : 'btn-ghost'}>
-            {label}
+        {TABS.map(([t, label, Icon]) => (
+          <button key={t} onClick={() => setTab(t)} className={`${tab === t ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
+            <Icon size={15} strokeWidth={1.75} /> {label}
           </button>
         ))}
       </div>
 
       {tab === 'favorites' && (
         <div className="flex gap-2 mb-4 flex-wrap items-center">
-          <span className="text-xs text-slate-500">Faceta:</span>
-          {[['director', '🎬 Como directores/as'], ['actor', '🎭 Como actores/actrices']].map(([r, label]) => (
+          <span className="text-xs text-zinc-500">Faceta:</span>
+          {[['director', 'Como directores/as', Clapperboard], ['actor', 'Como actores/actrices', Drama]].map(([r, label, Icon]) => (
             <button
               key={r}
               onClick={() => setFavRolePref(r)}
-              className={`btn-ghost !py-1 text-xs ${favRole === r ? '!border-gold-400 text-gold-400' : ''}`}
+              className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${favRole === r ? '!border-gold-400 text-gold-400' : ''}`}
             >
-              {label}
+              <Icon size={13} strokeWidth={2} /> {label}
             </button>
           ))}
         </div>

@@ -1,7 +1,11 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
-import { Spinner, Toaster, GlobalSearch } from './components.jsx';
-import { api } from './api.js';
+import {
+  LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy, Layers,
+  Eye, HardDrive, Settings as SettingsIcon, HelpCircle, Search, Menu, X,
+} from 'lucide-react';
+import { Spinner, Toaster, GlobalSearch, LetterboxdLogo } from './components.jsx';
+import { api, applyTheme } from './api.js';
 
 // lazy per route so heavy pages (and recharts) don't weigh down the first paint
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
@@ -19,21 +23,44 @@ const Lists = lazy(() => import('./pages/Lists.jsx'));
 const About = lazy(() => import('./pages/About.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
-const NAV = [
-  { to: '/', label: 'Dashboard', icon: '📊' },
-  { to: '/biblioteca', label: 'Biblioteca', icon: '🎞️' },
-  { to: '/personas', label: 'Directores/as y actores/actrices', icon: '🎭' },
-  { to: '/calendario', label: 'Cine venidero', icon: '🗓️' },
-  { to: '/favoritos', label: 'Favoritos', icon: '⭐' },
-  { to: '/descubrir', label: 'Descubrir huecos', icon: '🧭' },
-  { to: '/listas', label: 'Listas y retos', icon: '🏆' },
-  { to: '/colecciones', label: 'Sagas', icon: '📚' },
-  { to: '/visionado', label: 'Visionado', icon: '👁️' },
-  { to: '/calidad', label: 'Calidad y disco', icon: '💾' },
-  { to: '/letterboxd', label: 'Letterboxd', icon: '🟠' },
-  { to: '/ajustes', label: 'Ajustes', icon: '⚙️' },
-  { to: '/acerca', label: '¿Qué es PowaFlex?', icon: '❓' },
+// grouped so the eye finds things: what you have, what you hunt, everything else
+const NAV_GROUPS = [
+  {
+    label: 'Tu colección',
+    items: [
+      { to: '/', label: 'Dashboard', Icon: LayoutDashboard },
+      { to: '/biblioteca', label: 'Biblioteca', Icon: Film },
+      { to: '/personas', label: 'Directores y actores', Icon: Users },
+      { to: '/colecciones', label: 'Sagas', Icon: Layers },
+      { to: '/visionado', label: 'Visionado', Icon: Eye },
+      { to: '/calidad', label: 'Calidad y disco', Icon: HardDrive },
+    ],
+  },
+  {
+    label: 'La caza',
+    items: [
+      { to: '/favoritos', label: 'Favoritos', Icon: Star },
+      { to: '/descubrir', label: 'Descubrir huecos', Icon: Compass },
+      { to: '/calendario', label: 'Cine venidero', Icon: CalendarDays },
+      { to: '/listas', label: 'Listas y retos', Icon: Trophy },
+    ],
+  },
+  {
+    label: 'Cuenta',
+    items: [
+      // the logo is a wide 3-dot mark: give it a size that reads at nav scale
+      { to: '/letterboxd', label: 'Letterboxd', Icon: () => <LetterboxdLogo size={7} className="shrink-0" /> },
+      { to: '/ajustes', label: 'Ajustes', Icon: SettingsIcon },
+      { to: '/acerca', label: '¿Qué es PowaFlex?', Icon: HelpCircle },
+    ],
+  },
 ];
+
+const Wordmark = ({ className = '' }) => (
+  <span className={`font-display tracking-wide ${className}`}>
+    Powa<span className="text-gold-400">Flex</span>
+  </span>
+);
 
 function Shell() {
   const navigate = useNavigate();
@@ -47,55 +74,81 @@ function Shell() {
       if (!s.plex && window.location.pathname !== '/ajustes') navigate('/ajustes');
     });
     api('/version').then((v) => v.label && setVersion(v));
-    // mirror the headline-rating pref so poster cards can read it synchronously (#5)
-    api('/settings').then((st) => st && localStorage.setItem('primary_rating', st.primary_rating || 'score'));
+    // mirror display prefs locally: cards read the rating synchronously and
+    // index.html applies the look before paint
+    api('/settings').then((st) => {
+      if (!st) return;
+      localStorage.setItem('primary_rating', st.primary_rating || 'score');
+      applyTheme(st.ui_theme || 'cartelera');
+    });
   }, []);
 
   return (
     <div className="flex min-h-screen">
       {/* mobile top bar */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-30 flex items-center gap-3 bg-ink-900 border-b border-ink-700 px-4 h-14">
-        <button onClick={() => setOpen(true)} className="text-slate-200 text-2xl leading-none" aria-label="Menú">☰</button>
-        <div className="text-lg font-black text-gold-400">Powa<span className="text-slate-100">Flex</span></div>
-        <button onClick={() => window.dispatchEvent(new Event('powaflex-search'))} className="ml-auto text-slate-300 text-xl" aria-label="Buscar">🔍</button>
+      <div className="app-nav md:hidden fixed top-0 inset-x-0 z-30 flex items-center gap-3 bg-ink-900 border-b border-ink-700 px-4 h-14">
+        <button onClick={() => setOpen(true)} className="text-zinc-300 hover:text-zinc-100" aria-label="Menú">
+          <Menu size={20} strokeWidth={1.75} />
+        </button>
+        <Wordmark className="text-lg text-zinc-100" />
+        <button
+          onClick={() => window.dispatchEvent(new Event('powaflex-search'))}
+          className="ml-auto text-zinc-300 hover:text-zinc-100"
+          aria-label="Buscar"
+        >
+          <Search size={18} strokeWidth={1.75} />
+        </button>
       </div>
       {open && <div className="md:hidden fixed inset-0 bg-black/60 z-40" onClick={() => setOpen(false)} />}
 
       <aside
-        className={`w-56 shrink-0 border-r border-ink-700 bg-ink-900 p-4 flex flex-col gap-1 z-50 fixed md:sticky top-0 h-screen overflow-y-auto transition-transform ${
+        className={`app-nav w-56 shrink-0 border-r border-ink-700 bg-ink-900 py-4 flex flex-col z-50 fixed md:sticky top-0 h-screen overflow-y-auto transition-transform ${
           open ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0`}
       >
-        <div className="text-xl font-black text-gold-400 mb-3 px-2 flex items-center justify-between">
-          <span>Powa<span className="text-slate-100">Flex</span></span>
-          <button onClick={() => setOpen(false)} className="md:hidden text-slate-400 text-xl" aria-label="Cerrar">✕</button>
+        <div className="mb-4 px-5 flex items-center justify-between">
+          <Wordmark className="text-2xl text-zinc-100" />
+          <button onClick={() => setOpen(false)} className="md:hidden text-zinc-500" aria-label="Cerrar">
+            <X size={18} />
+          </button>
         </div>
         <button
           onClick={() => { setOpen(false); window.dispatchEvent(new Event('powaflex-search')); }}
-          className="mb-3 mx-1 flex items-center gap-2 text-sm text-slate-400 bg-ink-800 border border-ink-600 rounded-lg px-3 py-2 hover:border-gold-400"
+          className="mb-4 mx-4 flex items-center gap-2 text-sm text-zinc-400 bg-ink-800 border border-ink-600 rounded-lg px-3 py-2 hover:border-zinc-500 hover:text-zinc-200 transition-colors"
         >
-          🔍 Buscar… <span className="ml-auto text-[10px] text-slate-600">⌘K</span>
+          <Search size={15} strokeWidth={1.75} /> Buscar…
+          <span className="ml-auto text-[11px] text-zinc-600">⌘K</span>
         </button>
-        {NAV.map((n) => (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            end={n.to === '/'}
-            onClick={() => setOpen(false)}
-            className={({ isActive }) =>
-              `px-3 py-2 rounded-lg text-sm flex items-center gap-2.5 transition-colors ${
-                isActive
-                  ? 'bg-ink-700 text-gold-400 font-medium'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-ink-800'
-              }`
-            }
-          >
-            <span>{n.icon}</span> {n.label}
-          </NavLink>
+
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} className="mb-3">
+            <div className="nav-group px-5 pb-1 text-[11px] font-semibold tracking-[0.18em] uppercase text-zinc-600">
+              {group.label}
+            </div>
+            {group.items.map(({ to, label, Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  `nav-item pl-4 pr-3 py-2 text-sm flex items-center gap-2.5 border-l-2 transition-colors ${
+                    isActive
+                      ? 'nav-item-on border-gold-400 bg-gold-400/5 text-gold-400 font-medium'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-ink-800'
+                  }`
+                }
+              >
+                <Icon size={16} strokeWidth={1.75} className="shrink-0" />
+                <span className="truncate">{label}</span>
+              </NavLink>
+            ))}
+          </div>
         ))}
+
         {setup && setup.movies > 0 && (
-          <div className="mt-auto pt-4 text-xs text-slate-500 px-2">
-            {setup.movies.toLocaleString('es-ES')} películas sincronizadas
+          <div className="mt-auto pt-4 text-xs text-zinc-500 px-5">
+            <span className="tabular">{setup.movies.toLocaleString('es-ES')}</span> películas sincronizadas
             {setup.newlyAdded > 0 && (
               <span className="text-emerald-400" title="Añadidas en la última sincronización">
                 {' '}+{setup.newlyAdded.toLocaleString('es-ES')}
@@ -110,7 +163,7 @@ function Shell() {
           target="_blank"
           rel="noreferrer"
           title={`PowaFlex ${version.version} — ver novedades en GitHub`}
-          className="fixed bottom-2 right-3 z-40 text-[10px] text-slate-600 hover:text-gold-400 transition-colors"
+          className="fixed bottom-2 right-3 z-40 text-[11px] text-zinc-600 hover:text-gold-400 transition-colors"
         >
           {version.label}
         </a>

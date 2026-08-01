@@ -409,7 +409,7 @@ const roleRaw = (credits, role) => {
   return credits.cast || [];
 };
 
-function buildRoleItems(credits, role, inLib, widx) {
+export function buildRoleItems(credits, role, inLib, widx) {
   const now = today();
   const seen = new Set();
   const items = [];
@@ -429,6 +429,7 @@ function buildRoleItems(credits, role, inLib, widx) {
       watched: isWatched({ tmdb_id: c.id, title: c.title, year: date ? Number(date.slice(0, 4)) : null }, widx),
       poster_path: c.poster_path,
       vote: c.vote_average,
+      votes: c.vote_count ?? 0, // vote volume: the gaps flow filters obscure credits by it
       popularity: c.popularity,
       character: c.character || null,
       job: c.job || null,
@@ -446,7 +447,7 @@ function buildRoleItems(credits, role, inLib, widx) {
 // Completeness bar. For directors it counts features only (#6): no shorts, no
 // TV movies, no "coral" 3+ director films (#7), and no documentaries unless the
 // person is a documentarian (>5 directed docs). Other roles count every release.
-function roleStats(items, role) {
+export function roleStats(items, role) {
   const released = items.filter((i) => i.released);
   const base = { upcoming: items.filter((i) => !i.released).length };
   if (role !== 'director') {

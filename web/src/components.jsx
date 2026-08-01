@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { api, fmtDuration, tmdbImg, ratingLinks, primaryRating } from './api.js';
 import { onToast, toast } from './toast.js';
 
@@ -33,20 +34,43 @@ function PrimaryRating({ movie }) {
     if (src === 'imdb' && movie.imdb != null)
       return <span className="text-yellow-500">IMDb {Number(movie.imdb).toFixed(1)}</span>;
     if (src === 'letterboxd' && movie.letterboxd != null)
-      return <span className="inline-flex items-center gap-1 text-slate-300"><LetterboxdLogo size={9} /> {Number(movie.letterboxd).toFixed(1)}</span>;
+      return <span className="inline-flex items-center gap-1 text-zinc-300"><LetterboxdLogo size={9} /> {Number(movie.letterboxd).toFixed(1)}</span>;
   }
   return null;
 }
 
-// Consistent status colours across the app (#3): 🟢 en Plex · 🟡 vista.
+// Consistent status marks across the app: emerald dot = in Plex, gold star = watched.
 export function StatusLegend({ className = '' }) {
   return (
-    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400 ${className}`}>
-      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm border-2 border-emerald-500" /> En Plex</span>
-      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm border-2 border-ink-600" /> Te falta</span>
+    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500 ${className}`}>
+      <span className="flex items-center gap-1.5">
+        <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,.9)]" /> En Plex
+      </span>
+      <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-ink-600" /> Te falta</span>
       <span className="flex items-center gap-1.5"><span className="text-gold-400">★</span> Vista</span>
-      <span className="flex items-center gap-1.5"><span className="text-ink-500">★</span> Sin ver</span>
     </div>
+  );
+}
+
+/**
+ * Page masthead: a gold eyebrow in small caps over a display-face title. Two
+ * lines of markup that give every page the same anchor.
+ */
+export function PageHeader({ eyebrow, title, subtitle, action, children }) {
+  return (
+    <header className="mb-7">
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          {eyebrow && (
+            <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-gold-400/80 mb-1">{eyebrow}</p>
+          )}
+          <h1 className="font-display text-3xl md:text-4xl text-zinc-100 leading-tight text-balance">{title}</h1>
+        </div>
+        {action}
+      </div>
+      {subtitle && <p className="text-sm text-zinc-400 mt-2 max-w-3xl leading-relaxed">{subtitle}</p>}
+      {children}
+    </header>
   );
 }
 
@@ -86,27 +110,57 @@ export function GlobalSearch() {
   if (!open) return null;
   const go = (path) => { setOpen(false); setQ(''); navigate(path); };
   return (
-    <div className="fixed inset-0 bg-black/60 z-[70] flex items-start justify-center p-4 pt-24" onClick={() => setOpen(false)}>
-      <div className="card w-full max-w-xl p-3" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-start justify-center p-4 pt-24"
+      onClick={() => setOpen(false)}
+    >
+      <div className="card-float w-full max-w-xl p-3" onClick={(e) => e.stopPropagation()}>
         <input autoFocus className="input" placeholder="Buscar película o persona…" value={q} onChange={(e) => setQ(e.target.value)} />
         {res && (
           <div className="mt-2 max-h-[60vh] overflow-y-auto">
-            {res.people?.length > 0 && <div className="text-xs text-slate-500 px-1 mt-1 mb-0.5">Personas</div>}
+            {res.people?.length > 0 && (
+              <div className="text-[11px] uppercase tracking-widest text-zinc-600 px-2 mt-1 mb-1">Personas</div>
+            )}
             {res.people?.map((p) => (
-              <button key={`p${p.id}`} className="w-full text-left px-2 py-1.5 rounded hover:bg-ink-800 text-sm text-slate-200" onClick={() => go(`/personas/${p.id}?role=${p.role}`)}>
-                🎭 {p.name} <span className="text-slate-500 text-xs">· {p.total} títulos</span>
+              <button
+                key={`p${p.id}`}
+                className="w-full text-left px-2 py-1.5 rounded hover:bg-ink-800 text-sm text-zinc-200 flex items-center gap-2.5"
+                onClick={() => go(`/personas/${p.id}?role=${p.role}`)}
+              >
+                {p.thumb ? (
+                  <img src={`/img/person/${p.id}`} alt="" loading="lazy" className="w-7 h-7 rounded-full object-cover bg-ink-700 shrink-0" />
+                ) : (
+                  <span className="w-7 h-7 rounded-full bg-ink-700 text-zinc-500 text-[11px] flex items-center justify-center shrink-0">
+                    {p.name.slice(0, 1)}
+                  </span>
+                )}
+                <span className="truncate">{p.name}</span>
+                <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{p.total} títulos</span>
               </button>
             ))}
-            {res.movies?.length > 0 && <div className="text-xs text-slate-500 px-1 mt-2 mb-0.5">Películas</div>}
+            {res.movies?.length > 0 && (
+              <div className="text-[11px] uppercase tracking-widest text-zinc-600 px-2 mt-3 mb-1">Películas</div>
+            )}
             {res.movies?.map((m) => (
-              <button key={`m${m.rating_key}`} className="w-full text-left px-2 py-1.5 rounded hover:bg-ink-800 text-sm text-slate-200" onClick={() => setSel(m.rating_key)}>
-                🎬 {m.title} <span className="text-slate-500 text-xs">({m.year ?? '¿?'})</span>
+              <button
+                key={`m${m.rating_key}`}
+                className="w-full text-left px-2 py-1.5 rounded hover:bg-ink-800 text-sm text-zinc-200 flex items-center gap-2.5"
+                onClick={() => setSel(m.rating_key)}
+              >
+                <img
+                  src={`/img/${m.rating_key}/poster`}
+                  alt=""
+                  loading="lazy"
+                  className="w-7 h-10 rounded-sm object-cover bg-ink-700 ring-art shrink-0"
+                />
+                <span className="truncate">{m.title}</span>
+                <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{m.year ?? '¿?'}</span>
               </button>
             ))}
-            {!res.people?.length && !res.movies?.length && <div className="text-sm text-slate-500 px-2 py-3">Nada encontrado.</div>}
+            {!res.people?.length && !res.movies?.length && <div className="text-sm text-zinc-500 px-2 py-3">Nada encontrado.</div>}
           </div>
         )}
-        {!res && <div className="text-xs text-slate-500 px-2 py-3">Escribe para buscar en tu biblioteca. Atajo: Ctrl/⌘ + K.</div>}
+        {!res && <div className="text-xs text-zinc-500 px-2 py-3">Escribe para buscar en tu biblioteca. Atajo: Ctrl/⌘ + K.</div>}
       </div>
       {sel && <MovieModal id={sel} onClose={() => { setSel(null); setOpen(false); }} />}
     </div>
@@ -134,7 +188,7 @@ export function Toaster() {
               ? 'bg-red-950 border-red-800 text-red-200'
               : t.type === 'success'
                 ? 'bg-emerald-950 border-emerald-800 text-emerald-200'
-                : 'bg-ink-800 border-ink-600 text-slate-200'
+                : 'bg-ink-800 border-ink-600 text-zinc-200'
           }`}
         >
           {t.message}
@@ -167,8 +221,8 @@ export function Dropzone({ accept, multiple = true, onFiles, busy = false, label
     >
       <input ref={inputRef} type="file" accept={accept} multiple={multiple} className="hidden" onChange={(e) => pick(e.target.files)} />
       <div className="text-3xl mb-2">{busy ? '⏳' : '📥'}</div>
-      <div className="text-sm text-slate-200">{busy ? 'Importando…' : label || 'Arrastra aquí tus archivos o haz clic para elegir'}</div>
-      {hint && <div className="text-xs text-slate-500 mt-1">{hint}</div>}
+      <div className="text-sm text-zinc-200">{busy ? 'Importando…' : label || 'Arrastra aquí tus archivos o haz clic para elegir'}</div>
+      {hint && <div className="text-xs text-zinc-500 mt-1">{hint}</div>}
       {names.length > 0 && !busy && (
         <div className="text-xs text-gold-400 mt-2 truncate">{names.length} archivo(s): {names.join(', ')}</div>
       )}
@@ -208,7 +262,7 @@ export function RatingsChips({ ratings, movie, className = '' }) {
 
 export function Spinner({ label = 'Cargando…' }) {
   return (
-    <div className="flex items-center gap-3 text-slate-400 py-10 justify-center">
+    <div className="flex items-center gap-3 text-zinc-400 py-10 justify-center">
       <div className="w-5 h-5 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
       {label}
     </div>
@@ -223,12 +277,14 @@ export function ErrorBox({ error }) {
   );
 }
 
+// Numbers read as data, not as accents: gold is reserved for actions and
+// favourites, so the figure itself is white in the display face.
 export function StatCard({ label, value, sub }) {
   return (
     <div className="card p-4">
-      <div className="text-2xl font-bold text-gold-400">{value}</div>
-      <div className="text-sm text-slate-400 mt-1">{label}</div>
-      {sub && <div className="text-xs text-slate-500 mt-1">{sub}</div>}
+      <div className="font-display text-3xl text-zinc-100 tabular leading-none">{value}</div>
+      <div className="text-sm text-zinc-400 mt-2">{label}</div>
+      {sub && <div className="text-xs text-zinc-500 mt-1">{sub}</div>}
     </div>
   );
 }
@@ -237,7 +293,7 @@ export function Section({ title, action, children }) {
   return (
     <section className="mb-8">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
+        <h2 className="text-lg font-semibold text-zinc-100">{title}</h2>
         {action}
       </div>
       {children}
@@ -253,34 +309,35 @@ export function MovieCard({ movie, onClick }) {
       className="group text-left cursor-pointer w-full"
       title={`${movie.title} (${movie.year ?? '¿?'})`}
     >
-      <div className="aspect-[2/3] rounded-lg overflow-hidden bg-ink-800 border border-emerald-600/70 group-hover:border-gold-400 transition-colors relative">
+      {/* everything here is in your library, so no "owned" colour: a clean
+          poster with a quiet ring, lifting on hover */}
+      <div className="poster">
         {!imgError ? (
           <img
             src={`/img/${movie.rating_key}/poster`}
             alt={movie.title}
             loading="lazy"
             onError={() => setImgError(true)}
-            className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-center p-2 text-xs text-slate-400">
+          <div className="w-full h-full flex items-center justify-center text-center p-2 text-[11px] text-zinc-400">
             {movie.title}
           </div>
         )}
         <WatchedStar watched={movie.watched != null ? movie.watched : movie.view_count > 0} />
         {movie.resolution === '4k' && (
-          <span className="absolute bottom-1.5 left-1.5 bg-black/70 text-gold-400 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+          <span className="absolute bottom-1.5 left-1.5 bg-black/70 text-zinc-100 text-[11px] px-1.5 py-0.5 rounded font-semibold">
             4K
           </span>
         )}
         {movie.hdr && (
-          <span className="absolute bottom-1.5 right-1.5 bg-black/70 text-sky-300 text-[10px] px-1.5 py-0.5 rounded">
+          <span className="absolute bottom-1.5 right-1.5 bg-black/70 text-zinc-300 text-[11px] px-1.5 py-0.5 rounded">
             {movie.hdr === 'Dolby Vision' ? 'DV' : 'HDR'}
           </span>
         )}
       </div>
-      <div className="mt-1.5 text-xs text-slate-300 truncate">{movie.title}</div>
-      <div className="text-[11px] text-slate-500 flex gap-2 items-center">
+      <div className="mt-1.5 text-xs text-zinc-300 truncate group-hover:text-zinc-100 transition-colors">{movie.title}</div>
+      <div className="text-[11px] text-zinc-500 flex gap-2 items-center tabular">
         <span>{movie.year ?? '—'}</span>
         <PrimaryRating movie={movie} />
       </div>
@@ -292,29 +349,34 @@ export function TmdbCard({ item, badge, children }) {
   const img = tmdbImg(item.poster_path);
   const [openFicha, setOpenFicha] = useState(false);
   return (
-    <div className="text-left">
+    <div className="text-left group">
       <button
         type="button"
         onClick={() => item.tmdb_id && setOpenFicha(true)}
-        className={`block w-full aspect-[2/3] rounded-lg overflow-hidden bg-ink-800 border relative cursor-pointer group ${
-          item.owned ? 'border-emerald-600' : 'border-ink-700 hover:border-gold-400'
-        }`}
+        className="block w-full poster cursor-pointer"
         title={`${item.title} — ver ficha`}
       >
         {img ? (
-          <img src={img} alt={item.title} loading="lazy" className="w-full h-full object-cover" />
+          <img src={img} alt={item.title} loading="lazy" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-center p-2 text-xs text-slate-400">
+          <div className="w-full h-full flex items-center justify-center text-center p-2 text-[11px] text-zinc-400">
             {item.title}
           </div>
         )}
         <WatchedStar watched={item.watched} />
+        {/* "in Plex" is information, not decoration: a dot, not a green frame */}
+        {item.owned && !badge && (
+          <span
+            title="Ya está en tu Plex"
+            className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,.9)]"
+          />
+        )}
         {badge}
       </button>
-      <div className="mt-1.5 text-xs text-slate-300 truncate" title={item.title}>
+      <div className="mt-1.5 text-xs text-zinc-300 truncate group-hover:text-zinc-100 transition-colors" title={item.title}>
         {item.title}
       </div>
-      <div className="text-[11px] text-slate-500">{item.date ? item.date.slice(0, 4) : 'Sin fecha'}</div>
+      <div className="text-[11px] text-zinc-500 tabular">{item.date ? item.date.slice(0, 4) : 'Sin fecha'}</div>
       {children}
       {openFicha && <MediaModal tmdbId={item.tmdb_id} onClose={() => setOpenFicha(false)} />}
     </div>
@@ -369,20 +431,22 @@ export function RadarrButton({ tmdbId, small = false, alreadyInRadarr = false, o
 }
 
 // Ask JustWatch whether a better-quality digital version exists on the market (#2).
-export function JustWatchCheck({ tmdbId }) {
-  const [r, setR] = useState(null);
+// `result` lets a batch check (Calidad) fill these in without one request per card
+export function JustWatchCheck({ tmdbId, result = null }) {
+  const [own, setOwn] = useState(null);
   const [busy, setBusy] = useState(false);
+  const r = own || result;
   const check = async () => {
     setBusy(true);
-    setR(await api(`/justwatch/${tmdbId}`));
+    setOwn(await api(`/justwatch/${tmdbId}`));
     setBusy(false);
   };
   if (r) {
-    if (r.error) return <span className="text-[10px] text-red-400">JustWatch no responde</span>;
-    if (!r.maxQuality) return <span className="text-[10px] text-slate-500">Sin oferta digital encontrada</span>;
+    if (r.error) return <span className="text-[11px] text-red-400">JustWatch no responde</span>;
+    if (!r.maxQuality) return <span className="text-[11px] text-zinc-500">Sin oferta digital encontrada</span>;
     return (
       <span
-        className={`text-[10px] ${r.upgradeable ? 'text-emerald-400' : 'text-slate-500'}`}
+        className={`text-[11px] ${r.upgradeable ? 'text-emerald-400' : 'text-zinc-500'}`}
         title={r.providers?.length ? `En ${r.providers.join(', ')}` : ''}
       >
         {r.upgradeable ? `↑ Hay ${r.maxQuality} en el mercado` : `Máx. ${r.maxQuality} disponible`}
@@ -390,7 +454,7 @@ export function JustWatchCheck({ tmdbId }) {
     );
   }
   return (
-    <button onClick={check} disabled={busy} className="text-[10px] text-sky-400 hover:underline cursor-pointer">
+    <button onClick={check} disabled={busy} className="text-[11px] text-sky-400 hover:underline cursor-pointer">
       {busy ? 'Consultando…' : '¿existe mejor versión?'}
     </button>
   );
@@ -417,11 +481,11 @@ export function PersonCard({ person, role }) {
         )}
       </div>
       <div className="min-w-0">
-        <div className="text-sm font-medium text-slate-200 truncate flex items-center gap-1.5">
+        <div className="text-sm font-medium text-zinc-200 truncate flex items-center gap-1.5">
           <span className="truncate">{person.name}</span>
           <DeathBadge deathday={person.deathday} />
         </div>
-        <div className="text-xs text-slate-500">
+        <div className="text-xs text-zinc-500">
           {person.n} películas
           {person.watched != null && <span> · {person.watched} vistas</span>}
         </div>
@@ -442,7 +506,7 @@ export function ProgressBar({ pct }) {
 }
 
 export function Empty({ children }) {
-  return <div className="text-slate-500 text-sm py-8 text-center">{children}</div>;
+  return <div className="text-zinc-500 text-sm py-8 text-center">{children}</div>;
 }
 
 // Poster-grid skeleton for loading states.
@@ -467,14 +531,14 @@ export function BuildProgress({ label = 'Construyendo desde TMDB…' }) {
   }, []);
   return (
     <div className="py-12 max-w-md mx-auto text-center">
-      <div className="flex items-center gap-3 justify-center text-slate-400 mb-4">
+      <div className="flex items-center gap-3 justify-center text-zinc-400 mb-4">
         <div className="w-5 h-5 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
         {label}
       </div>
       {p && p.total > 0 && (
         <>
           <ProgressBar pct={Math.round((p.done / p.total) * 100)} />
-          <div className="text-xs text-slate-500 mt-2">{p.label} · {p.done} / {p.total}</div>
+          <div className="text-xs text-zinc-500 mt-2">{p.label} · {p.done} / {p.total}</div>
         </>
       )}
     </div>
@@ -518,24 +582,29 @@ export const matchesTypeFilters = (item, show) =>
   (show.tv || !item.isTvMovie) && (show.coral || !item.isCoral) &&
   (show.cameos || !item.isCameo);
 
+// Toggle chips, not struck-through buttons: strikethrough reads as
+// "unavailable", and this bar sits above the gaps grid all day long.
 export function TypeFilterBar({ show, toggle, counts }) {
+  const items = [
+    ['shorts', 'Cortos', counts?.shorts],
+    ['docs', 'Documentales', counts?.docs],
+    ['tv', 'Películas de TV', counts?.tv],
+    ['coral', 'Dirección coral', counts?.coral],
+    ['cameos', 'Cameos', counts?.cameos],
+  ].filter(([, , n]) => n == null || n > 0);
+  if (!items.length) return null;
   return (
-    <div className="card p-3 mb-4 flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-slate-500 text-xs mr-1">Mostrar:</span>
-      {[
-        ['shorts', 'Cortos', counts?.shorts],
-        ['docs', 'Documentales', counts?.docs],
-        ['tv', 'Películas de TV', counts?.tv],
-        ['coral', 'Dirección coral', counts?.coral],
-        ['cameos', 'Cameos', counts?.cameos],
-      ].filter(([, , n]) => n == null || n > 0).map(([k, label, n]) => (
+    <div className="flex flex-wrap items-center gap-1.5 mb-4 text-sm">
+      <span className="text-zinc-500 text-xs mr-1">Mostrar:</span>
+      {items.map(([k, label, n]) => (
         <button
           key={k}
           onClick={() => toggle(k)}
           title={show[k] ? `Ocultar ${label.toLowerCase()}` : `Mostrar ${label.toLowerCase()}`}
-          className={`btn-ghost !py-1 ${show[k] ? '!border-gold-400 text-gold-400' : 'line-through opacity-60'}`}
+          className={`chip ${show[k] ? 'chip-on' : ''}`}
         >
-          {show[k] ? '👁 ' : '🚫 '}{label}{n != null ? ` (${n})` : ''}
+          {label}
+          {n != null && <span className="tabular opacity-70"> {n}</span>}
         </button>
       ))}
     </div>
@@ -548,7 +617,7 @@ export function DeathBadge({ deathday, className = '' }) {
   return (
     <span
       title={`Fallecido${year ? ` en ${year}` : ''}`}
-      className={`text-[10px] px-1.5 py-0.5 rounded bg-ink-700 text-slate-400 ${className}`}
+      className={`text-[11px] px-1.5 py-0.5 rounded bg-ink-700 text-zinc-400 ${className}`}
     >
       ✝ {year}
     </span>
@@ -638,7 +707,7 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
           {p.id ? (
             <Link className={cls} to={`/personas/${p.id}?role=${role}`} onClick={onClose}>{p.name}</Link>
           ) : (
-            <span className="text-slate-300">{p.name}</span>
+            <span className="text-zinc-300">{p.name}</span>
           )}
         </span>
       ))}
@@ -646,41 +715,52 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
   );
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="card max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6 flex gap-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="card-float max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6 flex gap-6 relative" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="absolute top-3 right-3 text-zinc-500 hover:text-zinc-100 transition-colors z-10"
+        >
+          <X size={18} />
+        </button>
         {!vm ? (
           err ? <ErrorBox error={err} /> : <Spinner label="Cargando ficha…" />
         ) : (
           <>
             {vm.posterUrl && (
-              <img src={vm.posterUrl} alt="" className="w-44 rounded-lg shrink-0 hidden sm:block object-cover self-start" />
+              <img
+                src={vm.posterUrl}
+                alt=""
+                className="w-44 rounded-lg shrink-0 hidden sm:block object-cover self-start ring-art shadow-2xl shadow-black/60"
+              />
             )}
             <div className="min-w-0">
-              <h2 className="text-xl font-bold text-slate-100">
-                {vm.title} <span className="text-slate-500 font-normal">({vm.year ?? '¿?'})</span>
+              <h2 className="font-display text-3xl text-zinc-100 leading-tight text-balance">
+                {vm.title} <span className="text-zinc-500 font-normal">({vm.year ?? '¿?'})</span>
               </h2>
-              {vm.tagline && <div className="text-gold-400 text-sm italic mt-1">{vm.tagline}</div>}
+              {vm.tagline && <div className="text-zinc-400 text-sm italic mt-1">{vm.tagline}</div>}
               {vm.originalTitle && vm.originalTitle !== vm.title && (
-                <div className="text-sm text-slate-500 italic">{vm.originalTitle}</div>
+                <div className="text-sm text-zinc-500 italic">{vm.originalTitle}</div>
               )}
-              <div className="text-xs text-slate-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              <div className="text-xs text-zinc-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
                 {vm.runtimeMin ? <span>{fmtDuration(vm.runtimeMin * 60000)}</span> : null}
-                {owned?.resolution && <span className="text-slate-300">{owned.resolution.toUpperCase?.() || owned.resolution}</span>}
+                {owned?.resolution && <span className="text-zinc-300">{owned.resolution.toUpperCase?.() || owned.resolution}</span>}
                 {owned?.hdr && <span className="text-sky-300">{owned.hdr}</span>}
                 {owned?.video_codec && <span>{owned.video_codec}</span>}
                 {owned?.view_count > 0 && <span className="text-gold-400">★ Vista {owned.view_count}×</span>}
               </div>
               <RatingsChips ratings={vm.ratings} movie={vm} className="mt-2" />
-              {vm.overview && <p className="text-sm text-slate-300 mt-3 leading-relaxed">{vm.overview}</p>}
+              {vm.overview && <p className="text-sm text-zinc-300 mt-3 leading-relaxed">{vm.overview}</p>}
               <div className="mt-3 text-sm">
                 {vm.directors.length > 0 && (
-                  <div><span className="text-slate-500">Dirección: </span><PersonLinks people={vm.directors} role="director" cls="text-gold-400 hover:underline" /></div>
+                  <div><span className="text-zinc-500">Dirección: </span><PersonLinks people={vm.directors} role="director" cls="text-zinc-100 hover:text-gold-400 hover:underline" /></div>
                 )}
                 {vm.cast.length > 0 && (
-                  <div className="mt-1"><span className="text-slate-500">Reparto: </span><PersonLinks people={vm.cast} role="actor" cls="text-slate-300 hover:text-gold-400 hover:underline" /></div>
+                  <div className="mt-1"><span className="text-zinc-500">Reparto: </span><PersonLinks people={vm.cast} role="actor" cls="text-zinc-300 hover:text-gold-400 hover:underline" /></div>
                 )}
                 {(vm.genres.length > 0 || vm.countries.length > 0) && (
-                  <div className="mt-1 text-slate-400 text-xs">{vm.genres.join(' · ')}{vm.countries.length > 0 && ` · ${vm.countries.join(', ')}`}</div>
+                  <div className="mt-1 text-zinc-400 text-xs">{vm.genres.join(' · ')}{vm.countries.length > 0 && ` · ${vm.countries.join(', ')}`}</div>
                 )}
               </div>
               <div className="mt-4">
@@ -697,7 +777,7 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
                   vm.tmdb_id && <RadarrButton tmdbId={vm.tmdb_id} alreadyInRadarr={vm.inRadarr} />
                 )}
               </div>
-              {owned?.file_path && <div className="mt-2 text-[11px] text-slate-600 break-all">{owned.file_path}</div>}
+              {owned?.file_path && <div className="mt-2 text-[11px] text-zinc-600 break-all">{owned.file_path}</div>}
             </div>
           </>
         )}

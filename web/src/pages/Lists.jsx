@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Spinner, ErrorBox, Empty, ProgressBar, MovieModal } from '../components.jsx';
+import { Spinner, ErrorBox, Empty, ProgressBar, MovieModal, PageHeader } from '../components.jsx';
 
 // --- Letterboxd completista rings -------------------------------------------
 
@@ -29,7 +29,7 @@ function DualRing({ ownedPct, watchedPct, mode, size = 64 }) {
           <circle cx={cx} cy={cx} r={r2} fill="none" stroke="#34d399" strokeWidth={s} strokeDasharray={c(r2)} strokeDashoffset={off(r2, watchedPct)} strokeLinecap="round" />
         </>
       )}
-      <text x="50%" y="50%" transform={`rotate(90 ${cx} ${cx})`} textAnchor="middle" dominantBaseline="central" className="fill-slate-200" style={{ fontSize: 12, fontWeight: 700 }}>
+      <text x="50%" y="50%" transform={`rotate(90 ${cx} ${cx})`} textAnchor="middle" dominantBaseline="central" className="fill-zinc-200" style={{ fontSize: 12, fontWeight: 700 }}>
         {headline}%
       </text>
     </svg>
@@ -80,13 +80,13 @@ function ChallengeDetail({ listId, onChanged }) {
         <div className="max-h-96 overflow-y-auto card divide-y divide-ink-800">
           {shown.map((i, idx) => (
             <div key={idx} className="flex items-center gap-3 px-4 py-1.5 text-sm">
-              {i.position != null && <span className="text-slate-600 w-8 text-right shrink-0">{i.position}.</span>}
+              {i.position != null && <span className="text-zinc-600 w-8 text-right shrink-0">{i.position}.</span>}
               {i.movie_id ? (
-                <button className="text-slate-200 hover:text-gold-400 truncate text-left" onClick={() => setSelected(i.movie_id)}>
-                  {i.title} <span className="text-slate-500">({i.year ?? '¿?'})</span>
+                <button className="text-zinc-200 hover:text-gold-400 truncate text-left" onClick={() => setSelected(i.movie_id)}>
+                  {i.title} <span className="text-zinc-500">({i.year ?? '¿?'})</span>
                 </button>
               ) : (
-                <span className="text-slate-300 truncate">{i.title} <span className="text-slate-500">({i.year ?? '¿?'})</span></span>
+                <span className="text-zinc-300 truncate">{i.title} <span className="text-zinc-500">({i.year ?? '¿?'})</span></span>
               )}
               <span className="ml-auto flex items-center gap-2 shrink-0 text-xs">
                 {i.movie_id && <span className="text-gold-400" title="En tu Plex">📀</span>}
@@ -110,27 +110,27 @@ function ChallengeCard({ l, mode, open, setOpen, load }) {
         <DualRing ownedPct={ownedPct} watchedPct={watchedPct} mode={mode} />
         <div className="min-w-0 flex-1">
           <button
-            className="font-medium text-slate-100 hover:text-gold-400 text-left text-sm block truncate w-full"
+            className="font-medium text-zinc-100 hover:text-gold-400 text-left text-sm block truncate w-full"
             onClick={() => setOpen(open === l.id ? null : l.id)}
             title={l.name}
           >
             {l.official ? '🏅 ' : ''}{l.name}
           </button>
-          <div className="text-xs text-slate-400 mt-1 flex gap-3">
+          <div className="text-xs text-zinc-400 mt-1 flex gap-3">
             <span title="En tu Plex"><b className="text-gold-400">{l.owned || 0}</b>/{l.item_count} tengo</span>
             <span title="Vistas (Plex o Letterboxd)"><b className="text-emerald-400">{l.watched || 0}</b>/{l.item_count} vistas</span>
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs">
-            {l.url && <a href={l.url} target="_blank" rel="noreferrer" className="text-slate-500 hover:text-gold-400">Letterboxd ↗</a>}
+            {l.url && <a href={l.url} target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-gold-400">Letterboxd ↗</a>}
             <button
-              className="text-slate-500 hover:text-gold-400"
+              className="text-zinc-500 hover:text-gold-400"
               title={l.hidden ? 'Mostrar' : 'Ocultar este reto'}
               onClick={async () => { await api(`/letterboxd/lists/${l.id}/hide`, { method: 'POST', body: { hidden: !l.hidden } }); load(); }}
             >
               {l.hidden ? '👁 Mostrar' : '🚫 Ocultar'}
             </button>
             <button
-              className="text-slate-500 hover:text-red-400"
+              className="text-zinc-500 hover:text-red-400"
               title="Quitar reto"
               onClick={async () => { await api(`/letterboxd/lists/${l.id}`, { method: 'DELETE' }); if (open === l.id) setOpen(null); load(); }}
             >
@@ -174,14 +174,14 @@ function LetterboxdChallenges() {
   return (
     <div>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-        <h2 className="text-lg font-semibold text-slate-100">Anillos de completista</h2>
+        <h2 className="text-lg font-semibold text-zinc-100">Anillos de completista</h2>
         <div className="flex gap-1">
           {[['owned', '📀 Tengo'], ['watched', '👁️ Visto'], ['both', 'Ambos']].map(([v, label]) => (
             <button key={v} onClick={() => setMode(v)} className={`btn-ghost !py-1 text-xs ${mode === v ? '!border-gold-400 text-gold-400' : ''}`}>{label}</button>
           ))}
         </div>
       </div>
-      <p className="text-sm text-slate-500 mb-4 max-w-3xl">
+      <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
         Tus listas de Letterboxd como anillos de completismo. Anillo exterior <span className="text-gold-400">dorado</span> = las que
         <b> tienes en Plex</b>; anillo interior <span className="text-emerald-400">verde</span> = las que <b>has visto</b> (Plex o Letterboxd).
         Importa el zip en <a href="/letterboxd" className="text-gold-400 hover:underline">Letterboxd</a> o pega la URL de cualquier lista pública.
@@ -203,7 +203,7 @@ function LetterboxdChallenges() {
 
       {hidden.length > 0 && (
         <div className="mt-6">
-          <button className="text-sm text-slate-400 hover:text-gold-400" onClick={() => setShowHidden(!showHidden)}>
+          <button className="text-sm text-zinc-400 hover:text-gold-400" onClick={() => setShowHidden(!showHidden)}>
             {showHidden ? '▾' : '▸'} Retos ocultos ({hidden.length})
           </button>
           {showHidden && (
@@ -270,17 +270,17 @@ function ListDetail({ listId, onChanged }) {
         <div className="max-h-96 overflow-y-auto card divide-y divide-ink-800">
           {shown.map((i) => (
             <div key={i.tmdb_id} className="flex items-center gap-3 px-4 py-1.5 text-sm">
-              {i.rank != null && <span className="text-slate-600 w-10 text-right shrink-0">{i.rank}.</span>}
+              {i.rank != null && <span className="text-zinc-600 w-10 text-right shrink-0">{i.rank}.</span>}
               {i.owned && i.rating_key ? (
-                <button className="text-slate-200 hover:text-gold-400 truncate text-left" onClick={() => setSelected(i.rating_key)}>
-                  {i.title} <span className="text-slate-500">({i.year ?? '¿?'})</span>
+                <button className="text-zinc-200 hover:text-gold-400 truncate text-left" onClick={() => setSelected(i.rating_key)}>
+                  {i.title} <span className="text-zinc-500">({i.year ?? '¿?'})</span>
                 </button>
               ) : (
-                <span className="text-slate-300 truncate">
-                  {i.title} <span className="text-slate-500">({i.year ?? '¿?'})</span>
+                <span className="text-zinc-300 truncate">
+                  {i.title} <span className="text-zinc-500">({i.year ?? '¿?'})</span>
                 </span>
               )}
-              <span className="ml-auto flex items-center gap-3 shrink-0 text-xs text-slate-500">
+              <span className="ml-auto flex items-center gap-3 shrink-0 text-xs text-zinc-500">
                 {i.imdb != null && <span>IMDb {Number(i.imdb).toFixed(1)}</span>}
                 {i.owned ? (
                   <span className="text-emerald-400">✓{i.view_count > 0 ? ' vista' : ''}</span>
@@ -355,8 +355,8 @@ export default function Lists() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-100 mb-2">Listas y retos</h1>
-      <p className="text-sm text-slate-500 mb-4 max-w-3xl">
+      <PageHeader eyebrow="La caza" title="Listas y retos" />
+      <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
         Convierte listas famosas en retos de completismo: qué % tienes, qué has visto, qué te falta y envío a Radarr.
       </p>
       <div className="flex gap-2 mb-6">
@@ -368,7 +368,7 @@ export default function Lists() {
         <LetterboxdChallenges />
       ) : (
       <>
-      <p className="text-sm text-slate-500 mb-5 max-w-3xl">
+      <p className="text-sm text-zinc-500 mb-5 max-w-3xl">
         Sigue listas de MDBList (1001 películas, palmarés de premios, tops de la comunidad…). Necesita la API key de
         MDBList en Ajustes.
       </p>
@@ -399,14 +399,14 @@ export default function Lists() {
 
       {results && (
         <div className="card p-4 mb-6">
-          <h3 className="text-sm font-semibold text-slate-300 mb-2">Resultados ({results.length})</h3>
+          <h3 className="text-sm font-semibold text-zinc-300 mb-2">Resultados ({results.length})</h3>
           {results.length === 0 && <Empty>Nada encontrado.</Empty>}
           <div className="divide-y divide-ink-800">
             {results.slice(0, 20).map((r) => (
               <div key={r.mdb_id} className="flex items-center gap-3 py-2 text-sm">
                 <div className="min-w-0">
-                  <div className="text-slate-200 truncate">{r.name}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-zinc-200 truncate">{r.name}</div>
+                  <div className="text-xs text-zinc-500">
                     de {r.user_name ?? '¿?'} · {r.item_count ?? '¿?'} títulos{r.likes != null && ` · ${r.likes} ❤`}
                   </div>
                 </div>
@@ -428,22 +428,22 @@ export default function Lists() {
             <section key={l.id} className="card p-4 mb-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <button
-                  className="font-semibold text-slate-100 hover:text-gold-400 text-left"
+                  className="font-semibold text-zinc-100 hover:text-gold-400 text-left"
                   onClick={() => setOpen(open === l.id ? null : l.id)}
                 >
                   {open === l.id ? '▾' : '▸'} {l.name}
                 </button>
-                <div className="text-xs text-slate-400 flex items-center gap-3">
+                <div className="text-xs text-zinc-400 flex items-center gap-3">
                   <span>
                     <b className="text-gold-400">{l.owned || 0}</b> / {l.items} · {pct}%
                   </span>
                   {l.url && (
-                    <a href={l.url} target="_blank" rel="noreferrer" className="text-slate-500 hover:text-gold-400">
+                    <a href={l.url} target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-gold-400">
                       MDBList ↗
                     </a>
                   )}
                   <button
-                    className="text-slate-500 hover:text-gold-400"
+                    className="text-zinc-500 hover:text-gold-400"
                     title="Actualizar la lista desde MDBList"
                     onClick={async () => {
                       await api(`/mdblist/lists/${l.id}/refresh`, { method: 'POST' });
@@ -453,7 +453,7 @@ export default function Lists() {
                     ↻
                   </button>
                   <button
-                    className="text-slate-500 hover:text-red-400"
+                    className="text-zinc-500 hover:text-red-400"
                     title="Dejar de seguir"
                     onClick={async () => {
                       await api(`/mdblist/lists/${l.id}`, { method: 'DELETE' });

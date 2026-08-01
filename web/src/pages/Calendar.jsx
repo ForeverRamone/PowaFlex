@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
+import { Plus, RotateCw } from 'lucide-react';
 import {
   Spinner, ErrorBox, RadarrButton, Empty, useRadarrIds, MediaModal, BuildProgress,
   useTypeFilters, matchesTypeFilters, TypeFilterBar,
@@ -35,37 +36,37 @@ function EventCard({ ev, radarrIds, onAdded }) {
       </button>
       {ficha && <MediaModal tmdbId={ev.tmdb_id} onClose={() => setFicha(false)} />}
       <div className="min-w-0 flex-1">
-        <div className="font-medium text-slate-100 text-sm">
+        <div className="font-medium text-zinc-100 text-sm">
           {ev.title}
           {typeBadges(ev).map(([label, cls]) => (
-            <span key={label} className={`ml-1.5 align-middle text-[10px] px-1.5 py-0.5 rounded ${cls}`}>
+            <span key={label} className={`ml-1.5 align-middle text-[11px] px-1.5 py-0.5 rounded ${cls}`}>
               {label}
             </span>
           ))}
         </div>
         {ev.original_title !== ev.title && (
-          <div className="text-xs text-slate-500 italic">{ev.original_title}</div>
+          <div className="text-xs text-zinc-500 italic">{ev.original_title}</div>
         )}
         <div className="text-xs text-gold-400 mt-1">
           {ev.date ? fmtDate(ev.date) : 'Fecha por anunciar'}
-          {ev.runtime ? <span className="text-slate-500"> · {ev.runtime} min</span> : null}
+          {ev.runtime ? <span className="text-zinc-500"> · {ev.runtime} min</span> : null}
         </div>
-        <div className="text-xs text-slate-400 mt-1">
+        <div className="text-xs text-zinc-400 mt-1">
           {ev.people.map((p, i) => (
             <span key={`${p.id ?? p.name}-${p.credit}`}>
               {i > 0 && ' · '}
               {p.credit}{' '}
               {p.id ? (
-                <Link to={`/personas/${p.id}?role=${p.credit === 'Dirige' ? 'director' : 'actor'}`} className="text-slate-200 hover:text-gold-400">
+                <Link to={`/personas/${p.id}?role=${p.credit === 'Dirige' ? 'director' : 'actor'}`} className="text-zinc-200 hover:text-gold-400">
                   {p.name}
                 </Link>
               ) : (
-                <span className="text-slate-300">{p.name}</span>
+                <span className="text-zinc-300">{p.name}</span>
               )}
             </span>
           ))}
         </div>
-        {ev.overview && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{ev.overview}</p>}
+        {ev.overview && <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{ev.overview}</p>}
         <div className="mt-2">
           {ev.inLibrary ? (
             <span className="text-emerald-400 text-xs">✓ Ya en tu biblioteca</span>
@@ -106,7 +107,7 @@ export default function Calendar() {
   if (error)
     return (
       <div>
-        <h1 className="text-2xl font-bold text-slate-100 mb-4">Cine venidero</h1>
+        <h1 className="text-2xl font-bold text-zinc-100 mb-4">Cine venidero</h1>
         <ErrorBox error={`${error} — comprueba la API key de TMDB en Ajustes.`} />
       </div>
     );
@@ -164,12 +165,12 @@ export default function Calendar() {
   return (
     <div>
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-slate-100">Cine venidero</h1>
-        <button className="btn-ghost" onClick={() => load(true)} disabled={refreshing}>
-          {refreshing ? 'Actualizando…' : '↻ Actualizar desde TMDB'}
+        <h1 className="text-2xl font-bold text-zinc-100">Cine venidero</h1>
+        <button className="btn-ghost inline-flex items-center gap-2" onClick={() => load(true)} disabled={refreshing}>
+          {refreshing ? 'Actualizando…' : <><RotateCw size={14} strokeWidth={2} /> Actualizar desde TMDB</>}
         </button>
       </div>
-      <p className="text-sm text-slate-500 mb-6">
+      <p className="text-sm text-zinc-500 mb-6">
         Estrenos próximos y proyectos anunciados de los {data.peopleCount} directores/actores vigilados: el top
         automático de tu biblioteca más tus <Link to="/favoritos" className="text-gold-400 hover:underline">favoritos</Link>.
         Generado {new Date(data.generatedAt).toLocaleString('es-ES')}.
@@ -177,11 +178,11 @@ export default function Calendar() {
 
       <TypeFilterBar show={show} toggle={toggleFilter} counts={counts} />
       {hiddenCount > 0 && (
-        <p className="text-xs text-slate-500 -mt-2 mb-6">{hiddenCount} ocultas por tus filtros — solo cine largometraje</p>
+        <p className="text-xs text-zinc-500 -mt-2 mb-6">{hiddenCount} ocultas por tus filtros — solo cine largometraje</p>
       )}
 
       <div className="card p-3 mb-6 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-slate-400">Monitorizar en bloque lo visible de los próximos</span>
+        <span className="text-zinc-400">Monitorizar en bloque lo visible de los próximos</span>
         <select className="input !w-auto !py-1" value={horizon} onChange={(e) => setHorizon(e.target.value)}>
           <option value="3">3 meses</option>
           <option value="6">6 meses</option>
@@ -189,17 +190,17 @@ export default function Calendar() {
           <option value="24">2 años</option>
           <option value="all">todo (incl. sin fecha)</option>
         </select>
-        <button className="btn-gold !py-1.5" onClick={bulkAdd} disabled={bulk.running || eligible.length === 0}>
-          {bulk.running ? 'Añadiendo…' : `➕ Añadir ${eligible.length} a Radarr`}
+        <button className="btn-gold !py-1.5 inline-flex items-center gap-2" onClick={bulkAdd} disabled={bulk.running || eligible.length === 0}>
+          {bulk.running ? 'Añadiendo…' : <><Plus size={14} strokeWidth={2.5} /> Añadir {eligible.length} a Radarr</>}
         </button>
         {bulk.summary && <span className="text-xs text-emerald-400">{bulk.summary}</span>}
         {!bulk.running && !bulk.summary && beyondHorizon > 0 && (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-zinc-500">
             ({beyondHorizon} más pendientes fuera de ese plazo — amplía el horizonte para incluirlas)
           </span>
         )}
         {!bulk.running && eligible.length === 0 && beyondHorizon === 0 && !bulk.summary && (
-          <span className="text-xs text-slate-500">Nada pendiente en ese plazo: todo está en tu Plex o en Radarr.</span>
+          <span className="text-xs text-zinc-500">Nada pendiente en ese plazo: todo está en tu Plex o en Radarr.</span>
         )}
       </div>
 
@@ -230,7 +231,7 @@ export default function Calendar() {
 
       {recent.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-slate-400 mb-3">Estrenadas recientemente (últimos 60 días)</h2>
+          <h2 className="text-lg font-semibold text-zinc-400 mb-3">Estrenadas recientemente (últimos 60 días)</h2>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
             {recent.reverse().map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} onAdded={addRadarrId} />)}
           </div>

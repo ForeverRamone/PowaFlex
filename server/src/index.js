@@ -3,6 +3,7 @@ import fastifyStatic from '@fastify/static';
 import multipart from '@fastify/multipart';
 import path from 'node:path';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { db, DATA_DIR, getAllSettings, setSetting, getSetting } from './db.js';
 import { plexTest, plexConfig, runSync, syncStatus, movieSections } from './plex.js';
@@ -15,6 +16,8 @@ import {
   searchMovieId,
   tmdbMovieDetail,
   buildProgress,
+  setBuildProgress,
+  clearBuildProgress,
   suggestedPeople,
   trackByTmdb,
   searchPeople,
@@ -65,6 +68,30 @@ import * as q from './queries.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf-8'));
 const app = Fastify({ logger: { level: 'info' } });
+
+// --- optional authentication ----------------------------------------------------
+// POWAFLEX_AUTH="user:password" turns on HTTP Basic for the whole panel (API,
+// images and the SPA). Basic is the only scheme the browser replays by itself on
+// every same-origin request, so web/ needs no login screen and no custom header.
+// If the value has no ":", the user is "powaflex" and the value is the password.
+// Undefined variable = exactly the previous behaviour (no auth at all).
+// Only /api/version stays open, so the Docker HEALTHCHECK needs no credentials.
+const AUTH_OPEN_PATHS = new Set(['/api/version']);
+if (process.env.POWAFLEX_AUTH) {
+  const raw = process.env.POWAFLEX_AUTH.includes(':')
+    ? process.env.POWAFLEX_AUTH
+    : `powaflex:${process.env.POWAFLEX_AUTH}`;
+  const expected = Buffer.from(`Basic ${Buffer.from(raw, 'utf-8').toString('base64')}`, 'utf-8');
+  app.addHook('onRequest', async (req, reply) => {
+    if (AUTH_OPEN_PATHS.has((req.raw.url || '').split('?')[0])) return;
+    const got = Buffer.from(req.headers.authorization || '', 'utf-8');
+    // timingSafeEqual needs equal lengths, so the length check goes first
+    if (got.length === expected.length && crypto.timingSafeEqual(got, expected)) return;
+    reply.header('WWW-Authenticate', 'Basic realm="PowaFlex", charset="UTF-8"');
+    return reply.code(401).send({ error: 'No autorizado' });
+  });
+  console.log('[PowaFlex] Autenticación básica activada (POWAFLEX_AUTH)');
+}
 
 app.get('/api/version', async () => ({
   version: pkg.version,
@@ -356,13 +383,22 @@ app.get('/api/media/:tmdbId', async (req, reply) => {
       db.prepare('SELECT imdb, imdb_votes, rt_critic, rt_audience, metacritic, letterboxd, trakt, score FROM mdb_ratings WHERE tmdb_id = ?').get(tmdbId) || null
     );
     const inRadarr = !!db.prepare('SELECT 1 FROM radarr_movies WHERE tmdb_id = ?').get(tmdbId);
-    // map TMDB person ids to our library people, so cast/crew link to their pages
+    // map TMDB person ids to our library people, so cast/crew link to their
+    // pages — asking only for the ~15 ids on this ficha, not the whole table
+    const crew = (det.credits?.crew || []).filter((c) => c.job === 'Director');
+    const castCredits = (det.credits?.cast || []).slice(0, 14);
+    const wanted = [...new Set([...crew, ...castCredits].map((c) => c.id).filter(Boolean))];
     const peopleByTmdb = new Map(
-      db.prepare('SELECT id, tmdb_id FROM people WHERE tmdb_id IS NOT NULL').all().map((r) => [r.tmdb_id, r.id])
+      wanted.length
+        ? db
+            .prepare(`SELECT id, tmdb_id FROM people WHERE tmdb_id IN (${wanted.map(() => '?').join(',')})`)
+            .all(...wanted)
+            .map((r) => [r.tmdb_id, r.id])
+        : []
     );
     const mapPerson = (c) => ({ id: peopleByTmdb.get(c.id) ?? null, tmdb_id: c.id, name: c.name, character: c.character || null });
-    const directors = (det.credits?.crew || []).filter((c) => c.job === 'Director').map(mapPerson);
-    const cast = (det.credits?.cast || []).slice(0, 14).map(mapPerson);
+    const directors = crew.map(mapPerson);
+    const cast = castCredits.map(mapPerson);
     return {
       tmdb_id: tmdbId,
       title: det.title,
@@ -427,6 +463,58 @@ app.get('/api/justwatch/:tmdbId', async (req, reply) => {
     const av = await availability(title, year);
     return { ...av, ownedResolution: m?.resolution || null, upgradeable: isUpgradeable(m?.resolution, av.maxQuality) };
   } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+/**
+ * Same check for a whole batch, so "Calidad" can tell which upgrade candidates
+ * actually have a better version on the market and filter by it. JustWatch is
+ * unofficial: keep the concurrency low and let per-title failures through as
+ * `error` instead of failing the batch. Answers are cached 3 days upstream, so
+ * re-running is cheap.
+ */
+app.post('/api/justwatch/batch', async (req, reply) => {
+  try {
+    const ids = [...new Set((req.body?.tmdbIds || []).map(Number).filter(Boolean))].slice(0, 400);
+    if (!ids.length) {
+      reply.code(400);
+      return { error: 'Falta tmdbIds' };
+    }
+    const owned = new Map(
+      db
+        .prepare(`SELECT tmdb_id, title, original_title, year, resolution FROM movies WHERE tmdb_id IN (${ids.map(() => '?').join(',')})`)
+        .all(...ids)
+        .map((m) => [m.tmdb_id, m])
+    );
+    const results = {};
+    let done = 0;
+    setBuildProgress('justwatch', 'Consultando JustWatch', 0, ids.length);
+    let i = 0;
+    async function worker() {
+      for (;;) {
+        const idx = i++;
+        if (idx >= ids.length) return;
+        const tmdbId = ids[idx];
+        const m = owned.get(tmdbId);
+        try {
+          const title = m?.original_title || m?.title;
+          if (!title) throw new Error('sin título en la biblioteca');
+          const av = await availability(title, m.year || null);
+          results[tmdbId] = { ...av, ownedResolution: m.resolution || null, upgradeable: isUpgradeable(m.resolution, av.maxQuality) };
+        } catch (err) {
+          results[tmdbId] = { maxQuality: null, providers: [], error: String(err.message || err) };
+        }
+        setBuildProgress('justwatch', 'Consultando JustWatch', ++done, ids.length);
+      }
+    }
+    await Promise.all(Array.from({ length: 3 }, worker));
+    clearBuildProgress('justwatch');
+    const upgradeable = Object.values(results).filter((r) => r.upgradeable).length;
+    return { checked: ids.length, upgradeable, results };
+  } catch (err) {
+    clearBuildProgress('justwatch');
     reply.code(502);
     return { error: String(err.message || err) };
   }

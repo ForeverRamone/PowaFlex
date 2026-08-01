@@ -55,21 +55,24 @@ export async function availability(title, year) {
   const hit = cacheRead(cacheKey, 3 * DAY);
   if (hit) return hit;
 
-  let out = { maxQuality: null, providers: [], offers: 0 };
+  let node;
   try {
-    const node = await search(title, year);
-    const offers = node?.offers || [];
-    let best = 0;
-    const providers = new Set();
-    for (const o of offers) {
-      best = Math.max(best, RANK[o.presentationType] || 0);
-      if (o.package?.clearName) providers.add(o.package.clearName);
-    }
-    const maxKey = Object.keys(RANK).find((k) => RANK[k] === best);
-    out = { maxQuality: best ? LABEL[maxKey] : null, providers: [...providers].slice(0, 8), offers: offers.length };
+    node = await search(title, year);
   } catch (err) {
-    out = { maxQuality: null, providers: [], error: String(err.message || err) };
+    // A timeout or a JustWatch hiccup is not an answer: caching it would mark
+    // the film as "sin oferta digital" for three days. Return it uncached.
+    return { maxQuality: null, providers: [], offers: 0, error: String(err.message || err) };
   }
+
+  const offers = node?.offers || [];
+  let best = 0;
+  const providers = new Set();
+  for (const o of offers) {
+    best = Math.max(best, RANK[o.presentationType] || 0);
+    if (o.package?.clearName) providers.add(o.package.clearName);
+  }
+  const maxKey = Object.keys(RANK).find((k) => RANK[k] === best);
+  const out = { maxQuality: best ? LABEL[maxKey] : null, providers: [...providers].slice(0, 8), offers: offers.length };
   cacheWrite(cacheKey, out);
   return out;
 }

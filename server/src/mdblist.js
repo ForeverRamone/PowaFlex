@@ -18,7 +18,13 @@ async function mdbFetch(path, { method = 'GET', body = null, params = {} } = {})
     body: body ? JSON.stringify(body) : null,
     signal: AbortSignal.timeout(30000),
   });
-  if (res.status === 429) throw new Error('MDBList: límite de peticiones alcanzado (429)');
+  if (res.status === 429) {
+    // flagged so callers can stop the whole batch loop instead of hammering a
+    // rate-limited API and reporting success
+    const err = new Error('MDBList: límite de peticiones alcanzado (429). Inténtalo más tarde.');
+    err.rateLimited = true;
+    throw err;
+  }
   if (!res.ok) throw new Error(`MDBList ${res.status} en ${path}`);
   return res.json();
 }
@@ -99,25 +105,38 @@ function parseItem(item) {
 
 /**
  * Fetch ratings for up to ~100 TMDB ids. Tries the batch endpoint first and
- * falls back to per-title GETs if the instance doesn't accept it.
+ * falls back to per-title GETs if the instance doesn't accept it. A 429
+ * propagates (it is not a per-title failure: the whole sync has to stop), and
+ * only the requests actually issued are charged to the daily budget.
  */
 export async function fetchRatingsBatch(tmdbIds) {
+  apiKey(); // no key = no request leaves: must not spend budget either
   let items = null;
+  let used = 0;
   try {
-    const res = await mdbFetch('/tmdb/movie', { method: 'POST', body: { ids: tmdbIds } });
-    items = Array.isArray(res) ? res : res.movies || res.results || null;
-  } catch {
-    items = null;
-  }
-  if (!items) {
-    items = [];
-    for (const id of tmdbIds) {
-      try {
-        items.push(await mdbFetch(`/tmdb/movie/${id}`));
-      } catch {}
+    try {
+      used = 1;
+      const res = await mdbFetch('/tmdb/movie', { method: 'POST', body: { ids: tmdbIds } });
+      used = tmdbIds.length; // the batch endpoint is billed per title
+      items = Array.isArray(res) ? res : res.movies || res.results || null;
+    } catch (err) {
+      if (err.rateLimited) throw err;
+      items = null; // endpoint not supported here: fall back to per-title GETs
     }
+    if (!items) {
+      items = [];
+      for (const id of tmdbIds) {
+        used++;
+        try {
+          items.push(await mdbFetch(`/tmdb/movie/${id}`));
+        } catch (err) {
+          if (err.rateLimited) throw err;
+        }
+      }
+    }
+  } finally {
+    if (used) addUsage(used);
   }
-  addUsage(tmdbIds.length);
   const parsed = items.map(parseItem).filter(Boolean);
   const tx = db.transaction(() => {
     for (const p of parsed) upsertRating.run(p);
@@ -131,6 +150,7 @@ export const mdbSyncStatus = {
   total: 0,
   done: 0,
   error: null,
+  rateLimited: false,
   finishedAt: null,
 };
 
@@ -140,7 +160,7 @@ export const mdbSyncStatus = {
  */
 export async function syncRatings() {
   if (mdbSyncStatus.running) return mdbSyncStatus;
-  Object.assign(mdbSyncStatus, { running: true, total: 0, done: 0, error: null, finishedAt: null });
+  Object.assign(mdbSyncStatus, { running: true, total: 0, done: 0, error: null, rateLimited: false, finishedAt: null });
   try {
     apiKey();
     const cutoff = Date.now() - WEEK;
@@ -163,7 +183,10 @@ export async function syncRatings() {
       mdbSyncStatus.done = Math.min(i + 100, work.length);
     }
   } catch (err) {
+    // a 429 aborts the remaining batches: the loop dies here on purpose and the
+    // interface shows the reason instead of a silent "listo"
     mdbSyncStatus.error = String(err.message || err);
+    mdbSyncStatus.rateLimited = !!err.rateLimited;
   } finally {
     mdbSyncStatus.running = false;
     mdbSyncStatus.finishedAt = Date.now();

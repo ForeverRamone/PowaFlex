@@ -88,8 +88,14 @@ ON CONFLICT(rating_key) DO UPDATE SET
   updated_at = excluded.updated_at
 `);
 
-const personIdByName = db.prepare('SELECT id FROM people WHERE name = ?');
-const insertPerson = db.prepare('INSERT INTO people (name, thumb) VALUES (?, ?)');
+const personIdByName = db.prepare('SELECT id FROM people WHERE name = ? ORDER BY id LIMIT 1');
+const personIdByTag = db.prepare('SELECT id FROM people WHERE plex_tag_id = ?');
+// only rows predating the tag-key identity can be adopted by a tag key
+const untaggedPersonByName = db.prepare(
+  'SELECT id FROM people WHERE name = ? AND plex_tag_id IS NULL ORDER BY id LIMIT 1'
+);
+const insertPerson = db.prepare('INSERT INTO people (name, thumb, plex_tag_id) VALUES (?, ?, ?)');
+const setPersonTag = db.prepare('UPDATE people SET plex_tag_id = ? WHERE id = ?');
 const updatePersonThumb = db.prepare('UPDATE people SET thumb = COALESCE(?, thumb) WHERE id = ?');
 const insertMoviePerson = db.prepare(
   'INSERT OR REPLACE INTO movie_people (movie_id, person_id, role, character, ord) VALUES (?, ?, ?, ?, ?)'
@@ -101,13 +107,35 @@ const insertTag = db.prepare('INSERT INTO tags (type, name) VALUES (?, ?)');
 const insertMovieTag = db.prepare('INSERT OR IGNORE INTO movie_tags (movie_id, tag_id) VALUES (?, ?)');
 const deleteMovieTags = db.prepare('DELETE FROM movie_tags WHERE movie_id = ?');
 
-function ensurePerson(name, thumb) {
+/**
+ * Resolve (or create) a person row. `tagKey` is Plex's per-person tag key
+ * (`tagKey` attribute of Director/Writer/Role tags): it is the same for the
+ * same person across roles and different for two people who share a name, so
+ * when it is present it — not the name — decides identity. Legacy agents don't
+ * send it; those tags keep the old name-based behaviour.
+ */
+export function ensurePerson(name, thumb, tagKey = null) {
+  if (tagKey) {
+    const tagged = personIdByTag.get(tagKey);
+    if (tagged) {
+      if (thumb) updatePersonThumb.run(thumb, tagged.id);
+      return tagged.id;
+    }
+    // first time we see this key: adopt the pre-tag-key row of that name, if any
+    const legacy = untaggedPersonByName.get(name);
+    if (legacy) {
+      setPersonTag.run(tagKey, legacy.id);
+      if (thumb) updatePersonThumb.run(thumb, legacy.id);
+      return legacy.id;
+    }
+    return insertPerson.run(name, thumb || null, tagKey).lastInsertRowid;
+  }
   const row = personIdByName.get(name);
   if (row) {
     if (thumb) updatePersonThumb.run(thumb, row.id);
     return row.id;
   }
-  return insertPerson.run(name, thumb || null).lastInsertRowid;
+  return insertPerson.run(name, thumb || null, null).lastInsertRowid;
 }
 
 function ensureTag(type, name) {
@@ -167,7 +195,7 @@ function baseRecord(v, sectionId) {
   };
 }
 
-function applyDetail(ratingKey, meta) {
+export function applyDetail(ratingKey, meta) {
   const tx = db.transaction(() => {
     deleteMoviePeople.run(ratingKey);
     deleteMovieTags.run(ratingKey);
@@ -175,7 +203,7 @@ function applyDetail(ratingKey, meta) {
     const addPeople = (arr, role) => {
       (arr || []).forEach((t, i) => {
         if (!t.tag) return;
-        const pid = ensurePerson(t.tag, t.thumb);
+        const pid = ensurePerson(t.tag, t.thumb, t.tagKey || null);
         insertMoviePerson.run(ratingKey, pid, role, t.role || null, i);
       });
     };
@@ -259,6 +287,11 @@ export async function runSync({ force = false } = {}) {
 
     for (const section of sections) {
       syncStatus.section = section.title;
+      // total is cumulative across sections, so freeze what previous sections
+      // contributed and add this section's size ONCE (recomputing it per page
+      // kept inflating the total and pinned the bar around 50%)
+      const doneBeforeSection = syncStatus.done;
+      let sectionTotal = null;
       let start = 0;
       for (;;) {
         const data = await plexGet(`/library/sections/${section.id}/all`, {
@@ -269,7 +302,10 @@ export async function runSync({ force = false } = {}) {
         });
         const mc = data.MediaContainer || {};
         const items = mc.Metadata || [];
-        syncStatus.total = (mc.totalSize ?? items.length) + syncStatus.done;
+        if (sectionTotal == null) {
+          sectionTotal = mc.totalSize ?? mc.size ?? items.length;
+          syncStatus.total = doneBeforeSection + sectionTotal;
+        }
 
         const tx = db.transaction(() => {
           for (const v of items) {
