@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Star, Clapperboard, Drama, Search, Scissors, RotateCw, ArrowLeftRight, X } from 'lucide-react';
+import { Star, Clapperboard, Drama, Search, Scissors, RotateCw, X } from 'lucide-react';
 import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature, ErrorBox } from '../components.jsx';
 import { toast } from '../toast.js';
 
@@ -54,7 +54,7 @@ const Avatar = ({ person, size = 'w-12 h-12' }) =>
   );
 
 /** One favorite: who they are, what you have of theirs, and what you're missing. */
-function FavoriteCard({ p, role, selectable, selected, onSelect, onRemove, onSwitchRole }) {
+function FavoriteCard({ p, role, alsoOther, selectable, selected, onSelect, onRemove, onAddOtherFacet }) {
   const gaps = p.gaps;
   const complete = gaps === 0;
   return (
@@ -112,16 +112,25 @@ function FavoriteCard({ p, role, selectable, selected, onSelect, onRemove, onSwi
         )}
       </div>
       <div className="flex flex-col gap-1 shrink-0">
-        <button onClick={() => onRemove(p)} title="Quitar de favoritos" className="text-zinc-600 hover:text-red-400">
+        <button onClick={() => onRemove(p)} title={`Quitar de ${roleLabel(role).toLowerCase()}`} className="text-zinc-600 hover:text-red-400">
           <X size={15} />
         </button>
-        <button
-          onClick={() => onSwitchRole(p)}
-          title={`Seguirle como ${role === 'director' ? 'actor/actriz' : 'director/a'} en su lugar`}
-          className="text-zinc-600 hover:text-gold-400"
-        >
-          <ArrowLeftRight size={15} />
-        </button>
+        {alsoOther ? (
+          <span
+            title={`También le sigues como ${role === 'director' ? 'actor/actriz' : 'director/a'}`}
+            className="text-gold-400/60"
+          >
+            {role === 'director' ? <Drama size={15} /> : <Clapperboard size={15} />}
+          </span>
+        ) : (
+          <button
+            onClick={() => onAddOtherFacet(p)}
+            title={`Seguirle TAMBIÉN como ${role === 'director' ? 'actor/actriz' : 'director/a'} (sin dejar esta faceta)`}
+            className="text-zinc-600 hover:text-gold-400"
+          >
+            {role === 'director' ? <Drama size={15} /> : <Clapperboard size={15} />}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -224,12 +233,19 @@ function CanonPacks({ role, onDone }) {
 
 export default function Favorites() {
   const [tracked, setTracked] = useState(null);
-  const [role, setRole] = useState('director'); // scopes the entire page
+  // la faceta y los filtros sobreviven a la navegación hasta pulsar «Limpiar»
+  const [role, setRoleState] = useState(() => localStorage.getItem('fav_role') || 'director'); // scopes the entire page
+  const setRole = (r) => { setRoleState(r); localStorage.setItem('fav_role', r); };
   const [tab, setTab] = useState('mine'); // mine | discover
   const [health, setHealth] = useState({ gaps: false, calendar: false });
   const [rankItems, setRankItems] = useState(null);
   const [rankMore, setRankMore] = useState(false);
-  const [hideDead, setHideDead] = useState(false);
+  const [hideDead, setHideDeadState] = useState(() => localStorage.getItem('fav_hide_dead') === '1');
+  const setHideDead = (fn) => setHideDeadState((prev) => {
+    const next = typeof fn === 'function' ? fn(prev) : fn;
+    localStorage.setItem('fav_hide_dead', next ? '1' : '0');
+    return next;
+  });
   const [lifeMsg, setLifeMsg] = useState('');
   const [updatingLife, setUpdatingLife] = useState(false);
   const [topN, setTopN] = useState(10);
@@ -243,7 +259,10 @@ export default function Favorites() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
   const [favSearch, setFavSearch] = useState('');
-  const [favSort, setFavSort] = useState('titulos');
+  const [favSort, setFavSortState] = useState(() => localStorage.getItem('fav_sort') || 'titulos');
+  const setFavSort = (v) => { setFavSortState(v); localStorage.setItem('fav_sort', v); };
+  const limpiarFiltros = () => { setFavSearch(''); setFavSort('titulos'); setHideDead(false); };
+  const hayFiltros = () => favSearch.trim() || favSort !== 'titulos' || hideDead;
   const [pruneMode, setPruneMode] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [preview, setPreview] = useState(null);
@@ -266,8 +285,11 @@ export default function Favorites() {
     api('/people/suggestions').then((s) => !s.error && setSuggest(s));
   }, []);
 
-  const trackedTmdb = new Set((tracked || []).map((t) => t.tmdb_id).filter(Boolean));
-  const trackedIds = new Set((tracked || []).map((t) => t.id));
+  // scoped to the active facet: followed as director must still be addable as actor
+  const trackedTmdb = new Set(
+    (tracked || []).filter((t) => (t.role || 'director') === role).map((t) => t.tmdb_id).filter(Boolean)
+  );
+  const trackedIds = new Set((tracked || []).filter((t) => (t.role || 'director') === role).map((t) => t.id));
 
   const addTmdb = async (p) => {
     await api('/tracked/tmdb', { method: 'POST', body: { tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path, role } });
@@ -275,8 +297,8 @@ export default function Favorites() {
     loadTracked();
   };
   const removeTmdb = async (p) => {
-    const t = (tracked || []).find((x) => x.tmdb_id === p.tmdb_id);
-    if (t) { await api(`/tracked/${t.id}`, { method: 'DELETE' }); toast(`${p.name} quitado de favoritos`); loadTracked(); }
+    const t = (tracked || []).find((x) => x.tmdb_id === p.tmdb_id && (x.role || 'director') === role);
+    if (t) { await api(`/tracked/${t.id}?role=${role}`, { method: 'DELETE' }); toast(`${p.name} fuera de ${roleLabel(role).toLowerCase()}`); loadTracked(); }
   };
   const addByNames = async () => {
     if (!bulkNames.trim()) return;
@@ -305,7 +327,7 @@ export default function Favorites() {
     e.preventDefault();
     if (!pq.trim()) return;
     setSearching(true);
-    const r = await api(`/people/search-tmdb?q=${encodeURIComponent(pq.trim())}`);
+    const r = await api(`/people/search-tmdb?q=${encodeURIComponent(pq.trim())}&role=${role}`);
     setSearching(false);
     setPresults(Array.isArray(r) ? r : []);
   };
@@ -360,34 +382,37 @@ export default function Favorites() {
     else toast(`⚠️ ${res.error || 'error'}`, 'error');
   };
 
-  // the star reflects THIS facet: following someone you already follow in the
-  // other facet moves them here rather than silently doing nothing
+  // the star reflects THIS facet only: adding here never touches the other
+  // facet, so someone can be in directors AND actors at once (#Eastwood)
   const toggle = async (id, name) => {
-    const fav = (tracked || []).find((t) => t.id === id);
-    const followedHere = fav && (fav.role || 'director') === role;
+    const followedHere = (tracked || []).some((t) => t.id === id && (t.role || 'director') === role);
     if (followedHere) {
-      setTracked((prev) => prev.filter((t) => t.id !== id));
-      await api(`/tracked/${id}`, { method: 'DELETE' });
+      setTracked((prev) => prev.filter((t) => !(t.id === id && (t.role || 'director') === role)));
+      await api(`/tracked/${id}?role=${role}`, { method: 'DELETE' });
       toast(`${name || 'Quitado'} fuera de ${roleLabel(role).toLowerCase()}`);
-    } else if (fav) {
-      await api(`/tracked/${id}/role`, { method: 'PATCH', body: { role } });
-      toast(`⇄ ${name} pasa a ${roleLabel(role).toLowerCase()}`, 'success');
     } else {
-      await api(`/tracked/${id}`, { method: 'POST', body: { role } });
-      toast(`⭐ ${name || 'Añadido'} a ${roleLabel(role).toLowerCase()}`, 'success');
+      const r = await api(`/tracked/${id}`, { method: 'POST', body: { role } });
+      const extra = r.directorAlso
+        ? ' · y a directores/as: dirige 4+ películas'
+        : r.actorAlso
+          ? ' · y a actores/actrices: tiene 8+ interpretadas'
+          : '';
+      toast(`⭐ ${name || 'Añadido'} a ${roleLabel(role).toLowerCase()}${extra}`, 'success');
     }
     loadTracked();
   };
+  // la ✕ de una tarjeta quita SOLO la faceta de la lista que estás viendo
   const removeFav = async (p) => {
-    setTracked((prev) => prev.filter((t) => t.id !== p.id));
-    await api(`/tracked/${p.id}`, { method: 'DELETE' });
-    toast(`${p.name} fuera de favoritos`);
+    setTracked((prev) => prev.filter((t) => !(t.id === p.id && (t.role || 'director') === role)));
+    await api(`/tracked/${p.id}?role=${p.role || role}`, { method: 'DELETE' });
+    toast(`${p.name} fuera de ${roleLabel(role).toLowerCase()}`);
     loadTracked();
   };
-  const switchRole = async (p) => {
-    const next = p.role === 'director' ? 'actor' : 'director';
-    await api(`/tracked/${p.id}/role`, { method: 'PATCH', body: { role: next } });
-    toast(`${p.name} pasa a ${next === 'director' ? 'directores/as' : 'actores/actrices'}`);
+  // seguirle también en la otra faceta, sin dejar esta
+  const addOtherFacet = async (p) => {
+    const next = (p.role || 'director') === 'director' ? 'actor' : 'director';
+    await api(`/tracked/${p.id}`, { method: 'POST', body: { role: next } });
+    toast(`⭐ ${p.name} también en ${next === 'director' ? 'directores/as' : 'actores/actrices'}`, 'success');
     loadTracked();
   };
 
@@ -399,7 +424,7 @@ export default function Favorites() {
     }
     setConfirmClear(false);
     const ids = shownFavs.map((t) => t.id);
-    await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids } });
+    await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids, role } });
     toast(`Quitados ${ids.length} ${favSearch.trim() ? 'favoritos de los que se ven ahora' : `favoritos de ${roleLabel(role).toLowerCase()}`}`);
     loadTracked();
   };
@@ -407,12 +432,12 @@ export default function Favorites() {
   const clearDeceased = async () => {
     const ids = shownFavs.filter((t) => t.deathday).map((t) => t.id);
     if (!ids.length) return;
-    const r = await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids } });
+    const r = await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids, role } });
     if (r.ok) { toast(`✝ ${r.removed} fallecidos/as retirados/as`); loadTracked(); }
   };
 
   const pruneSelected = async () => {
-    const r = await api('/tracked/batch', { method: 'DELETE', body: { personIds: [...selected] } });
+    const r = await api('/tracked/batch', { method: 'DELETE', body: { personIds: [...selected], role } });
     if (r.ok) {
       toast(`✂️ ${r.removed} favoritos quitados`);
       setSelected(new Set());
@@ -544,6 +569,9 @@ export default function Favorites() {
                 <button className="btn-ghost !py-1.5 text-xs !border-red-500/40 text-red-400" onClick={clearAll}>
                   {confirmClear ? `¿Seguro? Vaciar ${shownFavs.length}` : 'Vaciar'}
                 </button>
+                {hayFiltros() && (
+                  <button className="btn-ghost !py-1.5 text-xs" onClick={limpiarFiltros}>✕ Limpiar filtros</button>
+                )}
               </div>
 
               {pruneMode && (
@@ -581,11 +609,12 @@ export default function Favorites() {
                     key={p.id}
                     p={p}
                     role={role}
+                    alsoOther={tracked.some((t) => t.id === p.id && (t.role || 'director') !== role)}
                     selectable={pruneMode}
                     selected={selected.has(p.id)}
                     onSelect={toggleSelected}
                     onRemove={removeFav}
-                    onSwitchRole={switchRole}
+                    onAddOtherFacet={addOtherFacet}
                   />
                 ))}
               </div>
@@ -645,9 +674,9 @@ export default function Favorites() {
             ) : (
               <div className="card divide-y divide-ink-800 max-h-[60vh] overflow-y-auto">
                 {rankItems.map((p, i) => {
-                  const fav = tracked.find((t) => t.id === p.id);
-                  const here = fav && (fav.role || 'director') === role;
-                  const elsewhere = fav && !here;
+                  const here = tracked.some((t) => t.id === p.id && (t.role || 'director') === role);
+                  const other = tracked.find((t) => t.id === p.id && (t.role || 'director') !== role);
+                  const elsewhere = !here && !!other;
                   return (
                     <div key={p.id} className="flex items-center gap-3 px-4 py-2">
                       <span className="text-zinc-600 text-sm w-8 text-right shrink-0">{i + 1}.</span>
@@ -655,8 +684,8 @@ export default function Favorites() {
                         <span className="truncate">{p.name}</span>
                         <DeathBadge deathday={p.deathday} />
                         {elsewhere && (
-                          <span className="text-[11px] text-zinc-500 shrink-0" title={`Le sigues como ${fav.role === 'director' ? 'director/a' : 'actor/actriz'}`}>
-                            {fav.role === 'director' ? <Clapperboard size={11} /> : <Drama size={11} />}
+                          <span className="text-[11px] text-zinc-500 shrink-0" title={`Le sigues como ${other.role === 'director' ? 'director/a' : 'actor/actriz'}`}>
+                            {other.role === 'director' ? <Clapperboard size={11} /> : <Drama size={11} />}
                           </span>
                         )}
                       </Link>
@@ -667,14 +696,14 @@ export default function Favorites() {
                           here
                             ? `Quitar de ${roleLabel(role).toLowerCase()}`
                             : elsewhere
-                              ? `Le sigues como ${fav.role === 'director' ? 'director/a' : 'actor/actriz'}: pásale a ${roleLabel(role).toLowerCase()}`
+                              ? `Le sigues como ${other.role === 'director' ? 'director/a' : 'actor/actriz'}: seguirle TAMBIÉN como ${role === 'director' ? 'director/a' : 'actor/actriz'}`
                               : `Seguir como ${role === 'director' ? 'director/a' : 'actor/actriz'}`
                         }
                         className={`text-lg cursor-pointer transition-colors shrink-0 ${
                           here ? 'text-gold-400' : elsewhere ? 'text-gold-400/30 hover:text-gold-400' : 'text-zinc-600 hover:text-gold-400'
                         }`}
                       >
-                        {elsewhere ? <ArrowLeftRight size={15} /> : '★'}
+                        ★
                       </button>
                     </div>
                   );

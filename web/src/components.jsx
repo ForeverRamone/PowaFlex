@@ -660,7 +660,12 @@ export function useTypeFilters(key = 'type_filters') {
     setShow(next);
     localStorage.setItem(key, JSON.stringify(next));
   };
-  return [show, toggle];
+  // tercer elemento opcional: los botones «Limpiar filtros» de cada página
+  const reset = () => {
+    setShow({ ...TYPE_DEFAULTS });
+    localStorage.removeItem(key);
+  };
+  return [show, toggle, reset];
 }
 
 export const matchesTypeFilters = (item, show) =>

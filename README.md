@@ -2,7 +2,7 @@
 
 # 🎬 PowaFlex
 
-> **Alpha 0.9.4** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
+> **Alpha 0.9.5** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
 > de filmografías, calendario de estrenos venideros conectado a TMDB y envío directo a Radarr.
 
 PowaFlex es tu centro de mando cinéfilo. Vive junto a tu servidor Plex (en Docker), lee tu
@@ -21,7 +21,8 @@ cuentas ni telemetría.
 | 🎞️ **Biblioteca** | Toda la colección en parrilla de pósters con código de color (🟢 en Plex · ★ vista) y filtros estilo Letterboxd: género, país, década, visto/sin ver, largo/corto (<40 min), resolución, HDR/Dolby Vision, notas mínimas de IMDb/RT/Letterboxd… y ordenaciones por cualquiera de esas notas (incluido aleatorio). La nota que sale en cada póster es configurable (IMDb, Letterboxd o la combinada de MDBList). |
 | 🎭 **Directores/as y actores/actrices** | Ranking por presencia, con filtros por género, vivo/fallecido, continente y país. Cada ficha cruza la filmografía de TMDB con lo que tienes: % de completismo (solo largometrajes, con filtros para cortos, documentales, TV y dirección coral), lo que falta (botón **+ Radarr**) y proyectos anunciados. Quien dirige **y** actúa tiene dos barras (director/a y actor/actriz). |
 | 🗓️ **Cine venidero** | Calendario mensual de estrenos y proyectos anunciados de tus directores/as y actores/actrices top y favoritos, con envío a Radarr en un clic. |
-| ⭐ **Favoritos** | Ranking paginado por nº de títulos (con filtro de fallecidos y actualización de estado vital), paquetes temáticos de directores/as (españoles, premiados en festivales, emergentes, taquilleros, en boga) con **«añadir todos»**, pegar una lista de nombres separados por comas o líneas, y añadir a cualquiera tecleando. Alimentan el calendario y el auto-Radarr. |
+| 🎪 **Festivales** | Las secciones oficiales de los seis festivales cuyo gran premio clasifica para el Óscar internacional (Cannes, Venecia, Berlinale, Sundance, Toronto, Busan), edición a edición, y el **palmarés histórico** de cada premio. Manda a Radarr lo que falte y sigue a sus directores/as, de una en una o la sección entera. |
+| ⭐ **Favoritos** | Ranking paginado por nº de títulos (con filtro de fallecidos y actualización de estado vital), paquetes temáticos de directores/as (españoles, premiados en festivales, emergentes, taquilleros, en boga) con **«añadir todos»**, pegar una lista de nombres separados por comas o líneas, y añadir a cualquiera tecleando. Cada persona puede seguirse como director/a, como actor/actriz **o por las dos facetas a la vez**. Alimentan el calendario y el auto-Radarr. |
 | 🧭 **Descubrir huecos** | Lo que te falta de tus favoritos y de tus filmografías top, más los canon de directores/as de **They Shoot Pictures** (Top 250 de siempre y Top 100 del siglo XXI) para detectar ausencias en tu servidor. Con buscador de personas y actualización bajo demanda. |
 | 🏆 **Listas y retos** | Listas de MDBList y **retos de Letterboxd** con anillos concéntricos de «lo que tengo» vs «lo que he visto», ocultar los que no te interesen y envío en bloque a Radarr. |
 | 📚 **Sagas** | Detecta franquicias desde la colección real de TMDB de cada película: qué partes te faltan o están por estrenar, con envío a Radarr. |
@@ -128,9 +129,12 @@ Los datos van a `server/data/` (configurable con `DATA_DIR`).
 ## 🔒 Privacidad y seguridad
 
 - Todo corre y se guarda en tu máquina (SQLite en `/data`). Sin cuentas, sin telemetría.
-- Solo salen de tu red las consultas a la API de TMDB.
-- La app **no tiene autenticación propia**: está pensada para red local. No la expongas a
-  internet sin un proxy con autenticación delante.
+- De tu red solo salen las consultas a los servicios que conectes: TMDB, MDBList, JustWatch,
+  Letterboxd y Wikipedia (festivales).
+- Autenticación básica opcional con `POWAFLEX_AUTH="usuario:contraseña"`. Aun así está pensada
+  para red local: no la expongas a internet sin un proxy con autenticación delante.
+- En **Ajustes → Copia de seguridad** puedes descargar la base de datos entera y
+  exportar/importar la configuración para reinstalar sin empezar de cero.
 
 ## 🙏 Créditos
 

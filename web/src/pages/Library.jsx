@@ -122,7 +122,7 @@ export default function Library() {
           ⚙ Filtros{activeKeys.length > 0 ? ` (${activeKeys.length})` : ''}
         </button>
         {[...params.keys()].length > 0 && (
-          <button className="btn-ghost" onClick={() => { setSearch(''); setParams({}, { replace: true }); setShowFilters(false); }}>✕ Limpiar</button>
+          <button className="btn-ghost" onClick={() => { setSearch(''); setParams({}, { replace: true }); setShowFilters(false); }}>✕ Limpiar filtros</button>
         )}
         {data && <span className="text-sm text-zinc-400 ml-auto">{data.total.toLocaleString('es-ES')} películas</span>}
       </div>

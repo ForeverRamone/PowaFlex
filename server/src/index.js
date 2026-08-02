@@ -3,6 +3,7 @@ import fastifyStatic from '@fastify/static';
 import multipart from '@fastify/multipart';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { db, DATA_DIR, getAllSettings, setSetting, getSetting } from './db.js';
@@ -20,6 +21,7 @@ import {
   clearBuildProgress,
   suggestedPeople,
   trackByTmdb,
+  followFacets,
   searchPeople,
   findPersonInfo,
   normalizeLibraryTitles,
@@ -63,6 +65,7 @@ import {
   letterboxdSummary,
 } from './letterboxd.js';
 import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
+import { festivalsIndex, festivalEdition, festivalWinners } from './festivals.js';
 import { runFullRefresh, refreshStatus } from './refresh.js';
 import { availability, isUpgradeable } from './justwatch.js';
 import { scanSagas, sagaScanStatus, sagaScanState, sagaList, sagaComplete, enrichSagaStats, sagaStatsStatus } from './saga.js';
@@ -162,6 +165,13 @@ const CACHE_BUSTING_SETTINGS = new Set([
   'gaps_min_votes_director', 'gaps_min_votes_actor', 'cal_top_directors', 'cal_top_actors', 'language',
 ]);
 
+function invalidarPaginasCalculadas() {
+  db.prepare(
+    `DELETE FROM tmdb_cache WHERE key LIKE 'discover_gaps:%' OR key LIKE 'discover_favorites:%'
+       OR key LIKE 'discover_absent:%' OR key LIKE 'calendar:%'`
+  ).run();
+}
+
 app.get('/api/settings', async () => {
   const all = getAllSettings();
   const out = {};
@@ -185,12 +195,7 @@ app.put('/api/settings', async (req) => {
   }
   // los umbrales y el tamaño del radar deciden lo que sale en Descubrir y en el
   // calendario: sin esto, cambiarlos no se notaba hasta que caducara la caché
-  if (invalidar) {
-    db.prepare(
-      `DELETE FROM tmdb_cache WHERE key LIKE 'discover_gaps:%' OR key LIKE 'discover_favorites:%'
-         OR key LIKE 'discover_absent:%' OR key LIKE 'calendar:%'`
-    ).run();
-  }
+  if (invalidar) invalidarPaginasCalculadas();
   return { ok: true, ignoradas: ignoradas.length ? ignoradas : undefined, cachesInvalidadas: invalidar || undefined };
 });
 
@@ -224,6 +229,82 @@ app.get('/api/setup-state', async () => {
     newlyAdded: Number(s.last_sync_added || 0),
     lastSyncAt: Number(s.last_sync_at || 0) || null,
   };
+});
+
+// --- festivales ----------------------------------------------------------------
+
+app.get('/api/festivals', async () => festivalsIndex());
+
+// palmarés histórico del premio que clasifica (antes que :year para no chocar)
+app.get('/api/festivals/:key/palmares', async (req, reply) => {
+  try {
+    return await festivalWinners(req.params.key, { refresh: req.query.refresh === '1' });
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.get('/api/festivals/:key/:year', async (req, reply) => {
+  try {
+    return await festivalEdition(req.params.key, Number(req.params.year), {
+      refresh: req.query.refresh === '1',
+    });
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// --- copia de seguridad --------------------------------------------------------
+
+// La base de datos entera, como fichero. Se copia primero con la API de backup
+// de SQLite (una lectura coherente aunque haya escrituras en marcha y WAL a
+// medias) y se sirve esa copia, nunca el fichero vivo.
+app.get('/api/backup/database', async (req, reply) => {
+  const tmp = path.join(os.tmpdir(), `powaflex-backup-${process.pid}-${Date.now()}.db`);
+  await db.backup(tmp);
+  const fecha = new Date().toISOString().slice(0, 10);
+  reply.header('Content-Disposition', `attachment; filename="powaflex-${fecha}.db"`);
+  reply.type('application/octet-stream');
+  const stream = fs.createReadStream(tmp);
+  stream.on('close', () => fs.unlink(tmp, () => {}));
+  return reply.send(stream);
+});
+
+// Los ajustes con sus valores REALES (a diferencia de /api/settings, que tapa
+// los secretos): es una copia para reinstalar, no una pantalla. Solo las claves
+// que se pueden escribir, nada de contadores ni estado interno.
+app.get('/api/backup/settings', async (req, reply) => {
+  const all = getAllSettings();
+  const settings = {};
+  for (const k of WRITABLE_SETTINGS) if (all[k] != null) settings[k] = all[k];
+  const fecha = new Date().toISOString().slice(0, 10);
+  reply.header('Content-Disposition', `attachment; filename="powaflex-ajustes-${fecha}.json"`);
+  reply.type('application/json');
+  return { app: 'powaflex', kind: 'ajustes', exportedAt: new Date().toISOString(), settings };
+});
+
+app.post('/api/backup/settings', async (req, reply) => {
+  const body = req.body || {};
+  if (body.app !== 'powaflex' || body.kind !== 'ajustes' || typeof body.settings !== 'object' || !body.settings) {
+    reply.code(400);
+    return { error: 'Esto no parece un fichero de ajustes exportado por PowaFlex' };
+  }
+  let aplicadas = 0;
+  const ignoradas = [];
+  for (const [k, v] of Object.entries(body.settings)) {
+    // la misma puerta que /api/settings: nada de claves fuera de la lista
+    if (!WRITABLE_SETTINGS.has(k) || (typeof v !== 'string' && v !== null)) {
+      ignoradas.push(k);
+      continue;
+    }
+    setSetting(k, v);
+    aplicadas++;
+  }
+  // varios de estos ajustes deciden lo que sale en Descubrir y el calendario
+  invalidarPaginasCalculadas();
+  return { ok: true, aplicadas, ignoradas: ignoradas.length ? ignoradas : undefined };
 });
 
 // --- sync ----------------------------------------------------------------------
@@ -356,7 +437,8 @@ app.get('/api/people/search-tmdb', async (req, reply) => {
   try {
     const query = String(req.query.q || '').trim();
     if (!query) return [];
-    return await searchPeople(query);
+    const role = ['director', 'actor'].includes(req.query.role) ? req.query.role : null;
+    return await searchPeople(query, role);
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -687,14 +769,13 @@ const invalidateFavoritesCaches = () =>
 
 app.post('/api/tracked/bulk', async (req, reply) => {
   const { role, top, personIds, preview } = req.body || {};
-  const ins = db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at, role) VALUES (?, ?, ?)');
   const followRole = role === 'actor' ? 'actor' : 'director';
 
   // confirmed selection coming back from the preview dialog
   if (Array.isArray(personIds) && personIds.length) {
     let added = 0;
     const tx = db.transaction(() => {
-      for (const id of personIds.slice(0, 1000)) added += ins.run(Number(id), Date.now(), followRole).changes;
+      for (const id of personIds.slice(0, 1000)) added += followFacets(Number(id), followRole).added ? 1 : 0;
     });
     tx();
     if (added) invalidateFavoritesCaches();
@@ -709,15 +790,16 @@ app.post('/api/tracked/bulk', async (req, reply) => {
     .prepare(
       `SELECT p.id, p.name, p.deathday, COUNT(*) n FROM movie_people mp JOIN people p ON p.id = mp.person_id
        WHERE mp.role = ? AND p.id NOT IN (SELECT person_id FROM unfollowed_people)
-         AND p.id NOT IN (SELECT person_id FROM tracked_people)
+         -- ya seguido EN ESTA faceta: seguirle en la otra no le excluye del top
+         AND p.id NOT IN (SELECT person_id FROM tracked_people WHERE role = ?)
        GROUP BY p.id ORDER BY n DESC, p.name LIMIT ?`
     )
-    .all(role, Math.min(Number(top), 1000));
+    .all(role, followRole, Math.min(Number(top), 1000));
   // with preview the client shows the candidates first: no more blind top-N adds
   if (preview) return { candidates };
   let added = 0;
   const tx = db.transaction(() => {
-    for (const c of candidates) added += ins.run(c.id, Date.now(), followRole).changes;
+    for (const c of candidates) added += followFacets(c.id, followRole).added ? 1 : 0;
   });
   tx();
   if (added) invalidateFavoritesCaches();
@@ -727,17 +809,23 @@ app.post('/api/tracked/bulk', async (req, reply) => {
 // prune several favorites at once, blocking auto re-adds like the single ✕ (poda)
 app.delete('/api/tracked/batch', async (req, reply) => {
   const ids = Array.isArray(req.body?.personIds) ? req.body.personIds.map(Number).filter(Boolean) : [];
+  // con role, la poda solo toca esa faceta (la página de Favoritos trabaja
+  // siempre dentro de una); sin él, se lleva a la persona entera
+  const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : null;
   if (!ids.length) {
     reply.code(400);
     return { error: 'Faltan personIds' };
   }
-  const del = db.prepare('DELETE FROM tracked_people WHERE person_id = ?');
+  const delFacet = db.prepare('DELETE FROM tracked_people WHERE person_id = ? AND role = ?');
+  const delAll = db.prepare('DELETE FROM tracked_people WHERE person_id = ?');
+  const left = db.prepare('SELECT COUNT(*) n FROM tracked_people WHERE person_id = ?');
   const block = db.prepare('INSERT OR IGNORE INTO unfollowed_people (person_id, at) VALUES (?, ?)');
   let removed = 0;
   const tx = db.transaction(() => {
     for (const id of ids) {
-      removed += del.run(id).changes;
-      block.run(id, Date.now());
+      removed += (role ? delFacet.run(id, role) : delAll.run(id)).changes;
+      // el veto a re-añadidos automáticos solo cuando no queda ninguna faceta
+      if (!left.get(id).n) block.run(id, Date.now());
     }
   });
   tx();
@@ -750,15 +838,14 @@ app.delete('/api/tracked/batch', async (req, reply) => {
 app.get('/api/tracked/health', async () => {
   const favs = db
     .prepare(
-      `SELECT p.id, p.name, p.thumb, p.deathday, p.tmdb_id,
-              COALESCE(t.role, 'director') AS role,
+      `SELECT p.id, p.name, p.thumb, p.deathday, p.tmdb_id, t.role,
               SUM(CASE WHEN mp.role = 'director' THEN 1 ELSE 0 END) directed,
               SUM(CASE WHEN mp.role = 'actor' THEN 1 ELSE 0 END) acted,
-              SUM(CASE WHEN mp.role = COALESCE(t.role, 'director') THEN 1 ELSE 0 END) movies
+              SUM(CASE WHEN mp.role = t.role THEN 1 ELSE 0 END) movies
        FROM tracked_people t
        JOIN people p ON p.id = t.person_id
        LEFT JOIN movie_people mp ON mp.person_id = p.id
-       GROUP BY p.id ORDER BY movies DESC, p.name`
+       GROUP BY p.id, t.role ORDER BY movies DESC, p.name`
     )
     .all();
   // one cache per facet now, so merge them all; a favorite missing from every
@@ -769,10 +856,15 @@ app.get('/api/tracked/health', async () => {
   const calRow = db
     .prepare(`SELECT json FROM tmdb_cache WHERE key LIKE 'calendar:%' ORDER BY fetched_at DESC LIMIT 1`)
     .get();
+  // clave (id, faceta): con las facetas dobles, la fila de director y la de
+  // actor de una misma persona buscan cada una SU cálculo de huecos
   const gapsBy = new Map();
   for (const row of gapsRows) {
     try {
-      for (const p of (JSON.parse(row.json || '{}').people || [])) if (!gapsBy.has(p.id)) gapsBy.set(p.id, p);
+      for (const p of (JSON.parse(row.json || '{}').people || [])) {
+        const k = `${p.id}:${p.role || 'director'}`;
+        if (!gapsBy.has(k)) gapsBy.set(k, p);
+      }
     } catch {}
   }
   const upcomingBy = new Map();
@@ -791,7 +883,7 @@ app.get('/api/tracked/health', async () => {
   return {
     cached: { gaps: gapsBy.size > 0, calendar: !!calRow },
     people: favs.map((f) => {
-      const g = gapsBy.get(f.id);
+      const g = gapsBy.get(`${f.id}:${f.role || 'director'}`);
       // `movies` straight from movie_people counts EVERY credit (shorts, docs,
       // TV, segments), which is why Favoritos said 52 where the person page said
       // 50/50. When the gaps cache knows this facet, take its feature-only count
@@ -860,38 +952,44 @@ app.post('/api/tracked/:personId', async (req) => {
          FROM movie_people WHERE person_id = ?`
       )
       .get(id)?.r || 'director');
-  const r = db
-    .prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at, role) VALUES (?, ?, ?)')
-    .run(id, Date.now(), guessed);
-  // an explicit role on an existing favorite switches which facet you follow
-  if (!r.changes && role) db.prepare('UPDATE tracked_people SET role = ? WHERE person_id = ?').run(role, id);
+  // añadir una faceta nunca toca la otra: se puede seguir a alguien como
+  // director/a Y como actor/actriz a la vez
+  const f = followFacets(id, guessed);
   invalidateFavoritesCaches();
-  return { ok: true, role: guessed };
+  return { ok: true, role: f.role, directorAlso: f.directorAlso, actorAlso: f.actorAlso };
 });
 app.get('/api/tracked', async (req) => {
   const role = ['director', 'actor'].includes(req.query.role) ? req.query.role : null;
+  // una fila por (persona, faceta): quien tiene las dos sale dos veces, cada
+  // una con el conteo de SU faceta
   return db
     .prepare(
-      `SELECT p.id, p.name, p.thumb, p.deathday, p.tmdb_id,
-              COALESCE(t.role, 'director') AS role,
+      `SELECT p.id, p.name, p.thumb, p.deathday, p.tmdb_id, t.role,
               SUM(CASE WHEN mp.role = 'director' THEN 1 ELSE 0 END) directed,
               SUM(CASE WHEN mp.role = 'actor' THEN 1 ELSE 0 END) acted,
               -- titles in the role you follow them for: no mixing the two counts
-              SUM(CASE WHEN mp.role = COALESCE(t.role, 'director') THEN 1 ELSE 0 END) movies
+              SUM(CASE WHEN mp.role = t.role THEN 1 ELSE 0 END) movies
        FROM tracked_people t
        JOIN people p ON p.id = t.person_id
        LEFT JOIN movie_people mp ON mp.person_id = p.id
-       WHERE (? IS NULL OR COALESCE(t.role, 'director') = ?)
-       GROUP BY p.id ORDER BY movies DESC, p.name`
+       WHERE (? IS NULL OR t.role = ?)
+       GROUP BY p.id, t.role ORDER BY movies DESC, p.name`
     )
     .all(role, role);
 });
 
 app.delete('/api/tracked/:personId', async (req) => {
   const id = Number(req.params.personId);
-  const r = db.prepare('DELETE FROM tracked_people WHERE person_id = ?').run(id);
-  // remember the explicit ✕ so bulk/automatic adds skip this person (C)
-  db.prepare('INSERT OR IGNORE INTO unfollowed_people (person_id, at) VALUES (?, ?)').run(id, Date.now());
+  // con ?role= se quita SOLO esa faceta; sin él, la persona entera
+  const role = ['director', 'actor'].includes(req.query.role) ? req.query.role : null;
+  const r = role
+    ? db.prepare('DELETE FROM tracked_people WHERE person_id = ? AND role = ?').run(id, role)
+    : db.prepare('DELETE FROM tracked_people WHERE person_id = ?').run(id);
+  // remember the explicit ✕ so bulk/automatic adds skip this person (C) — pero
+  // solo si ya no queda NINGUNA faceta: quitarle de actores no debe vetar que
+  // un añadido masivo de directores lo traiga como director
+  const quedan = db.prepare('SELECT COUNT(*) n FROM tracked_people WHERE person_id = ?').get(id).n;
+  if (!quedan) db.prepare('INSERT OR IGNORE INTO unfollowed_people (person_id, at) VALUES (?, ?)').run(id, Date.now());
   if (r.changes) invalidateFavoritesCaches();
   return { ok: true };
 });
@@ -915,15 +1013,21 @@ app.post('/api/people/from-tmdb', async (req, reply) => {
   return { personId: id };
 });
 
-// switch which facet of a person you follow (director <-> actor)
+// switch which facet of a person you follow (director <-> actor). Con las
+// facetas dobles esto significa «quédate SOLO con esta»: para añadir la otra
+// sin perder la actual está el POST normal con role.
 app.patch('/api/tracked/:personId/role', async (req, reply) => {
   const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : null;
   if (!role) {
     reply.code(400);
     return { error: 'role debe ser director o actor' };
   }
-  const r = db.prepare('UPDATE tracked_people SET role = ? WHERE person_id = ?').run(role, Number(req.params.personId));
-  if (r.changes) invalidateFavoritesCaches();
+  const id = Number(req.params.personId);
+  db.transaction(() => {
+    db.prepare('DELETE FROM tracked_people WHERE person_id = ? AND role <> ?').run(id, role);
+    db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at, role) VALUES (?, ?, ?)').run(id, Date.now(), role);
+  })();
+  invalidateFavoritesCaches();
   return { ok: true, role };
 });
 

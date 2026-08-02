@@ -2,7 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy, Layers,
-  Eye, HardDrive, Settings as SettingsIcon, HelpCircle, Search, Menu, X,
+  Eye, HardDrive, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award,
 } from 'lucide-react';
 import { Spinner, Toaster, GlobalSearch, LetterboxdLogo, ErrorBoundary } from './components.jsx';
 import { api, applyTheme } from './api.js';
@@ -21,6 +21,7 @@ const WatchStats = lazy(() => import('./pages/WatchStats.jsx'));
 const Discover = lazy(() => import('./pages/Discover.jsx'));
 const Favorites = lazy(() => import('./pages/Favorites.jsx'));
 const Lists = lazy(() => import('./pages/Lists.jsx'));
+const Festivals = lazy(() => import('./pages/Festivals.jsx'));
 const About = lazy(() => import('./pages/About.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
@@ -43,6 +44,7 @@ const NAV_GROUPS = [
       { to: '/favoritos', label: 'Favoritos', Icon: Star },
       { to: '/descubrir', label: 'Descubrir huecos', Icon: Compass },
       { to: '/calendario', label: 'Cine venidero', Icon: CalendarDays },
+      { to: '/festivales', label: 'Festivales', Icon: Award },
       { to: '/listas', label: 'Listas y retos', Icon: Trophy },
     ],
   },
@@ -202,6 +204,7 @@ function Shell() {
           <Route path="/descubrir" element={<Discover />} />
           <Route path="/favoritos" element={<Favorites />} />
           <Route path="/listas" element={<Lists />} />
+          <Route path="/festivales" element={<Festivals />} />
           <Route path="/acerca" element={<About />} />
           <Route path="/calidad" element={<Quality />} />
           <Route path="/letterboxd" element={<Letterboxd />} />

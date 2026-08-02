@@ -196,7 +196,7 @@ function FilmGrid({ people, show, minScore, dismissed, onDismiss, radarrIds, add
 
 function GapsView({
   endpoint, role, radarrIds, addRadarrId, show, toggle, minScore, setMinScore,
-  dismissed, onDismiss, intro, paginated,
+  dismissed, onDismiss, intro, paginated, clearBaseFilters,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -283,7 +283,16 @@ function GapsView({
                 </select>
               )}
             </div>
-            <MinScoreBar minScore={minScore} setMinScore={setMinScore} />
+            <div className="flex items-center gap-3 flex-wrap">
+              <MinScoreBar minScore={minScore} setMinScore={setMinScore} />
+              <button
+                className="btn-ghost !py-1 text-xs"
+                title="Vuelve la página a su estado de fábrica: vista, orden, nota mínima y filtros de tipo"
+                onClick={() => { clearBaseFilters?.(); setViewPref('person'); setPersonSortPref('huecos'); setFilmSortPref('score'); }}
+              >
+                ✕ Limpiar filtros
+              </button>
+            </div>
           </div>
 
           <TypeFilterBar show={show} toggle={toggle} counts={typeCounts(data.people)} />
@@ -587,11 +596,17 @@ export default function Discover() {
   const [tab, setTab] = useState('favorites');
   const [favRole, setFavRole] = useState(() => localStorage.getItem('gaps_fav_role') || 'director');
   const [radarrIds, addRadarrId] = useRadarrIds();
-  const [show, toggle] = useTypeFilters();
+  const [show, toggle, resetTypes] = useTypeFilters();
   const [minScore, setMinScoreState] = useState(() => Number(localStorage.getItem('gaps_min_score') || 0));
   const setMinScore = (v) => {
     setMinScoreState(v);
     localStorage.setItem('gaps_min_score', String(v));
+  };
+  // la parte del padre de «limpiar filtros»: listón de nota y filtros de tipo
+  // (la vista y los órdenes viven en GapsView, que completa la limpieza)
+  const clearBaseFilters = () => {
+    setMinScore(0);
+    resetTypes();
   };
   const [dismissed, setDismissed] = useState(new Set());
   useEffect(() => {
@@ -617,7 +632,7 @@ export default function Discover() {
   };
   const setFavRolePref = (r) => { setFavRole(r); localStorage.setItem('gaps_fav_role', r); };
 
-  const gapProps = { radarrIds, addRadarrId, show, toggle, minScore, setMinScore, dismissed, onDismiss };
+  const gapProps = { radarrIds, addRadarrId, show, toggle, minScore, setMinScore, dismissed, onDismiss, clearBaseFilters };
 
   return (
     <div>

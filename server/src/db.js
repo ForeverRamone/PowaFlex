@@ -102,8 +102,10 @@ CREATE TABLE IF NOT EXISTS tmdb_cache (
 );
 
 CREATE TABLE IF NOT EXISTS tracked_people (
-  person_id INTEGER PRIMARY KEY,
-  added_at INTEGER
+  person_id INTEGER NOT NULL,
+  role TEXT NOT NULL DEFAULT 'director',
+  added_at INTEGER,
+  PRIMARY KEY (person_id, role)
 );
 
 -- People the user explicitly removed from favorites with the "✕". Bulk/automatic
@@ -325,6 +327,18 @@ if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'id
 // challenge lists can be hidden by the user without deleting them
 ensureColumn('lb_lists', 'hidden', 'hidden INTEGER DEFAULT 0');
 
+// Votos de Letterboxd por película: en TMDB apenas vota nadie y el umbral de
+// ruido de Descubrir descartaba cine de verdad; Letterboxd es la señal fiable.
+// La cifra ya venía en el JSON de MDBList que guardamos: se saca a columna y
+// se rellena lo histórico sin gastar ni una petición.
+ensureColumn('mdb_ratings', 'lb_votes', 'lb_votes INTEGER');
+db.exec(`
+  UPDATE mdb_ratings SET lb_votes = (
+    SELECT je.value ->> '$.votes' FROM json_each(mdb_ratings.json) je
+    WHERE je.value ->> '$.source' = 'letterboxd' LIMIT 1
+  ) WHERE lb_votes IS NULL AND json IS NOT NULL AND json <> '[]'
+`);
+
 // TMDB English title: Plex only knows the Spanish + original titles, so
 // English-titled sources (Letterboxd lists/CSVs) miss third-language films
 ensureColumn('movies', 'english_title', 'english_title TEXT');
@@ -350,6 +364,43 @@ db.exec(`
   ) WHERE role IS NULL;
   UPDATE tracked_people SET role = 'director' WHERE role IS NULL;
 `);
+
+// Un favorito puede tener LAS DOS facetas (Eastwood: directores Y actores).
+// La tabla nació con person_id como clave primaria —una faceta por persona—,
+// así que se reconstruye con clave (person_id, role). De paso, la reparación
+// única en ambos sentidos: al seguido como actor/actriz que dirige 4+ de tu
+// biblioteca le faltaba la faceta de director/a, y al seguido como director/a
+// con 8+ interpretadas, la de actor/actriz (umbral más alto a propósito: el
+// conteo de actor arrastra cameos). Mismos umbrales que followFacets (tmdb.js).
+{
+  const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tracked_people'").get()?.sql || '';
+  if (!/PRIMARY KEY\s*\(\s*person_id\s*,\s*role\s*\)/i.test(sql)) {
+    db.exec(`
+      BEGIN;
+      CREATE TABLE tracked_people_new (
+        person_id INTEGER NOT NULL,
+        role TEXT NOT NULL DEFAULT 'director',
+        added_at INTEGER,
+        PRIMARY KEY (person_id, role)
+      );
+      INSERT OR IGNORE INTO tracked_people_new (person_id, role, added_at)
+        SELECT person_id, COALESCE(role, 'director'), added_at FROM tracked_people;
+      DROP TABLE tracked_people;
+      ALTER TABLE tracked_people_new RENAME TO tracked_people;
+      INSERT OR IGNORE INTO tracked_people (person_id, role, added_at)
+        SELECT t.person_id, 'director', t.added_at FROM tracked_people t
+        WHERE t.role = 'actor'
+          AND (SELECT COUNT(*) FROM movie_people mp
+               WHERE mp.person_id = t.person_id AND mp.role = 'director') >= 4;
+      INSERT OR IGNORE INTO tracked_people (person_id, role, added_at)
+        SELECT t.person_id, 'actor', t.added_at FROM tracked_people t
+        WHERE t.role = 'director'
+          AND (SELECT COUNT(*) FROM movie_people mp
+               WHERE mp.person_id = t.person_id AND mp.role = 'actor') >= 8;
+      COMMIT;
+    `);
+  }
+}
 
 // Al arrancar, fuera todo lo cacheado con reglas ya superadas. La lista de
 // versiones buenas vive en cache-versions.js, junto a las claves que las

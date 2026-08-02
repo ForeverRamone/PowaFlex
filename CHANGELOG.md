@@ -1,5 +1,38 @@
 # Changelog
 
+## Alpha 0.9.5 (0.9.5-alpha) — 2026-08-03
+
+- **Página nueva: Festivales** (en «La caza»). Las secciones oficiales de los seis festivales cuyo
+  gran premio clasifica directamente para el Óscar internacional según las reglas nuevas de la
+  Academia —Cannes (Palma de Oro), Venecia (León de Oro), Berlinale (Oso de Oro), Sundance (World
+  Cinema Grand Jury Prize), Toronto (Platform Prize) y Busan (Busan Award)—, edición a edición y
+  con el **palmarés histórico** de cada premio. Los datos salen de Wikipedia y se casan con TMDB y
+  con tu Plex: cada película dice si la tienes o te falta, con su nota y su botón de Radarr (suelto
+  o «las N que te faltan» en bloque), y cada director/a se puede mandar a favoritos —de uno en uno
+  o **la sección entera de un clic**, pensado para seguir a toda la competición de una edición
+  nueva en cuanto se anuncie.
+- **Un favorito puede estar en directores Y en actores a la vez.** Antes cada persona solo cabía
+  en una lista, así que Eastwood acababa solo en actores. Ahora las facetas son independientes: la
+  ✕ y las podas quitan solo la faceta de la lista que miras, cada tarjeta ofrece «seguirle también
+  como…», y al añadir a alguien se completa sola la otra faceta cuando su obra lo pide (dirige 4+
+  películas de tu biblioteca, o tiene 8+ interpretadas). Tus favoritos actuales se reparan solos al
+  actualizar.
+- **Las fichas de personas enseñan las notas** (media Σ de MDBList e IMDb bajo cada carátula) y
+  ganan orden por calificación, año o votos más un listón de «nota mínima Σ», para ir directo a lo
+  mejor de cada filmografía.
+- **El umbral de ruido de Descubrir ya no descarta cine de verdad**: una película cuenta como
+  hueco si llega a los votos mínimos en TMDB **o en Letterboxd** (vía MDBList). En TMDB apenas
+  vota nadie y el listón se tragaba películas importantes del cine de autor.
+- **Los filtros se quedan puestos** en todas las páginas —Biblioteca, Personas, Favoritos,
+  Descubrir, Calendario y fichas— aunque navegues adelante y atrás, hasta que pulses el botón
+  nuevo «✕ Limpiar filtros».
+- **Copia de seguridad en Ajustes**: descarga la base de datos entera (copia coherente, aunque
+  haya escrituras en marcha) y exporta o importa la configuración en un JSON, para reinstalar el
+  contenedor sin empezar de cero.
+- Arreglado de paso: la página de Ajustes reventaba en vez de avisar si fallaba un guardado (le
+  faltaba un import), y los textos de «¿Qué es PowaFlex?» y del README se han puesto al día
+  (llevaban versiones desactualizadas de qué sale de tu red y de la autenticación).
+
 ## Alpha 0.9.4 (0.9.4-alpha) — 2026-08-02
 
 - **Arreglado «out is not defined» en Grandes ausentes.** Se coló en la 0.9.3: la pantalla no

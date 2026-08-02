@@ -17,6 +17,21 @@ const VIEWS = [
 const ROLE_LABEL = { director: 'director/a', actor: 'actor/actriz', writer: 'guionista' };
 const ROLE_TAB = { director: '🎬 Como director/a', actor: '🎭 Como actor/actriz', writer: '✍️ Como guionista' };
 
+// Orden de la parrilla. «reciente» replica el orden que ya traía el servidor
+// (fecha descendente, las sin fecha/anunciadas primero).
+const SORTS = {
+  reciente: { label: 'Más recientes', fn: (a, b) => String(b.date || '9999').localeCompare(String(a.date || '9999')) },
+  antigua: { label: 'Más antiguas', fn: (a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')) },
+  score: { label: 'Nota media Σ', fn: (a, b) => (b.mdb?.score ?? -1) - (a.mdb?.score ?? -1) },
+  imdb: { label: 'Nota IMDb', fn: (a, b) => (b.mdb?.imdb ?? -1) - (a.mdb?.imdb ?? -1) },
+  letterboxd: { label: 'Nota Letterboxd', fn: (a, b) => (b.mdb?.letterboxd ?? -1) - (a.mdb?.letterboxd ?? -1) },
+  votos: { label: 'Más votadas', fn: (a, b) => (b.votes || 0) - (a.votes || 0) },
+};
+
+// Igual que en Descubrir: el listón solo esconde lo que tiene nota por debajo;
+// lo que no tiene nota se queda a la vista.
+const passesScore = (i, minScore) => !minScore || i.mdb?.score == null || i.mdb.score >= minScore;
+
 export default function PersonDetail() {
   const { id } = useParams();
   const [params] = useSearchParams();
@@ -24,11 +39,24 @@ export default function PersonDetail() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [role, setRole] = useState(null); // active role tab
-  const [view, setView] = useState('all');
-  const [tracked, setTracked] = useState(false);
+  // vista, orden y listón sobreviven a la navegación hasta pulsar «Limpiar filtros»
+  const [view, setView] = useState(() => localStorage.getItem('person_view') || 'all');
+  const [trackedRoles, setTrackedRoles] = useState(new Set()); // facetas seguidas
   const [radarrIds, addRadarrId] = useRadarrIds();
-  const [show, toggle] = useTypeFilters();
+  const [show, toggle, resetTypes] = useTypeFilters();
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [sort, setSort] = useState(() => localStorage.getItem('person_film_sort') || 'reciente');
+  const [minScore, setMinScore] = useState(() => Number(localStorage.getItem('person_min_score') || 0));
+  const setSortPref = (v) => { setSort(v); localStorage.setItem('person_film_sort', v); };
+  const setMinScorePref = (v) => { setMinScore(v); localStorage.setItem('person_min_score', String(v)); };
+  const setViewPref = (v) => { setView(v); localStorage.setItem('person_view', v); };
+  const limpiarFiltros = () => {
+    setViewPref('all');
+    setSortPref('reciente');
+    setMinScorePref(0);
+    resetTypes();
+  };
+  const hayFiltros = view !== 'all' || sort !== 'reciente' || minScore > 0;
 
   useEffect(() => {
     setData(null);
@@ -41,16 +69,32 @@ export default function PersonDetail() {
         setRole(d.roles?.[wantRole] ? wantRole : d.primary);
       }
     });
-    api('/tracked').then((list) => Array.isArray(list) && setTracked(list.some((t) => t.id === Number(id))));
+    api('/tracked').then(
+      (list) =>
+        Array.isArray(list) &&
+        setTrackedRoles(new Set(list.filter((t) => t.id === Number(id)).map((t) => t.role || 'director')))
+    );
   }, [id, wantRole]);
 
-  const toggleTrack = async () => {
-    // follow them for the facet you're looking at, not a guess from the library
-    await api(`/tracked/${id}`, {
-      method: tracked ? 'DELETE' : 'POST',
-      body: tracked ? undefined : { role: role === 'actor' ? 'actor' : 'director' },
+  // follow/unfollow THE FACET you're looking at: the other one is untouched,
+  // so someone can be a favorite director AND actor at once
+  const toggleTrack = async (facet) => {
+    const siguiendo = trackedRoles.has(facet);
+    const r = siguiendo
+      ? await api(`/tracked/${id}?role=${facet}`, { method: 'DELETE' })
+      : await api(`/tracked/${id}`, { method: 'POST', body: { role: facet } });
+    setTrackedRoles((prev) => {
+      const next = new Set(prev);
+      if (siguiendo) next.delete(facet);
+      else {
+        next.add(facet);
+        if (r?.directorAlso) next.add('director');
+        if (r?.actorAlso) next.add('actor');
+      }
+      return next;
     });
-    setTracked(!tracked);
+    if (!siguiendo && r?.directorAlso) toast('⭐ Añadido también a directores/as: dirige 4+ películas de tu biblioteca');
+    if (!siguiendo && r?.actorAlso) toast('⭐ Añadido también a actores/actrices: tiene 8+ interpretadas en tu biblioteca');
   };
 
   if (error) return <ErrorBox error={`No se pudo cargar la filmografía: ${error}. ¿Está configurada la API key de TMDB en Ajustes?`} />;
@@ -82,22 +126,24 @@ export default function PersonDetail() {
     tv: items.filter((i) => i.isTvMovie).length,
     coral: items.filter((i) => i.isCoral).length,
   };
-  const filtered = items.filter((i) => {
-    if (!matchesTypeFilters(i, show)) return false;
-    if (view === 'owned') return i.owned;
-    if (view === 'missing') return i.released && !i.owned;
-    if (view === 'upcoming') return !i.released;
-    return true;
-  });
+  const filtered = items
+    .filter((i) => {
+      if (!matchesTypeFilters(i, show) || !passesScore(i, minScore)) return false;
+      if (view === 'owned') return i.owned;
+      if (view === 'missing') return i.released && !i.owned;
+      if (view === 'upcoming') return !i.released;
+      return true;
+    })
+    .sort(SORTS[sort]?.fn || SORTS.reciente.fn);
 
   // bulk-add what's visible in "Te faltan" instead of one click per film
   const missingPendingIds = items
-    .filter((i) => matchesTypeFilters(i, show) && i.released && !i.owned && !radarrIds.has(i.tmdb_id))
+    .filter((i) => matchesTypeFilters(i, show) && passesScore(i, minScore) && i.released && !i.owned && !radarrIds.has(i.tmdb_id))
     .map((i) => i.tmdb_id);
-  // …y decir cuántas deja fuera el filtro de tipos, para que el número del
-  // botón no parezca que se come parte de la filmografía
+  // …y decir cuántas dejan fuera los filtros de tipo y nota, para que el número
+  // del botón no parezca que se come parte de la filmografía
   const hiddenMissing = items.filter(
-    (i) => !matchesTypeFilters(i, show) && i.released && !i.owned && !radarrIds.has(i.tmdb_id)
+    (i) => !(matchesTypeFilters(i, show) && passesScore(i, minScore)) && i.released && !i.owned && !radarrIds.has(i.tmdb_id)
   ).length;
   const bulkAddMissing = async () => {
     setBulkBusy(true);
@@ -124,15 +170,17 @@ export default function PersonDetail() {
             <h1 className="font-display text-3xl text-zinc-100 leading-tight">{person.name}</h1>
             <DeathBadge deathday={person.deathday} />
             <button
-              onClick={toggleTrack}
-              className={tracked ? 'btn-gold' : 'btn-ghost'}
+              onClick={() => toggleTrack(active === 'actor' ? 'actor' : 'director')}
+              className={trackedRoles.has(active === 'actor' ? 'actor' : 'director') ? 'btn-gold' : 'btn-ghost'}
               title={
                 person.deathday
                   ? 'Ya fallecido: no tendrá nuevos estrenos, no hace falta seguirlo'
-                  : 'Las personas seguidas aparecen siempre en el calendario de cine venidero'
+                  : 'Sigue ESTA faceta: puedes tenerle a la vez en directores y en actores'
               }
             >
-              {tracked ? '★ Siguiendo' : '☆ Seguir en calendario'}
+              {trackedRoles.has(active === 'actor' ? 'actor' : 'director')
+                ? `★ Siguiendo como ${active === 'actor' ? 'actor/actriz' : 'director/a'}`
+                : `☆ Seguir como ${active === 'actor' ? 'actor/actriz' : 'director/a'}`}
             </button>
             <Link to={`/biblioteca?personId=${person.id}&personRole=${active}`} className="btn-ghost">
               Ver en tu biblioteca
@@ -151,7 +199,7 @@ export default function PersonDetail() {
               {roleKeys.map((r) => (
                 <button
                   key={r}
-                  onClick={() => { setRole(r); setView('all'); }}
+                  onClick={() => { setRole(r); setViewPref('all'); }}
                   className={`btn-ghost !py-1 text-xs ${active === r ? '!border-gold-400 text-gold-400' : ''}`}
                 >
                   {ROLE_TAB[r] || r} ({roles[r].stats.owned}/{roles[r].stats.released})
@@ -188,7 +236,7 @@ export default function PersonDetail() {
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
         {VIEWS.map(([v, label]) => (
-          <button key={v} onClick={() => setView(v)} className={view === v ? 'btn-gold' : 'btn-ghost'}>
+          <button key={v} onClick={() => setViewPref(v)} className={view === v ? 'btn-gold' : 'btn-ghost'}>
             {label}
             {v === 'missing' && ` (${stats.released - stats.owned})`}
             {v === 'upcoming' && ` (${stats.upcoming})`}
@@ -207,7 +255,7 @@ export default function PersonDetail() {
         <StatusLegend />
         {hiddenMissing > 0 && (
           <span className="text-[11px] text-zinc-500">
-            {hiddenMissing} más quedan fuera por los filtros de abajo (cortos, docs, conciertos, TV, coral)
+            {hiddenMissing} más quedan fuera por los filtros de abajo (tipo o nota mínima)
           </span>
         )}
       </div>
@@ -215,6 +263,32 @@ export default function PersonDetail() {
       {Object.values(typeCounts).some((n) => n > 0) && (
         <TypeFilterBar show={show} toggle={toggle} counts={typeCounts} />
       )}
+
+      {/* orden y listón de nota, con las notas de MDBList que trae el servidor */}
+      <div className="flex items-center gap-x-4 gap-y-2 flex-wrap mb-4 text-sm">
+        <label className="flex items-center gap-2 text-xs text-zinc-500">
+          Ordenar:
+          <select className="input !w-auto !py-1 text-xs" value={sort} onChange={(e) => setSortPref(e.target.value)}>
+            {Object.entries(SORTS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}
+          </select>
+        </label>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-zinc-500">Nota mínima Σ:</span>
+          {[0, 40, 50, 60, 70].map((v) => (
+            <button
+              key={v}
+              onClick={() => setMinScorePref(v)}
+              className={`btn-ghost !py-1 text-xs ${minScore === v ? '!border-gold-400 text-gold-400' : ''}`}
+            >
+              {v === 0 ? 'Todas' : `Σ ≥ ${v}`}
+            </button>
+          ))}
+          <span className="text-xs text-zinc-600">(las sin nota no se ocultan)</span>
+        </div>
+        {hayFiltros && (
+          <button className="btn-ghost !py-1 text-xs" onClick={limpiarFiltros}>✕ Limpiar filtros</button>
+        )}
+      </div>
 
       {filtered.length === 0 ? (
         <Empty>Nada que mostrar aquí. {view === 'missing' && '¡Filmografía completa! 🏆'}</Empty>
@@ -234,6 +308,12 @@ export default function PersonDetail() {
                 ) : null
               }
             >
+              {item.mdb?.score != null && (
+                <div className="text-[11px] text-gold-400/90 tabular">
+                  Σ {item.mdb.score}
+                  {item.mdb.imdb != null ? ` · IMDb ${Number(item.mdb.imdb).toFixed(1)}` : ''}
+                </div>
+              )}
               {!item.owned && (
                 <RadarrButton tmdbId={item.tmdb_id} small alreadyInRadarr={radarrIds.has(item.tmdb_id)} onAdded={addRadarrId} />
               )}

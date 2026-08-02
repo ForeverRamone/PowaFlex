@@ -46,7 +46,7 @@ const FIRST_STEPS = [
   {
     title: 'Marca a tu gente',
     to: '/favoritos',
-    body: 'Este es el paso que enciende el resto de la aplicación. Sigue a tus directores/as y actores/actrices —de uno en uno, por paquetes o pegando una lista de nombres— indicando por qué faceta los sigues. Sus filmografías pasan a ser tu lista de tareas.',
+    body: 'Este es el paso que enciende el resto de la aplicación. Sigue a tus directores/as y actores/actrices —de uno en uno, por paquetes o pegando una lista de nombres— indicando por qué faceta los sigues; quien dirige e interpreta puede estar en las dos a la vez. Sus filmografías pasan a ser tu lista de tareas.',
   },
   {
     title: 'Caza los huecos',
@@ -71,7 +71,8 @@ export default function About() {
         <b className="text-zinc-100">Radarr</b> (tu gestor de descargas monitorizadas), y convierte todo eso en
         dos cosas: <b className="text-gold-400">conocer a fondo el cine que tienes</b> y{' '}
         <b className="text-gold-400">cazar el cine que te falta o que está por venir</b>. Todo se guarda en local,
-        en tu propia máquina; nada sale de tu red salvo las consultas a TMDB.
+        en tu propia máquina; de tu red solo salen las consultas a los servicios que conectes (TMDB, MDBList,
+        JustWatch, Letterboxd, Wikipedia).
       </p>
 
       <h2 className="text-lg font-semibold text-zinc-100 mb-3">Si acabas de llegar: la ruta, paso a paso</h2>
@@ -114,6 +115,7 @@ export default function About() {
               <li>Seguir un calendario de estrenos y proyectos anunciados de tus cineastas.</li>
               <li>Detectar franquicias empezadas y sin terminar (sagas de TMDB), con las partes que faltan a la vista.</li>
               <li>Comprobar retos de listas famosas (IMDb Top 250, Cannes, 1001…) con anillos de «tengo» vs «visto».</li>
+              <li>Recorrer las secciones oficiales y el palmarés de los grandes festivales (Cannes, Venecia, Berlinale…) para cazar sus películas y seguir a sus cineastas.</li>
               <li>Encontrar grandes directores/as del canon de They Shoot Pictures ausentes de tu servidor.</li>
               <li>Comprobar en JustWatch si existe una versión de más calidad (HD/4K) en el mercado.</li>
             </ul>
@@ -182,8 +184,9 @@ export default function About() {
             Ranking de directores/as, actores/actrices y guionistas por presencia en tu biblioteca. La ficha de
             cada persona cruza su filmografía completa de TMDB con lo que tienes: porcentaje de completismo (solo
             largometrajes, con filtros para cortos, documentales, TV y dirección coral), lo que te falta (con
-            botón directo a Radarr) y sus proyectos anunciados. Quien dirige y actúa tiene una pestaña por faceta. Con
-            «☆ Seguir» la fijas en el calendario.
+            botón directo a Radarr), sus proyectos anunciados y las notas de cada título, con orden por
+            calificación, año o votos y listón de nota mínima. Quien dirige y actúa tiene una pestaña por faceta,
+            y con «☆ Seguir» fijas esa faceta en el calendario.
           </p>
         </Block>
         <Block icon="🗓️" title="Cine venidero" to="/calendario">
@@ -195,10 +198,19 @@ export default function About() {
         </Block>
         <Block icon="⭐" title="Favoritos" to="/favoritos">
           <p>
-            Tu lista de directores/as y actores/actrices de cabecera, la que alimenta el calendario. Incluye un
+            Tu lista de directores/as y actores/actrices de cabecera, la que alimenta el calendario. Cada persona
+            puede seguirse por una faceta o por las dos (un Eastwood cuenta en directores Y en actores). Incluye un
             ranking paginado por número de títulos (con filtro de fallecidos y actualización de estado vital),
             paquetes temáticos con «añadir todos», pegar una lista de nombres, y quitar o añadir individualmente.
             Lo que quites con la ✕ no vuelve por los añadidos masivos (solo a mano).
+          </p>
+        </Block>
+        <Block icon="🎪" title="Festivales" to="/festivales">
+          <p>
+            Las secciones oficiales de los seis festivales cuyo gran premio clasifica directamente para el Óscar
+            internacional (Cannes, Venecia, Berlinale, Sundance, Toronto y Busan), edición a edición, y el
+            palmarés histórico de cada premio. Todo casado con tu Plex: manda a Radarr lo que falte y sigue a sus
+            directores/as —de una en una o la sección entera— para que sus estrenos entren en el calendario.
           </p>
         </Block>
         <Block icon="🧭" title="Descubrir huecos" to="/descubrir">
@@ -246,8 +258,9 @@ export default function About() {
         <Block icon="⚙️" title="Ajustes" to="/ajustes">
           <p>
             Las conexiones (Plex, TMDB, Radarr y MDBList) con guías paso a paso para conseguir cada credencial, el aspecto de la app, qué notas quieres ver, el
-            perfil de calidad y carpeta que usará Radarr, el tamaño del radar del calendario y el control de
-            sincronización manual.
+            perfil de calidad y carpeta que usará Radarr, el tamaño del radar del calendario, el control de
+            sincronización manual y la copia de seguridad: descarga de la base de datos entera y
+            exportación/importación de la configuración para reinstalar sin empezar de cero.
           </p>
         </Block>
       </div>

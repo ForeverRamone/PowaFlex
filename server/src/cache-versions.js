@@ -14,9 +14,11 @@
  */
 export const CACHE_VERSIONS = {
   calendar: 7,
-  discover_gaps: 7,
-  discover_favorites: 8,
+  // v8/v9: el umbral de ruido pasó a mirar también los votos de Letterboxd
+  discover_gaps: 8,
+  discover_favorites: 9,
   discover_absent: 5,
+  festival: 1,
 };
 
 /** Prefijo con versión de una caché: `calendar:v7`, `discover_gaps:v7`… */

@@ -2,6 +2,7 @@ import { db, getSetting, cacheRead, cacheWrite } from './db.js';
 import { watchedIndex, isWatched, normTitle } from './letterboxd.js';
 import { needsLatin, readableTitle } from './titles.js';
 import { cachePrefix } from './cache-versions.js';
+import { enrichWithScores } from './mdblist.js';
 
 const DAY = 24 * 3600 * 1000;
 
@@ -402,6 +403,20 @@ export async function searchMovieId(title, year = null) {
   }
 }
 
+/** Ficha mínima de una película (cartel, fecha, títulos), con la misma caché
+ *  de 7 días que usa enrichRuntimes para no pedir dos veces lo mismo. */
+export async function movieSummary(tmdbId) {
+  const det = await tmdbGet(`/movie/${tmdbId}`, {}, { cacheKey: `movie:${tmdbId}:${lang()}`, cacheMs: 7 * DAY });
+  return {
+    tmdb_id: tmdbId,
+    title: det.title || det.original_title || null,
+    original_title: det.original_title || null,
+    poster_path: det.poster_path || null,
+    date: det.release_date || null,
+    runtime: det.runtime || null,
+  };
+}
+
 /** Deterministic TMDB id from an IMDb id (Plex guids carry it), cached. */
 export async function findByImdbId(imdbId) {
   if (!imdbId) return null;
@@ -787,6 +802,13 @@ export async function filmographyProfile(personId, wantRole = null) {
     roles[role] = { stats: roleStats(items, role), items };
   }
 
+  // Notas de MDBList sobre cada título (para ordenar/filtrar por calificación).
+  // Solo estrenadas: las por venir no tienen nota y gastarían presupuesto.
+  await enrichWithScores(
+    Object.values(roles).flatMap((r) => r.items.filter((i) => i.released)),
+    { maxFetch: 200 }
+  );
+
   // open on the requested role if we built it, else the one with most releases
   const primary =
     (wantRole && roles[wantRole] && wantRole) ||
@@ -1049,8 +1071,10 @@ const DIRECTOR_PACKS = [
 
 /** Curated director packs + directors "en boga" from TMDB, each with a tracked flag. */
 export async function suggestedPeople() {
+  // los paquetes son de directores: seguir a alguien como actor no le marca aquí
   const trackedTmdb = new Set(
-    db.prepare(`SELECT p.tmdb_id FROM tracked_people t JOIN people p ON p.id = t.person_id WHERE p.tmdb_id IS NOT NULL`)
+    db.prepare(`SELECT p.tmdb_id FROM tracked_people t JOIN people p ON p.id = t.person_id
+                WHERE p.tmdb_id IS NOT NULL AND t.role = 'director'`)
       .all().map((r) => r.tmdb_id)
   );
   const mapP = (p) => ({
@@ -1100,12 +1124,15 @@ export async function suggestedPeople() {
   return { packs, spanish: packs.find((p) => p.key === 'spanish')?.people || [], popular: trending };
 }
 
-/** Search TMDB people (to add anyone to favorites by typing). */
-export async function searchPeople(query) {
+/** Search TMDB people (to add anyone to favorites by typing). With `role`, the
+ *  tracked flag refleja SOLO esa faceta: seguido como director sigue siendo
+ *  añadible como actor. */
+export async function searchPeople(query, role = null) {
   const data = await tmdbGet('/search/person', { query }, { cacheKey: null });
   const trackedTmdb = new Set(
-    db.prepare(`SELECT p.tmdb_id FROM tracked_people t JOIN people p ON p.id = t.person_id WHERE p.tmdb_id IS NOT NULL`)
-      .all().map((r) => r.tmdb_id)
+    db.prepare(`SELECT p.tmdb_id FROM tracked_people t JOIN people p ON p.id = t.person_id
+                WHERE p.tmdb_id IS NOT NULL AND (? IS NULL OR t.role = ?)`)
+      .all(role, role).map((r) => r.tmdb_id)
   );
   return latinizeNames((data.results || []).slice(0, 12).map((p) => ({
     tmdb_id: p.id,
@@ -1115,6 +1142,33 @@ export async function searchPeople(query) {
     knownFor: (p.known_for || []).map((k) => k.title || k.name).filter(Boolean).slice(0, 2),
     tracked: trackedTmdb.has(p.id),
   })));
+}
+
+// Con cuántas interpretadas en tu biblioteca un director/a seguido gana solo la
+// faceta de actor. Más alto que el umbral de director (4): dirigir no pasa por
+// accidente, pero el conteo de actor arrastra cameos y papeles menores.
+const ACTOR_SPECIALITY_MIN = 8;
+
+/**
+ * Sigue una faceta de una persona, y la otra de propina cuando toca (el caso
+ * Eastwood): añadido como actor, si dirige 4+ películas de tu biblioteca
+ * (SPECIALITY_MIN) entra también en directores; añadido como director/a, si
+ * tiene 8+ interpretadas (ACTOR_SPECIALITY_MIN) entra también en actores.
+ */
+export function followFacets(personId, role = 'director') {
+  const followRole = role === 'actor' ? 'actor' : 'director';
+  const ins = db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at, role) VALUES (?, ?, ?)');
+  const added = !!ins.run(personId, Date.now(), followRole).changes;
+  const cuenta = db.prepare('SELECT COUNT(*) n FROM movie_people WHERE person_id = ? AND role = ?');
+  let directorAlso = false;
+  let actorAlso = false;
+  if (followRole === 'actor' && cuenta.get(personId, 'director').n >= SPECIALITY_MIN) {
+    directorAlso = !!ins.run(personId, Date.now(), 'director').changes;
+  }
+  if (followRole === 'director' && cuenta.get(personId, 'actor').n >= ACTOR_SPECIALITY_MIN) {
+    actorAlso = !!ins.run(personId, Date.now(), 'actor').changes;
+  }
+  return { added, directorAlso, actorAlso, role: followRole };
 }
 
 /** Add someone to favorites by TMDB person id, creating a people row if needed. */
@@ -1132,10 +1186,8 @@ export function trackByTmdb({ tmdbId, name, profilePath = null, role = 'director
       row = { id };
     }
   }
-  const followRole = role === 'actor' ? 'actor' : 'director';
-  db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at, role) VALUES (?, ?, ?)')
-    .run(row.id, Date.now(), followRole);
-  return { ok: true, personId: row.id, role: followRole };
+  const f = followFacets(row.id, role);
+  return { ok: true, personId: row.id, role: f.role, directorAlso: f.directorAlso };
 }
 
 // --- collections ------------------------------------------------------------

@@ -25,7 +25,19 @@ export default function People() {
   const [people, setPeople] = useState(null);
   const [limit, setLimit] = useState(60);
   const [opts, setOpts] = useState(null);
-  const [f, setF] = useState({ gender: '', life: '', continent: '', country: '' });
+  // los filtros sobreviven a la navegación (adelante, atrás, otra página y
+  // vuelta) hasta que se pulse «Limpiar»
+  const [f, setF] = useState(() => {
+    const vacio = { gender: '', life: '', continent: '', country: '' };
+    try {
+      return { ...vacio, ...JSON.parse(localStorage.getItem('people_filters') || '{}') };
+    } catch {
+      return vacio;
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem('people_filters', JSON.stringify(f));
+  }, [f]);
 
   useEffect(() => {
     api('/people/filter-options').then((o) => !o.error && setOpts(o));
@@ -73,7 +85,7 @@ export default function People() {
         <Select value={f.country} onChange={setFilter('country')} placeholder="País (nacimiento)"
           options={(opts?.countries || []).map((c) => [c, c])} />
         {(f.gender || f.life || f.continent || f.country) && (
-          <button className="btn-ghost" onClick={() => setF({ gender: '', life: '', continent: '', country: '' })}>✕ Limpiar</button>
+          <button className="btn-ghost" onClick={() => setF({ gender: '', life: '', continent: '', country: '' })}>✕ Limpiar filtros</button>
         )}
         {opts && (
           <span className="text-xs text-zinc-500 ml-auto">

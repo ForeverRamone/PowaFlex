@@ -73,11 +73,11 @@ export function remainingBudget() {
 // --- ratings ------------------------------------------------------------------
 
 const upsertRating = db.prepare(`
-INSERT INTO mdb_ratings (tmdb_id, imdb, imdb_votes, rt_critic, rt_audience, metacritic, letterboxd, trakt, score, json, fetched_at)
-VALUES (@tmdb_id, @imdb, @imdb_votes, @rt_critic, @rt_audience, @metacritic, @letterboxd, @trakt, @score, @json, @fetched_at)
+INSERT INTO mdb_ratings (tmdb_id, imdb, imdb_votes, rt_critic, rt_audience, metacritic, letterboxd, lb_votes, trakt, score, json, fetched_at)
+VALUES (@tmdb_id, @imdb, @imdb_votes, @rt_critic, @rt_audience, @metacritic, @letterboxd, @lb_votes, @trakt, @score, @json, @fetched_at)
 ON CONFLICT(tmdb_id) DO UPDATE SET imdb=excluded.imdb, imdb_votes=excluded.imdb_votes,
   rt_critic=excluded.rt_critic, rt_audience=excluded.rt_audience, metacritic=excluded.metacritic,
-  letterboxd=excluded.letterboxd, trakt=excluded.trakt, score=excluded.score,
+  letterboxd=excluded.letterboxd, lb_votes=excluded.lb_votes, trakt=excluded.trakt, score=excluded.score,
   json=excluded.json, fetched_at=excluded.fetched_at`);
 
 function parseItem(item) {
@@ -98,6 +98,9 @@ function parseItem(item) {
     // MDBList hands Letterboxd over already doubled to 0–10 (its 4.2 stars = 8.4),
     // so it is stored and displayed as-is: never scale it again.
     letterboxd: val('letterboxd'),
+    // el volumen de votos de Letterboxd: la señal de popularidad fiable (en
+    // TMDB apenas vota nadie), usada por el umbral de ruido de Descubrir
+    lb_votes: src.letterboxd?.votes ?? null,
     trakt: val('trakt'),
     score: item.score_average ?? item.score ?? null,
     json: JSON.stringify(item.ratings || []),
@@ -219,7 +222,7 @@ export async function enrichWithScores(items, { fetchMissing = true, maxFetch = 
   if (!ids.length) return items;
   const rows = new Map(
     db
-      .prepare(`SELECT tmdb_id, imdb, rt_critic, letterboxd, score FROM mdb_ratings
+      .prepare(`SELECT tmdb_id, imdb, rt_critic, letterboxd, lb_votes, score FROM mdb_ratings
                 WHERE tmdb_id IN (${ids.map(() => '?').join(',')})`)
       .all(...ids)
       .map((r) => [r.tmdb_id, r])
@@ -238,7 +241,7 @@ export async function enrichWithScores(items, { fetchMissing = true, maxFetch = 
   for (const item of items) {
     const r = rows.get(item.tmdb_id);
     if (r) {
-      item.mdb = { imdb: r.imdb, rt_critic: r.rt_critic, letterboxd: r.letterboxd, score: r.score };
+      item.mdb = { imdb: r.imdb, rt_critic: r.rt_critic, letterboxd: r.letterboxd, lb_votes: r.lb_votes, score: r.score };
     }
   }
   return items;

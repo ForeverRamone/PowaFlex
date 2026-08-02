@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, UI_THEMES, applyTheme, currentTheme } from '../api.js';
 import { Spinner, ProgressBar, PageHeader } from '../components.jsx';
+import { toast } from '../toast.js';
 
 function Guide({ title, children }) {
   const [open, setOpen] = useState(false);
@@ -103,6 +104,26 @@ export default function Settings() {
     await save();
     const st = await api('/sync', { method: 'POST', body: { force } });
     setSync({ ...st, running: true });
+  };
+
+  const importarAjustes = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // que se pueda reelegir el mismo fichero
+    if (!file) return;
+    let body;
+    try {
+      body = JSON.parse(await file.text());
+    } catch {
+      toast('⚠️ El fichero no es un JSON válido', 'error');
+      return;
+    }
+    const r = await api('/backup/settings', { method: 'POST', body });
+    if (r.error) {
+      toast(`⚠️ ${r.error}`, 'error');
+      return;
+    }
+    toast(`✓ ${r.aplicadas} ajustes importados${r.ignoradas ? ` · ${r.ignoradas.length} ignorados` : ''}`);
+    api('/settings').then(setS);
   };
 
   if (!s) return <Spinner />;
@@ -620,8 +641,9 @@ export default function Settings() {
       <section className="card p-5 mb-5">
         <h2 className="font-semibold text-zinc-100">6 · Descubrir huecos: umbral de ruido</h2>
         <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-2xl">
-          Una película con menos votos en TMDB que el umbral no cuenta como hueco. Sube el listón si los huecos
-          te traen demasiada morralla; baja a 0 para el completismo absoluto.
+          Una película cuenta como hueco si llega al umbral de votos en TMDB <b>o</b> en Letterboxd (vía
+          MDBList, donde la haya): en TMDB apenas vota nadie y el listón solo descartaba cine de verdad.
+          Sube el umbral si los huecos te traen demasiada morralla; baja a 0 para el completismo absoluto.
         </p>
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
@@ -675,6 +697,33 @@ export default function Settings() {
             )}
           </div>
         )}
+      </section>
+
+      {/* COPIA DE SEGURIDAD */}
+      <section className="card p-5 mb-5">
+        <h2 className="font-semibold text-zinc-100 mb-1">Copia de seguridad</h2>
+        <p className="text-xs text-zinc-500 mb-3">
+          Para reinstalar el contenedor sin empezar de cero. La base de datos lo incluye todo
+          (biblioteca, notas, favoritos, ajustes…); el fichero de ajustes solo guarda la
+          configuración (claves API, conexiones, umbrales) y se puede importar aquí mismo.
+        </p>
+        <div className="flex gap-2 items-center flex-wrap">
+          <a className="btn-gold" href="/api/backup/database" download>
+            ⬇ Descargar base de datos
+          </a>
+          <a className="btn-ghost" href="/api/backup/settings" download>
+            ⬇ Exportar ajustes (.json)
+          </a>
+          <label className="btn-ghost cursor-pointer">
+            ⬆ Importar ajustes
+            <input type="file" accept="application/json,.json" className="hidden" onChange={importarAjustes} />
+          </label>
+        </div>
+        <p className="text-[11px] text-zinc-600 mt-2">
+          Ambos ficheros contienen tus claves API y token de Plex: guárdalos en un sitio seguro.
+          Para restaurar la base de datos entera, copia el <code>.db</code> como{' '}
+          <code>powaflex.db</code> en la carpeta de datos del contenedor (parado) y arráncalo.
+        </p>
       </section>
     </div>
   );

@@ -88,8 +88,10 @@ export default function Calendar() {
   const [refreshing, setRefreshing] = useState(false);
   const [radarrIds, addRadarrId] = useRadarrIds();
   // same persisted filters as Descubrir/fichas: decide "sin cortos" once, applies everywhere
-  const [show, toggleFilter] = useTypeFilters();
-  const [horizon, setHorizon] = useState('6');
+  const [show, toggleFilter, resetTypes] = useTypeFilters();
+  // el horizonte sobrevive a la navegación hasta pulsar «Limpiar filtros»
+  const [horizon, setHorizonState] = useState(() => localStorage.getItem('cal_horizon') || '6');
+  const setHorizon = (v) => { setHorizonState(v); localStorage.setItem('cal_horizon', v); };
   const [bulk, setBulk] = useState({ running: false, summary: null });
 
   const load = (refresh = false) => {
@@ -180,7 +182,12 @@ export default function Calendar() {
         Generado {new Date(data.generatedAt).toLocaleString('es-ES')}.
       </p>
 
-      <TypeFilterBar show={show} toggle={toggleFilter} counts={counts} />
+      <div className="flex items-center gap-3 flex-wrap">
+        <TypeFilterBar show={show} toggle={toggleFilter} counts={counts} />
+        <button className="btn-ghost !py-1 text-xs" onClick={() => { resetTypes(); setHorizon('6'); }}>
+          ✕ Limpiar filtros
+        </button>
+      </div>
       {hiddenCount > 0 && (
         <p className="text-xs text-zinc-500 -mt-2 mb-6">{hiddenCount} ocultas por tus filtros — solo cine largometraje</p>
       )}

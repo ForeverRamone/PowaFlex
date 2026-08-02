@@ -47,6 +47,14 @@ const minVotesFor = (role) =>
 const dismissedIds = () =>
   new Set(db.prepare('SELECT tmdb_id FROM dismissed_movies').all().map((r) => r.tmdb_id));
 
+// Votos de Letterboxd cacheados en mdb_ratings. En TMDB apenas vota nadie, así
+// que el umbral de ruido por sí solo descartaba cine de verdad: una película
+// pasa si llega al listón en TMDB **o** en Letterboxd.
+const lbVotesMap = () =>
+  new Map(
+    db.prepare('SELECT tmdb_id, lb_votes FROM mdb_ratings WHERE lb_votes IS NOT NULL').all().map((r) => [r.tmdb_id, r.lb_votes])
+  );
+
 /**
  * Las dos películas por las que se reconoce a alguien, para no tener que abrir
  * su ficha y adivinar quién es.
@@ -252,6 +260,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
 
   const minVotes = minVotesFor(role);
   const dismissed = dismissedIds();
+  const lbVotes = lbVotesMap();
   // paginated so "ver más" can walk the ranking down to the first 500
   const tops = db
     .prepare(
@@ -313,7 +322,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
             dismissedN++;
             continue;
           }
-          if ((c.vote_count || 0) < minVotes) continue;
+          if ((c.vote_count || 0) < minVotes && (lbVotes.get(c.id) || 0) < minVotes) continue;
           missing.push({
             tmdb_id: c.id,
             title: c.title,
@@ -387,20 +396,23 @@ export async function favoritesGaps({ perPerson = 8, refresh = false, role: only
   }
   // the role you follow them FOR is explicit now: a favorite director never
   // brings in their acting credits, which is what mixed up the gaps before
+  // una fila por (persona, faceta): quien está en directores Y actores genera
+  // sus huecos por separado en cada faceta
   const tracked = db
     .prepare(
-      `SELECT p.id, p.name, p.thumb, p.deathday, COALESCE(t.role, 'director') AS role,
-              SUM(CASE WHEN mp.role = COALESCE(t.role, 'director') THEN 1 ELSE 0 END) inLibrary
+      `SELECT p.id, p.name, p.thumb, p.deathday, t.role,
+              SUM(CASE WHEN mp.role = t.role THEN 1 ELSE 0 END) inLibrary
        FROM tracked_people t JOIN people p ON p.id = t.person_id
        LEFT JOIN movie_people mp ON mp.person_id = p.id
-       WHERE (? IS NULL OR COALESCE(t.role, 'director') = ?)
-       GROUP BY p.id ORDER BY p.name`
+       WHERE (? IS NULL OR t.role = ?)
+       GROUP BY p.id, t.role ORDER BY p.name`
     )
     .all(onlyRole, onlyRole);
 
   const inLib = libraryTmdbIds();
   const widx = watchedIndex();
   const dismissed = dismissedIds();
+  const lbVotes = lbVotesMap();
   const out = [];
   const errors = [];
   setBuildProgress('discover:favoritos', 'Cruzando filmografías de tus favoritos', 0, tracked.length);
@@ -434,7 +446,7 @@ export async function favoritesGaps({ perPerson = 8, refresh = false, role: only
         for (const it of items) {
           if (!it.released || it.owned) continue;
           if (dismissed.has(it.tmdb_id)) { dismissedN++; continue; }
-          if ((it.votes || 0) < minVotes) continue;
+          if ((it.votes || 0) < minVotes && (lbVotes.get(it.tmdb_id) || 0) < minVotes) continue;
           missing.push({ ...it, owned: false });
         }
         missing.sort((a, b) => (b.votes || 0) - (a.votes || 0));
