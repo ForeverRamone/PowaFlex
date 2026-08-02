@@ -571,6 +571,6 @@ export async function absentGreats({ perPerson = 6, refresh = false, canon = 'al
     present,
     errors: errors.slice(0, 5),
   };
-  if (out.length || !errors.length) cacheWrite(cacheKey, { ...result, partial: errors.length > 0 }); // ver buildCalendar
+  if (absent.length || !errors.length) cacheWrite(cacheKey, { ...result, partial: errors.length > 0 }); // ver buildCalendar
   return result;
 }

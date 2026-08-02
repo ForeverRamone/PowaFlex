@@ -1,5 +1,14 @@
 # Changelog
 
+## Alpha 0.9.4 (0.9.4-alpha) — 2026-08-02
+
+- **Arreglado «out is not defined» en Grandes ausentes.** Se coló en la 0.9.3: la pantalla no
+  cargaba ningún canon aunque tuvieras la clave de TMDB puesta. Era un descuido mío al tocar el
+  guardado en caché; ahora hay una prueba que recorre las páginas que dependen de TMDB y falla si
+  alguna revienta con un error de programación en vez de con un aviso normal.
+- **«Actualizar todo» va arriba del todo en Ajustes**, con color propio para distinguirlo de las
+  conexiones.
+
 ## Alpha 0.9.3 (0.9.3-alpha) — 2026-08-02
 
 Versión de repaso a fondo: cuatro revisiones del código encontraron una lista larga de cosas

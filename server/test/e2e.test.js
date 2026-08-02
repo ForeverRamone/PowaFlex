@@ -94,6 +94,35 @@ test('las páginas principales responden 200 con la forma esperada', async () =>
   }
 });
 
+test('ninguna ruta revienta con un error de programación', async () => {
+  // «out is not defined» se coló en producción porque las rutas que necesitan
+  // TMDB no se probaban: sin clave fallan igual, pero tienen que fallar con un
+  // error CONTROLADO, no con una excepción de JavaScript.
+  const sospechoso = /is not defined|is not a function|Cannot read|undefined is not|TypeError|ReferenceError/i;
+  const rutas = [
+    '/api/discover/absent?canon=alltime',
+    '/api/discover/absent?canon=imdb501',
+    '/api/discover/absent?canon=noexiste',
+    '/api/discover/gaps?role=director',
+    '/api/discover/favorites',
+    '/api/calendar',
+    '/api/sagas',
+    '/api/mdblist/insights',
+    '/api/people/1/filmography',
+    '/api/media/550',
+    '/api/justwatch/550',
+  ];
+  for (const ruta of rutas) {
+    const r = await fetch(`${base}${ruta}`);
+    const texto = await r.text();
+    assert.ok(
+      !sospechoso.test(texto),
+      `${ruta} ha reventado en vez de devolver un error controlado:\n  ${texto.slice(0, 200)}`
+    );
+    assert.ok(r.status < 500 || r.status === 502, `${ruta} devolvió ${r.status}`);
+  }
+});
+
 test('el canon de los 501 directores está completo', async () => {
   const { body } = await get('/api/discover/canons');
   const c = body.find((x) => x.key === 'imdb501');

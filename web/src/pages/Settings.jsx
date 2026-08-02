@@ -119,6 +119,74 @@ export default function Settings() {
     <div>
       <PageHeader eyebrow="Cuenta" title="Ajustes" />
 
+      {/* ACTUALIZAR TODO */}
+      <section className="card-raised p-5 mb-6 border-l-4 !border-l-yellow-500 !bg-yellow-500/8">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold text-zinc-100">Actualizar todo</h2>
+            <p className="text-xs text-zinc-500 mt-1 max-w-2xl">
+              Una sola rutina con todo lo que PowaFlex necesita, en orden: biblioteca de Plex, emparejado de
+              Letterboxd, títulos en otros idiomas, notas de MDBList, lo que ya tienes en Radarr, calendario, huecos
+              de tus favoritos y sagas. Es exactamente lo mismo que se ejecuta solo cada noche. Lo que no tengas
+              configurado se salta.
+            </p>
+          </div>
+          <button className="btn-gold shrink-0" onClick={startFullRefresh} disabled={refresh?.running}>
+            {refresh?.running ? 'Actualizando…' : '↻ Actualizar todo'}
+          </button>
+        </div>
+
+        {refresh?.steps?.length > 0 && (
+          <div className="mt-4 space-y-1">
+            {refresh.steps.map((st) => {
+              const icon = { done: '✓', running: '⟳', error: '✗', skipped: '·', pending: '○' }[st.state] || '○';
+              const color = {
+                done: 'text-emerald-400', running: 'text-gold-400 animate-pulse',
+                error: 'text-red-400', skipped: 'text-zinc-600', pending: 'text-zinc-600',
+              }[st.state];
+              return (
+                <div key={st.key} className="flex items-baseline gap-2 text-sm">
+                  <span className={`${color} w-4 shrink-0`}>{icon}</span>
+                  <span className={st.state === 'skipped' ? 'text-zinc-600' : 'text-zinc-300'}>{st.label}</span>
+                  {st.detail && (
+                    <span className={`text-xs ${st.state === 'error' ? 'text-red-400' : 'text-zinc-500'}`}>
+                      — {st.detail}
+                    </span>
+                  )}
+                  {st.ms > 1000 && st.state === 'done' && (
+                    <span className="text-[11px] text-zinc-600 ml-auto shrink-0">{Math.round(st.ms / 1000)}s</span>
+                  )}
+                </div>
+              );
+            })}
+            {/* the Plex step drives the sync, so show its inner progress */}
+            {refresh.running && sync?.running && (
+              <div className="pt-2 max-w-md">
+                <ProgressBar pct={syncPct} />
+                <div className="text-[11px] text-zinc-500 mt-1">
+                  {sync.phase === 'listing' && `Listando «${sync.section || ''}»… ${sync.done}`}
+                  {sync.phase === 'details' && `Detalles ${sync.detailDone} / ${sync.detailTotal}`}
+                  {sync.phase === 'cleanup' && 'Limpiando eliminadas…'}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!refresh?.running && refresh?.finishedAt && (
+          <p className={`text-xs mt-3 ${refresh.lastError ? 'text-red-400' : 'text-emerald-400'}`}>
+            {refresh.lastError
+              ? `Terminada con avisos: ${refresh.lastError}`
+              : `✓ Todo actualizado · ${new Date(refresh.finishedAt).toLocaleString('es-ES')}`}
+          </p>
+        )}
+        {!refresh?.running && !refresh?.finishedAt && refresh?.lastRun && (
+          <p className="text-xs text-zinc-500 mt-3">
+            Última actualización completa: {new Date(refresh.lastRun).toLocaleString('es-ES')}
+          </p>
+        )}
+      </section>
+
       {/* PLEX */}
       <section className="card p-5 mb-5">
         <div className="flex items-center justify-between">
@@ -575,73 +643,6 @@ export default function Settings() {
         {saved && <span className="text-emerald-400 text-sm">✓ Guardado</span>}
       </div>
 
-      {/* ACTUALIZAR TODO */}
-      <section className="card p-5 mb-5 border-l-4 !border-l-gold-400">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-zinc-100">Actualizar todo</h2>
-            <p className="text-xs text-zinc-500 mt-1 max-w-2xl">
-              Una sola rutina con todo lo que PowaFlex necesita, en orden: biblioteca de Plex, emparejado de
-              Letterboxd, títulos en otros idiomas, notas de MDBList, lo que ya tienes en Radarr, calendario, huecos
-              de tus favoritos y sagas. Es exactamente lo mismo que se ejecuta solo cada noche. Lo que no tengas
-              configurado se salta.
-            </p>
-          </div>
-          <button className="btn-gold shrink-0" onClick={startFullRefresh} disabled={refresh?.running}>
-            {refresh?.running ? 'Actualizando…' : '↻ Actualizar todo'}
-          </button>
-        </div>
-
-        {refresh?.steps?.length > 0 && (
-          <div className="mt-4 space-y-1">
-            {refresh.steps.map((st) => {
-              const icon = { done: '✓', running: '⟳', error: '✗', skipped: '·', pending: '○' }[st.state] || '○';
-              const color = {
-                done: 'text-emerald-400', running: 'text-gold-400 animate-pulse',
-                error: 'text-red-400', skipped: 'text-zinc-600', pending: 'text-zinc-600',
-              }[st.state];
-              return (
-                <div key={st.key} className="flex items-baseline gap-2 text-sm">
-                  <span className={`${color} w-4 shrink-0`}>{icon}</span>
-                  <span className={st.state === 'skipped' ? 'text-zinc-600' : 'text-zinc-300'}>{st.label}</span>
-                  {st.detail && (
-                    <span className={`text-xs ${st.state === 'error' ? 'text-red-400' : 'text-zinc-500'}`}>
-                      — {st.detail}
-                    </span>
-                  )}
-                  {st.ms > 1000 && st.state === 'done' && (
-                    <span className="text-[11px] text-zinc-600 ml-auto shrink-0">{Math.round(st.ms / 1000)}s</span>
-                  )}
-                </div>
-              );
-            })}
-            {/* the Plex step drives the sync, so show its inner progress */}
-            {refresh.running && sync?.running && (
-              <div className="pt-2 max-w-md">
-                <ProgressBar pct={syncPct} />
-                <div className="text-[11px] text-zinc-500 mt-1">
-                  {sync.phase === 'listing' && `Listando «${sync.section || ''}»… ${sync.done}`}
-                  {sync.phase === 'details' && `Detalles ${sync.detailDone} / ${sync.detailTotal}`}
-                  {sync.phase === 'cleanup' && 'Limpiando eliminadas…'}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {!refresh?.running && refresh?.finishedAt && (
-          <p className={`text-xs mt-3 ${refresh.lastError ? 'text-red-400' : 'text-emerald-400'}`}>
-            {refresh.lastError
-              ? `Terminada con avisos: ${refresh.lastError}`
-              : `✓ Todo actualizado · ${new Date(refresh.finishedAt).toLocaleString('es-ES')}`}
-          </p>
-        )}
-        {!refresh?.running && !refresh?.finishedAt && refresh?.lastRun && (
-          <p className="text-xs text-zinc-500 mt-3">
-            Última actualización completa: {new Date(refresh.lastRun).toLocaleString('es-ES')}
-          </p>
-        )}
-      </section>
 
       {/* SYNC */}
       <section className="card p-5 mb-5">
