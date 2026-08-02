@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Spinner, ErrorBox, Empty, ProgressBar, MovieModal, PageHeader } from '../components.jsx';
+import {
+  Spinner, ErrorBox, Empty, ProgressBar, MovieModal, MediaModal, PageHeader, RadarrButton, useRadarrIds,
+} from '../components.jsx';
+import { toast } from '../toast.js';
+import { useChartTheme } from '../charts.js';
 
 // --- Letterboxd completista rings -------------------------------------------
 
-// Two concentric rings: owned (Plex, gold) on the outside, watched (green) inside.
+// Two concentric rings: owned (Plex, accent) on the outside, watched (green)
+// inside. Colours come from the theme: the old navy tracks belonged to the dark
+// look and sat like ink stains on «Cartelera»'s paper.
 function DualRing({ ownedPct, watchedPct, mode, size = 64 }) {
+  const ch = useChartTheme();
   const s = 5;
   const r1 = size / 2 - s / 2 - 1;
   const r2 = r1 - s - 2;
@@ -19,14 +26,14 @@ function DualRing({ ownedPct, watchedPct, mode, size = 64 }) {
     <svg width={size} height={size} className="shrink-0 -rotate-90">
       {showOwned && (
         <>
-          <circle cx={cx} cy={cx} r={r1} fill="none" stroke="#252d42" strokeWidth={s} />
-          <circle cx={cx} cy={cx} r={r1} fill="none" stroke="#e8b53a" strokeWidth={s} strokeDasharray={c(r1)} strokeDashoffset={off(r1, ownedPct)} strokeLinecap="round" />
+          <circle cx={cx} cy={cx} r={r1} fill="none" stroke={ch.muted} strokeWidth={s} />
+          <circle cx={cx} cy={cx} r={r1} fill="none" stroke={ch.accent} strokeWidth={s} strokeDasharray={c(r1)} strokeDashoffset={off(r1, ownedPct)} strokeLinecap="round" />
         </>
       )}
       {showWatched && (
         <>
-          <circle cx={cx} cy={cx} r={r2} fill="none" stroke="#1c2740" strokeWidth={s} />
-          <circle cx={cx} cy={cx} r={r2} fill="none" stroke="#34d399" strokeWidth={s} strokeDasharray={c(r2)} strokeDashoffset={off(r2, watchedPct)} strokeLinecap="round" />
+          <circle cx={cx} cy={cx} r={r2} fill="none" stroke={ch.muted} strokeWidth={s} opacity={0.6} />
+          <circle cx={cx} cy={cx} r={r2} fill="none" stroke={ch.positive} strokeWidth={s} strokeDasharray={c(r2)} strokeDashoffset={off(r2, watchedPct)} strokeLinecap="round" />
         </>
       )}
       <text x="50%" y="50%" transform={`rotate(90 ${cx} ${cx})`} textAnchor="middle" dominantBaseline="central" className="fill-zinc-200" style={{ fontSize: 12, fontWeight: 700 }}>
@@ -36,11 +43,75 @@ function DualRing({ ownedPct, watchedPct, mode, size = 64 }) {
   );
 }
 
+/**
+ * One row of a challenge list. Films you don't have often reach us with just a
+ * title and a year, so the TMDB id is resolved on the first click — then the
+ * row behaves like any card in the app: opens its ficha and goes to Radarr on
+ * its own, without having to send the whole list (#7).
+ */
+function ChallengeRow({ listId, item, radarrIds, onAdded, onOpenOwned }) {
+  const [tmdbId, setTmdbId] = useState(item.tmdb_id || null);
+  const [ficha, setFicha] = useState(false);
+  const [resolving, setResolving] = useState(false);
+
+  const ensureId = async () => {
+    if (tmdbId) return tmdbId;
+    setResolving(true);
+    const r = await api(`/letterboxd/lists/${listId}/resolve-item`, {
+      method: 'POST',
+      body: { title: item.title, year: item.year ?? null },
+    });
+    setResolving(false);
+    if (r?.tmdbId) {
+      setTmdbId(r.tmdbId);
+      return r.tmdbId;
+    }
+    toast(`⚠️ ${r?.error || 'No encuentro esta película en TMDB'}`, 'error');
+    return null;
+  };
+
+  const openFicha = async () => {
+    if (item.movie_id) return onOpenOwned(item.movie_id);
+    if (await ensureId()) setFicha(true);
+  };
+
+  return (
+    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 text-sm">
+      {item.position != null && <span className="text-zinc-600 w-8 text-right shrink-0 tabular">{item.position}.</span>}
+      <button
+        className="text-zinc-200 hover:text-gold-400 truncate text-left min-w-0"
+        onClick={openFicha}
+        disabled={resolving}
+        title={`${item.title} — ver ficha`}
+      >
+        {item.title} <span className="text-zinc-500">({item.year ?? '¿?'})</span>
+        {resolving && <span className="text-zinc-500"> · buscando…</span>}
+      </button>
+      <span className="ml-auto flex items-center gap-2 shrink-0 text-xs">
+        {item.movie_id && <span className="text-gold-400" title="En tu Plex">📀</span>}
+        {item.watched && <span className="text-emerald-400" title="Vista">👁️</span>}
+        {!item.movie_id && (
+          <RadarrButton
+            tmdbId={tmdbId}
+            resolveTmdbId={ensureId}
+            small
+            inline
+            alreadyInRadarr={!!tmdbId && radarrIds.has(tmdbId)}
+            onAdded={onAdded}
+          />
+        )}
+      </span>
+      {ficha && tmdbId && <MediaModal tmdbId={tmdbId} onClose={() => setFicha(false)} />}
+    </div>
+  );
+}
+
 function ChallengeDetail({ listId, onChanged }) {
   const [data, setData] = useState(null);
   const [view, setView] = useState('missing');
   const [selected, setSelected] = useState(null);
   const [bulk, setBulk] = useState({ running: false, msg: null });
+  const [radarrIds, addRadarrId] = useRadarrIds();
 
   const reload = () => api(`/letterboxd/lists/${listId}`).then(setData);
   useEffect(() => { setData(null); reload(); }, [listId]);
@@ -79,20 +150,14 @@ function ChallengeDetail({ listId, onChanged }) {
       ) : (
         <div className="max-h-96 overflow-y-auto card divide-y divide-ink-800">
           {shown.map((i, idx) => (
-            <div key={idx} className="flex items-center gap-3 px-4 py-1.5 text-sm">
-              {i.position != null && <span className="text-zinc-600 w-8 text-right shrink-0">{i.position}.</span>}
-              {i.movie_id ? (
-                <button className="text-zinc-200 hover:text-gold-400 truncate text-left" onClick={() => setSelected(i.movie_id)}>
-                  {i.title} <span className="text-zinc-500">({i.year ?? '¿?'})</span>
-                </button>
-              ) : (
-                <span className="text-zinc-300 truncate">{i.title} <span className="text-zinc-500">({i.year ?? '¿?'})</span></span>
-              )}
-              <span className="ml-auto flex items-center gap-2 shrink-0 text-xs">
-                {i.movie_id && <span className="text-gold-400" title="En tu Plex">📀</span>}
-                {i.watched && <span className="text-emerald-400" title="Vista">👁️</span>}
-              </span>
-            </div>
+            <ChallengeRow
+              key={`${i.tmdb_id || i.title}-${idx}`}
+              listId={listId}
+              item={i}
+              radarrIds={radarrIds}
+              onAdded={addRadarrId}
+              onOpenOwned={setSelected}
+            />
           ))}
         </div>
       )}
@@ -105,7 +170,9 @@ function ChallengeCard({ l, mode, open, setOpen, load }) {
   const ownedPct = l.item_count ? Math.round(((l.owned || 0) / l.item_count) * 100) : 0;
   const watchedPct = l.item_count ? Math.round(((l.watched || 0) / l.item_count) * 100) : 0;
   return (
-    <section className="card p-4">
+    // min-w-0: sin él la pista `1fr` del grid se dimensiona por el min-content
+    // de la tarjeta y en móvil se sale de la pantalla
+    <section className="card p-4 min-w-0">
       <div className="flex items-center gap-3">
         <DualRing ownedPct={ownedPct} watchedPct={watchedPct} mode={mode} />
         <div className="min-w-0 flex-1">
@@ -116,11 +183,11 @@ function ChallengeCard({ l, mode, open, setOpen, load }) {
           >
             {l.official ? '🏅 ' : ''}{l.name}
           </button>
-          <div className="text-xs text-zinc-400 mt-1 flex gap-3">
+          <div className="text-xs text-zinc-400 mt-1 flex flex-wrap gap-x-3">
             <span title="En tu Plex"><b className="text-gold-400">{l.owned || 0}</b>/{l.item_count} tengo</span>
             <span title="Vistas (Plex o Letterboxd)"><b className="text-emerald-400">{l.watched || 0}</b>/{l.item_count} vistas</span>
           </div>
-          <div className="flex items-center gap-3 mt-1 text-xs">
+          <div className="flex flex-wrap items-center gap-x-3 mt-1 text-xs">
             {l.url && <a href={l.url} target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-gold-400">Letterboxd ↗</a>}
             <button
               className="text-zinc-500 hover:text-gold-400"
@@ -182,8 +249,8 @@ function LetterboxdChallenges() {
         </div>
       </div>
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-        Tus listas de Letterboxd como anillos de completismo. Anillo exterior <span className="text-gold-400">dorado</span> = las que
-        <b> tienes en Plex</b>; anillo interior <span className="text-emerald-400">verde</span> = las que <b>has visto</b> (Plex o Letterboxd).
+        Tus listas de Letterboxd como anillos de completismo. El anillo <span className="text-gold-400 font-semibold">exterior</span> son
+        las que <b>tienes en Plex</b>; el <span className="text-emerald-400 font-semibold">interior</span>, las que <b>has visto</b> (Plex o Letterboxd).
         Importa el zip en <a href="/letterboxd" className="text-gold-400 hover:underline">Letterboxd</a> o pega la URL de cualquier lista pública.
       </p>
 
@@ -217,11 +284,44 @@ function LetterboxdChallenges() {
   );
 }
 
+// MDBList rows always carry a TMDB id, so the ficha and Radarr are one click.
+function MdbRow({ item, radarrIds, onAdded, onOpenOwned }) {
+  const [ficha, setFicha] = useState(false);
+  return (
+    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 text-sm">
+      {item.rank != null && <span className="text-zinc-600 w-10 text-right shrink-0 tabular">{item.rank}.</span>}
+      <button
+        className="text-zinc-200 hover:text-gold-400 truncate text-left min-w-0"
+        title={`${item.title} — ver ficha`}
+        onClick={() => (item.owned && item.rating_key ? onOpenOwned(item.rating_key) : setFicha(true))}
+      >
+        {item.title} <span className="text-zinc-500">({item.year ?? '¿?'})</span>
+      </button>
+      <span className="ml-auto flex items-center gap-2 sm:gap-3 shrink-0 text-xs text-zinc-500">
+        {item.imdb != null && <span className="hidden sm:inline">IMDb {Number(item.imdb).toFixed(1)}</span>}
+        {item.owned ? (
+          <span className="text-emerald-400">✓{item.view_count > 0 ? ' vista' : ''}</span>
+        ) : (
+          <RadarrButton
+            tmdbId={item.tmdb_id}
+            small
+            inline
+            alreadyInRadarr={radarrIds.has(item.tmdb_id)}
+            onAdded={onAdded}
+          />
+        )}
+      </span>
+      {ficha && <MediaModal tmdbId={item.tmdb_id} onClose={() => setFicha(false)} />}
+    </div>
+  );
+}
+
 function ListDetail({ listId, onChanged }) {
   const [data, setData] = useState(null);
   const [view, setView] = useState('missing');
   const [bulk, setBulk] = useState({ running: false, summary: null });
   const [selected, setSelected] = useState(null);
+  const [radarrIds, addRadarrId] = useRadarrIds();
 
   useEffect(() => {
     setData(null);
@@ -269,24 +369,13 @@ function ListDetail({ listId, onChanged }) {
       ) : (
         <div className="max-h-96 overflow-y-auto card divide-y divide-ink-800">
           {shown.map((i) => (
-            <div key={i.tmdb_id} className="flex items-center gap-3 px-4 py-1.5 text-sm">
-              {i.rank != null && <span className="text-zinc-600 w-10 text-right shrink-0">{i.rank}.</span>}
-              {i.owned && i.rating_key ? (
-                <button className="text-zinc-200 hover:text-gold-400 truncate text-left" onClick={() => setSelected(i.rating_key)}>
-                  {i.title} <span className="text-zinc-500">({i.year ?? '¿?'})</span>
-                </button>
-              ) : (
-                <span className="text-zinc-300 truncate">
-                  {i.title} <span className="text-zinc-500">({i.year ?? '¿?'})</span>
-                </span>
-              )}
-              <span className="ml-auto flex items-center gap-3 shrink-0 text-xs text-zinc-500">
-                {i.imdb != null && <span>IMDb {Number(i.imdb).toFixed(1)}</span>}
-                {i.owned ? (
-                  <span className="text-emerald-400">✓{i.view_count > 0 ? ' vista' : ''}</span>
-                ) : null}
-              </span>
-            </div>
+            <MdbRow
+              key={i.tmdb_id}
+              item={i}
+              radarrIds={radarrIds}
+              onAdded={addRadarrId}
+              onOpenOwned={setSelected}
+            />
           ))}
         </div>
       )}

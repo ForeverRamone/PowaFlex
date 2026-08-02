@@ -196,8 +196,8 @@ export default function Letterboxd() {
                   <thead>
                     <tr className="text-zinc-500 text-left border-b border-ink-700">
                       <th className="py-2">Título</th><th>Año</th>
-                      <th className="text-right">Tu nota</th>
-                      <th className="text-right">Comunidad LB</th>
+                      <th className="text-right">Tu nota /10</th>
+                      <th className="text-right">Comunidad LB /10</th>
                       <th className="text-right">Σ MDBList</th>
                     </tr>
                   </thead>

@@ -13,6 +13,53 @@ function Block({ icon, title, to, children }) {
   );
 }
 
+// El recorrido que resuelve la pregunta «vale, ¿y ahora qué hago?»: primero
+// dejar la aplicación funcionando, después el bucle de uso diario.
+const FIRST_STEPS = [
+  {
+    title: 'Conecta tu Plex',
+    to: '/ajustes',
+    body: 'En Ajustes, pega la dirección del servidor y tu X-Plex-Token (la propia página explica cómo sacarlo) y elige la biblioteca de películas. Lanza la sincronización: la primera tarda unos minutos y trae fichas, reparto, géneros, visionados y datos técnicos.',
+  },
+  {
+    title: 'Añade la clave de TMDB',
+    to: '/ajustes',
+    body: 'Es gratuita y es lo que convierte tu lista de archivos en filmografías: sin ella no hay completismo, ni calendario de estrenos, ni sagas, ni huecos que rellenar. Es el paso que más rendimiento da.',
+  },
+  {
+    title: 'Conecta Radarr',
+    to: '/ajustes',
+    optional: true,
+    body: 'Sin Radarr, PowaFlex te enseña lo que te falta; con Radarr, además lo pide. Necesita la URL y la API key, y le dices con qué perfil de calidad y en qué carpeta debe añadir.',
+  },
+  {
+    title: 'Trae tu Letterboxd y las notas',
+    to: '/letterboxd',
+    optional: true,
+    body: 'Importa el zip de tu export para que PowaFlex sepa qué has visto aunque no lo reprodujeras en Plex, y pon tu RSS para que se mantenga solo. Con la clave de MDBList (también en Ajustes) cada película gana las notas de IMDb, Rotten Tomatoes, Metacritic y Letterboxd.',
+  },
+  {
+    title: 'Mira dónde estás',
+    to: '/',
+    body: 'El Dashboard te da la foto general y Calidad y disco la salud técnica. En Visionado ves cuánto llevas visto y qué grandes películas tuyas siguen esperando. Aquí todavía no hay nada que decidir: es tomar medida de la colección.',
+  },
+  {
+    title: 'Marca a tu gente',
+    to: '/favoritos',
+    body: 'Este es el paso que enciende el resto de la aplicación. Sigue a tus directores/as y actores/actrices —de uno en uno, por paquetes o pegando una lista de nombres— indicando por qué faceta los sigues. Sus filmografías pasan a ser tu lista de tareas.',
+  },
+  {
+    title: 'Caza los huecos',
+    to: '/descubrir',
+    body: 'Descubrir huecos cruza esas filmografías con tu Plex y te dice qué falta, con filtros para dejar fuera el ruido (cortos, documentales, conciertos, TV, cameos). Sagas hace lo mismo con las franquicias a medias, y Listas y retos con los cánones (1001 películas, premios…). Cada película se manda a Radarr desde su propia fila.',
+  },
+  {
+    title: 'Déjalo corriendo',
+    to: '/calendario',
+    body: 'Cine venidero vigila los estrenos de tu gente. Cada noche PowaFlex resincroniza Plex, recalcula huecos y, si lo activas, manda solos a Radarr los estrenos de tus directores/as favoritos/as vivos. A partir de aquí solo tienes que entrar de vez en cuando.',
+  },
+];
+
 export default function About() {
   return (
     <div>
@@ -26,6 +73,26 @@ export default function About() {
         <b className="text-gold-400">cazar el cine que te falta o que está por venir</b>. Todo se guarda en local,
         en tu propia máquina; nada sale de tu red salvo las consultas a TMDB.
       </p>
+
+      <h2 className="text-lg font-semibold text-zinc-100 mb-3">Si acabas de llegar: la ruta, paso a paso</h2>
+      <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
+        Los cuatro primeros pasos se hacen una vez y dejan la aplicación funcionando. Del quinto en adelante
+        empieza el uso diario. Puedes saltarte cualquiera que no te interese: nada depende de lo que no configures.
+      </p>
+      <ol className="grid md:grid-cols-2 gap-3 mb-6">
+        {FIRST_STEPS.map((s, i) => (
+          <li key={s.title} className="card p-4 flex gap-3">
+            <span className="font-display text-2xl text-gold-400 leading-none shrink-0 w-8 tabular">{i + 1}</span>
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-zinc-100">
+                {s.to ? <Link to={s.to} className="hover:text-gold-400">{s.title} →</Link> : s.title}
+                {s.optional && <span className="badge-quiet ml-2 align-middle">opcional</span>}
+              </div>
+              <p className="text-sm text-zinc-400 leading-relaxed mt-1">{s.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
 
       <h2 className="text-lg font-semibold text-zinc-100 mb-3">¿Qué puedo hacer con PowaFlex?</h2>
       <div className="card p-5 mb-6 text-sm text-zinc-400 leading-relaxed">

@@ -1,5 +1,56 @@
 # Changelog
 
+## Alpha 0.9 (0.9.0-alpha) — 2026-08-02
+
+### Notas de Letterboxd
+
+- **Se acabaron las notas imposibles**. La nota de la comunidad de Letterboxd salía por encima de
+  diez («16.8/10») porque PowaFlex la doblaba cuando ya venía sobre diez. Ahora tu nota y la de la
+  comunidad se comparan en la misma escala, en Visionado y en la tabla de Letterboxd.
+- El filtro **«Letterboxd mín.»** de la biblioteca tampoco filtraba nada: ofrecía umbrales en
+  estrellas (3,5 · 4 · 4,3) contra una nota sobre diez. Ahora son 7+, 8+ y 8,6+.
+
+### Lo que se lee
+
+- **Colores de las gráficas por aspecto.** Los rótulos flotantes eran texto casi blanco sobre el
+  papel de Cartelera, y las barras, los ejes y las tartas conservaban la paleta del tema oscuro.
+  Todo el color de las gráficas sale ahora del aspecto elegido y cambia al vuelo con él.
+- **Las tres tartas de «Calidad y disco» no se dibujaban**: se veía la leyenda y ningún sector.
+- Insignias de fallecimiento, etiquetas del calendario, chips de notas de la ficha, iniciales sin
+  foto y anillos de completista: todo lo que era tinta oscura sobre tinta oscura vuelve a leerse.
+- **El número de versión** va en su propia tarjeta, en vez de flotar sobre el papel.
+
+### Móvil
+
+- Repaso de las trece páginas: **ninguna se sale ya de la pantalla**. La que rompía era «Listas y
+  retos».
+
+### Completismo y ruido
+
+- **Favoritos y la ficha de cada persona vuelven a decir lo mismo.** Favoritos contaba todos los
+  títulos de Plex (cortos, documentales, telefilmes) y la ficha solo largometrajes: Woody Allen
+  aparecía con 52 en un sitio y 50/50 en el otro. El total en bruto sigue estando, en el tooltip.
+- Con **cuatro documentales** dirigidos ya cuentas como documentalista (antes hacían falta seis).
+- **Nueva categoría «Conciertos»** junto a cortos, documentales, TV, dirección coral y cameos.
+  Distingue el concierto del musical, así que *Cabaret* sigue siendo una película como cualquier
+  otra. A quien filma conciertos de vez en cuando no se le penaliza por ellos; a quien vive de
+  ellos, sí se le cuentan.
+
+### Listas, huecos y Radarr
+
+- En **Listas y retos**, cada película que te falta abre su ficha y tiene su propio botón de
+  Radarr, sin tener que mandar la lista entera.
+- En la ficha de cada persona, **«Mandar a Radarr las que te faltan»** deja de disfrazarse de
+  pestaña: es un botón aparte, visible desde cualquier vista, y avisa de cuántas dejan fuera los
+  filtros.
+- En **Visionado**, «Consenso crítico que tienes sin ver» y «Mejor valoradas que aún no has visto»
+  eran la misma lista dos veces. Ahora es una.
+
+### Primeros pasos
+
+- **«¿Qué es PowaFlex?» abre con una ruta de ocho pasos** para recién llegados: qué conectar
+  primero, qué es opcional y en qué orden empieza a rendir la aplicación.
+
 ## Alpha 0.8.2 (0.8.2-alpha) — 2026-08-01
 
 - **Arreglado el arranque en unRAID** («attempt to write a readonly database»). La 0.8.1 miraba

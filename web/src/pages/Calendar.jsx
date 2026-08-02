@@ -13,11 +13,14 @@ function monthLabel(ym) {
   return `${names[Number(m) - 1]} ${y}`;
 }
 
+// tinta sobre el relleno de campo: los `bg-*-900` de Tailwind solo existen en
+// los temas oscuros y quedaban como manchas sobre el papel de «Cartelera»
 function typeBadges(ev) {
   const badges = [];
-  if (ev.isShort) badges.push(['Corto', 'bg-orange-900/60 text-orange-300']);
-  if (ev.isDocumentary) badges.push(['Documental', 'bg-teal-900/60 text-teal-300']);
-  if (ev.isTvMovie) badges.push(['TV', 'bg-purple-900/60 text-purple-300']);
+  if (ev.isShort) badges.push(['Corto', 'text-orange-300']);
+  if (ev.isDocumentary) badges.push(['Documental', 'text-sky-300']);
+  if (ev.isMusic) badges.push(['Concierto', 'text-gold-400']);
+  if (ev.isTvMovie) badges.push(['TV', 'text-red-400']);
   return badges;
 }
 
@@ -39,7 +42,7 @@ function EventCard({ ev, radarrIds, onAdded }) {
         <div className="font-medium text-zinc-100 text-sm">
           {ev.title}
           {typeBadges(ev).map(([label, cls]) => (
-            <span key={label} className={`ml-1.5 align-middle text-[11px] px-1.5 py-0.5 rounded ${cls}`}>
+            <span key={label} className={`badge-quiet ml-1.5 align-middle ${cls}`}>
               {label}
             </span>
           ))}
@@ -118,6 +121,7 @@ export default function Calendar() {
   const counts = {
     shorts: data.events.filter((e) => e.isShort).length,
     docs: data.events.filter((e) => e.isDocumentary).length,
+    music: data.events.filter((e) => e.isMusic).length,
     tv: data.events.filter((e) => e.isTvMovie).length,
     coral: data.events.filter((e) => e.isCoral).length,
     cameos: 0, // calendar events aren't actor credits: the toggle doesn't apply

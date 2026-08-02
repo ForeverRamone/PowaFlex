@@ -70,7 +70,10 @@ export async function runAutoRadarr({ months = 6, lookbackDays = 0, dryRun = fal
     // runtime is not in credit lists: one cached pass to drop known shorts
     const candidates = [...toAdd.values()];
     await enrichRuntimes(candidates);
-    for (const item of candidates.filter((c) => c.isShort || (!includeDocs && c.isDocumentary) || c.isTvMovie)) {
+    // enrichRuntimes re-reads the real genres, so concert films surface here too
+    for (const item of candidates.filter(
+      (c) => c.isShort || (!includeDocs && (c.isDocumentary || c.isMusic)) || c.isTvMovie
+    )) {
       toAdd.delete(item.tmdb_id);
     }
 

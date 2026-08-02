@@ -637,8 +637,15 @@ app.get('/api/tracked/health', async () => {
     cached: { gaps: gapsBy.size > 0, calendar: !!calRow },
     people: favs.map((f) => {
       const g = gapsBy.get(f.id);
+      // `movies` straight from movie_people counts EVERY credit (shorts, docs,
+      // TV, segments), which is why Favoritos said 52 where the person page said
+      // 50/50. When the gaps cache knows this facet, take its feature-only count
+      // so both screens tell the same story; keep the raw one for the tooltip.
+      const sameFacet = g && (g.role || 'director') === (f.role || 'director');
       return {
         ...f,
+        movies: sameFacet ? g.owned : f.movies,
+        moviesAll: f.movies,
         // null = still unknown; only a person present in a cache has a real number
         gaps: g ? g.missingTotal : null,
         pct: g?.pct ?? null,
@@ -1033,6 +1040,33 @@ app.post('/api/letterboxd/lists/:id/radarr', async (req, reply) => {
     const ids = await listMissingTmdbIds(Number(req.params.id));
     if (!ids.length) return { added: 0, alreadyInRadarr: 0, failed: 0, results: [] };
     return await radarrAddBulk(ids.slice(0, 300));
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+// Resolve ONE list item to its TMDB id on demand, so a film you're missing can
+// be opened or sent to Radarr by itself instead of only in bulk (#7). The id is
+// written back to the row, so the lookup happens once per film.
+app.post('/api/letterboxd/lists/:id/resolve-item', async (req, reply) => {
+  const listId = Number(req.params.id);
+  const title = String(req.body?.title || '').trim();
+  const year = req.body?.year != null && req.body.year !== '' ? Number(req.body.year) : null;
+  if (!listId || !title) {
+    reply.code(400);
+    return { error: 'Faltan listId o title' };
+  }
+  const where = 'list_id = ? AND title = ? AND COALESCE(year, -1) = COALESCE(?, -1)';
+  const row = db.prepare(`SELECT tmdb_id FROM lb_list_items WHERE ${where}`).get(listId, title, year);
+  if (row?.tmdb_id) return { tmdbId: row.tmdb_id };
+  try {
+    const tmdbId = await searchMovieId(title, year);
+    if (!tmdbId) {
+      reply.code(404);
+      return { error: `No encuentro «${title}» en TMDB` };
+    }
+    db.prepare(`UPDATE lb_list_items SET tmdb_id = ? WHERE ${where}`).run(tmdbId, listId, title, year);
+    return { tmdbId };
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };

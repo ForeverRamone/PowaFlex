@@ -244,12 +244,7 @@ export async function enrichRuntimes(items, { concurrency = 6, withCredits = fal
               { cacheKey: `movie:${it.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
             );
         it.runtime = det.runtime || null;
-        if (det.genres?.length) {
-          const g = det.genres.map((x) => x.id);
-          it.genre_ids = g;
-          it.isDocumentary = g.includes(99);
-          it.isTvMovie = g.includes(10770);
-        }
+        if (det.genres?.length) classifyGenres(it, det.genres.map((x) => x.id));
         if (withCredits) {
           const dirs = new Set((det.credits?.crew || []).filter((c) => c.job === 'Director').map((c) => c.id));
           it.directorCount = dirs.size || 1;
@@ -403,6 +398,24 @@ export async function tmdbPoster(tmdbId) {
   }
 }
 
+/**
+ * One place decides what kind of film a TMDB record is, so the person page, the
+ * gaps flow and the calendar can never disagree.
+ *
+ * «Música» is the concert-film bucket a completist wants out of the way: TMDB
+ * tags those with Music (10402) AND Documentary (99). A bare Music genre is a
+ * musical (Cabaret, La La Land) and stays a perfectly normal feature. Concert
+ * films leave the documentary bucket so they don't inflate the documentarian
+ * count either — the categories are mutually exclusive.
+ */
+export function classifyGenres(item, ids = []) {
+  item.genre_ids = ids;
+  item.isMusic = ids.includes(10402) && ids.includes(99);
+  item.isDocumentary = ids.includes(99) && !item.isMusic;
+  item.isTvMovie = ids.includes(10770);
+  return item;
+}
+
 const roleRaw = (credits, role) => {
   if (role === 'director') return (credits.crew || []).filter((c) => c.job === 'Director');
   if (role === 'writer') return (credits.crew || []).filter((c) => c.department === 'Writing');
@@ -418,8 +431,7 @@ export function buildRoleItems(credits, role, inLib, widx) {
     if (seen.has(c.id)) continue;
     seen.add(c.id);
     const date = c.release_date || null;
-    const genres = c.genre_ids || [];
-    items.push({
+    items.push(classifyGenres({
       tmdb_id: c.id,
       title: c.title,
       original_title: c.original_title,
@@ -433,20 +445,21 @@ export function buildRoleItems(credits, role, inLib, widx) {
       popularity: c.popularity,
       character: c.character || null,
       job: c.job || null,
-      genre_ids: genres,
-      isDocumentary: genres.includes(99),
-      isTvMovie: genres.includes(10770),
       isShort: false, // set after runtime enrichment
       isCoral: false, // set for directors after credits enrichment
-    });
+    }, c.genre_ids || []));
   }
   items.sort((a, b) => ((b.date || '9999') < (a.date || '9999') ? -1 : 1));
   return items;
 }
 
+// A body of work is somebody's speciality once they have this many titles of a
+// kind: below it they are side projects, above it they ARE the filmography.
+const SPECIALITY_MIN = 4;
+
 // Completeness bar. For directors it counts features only (#6): no shorts, no
-// TV movies, no "coral" 3+ director films (#7), and no documentaries unless the
-// person is a documentarian (>5 directed docs). Other roles count every release.
+// TV movies, no "coral" 3+ director films (#7), and no documentaries or concert
+// films unless that is the person's speciality. Other roles count every release.
 export function roleStats(items, role) {
   const released = items.filter((i) => i.released);
   const base = { upcoming: items.filter((i) => !i.released).length };
@@ -455,13 +468,19 @@ export function roleStats(items, role) {
     return { ...base, released: released.length, owned: owned.length,
       pct: released.length ? Math.round((owned.length / released.length) * 100) : 0 };
   }
-  const documentarian = released.filter((i) => i.isDocumentary).length > 5;
-  const isFeature = (i) => !i.isShort && !i.isTvMovie && !i.isCoral && (!i.isDocumentary || documentarian);
+  const documentarian = released.filter((i) => i.isDocumentary).length >= SPECIALITY_MIN;
+  // a director who films the odd concert isn't judged on those; one who lives
+  // off them (a Jonathan Demme of the genre) is
+  const concertFilmmaker = released.filter((i) => i.isMusic).length >= SPECIALITY_MIN;
+  const isFeature = (i) =>
+    !i.isShort && !i.isTvMovie && !i.isCoral &&
+    (!i.isDocumentary || documentarian) &&
+    (!i.isMusic || concertFilmmaker);
   const feats = released.filter(isFeature);
   const owned = feats.filter((i) => i.owned);
   return { ...base, released: feats.length, owned: owned.length,
     pct: feats.length ? Math.round((owned.length / feats.length) * 100) : 0,
-    documentarian, excludedFromCompletion: released.length - feats.length };
+    documentarian, concertFilmmaker, excludedFromCompletion: released.length - feats.length };
 }
 
 /**
@@ -645,8 +664,7 @@ export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays 
       }
       // Letterboxd/Academy: short = under 40 min (unknown runtime counts as feature)
       ev.isShort = !!ev.runtime && ev.runtime < 40;
-      ev.isDocumentary = (ev.genre_ids || []).includes(99);
-      ev.isTvMovie = (ev.genre_ids || []).includes(10770);
+      classifyGenres(ev, ev.genre_ids || []);
 
       // "Dirige X" (real director, always) then "Actúa Y" (top-billed favorite)
       const dirSource = directors.length
@@ -685,7 +703,7 @@ export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays 
 export async function getCalendarCached({ refresh = false } = {}) {
   // v4: favorites-only by default and one role per person, so any calendar
   // built under the old rules is discarded instead of showing ghost people
-  const key = 'calendar:v4';
+  const key = 'calendar:v5';
   if (!refresh) {
     const hit = cacheRead(key, 12 * 3600 * 1000);
     if (hit) return hit;

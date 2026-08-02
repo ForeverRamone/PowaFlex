@@ -4,13 +4,13 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } fro
 import { api } from '../api.js';
 import { Spinner, Section, MovieCard, Empty, PageHeader } from '../components.jsx';
 import { MovieModal } from '../components.jsx';
+import { useChartTheme } from '../charts.js';
 
-const tooltipStyle = { backgroundColor: 'var(--color-ink-800)', border: '1px solid var(--color-ink-600)', borderRadius: 8, color: '#e4e4e7' };
-
-function InsightGrid({ title, items, caption, onSelect }) {
+function InsightGrid({ title, hint, items, caption, onSelect }) {
   if (!items?.length) return null;
   return (
     <Section title={title}>
+      {hint && <p className="text-xs text-zinc-500 -mt-2 mb-3 max-w-3xl">{hint}</p>}
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-12 gap-3">
         {items.map((m) => (
           <div key={m.rating_key}>
@@ -24,6 +24,7 @@ function InsightGrid({ title, items, caption, onSelect }) {
 }
 
 export default function WatchStats() {
+  const ch = useChartTheme();
   const [data, setData] = useState(null);
   const [ins, setIns] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -111,12 +112,12 @@ export default function WatchStats() {
           <div className="card p-4 h-72">
             <ResponsiveContainer>
               <BarChart data={data.watchedByDecade} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
-                <XAxis dataKey="decade" stroke="#71717a" fontSize={12} tickMargin={6} />
-                <YAxis stroke="#71717a" fontSize={12} width={38} />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#26262b66' }} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="watched" name="Vistas" stackId="a" fill="#34d399" />
-                <Bar dataKey="total" name="Total" fill="#26262b" radius={[4, 4, 0, 0]} />
+                <XAxis dataKey="decade" stroke={ch.axis} fontSize={12} tickMargin={6} />
+                <YAxis stroke={ch.axis} fontSize={12} width={38} />
+                <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
+                <Legend wrapperStyle={{ fontSize: 12, color: ch.axis }} />
+                <Bar dataKey="watched" name="Vistas" stackId="a" fill={ch.positive} />
+                <Bar dataKey="total" name="Total" fill={ch.muted} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -125,12 +126,12 @@ export default function WatchStats() {
           <div className="card p-4 h-72">
             <ResponsiveContainer>
               <BarChart data={data.watchedByGenre} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
-                <XAxis type="number" stroke="#71717a" fontSize={12} />
-                <YAxis type="category" dataKey="name" width={120} stroke="#a1a1aa" fontSize={11} interval={0} tickMargin={4} />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#26262b66' }} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="watched" name="Vistas" fill="#34d399" />
-                <Bar dataKey="total" name="Total" fill="#26262b" />
+                <XAxis type="number" stroke={ch.axis} fontSize={12} />
+                <YAxis type="category" dataKey="name" width={104} stroke={ch.axis} fontSize={11} interval={0} tickMargin={4} />
+                <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
+                <Legend wrapperStyle={{ fontSize: 12, color: ch.axis }} />
+                <Bar dataKey="watched" name="Vistas" fill={ch.positive} />
+                <Bar dataKey="total" name="Total" fill={ch.muted} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -154,18 +155,29 @@ export default function WatchStats() {
         )}
       </Section>
 
+      {/* «Consenso crítico sin ver» y «Mejor valoradas que aún no has visto»
+          eran la MISMA consulta (sin ver + nota combinada, ordenadas por nota):
+          una sola sección, con la de MDBList cuando hay notas y la de la
+          biblioteca como respaldo. */}
+      <InsightGrid
+        title="🏛️ Lo mejor valorado que tienes sin ver"
+        hint="Películas de tu Plex que ni has reproducido ni tienes marcadas en Letterboxd, ordenadas por la nota combinada de MDBList."
+        items={ins?.consensusUnwatched?.length ? ins.consensusUnwatched : data.unwatchedTopRated}
+        caption={(m) => {
+          const score = m.score ?? m.mdb_score;
+          return [score != null ? `Σ ${score}` : null, m.rt_critic != null ? `🍅 ${m.rt_critic}%` : null]
+            .filter(Boolean)
+            .join(' · ');
+        }}
+        onSelect={setSelected}
+      />
+
       {ins && (
         <>
           <InsightGrid
             title="💎 Joyas tuyas que la crítica no entendió (tu nota LB ≥ 8, RT ≤ 55%)"
             items={ins.hiddenGems}
             caption={(m) => `Tú: ${Number(m.my_rating).toFixed(1)} · 🍅 ${m.rt_critic}%`}
-            onSelect={setSelected}
-          />
-          <InsightGrid
-            title="🏛️ Consenso crítico que tienes sin ver"
-            items={ins.consensusUnwatched}
-            caption={(m) => `Σ ${m.score}${m.rt_critic != null ? ` · 🍅 ${m.rt_critic}%` : ''}`}
             onSelect={setSelected}
           />
           <InsightGrid
@@ -177,19 +189,11 @@ export default function WatchStats() {
           <InsightGrid
             title="↔️ Donde más discrepas de la comunidad de Letterboxd"
             items={ins.letterboxdDivergence}
-            caption={(m) => `Tú: ${Number(m.my_rating).toFixed(1)} · comunidad ${(m.letterboxd * 2).toFixed(1)}/10`}
+            caption={(m) => `Tú: ${Number(m.my_rating).toFixed(1)}/10 · comunidad ${Number(m.letterboxd).toFixed(1)}/10`}
             onSelect={setSelected}
           />
         </>
       )}
-
-      <Section title="Mejor valoradas que aún no has visto">
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-12 gap-3">
-          {data.unwatchedTopRated.map((m) => (
-            <MovieCard key={m.rating_key} movie={m} onClick={() => setSelected(m.rating_key)} />
-          ))}
-        </div>
-      </Section>
 
       <Section title="Vistas recientemente">
         {data.recentlyViewed.length === 0 ? (

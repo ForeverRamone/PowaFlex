@@ -115,6 +115,7 @@ function typeCounts(people) {
   return {
     shorts: all.filter((f) => f.isShort).length,
     docs: all.filter((f) => f.isDocumentary).length,
+    music: all.filter((f) => f.isMusic).length,
     tv: all.filter((f) => f.isTvMovie).length,
     coral: all.filter((f) => f.isCoral).length,
     cameos: all.filter((f) => f.isCameo).length,
@@ -381,7 +382,7 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
               {d.profile_path ? (
                 <img src={tmdbImg(d.profile_path, 'w185')} alt="" className="w-12 h-12 rounded-full object-cover" />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-ink-700 flex items-center justify-center text-zinc-500"><Clapperboard size={18} /></div>
+                <div className="w-12 h-12 rounded-full bg-ink-800 flex items-center justify-center text-zinc-500"><Clapperboard size={18} /></div>
               )}
               <div className="flex-1">
                 <div className="font-semibold text-zinc-100">{d.name}</div>

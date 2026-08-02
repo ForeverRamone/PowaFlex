@@ -617,10 +617,12 @@ export function letterboxdSummary() {
     .all();
 
   // Your Letterboxd rating vs the Letterboxd community and the combined score.
+  // Scales: lb_entries.rating is Letterboxd's 0–5 (×2 → 0–10); mdb_ratings.letterboxd
+  // ALREADY comes 0–10 from MDBList, so scaling it again is what produced "16.8/10".
   const ratingCompare = db
     .prepare(
       `SELECT m.rating_key, m.title, m.year, m.thumb, MAX(e.rating) * 2 AS lb,
-              r.letterboxd * 2 AS community, r.score AS mdb_score
+              r.letterboxd AS community, r.score AS mdb_score
        FROM lb_entries e JOIN movies m ON m.rating_key = e.movie_id
        LEFT JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
        WHERE e.list IN ('ratings','diary') AND e.rating IS NOT NULL

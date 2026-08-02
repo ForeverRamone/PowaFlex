@@ -78,6 +78,7 @@ export default function PersonDetail() {
   const typeCounts = {
     shorts: items.filter((i) => i.isShort).length,
     docs: items.filter((i) => i.isDocumentary).length,
+    music: items.filter((i) => i.isMusic).length,
     tv: items.filter((i) => i.isTvMovie).length,
     coral: items.filter((i) => i.isCoral).length,
   };
@@ -93,6 +94,11 @@ export default function PersonDetail() {
   const missingPendingIds = items
     .filter((i) => matchesTypeFilters(i, show) && i.released && !i.owned && !radarrIds.has(i.tmdb_id))
     .map((i) => i.tmdb_id);
+  // …y decir cuántas deja fuera el filtro de tipos, para que el número del
+  // botón no parezca que se come parte de la filmografía
+  const hiddenMissing = items.filter(
+    (i) => !matchesTypeFilters(i, show) && i.released && !i.owned && !radarrIds.has(i.tmdb_id)
+  ).length;
   const bulkAddMissing = async () => {
     setBulkBusy(true);
     const res = await api('/radarr/add-bulk', { method: 'POST', body: { tmdbIds: missingPendingIds.slice(0, 300) } });
@@ -166,7 +172,8 @@ export default function PersonDetail() {
               <div className="text-[11px] text-zinc-500 mt-1">
                 Solo largometrajes
                 {stats.documentarian ? ' (incluye documentales: es documentalista)' : ''}
-                {stats.excludedFromCompletion > 0 && ` · ${stats.excludedFromCompletion} fuera del cómputo (cortos, TV, docs o dirección coral)`}
+                {stats.concertFilmmaker ? ' (incluye conciertos: los filma a menudo)' : ''}
+                {stats.excludedFromCompletion > 0 && ` · ${stats.excludedFromCompletion} fuera del cómputo (cortos, TV, docs, conciertos o dirección coral)`}
               </div>
             )}
             {stats.upcoming > 0 && (
@@ -187,15 +194,25 @@ export default function PersonDetail() {
             {v === 'upcoming' && ` (${stats.upcoming})`}
           </button>
         ))}
-        {view === 'missing' && missingPendingIds.length > 1 && (
-          <button className="btn-ghost !py-1 text-xs" disabled={bulkBusy} onClick={bulkAddMissing}>
-            {bulkBusy ? 'Añadiendo…' : `➕ Añadir las ${missingPendingIds.length} visibles a Radarr`}
+        {/* acción, no pestaña: antes vivía solo dentro de «Te faltan» y con el
+            mismo `btn-ghost` que los conmutadores de vista, así que se leía
+            como una pestaña más */}
+        {missingPendingIds.length > 0 && (
+          <button className="btn-gold ml-auto" disabled={bulkBusy} onClick={bulkAddMissing}>
+            {bulkBusy ? 'Añadiendo…' : `➕ Mandar a Radarr las ${missingPendingIds.length} que te faltan`}
           </button>
         )}
-        <StatusLegend className="ml-auto" />
+      </div>
+      <div className="flex items-center gap-3 flex-wrap mb-3">
+        <StatusLegend />
+        {hiddenMissing > 0 && (
+          <span className="text-[11px] text-zinc-500">
+            {hiddenMissing} más quedan fuera por los filtros de abajo (cortos, docs, conciertos, TV, coral)
+          </span>
+        )}
       </div>
 
-      {(typeCounts.shorts || typeCounts.docs || typeCounts.tv || typeCounts.coral) > 0 && (
+      {Object.values(typeCounts).some((n) => n > 0) && (
         <TypeFilterBar show={show} toggle={toggle} counts={typeCounts} />
       )}
 

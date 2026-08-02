@@ -1,21 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line,
 } from 'recharts';
 import { api, fmtBytes, fmtDate, tmdbImg } from '../api.js';
 import { Spinner, StatCard, Section, PersonCard, Empty, MovieModal, LetterboxdLogo, PageHeader } from '../components.jsx';
-
-const GOLD = '#e8b53a';
-const COLORS = ['#e8b53a', '#c9932c', '#a87c1e', '#7d5f1c', '#57493a', '#3a3a42', '#52525b', '#71717a'];
-
-const tooltipStyle = {
-  backgroundColor: 'var(--color-ink-800)',
-  border: '1px solid var(--color-ink-600)',
-  borderRadius: 8,
-  color: '#e4e4e7',
-  fontSize: 12,
-};
+import { useChartTheme } from '../charts.js';
 
 // small poster tile used across the "recent" strips
 function PosterTile({ item, onClick, badge, sub }) {
@@ -74,6 +64,7 @@ function RecentStrip({ items, onSelect, kind }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const ch = useChartTheme();
   const [ov, setOv] = useState(null);
   const [charts, setCharts] = useState(null);
   const [recent, setRecent] = useState(null);
@@ -152,10 +143,10 @@ export default function Dashboard() {
           <div className="card p-4 h-72">
             <ResponsiveContainer>
               <BarChart data={charts.byDecade} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
-                <XAxis dataKey="decade" stroke="#71717a" fontSize={12} tickMargin={6} />
-                <YAxis stroke="#71717a" fontSize={12} width={38} />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#26262b66' }} />
-                <Bar dataKey="n" name="Películas" fill={GOLD} radius={[4, 4, 0, 0]} />
+                <XAxis dataKey="decade" stroke={ch.axis} fontSize={12} tickMargin={6} />
+                <YAxis stroke={ch.axis} fontSize={12} width={38} />
+                <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
+                <Bar dataKey="n" name="Películas" fill={ch.accent} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -164,10 +155,10 @@ export default function Dashboard() {
           <div className="card p-4 h-72">
             <ResponsiveContainer>
               <BarChart data={charts.byGenre.slice(0, 12)} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
-                <XAxis type="number" stroke="#71717a" fontSize={12} />
-                <YAxis type="category" dataKey="name" width={130} stroke="#a1a1aa" fontSize={11} interval={0} tickMargin={4} />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#26262b66' }} />
-                <Bar dataKey="n" name="Películas" fill="#a1a1aa" radius={[0, 4, 4, 0]} />
+                <XAxis type="number" stroke={ch.axis} fontSize={12} />
+                <YAxis type="category" dataKey="name" width={110} stroke={ch.axis} fontSize={11} interval={0} tickMargin={4} />
+                <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
+                <Bar dataKey="n" name="Películas" fill={ch.ramp[1] || ch.accent} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -176,10 +167,10 @@ export default function Dashboard() {
           <div className="card p-4 h-72">
             <ResponsiveContainer>
               <LineChart data={charts.addedByMonth} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-                <XAxis dataKey="month" stroke="#71717a" fontSize={10} tickMargin={6} minTickGap={24} />
-                <YAxis stroke="#71717a" fontSize={12} width={38} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Line type="monotone" dataKey="n" name="Añadidas" stroke={GOLD} dot={false} strokeWidth={2} />
+                <XAxis dataKey="month" stroke={ch.axis} fontSize={10} tickMargin={6} minTickGap={24} />
+                <YAxis stroke={ch.axis} fontSize={12} width={38} />
+                <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ stroke: ch.axis }} />
+                <Line type="monotone" dataKey="n" name="Añadidas" stroke={ch.accent} dot={false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -19,7 +19,7 @@ function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
   const isTracked = person.tracked || trackedIds.has(person.tmdb_id);
   return (
     <div className="card p-3 flex items-center gap-3">
-      <div className="w-11 h-11 rounded-full overflow-hidden bg-ink-700 shrink-0 flex items-center justify-center">
+      <div className="w-11 h-11 rounded-full overflow-hidden bg-ink-800 shrink-0 flex items-center justify-center">
         {person.profile_path ? (
           <img src={tmdbImg(person.profile_path, 'w185')} alt="" loading="lazy" className="w-full h-full object-cover" />
         ) : (
@@ -46,9 +46,9 @@ function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
 
 const Avatar = ({ person, size = 'w-12 h-12' }) =>
   person.thumb ? (
-    <img src={`/img/person/${person.id}`} alt="" loading="lazy" className={`${size} rounded-full object-cover bg-ink-700 shrink-0`} />
+    <img src={`/img/person/${person.id}`} alt="" loading="lazy" className={`${size} rounded-full object-cover bg-ink-800 shrink-0`} />
   ) : (
-    <span className={`${size} rounded-full bg-ink-700 text-zinc-500 flex items-center justify-center shrink-0 text-sm`}>
+    <span className={`${size} rounded-full bg-ink-800 text-zinc-500 flex items-center justify-center shrink-0 text-sm`}>
       {person.name.slice(0, 1)}
     </span>
   );
@@ -72,7 +72,16 @@ function FavoriteCard({ p, role, selectable, selected, onSelect, onRemove, onSwi
           </Link>
           <DeathBadge deathday={p.deathday} />
         </div>
-        <div className="text-[11px] text-zinc-500 mt-0.5">
+        {/* el mismo criterio que la ficha: largometrajes. El conteo bruto de
+            Plex (cortos, documentales, TV, conciertos) va en el tooltip */}
+        <div
+          className="text-[11px] text-zinc-500 mt-0.5"
+          title={
+            p.moviesAll != null && p.moviesAll !== p.movies
+              ? `Solo largometrajes. En tu Plex hay ${p.moviesAll} títulos suyos contando cortos, documentales, TV y conciertos.`
+              : undefined
+          }
+        >
           <b className="text-zinc-300">{p.movies || 0}</b> {roleVerb(role)} en tu Plex
           {p.upcoming > 0 && <span className="text-sky-300"> · {p.upcoming} por venir</span>}
         </div>

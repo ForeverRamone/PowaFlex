@@ -4,11 +4,10 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { api, fmtBytes } from '../api.js';
 import { Spinner, Section, MovieCard, MovieModal, Empty, RadarrButton, useRadarrIds, JustWatchCheck, PageHeader, ProgressBar } from '../components.jsx';
 import { toast } from '../toast.js';
-
-const COLORS = ['#e8b53a', '#c9932c', '#a87c1e', '#7d5f1c', '#57493a', '#3a3a42', '#52525b', '#71717a'];
-const tooltipStyle = { backgroundColor: 'var(--color-ink-800)', border: '1px solid var(--color-ink-600)', borderRadius: 8, color: '#e4e4e7' };
+import { useChartTheme } from '../charts.js';
 
 export default function Quality() {
+  const ch = useChartTheme();
   const [ov, setOv] = useState(null);
   const [upgrades, setUpgrades] = useState(null);
   const [dups, setDups] = useState(null);
@@ -108,12 +107,21 @@ export default function Quality() {
                     innerRadius={40}
                     outerRadius={68}
                     cy="45%"
+                    /* con recharts 3.9 la animación de entrada del donut deja
+                       el grupo vacío: se veía la leyenda y ningún sector. Las
+                       barras y las líneas sí animan bien, esto es solo la tarta */
+                    isAnimationActive={false}
                     onClick={clickable ? (d) => openResolution(d?.name || d?.payload?.name) : undefined}
                     className={clickable ? 'cursor-pointer' : undefined}
                   >
-                    {data.map((_, i) => <Cell key={i} fill={COLORS[(i + shift) % COLORS.length]} />)}
+                    {data.map((_, i) => <Cell key={i} fill={ch.ramp[(i + shift) % ch.ramp.length]} />)}
                   </Pie>
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v, n, p) => [fmt(p), p.payload.name]} />
+                  <Tooltip
+                    contentStyle={ch.tooltip}
+                    labelStyle={ch.tooltipLabel}
+                    itemStyle={ch.tooltipItem}
+                    formatter={(v, n, p) => [fmt(p), p.payload.name]}
+                  />
                   <Legend
                     wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
                     onClick={clickable ? (e) => openResolution(e?.value) : undefined}
@@ -134,10 +142,16 @@ export default function Quality() {
         <div className="card p-4 h-64 mb-8">
           <ResponsiveContainer>
             <BarChart data={sizeByDecade}>
-              <XAxis dataKey="decade" stroke="#71717a" fontSize={12} />
-              <YAxis stroke="#71717a" fontSize={12} unit=" GB" />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} GB`]} />
-              <Bar dataKey="gb" name="GB" fill="#a87c1e" radius={[4, 4, 0, 0]} />
+              <XAxis dataKey="decade" stroke={ch.axis} fontSize={12} />
+              <YAxis stroke={ch.axis} fontSize={12} unit=" GB" width={64} />
+              <Tooltip
+                contentStyle={ch.tooltip}
+                labelStyle={ch.tooltipLabel}
+                itemStyle={ch.tooltipItem}
+                cursor={{ fill: ch.cursor }}
+                formatter={(v) => [`${v} GB`]}
+              />
+              <Bar dataKey="gb" name="GB" fill={ch.accent} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

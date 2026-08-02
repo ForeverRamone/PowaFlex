@@ -343,9 +343,9 @@ db.exec(`
 // leave "ghost" entries from people you no longer follow.
 db.prepare(
   `DELETE FROM tmdb_cache
-   WHERE key LIKE 'calendar:v_' AND key <> 'calendar:v4'
-      OR (key LIKE 'discover_favorites:%' AND key NOT LIKE 'discover_favorites:v4:%')
-      OR (key LIKE 'discover_gaps:%' AND key NOT LIKE 'discover_gaps:v3:%')`
+   WHERE key LIKE 'calendar:v_' AND key <> 'calendar:v5'
+      OR (key LIKE 'discover_favorites:%' AND key NOT LIKE 'discover_favorites:v5:%')
+      OR (key LIKE 'discover_gaps:%' AND key NOT LIKE 'discover_gaps:v4:%')`
 ).run();
 
 // Films explicitly marked "no me interesa" in the gaps flow: excluded from

@@ -48,6 +48,30 @@
   --shadow-hard: 3px 3px 0 #241c14;
   --border-w: 2px;
   color-scheme: light;
+
+  /* --- Gráficas ------------------------------------------------------------
+     Recharts pinta en SVG con colores literales, así que no puede leer las
+     clases de Tailwind: `useChartTheme()` (web/src/charts.js) resuelve estas
+     variables y se las pasa. Cualquier color de una gráfica sale de aquí; si
+     se escribe un hex en un componente, ese hex se queda del tema oscuro y
+     resulta ilegible sobre el papel de «Cartelera». */
+  --chart-axis: #6b594a;
+  --chart-grid: rgba(36, 28, 20, 0.16);
+  --chart-cursor: rgba(36, 28, 20, 0.1);
+  --chart-tip-bg: #f6ecd8;
+  --chart-tip-fg: #241c14;
+  --chart-tip-border: #241c14;
+  --chart-accent: #c8442a;
+  --chart-positive: #2f7d4f;
+  --chart-muted: #cdb89a;
+  --chart-1: #c8442a;
+  --chart-2: #f0c04a;
+  --chart-3: #2f7d4f;
+  --chart-4: #1f6b87;
+  --chart-5: #a75a12;
+  --chart-6: #8a6410;
+  --chart-7: #6b594a;
+  --chart-8: #241c14;
 }
 
 /* --- Aspecto conmutable (Ajustes) ------------------------------------------
@@ -78,6 +102,24 @@
   --shadow-hard: none;
   --border-w: 1px;
   color-scheme: dark;
+
+  --chart-axis: #71717a;
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-cursor: rgba(255, 255, 255, 0.06);
+  --chart-tip-bg: #1c1c1f;
+  --chart-tip-fg: #e4e4e7;
+  --chart-tip-border: #3a3a42;
+  --chart-accent: #e8b53a;
+  --chart-positive: #34d399;
+  --chart-muted: #2f2f35;
+  --chart-1: #e8b53a;
+  --chart-2: #c9932c;
+  --chart-3: #a87c1e;
+  --chart-4: #7d5f1c;
+  --chart-5: #57493a;
+  --chart-6: #52525b;
+  --chart-7: #71717a;
+  --chart-8: #3a3a42;
 }
 
 /* «Clásico»: la paleta y la tipografía de PowaFlex antes del rediseño —
@@ -105,6 +147,24 @@
   /* sin fuente de titulares: todo en la del sistema, como estaba */
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: var(--font-sans);
+
+  --chart-axis: #64748b;
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-cursor: rgba(255, 255, 255, 0.06);
+  --chart-tip-bg: #1a2030;
+  --chart-tip-fg: #e2e8f0;
+  --chart-tip-border: #35405c;
+  --chart-accent: #e8b53a;
+  --chart-positive: #34d399;
+  --chart-muted: #252d42;
+  --chart-1: #e8b53a;
+  --chart-2: #c9932c;
+  --chart-3: #a87c1e;
+  --chart-4: #7d5f1c;
+  --chart-5: #57493a;
+  --chart-6: #475569;
+  --chart-7: #64748b;
+  --chart-8: #35405c;
 }
 :root[data-ui='clasico'] .font-display {
   font-weight: 700;
@@ -189,6 +249,15 @@ body {
 /* artwork thumbnails share the poster's edge treatment */
 .ring-art {
   box-shadow: 0 0 0 var(--border-w) var(--ring-art);
+}
+
+/* Quiet badge (fallecimiento, tipo de película, versión). NUNCA usar
+   `bg-ink-700 + text-zinc-*`: en «Cartelera» ink-700 es la tinta oscura y las
+   zinc-* también son tintas, así que el resultado es oscuro sobre oscuro. Esta
+   clase se apoya en el relleno de campo, que sí contrasta en los tres temas. */
+.badge-quiet {
+  @apply text-[11px] px-1.5 py-0.5 rounded bg-ink-800 text-zinc-300;
+  border: 1px solid var(--color-ink-600);
 }
 
 /* Filter chips: pill in the dark looks, stamped rectangle on paper. */

@@ -128,9 +128,9 @@ export function GlobalSearch() {
                 onClick={() => go(`/personas/${p.id}?role=${p.role}`)}
               >
                 {p.thumb ? (
-                  <img src={`/img/person/${p.id}`} alt="" loading="lazy" className="w-7 h-7 rounded-full object-cover bg-ink-700 shrink-0" />
+                  <img src={`/img/person/${p.id}`} alt="" loading="lazy" className="w-7 h-7 rounded-full object-cover bg-ink-800 shrink-0" />
                 ) : (
-                  <span className="w-7 h-7 rounded-full bg-ink-700 text-zinc-500 text-[11px] flex items-center justify-center shrink-0">
+                  <span className="w-7 h-7 rounded-full bg-ink-800 text-zinc-500 text-[11px] flex items-center justify-center shrink-0">
                     {p.name.slice(0, 1)}
                   </span>
                 )}
@@ -151,7 +151,7 @@ export function GlobalSearch() {
                   src={`/img/${m.rating_key}/poster`}
                   alt=""
                   loading="lazy"
-                  className="w-7 h-10 rounded-sm object-cover bg-ink-700 ring-art shrink-0"
+                  className="w-7 h-10 rounded-sm object-cover bg-ink-800 ring-art shrink-0"
                 />
                 <span className="truncate">{m.title}</span>
                 <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{m.year ?? '¿?'}</span>
@@ -245,17 +245,17 @@ export function RatingsChips({ ratings, movie, className = '' }) {
     );
   const chips = [];
   if (ratings.imdb != null)
-    chips.push(<Chip key="imdb" href={links.imdb} cls="bg-yellow-900/50 text-yellow-300 px-1.5 py-0.5 rounded">IMDb {Number(ratings.imdb).toFixed(1)}</Chip>);
+    chips.push(<Chip key="imdb" href={links.imdb} cls="badge-quiet text-yellow-500">IMDb {Number(ratings.imdb).toFixed(1)}</Chip>);
   if (ratings.rt_critic != null)
-    chips.push(<Chip key="rt" href={links.rt} cls="bg-red-900/50 text-red-300 px-1.5 py-0.5 rounded">🍅 {ratings.rt_critic}%</Chip>);
+    chips.push(<Chip key="rt" href={links.rt} cls="badge-quiet text-red-400">🍅 {ratings.rt_critic}%</Chip>);
   if (ratings.rt_audience != null)
-    chips.push(<Chip key="rta" href={links.rt} cls="bg-red-900/40 text-orange-300 px-1.5 py-0.5 rounded">🍿 {ratings.rt_audience}%</Chip>);
+    chips.push(<Chip key="rta" href={links.rt} cls="badge-quiet text-orange-300">🍿 {ratings.rt_audience}%</Chip>);
   if (ratings.metacritic != null)
-    chips.push(<Chip key="mc" href={links.metacritic} cls="bg-emerald-900/50 text-emerald-300 px-1.5 py-0.5 rounded">MC {ratings.metacritic}</Chip>);
+    chips.push(<Chip key="mc" href={links.metacritic} cls="badge-quiet text-emerald-400">MC {ratings.metacritic}</Chip>);
   if (ratings.letterboxd != null)
-    chips.push(<Chip key="lb" href={links.letterboxd} cls="bg-orange-900/40 text-orange-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1"><LetterboxdLogo size={9} /> {Number(ratings.letterboxd).toFixed(1)}</Chip>);
+    chips.push(<Chip key="lb" href={links.letterboxd} cls="badge-quiet text-orange-300 inline-flex items-center gap-1"><LetterboxdLogo size={9} /> {Number(ratings.letterboxd).toFixed(1)}</Chip>);
   if (ratings.score != null)
-    chips.push(<Chip key="mdb" href={links.tmdb} cls="bg-ink-700 text-gold-400 px-1.5 py-0.5 rounded font-semibold">Σ {ratings.score}</Chip>);
+    chips.push(<Chip key="mdb" href={links.tmdb} cls="badge-quiet text-gold-400 font-semibold">Σ {ratings.score}</Chip>);
   if (!chips.length) return null;
   return <div className={`flex flex-wrap gap-1.5 text-[11px] ${className}`}>{chips}</div>;
 }
@@ -389,7 +389,12 @@ export function MediaModal({ tmdbId, onClose }) {
   return <Ficha tmdbId={tmdbId} onClose={onClose} />;
 }
 
-export function RadarrButton({ tmdbId, small = false, alreadyInRadarr = false, onAdded }) {
+/**
+ * `resolveTmdbId` covers rows that only know a title and a year (Letterboxd
+ * challenge lists): the id is looked up on the first click instead of resolving
+ * hundreds of films up front.
+ */
+export function RadarrButton({ tmdbId, resolveTmdbId, small = false, inline = false, alreadyInRadarr = false, onAdded }) {
   const [state, setState] = useState(alreadyInRadarr ? 'done' : 'idle');
   const [err, setErr] = useState('');
   // reflect a late-arriving radarr snapshot (ids often load after first paint)
@@ -398,15 +403,22 @@ export function RadarrButton({ tmdbId, small = false, alreadyInRadarr = false, o
   }, [alreadyInRadarr]);
   const add = async () => {
     setState('busy');
-    const res = await api('/radarr/add', { method: 'POST', body: { tmdbId } });
+    const id = tmdbId || (resolveTmdbId ? await resolveTmdbId() : null);
+    if (!id) {
+      setState('error');
+      setErr('Sin ficha en TMDB');
+      toast('⚠️ No encuentro esta película en TMDB', 'error');
+      return;
+    }
+    const res = await api('/radarr/add', { method: 'POST', body: { tmdbId: id } });
     // an "already added" isn't a failure — the film is in Radarr, show it green
     if (res.ok) {
       setState('done');
-      onAdded?.(tmdbId);
+      onAdded?.(id);
       toast(`✓ ${res.title || 'Película'} añadida a Radarr`, 'success');
     } else if (/already/i.test(res.error || '')) {
       setState('done');
-      onAdded?.(tmdbId);
+      onAdded?.(id);
       toast('Ya estaba en Radarr', 'info');
     } else {
       setState('error');
@@ -421,7 +433,7 @@ export function RadarrButton({ tmdbId, small = false, alreadyInRadarr = false, o
       <button
         onClick={add}
         disabled={state === 'busy'}
-        className={`btn-gold ${small ? 'text-[11px] px-2 py-1 mt-1' : ''}`}
+        className={`btn-gold ${small ? `text-[11px] px-2 py-1 ${inline ? '' : 'mt-1'}` : ''}`}
       >
         {state === 'busy' ? 'Añadiendo…' : '+ Radarr'}
       </button>
@@ -467,7 +479,7 @@ export function PersonCard({ person, role }) {
       to={`/personas/${person.id}?role=${role}`}
       className="card p-3 flex items-center gap-3 hover:border-gold-400 transition-colors"
     >
-      <div className="w-12 h-12 rounded-full overflow-hidden bg-ink-700 shrink-0 flex items-center justify-center">
+      <div className="w-12 h-12 rounded-full overflow-hidden bg-ink-800 shrink-0 flex items-center justify-center">
         {!imgError ? (
           <img
             src={`/img/person/${person.id}`}
@@ -559,7 +571,7 @@ export function useRadarrIds() {
 // Shorts / documentaries / TV-movie / cameo visibility toggles, persisted.
 // Defaults to hidden (the completist wants features first). All pages share the
 // default 'type_filters' key so a preference set once applies everywhere.
-const TYPE_DEFAULTS = { shorts: false, docs: false, tv: false, coral: false, cameos: false };
+const TYPE_DEFAULTS = { shorts: false, docs: false, music: false, tv: false, coral: false, cameos: false };
 
 export function useTypeFilters(key = 'type_filters') {
   const [show, setShow] = useState(() => {
@@ -579,6 +591,7 @@ export function useTypeFilters(key = 'type_filters') {
 
 export const matchesTypeFilters = (item, show) =>
   (show.shorts || !item.isShort) && (show.docs || !item.isDocumentary) &&
+  (show.music || !item.isMusic) &&
   (show.tv || !item.isTvMovie) && (show.coral || !item.isCoral) &&
   (show.cameos || !item.isCameo);
 
@@ -588,6 +601,7 @@ export function TypeFilterBar({ show, toggle, counts }) {
   const items = [
     ['shorts', 'Cortos', counts?.shorts],
     ['docs', 'Documentales', counts?.docs],
+    ['music', 'Conciertos', counts?.music],
     ['tv', 'Películas de TV', counts?.tv],
     ['coral', 'Dirección coral', counts?.coral],
     ['cameos', 'Cameos', counts?.cameos],
@@ -615,10 +629,7 @@ export function DeathBadge({ deathday, className = '' }) {
   if (!deathday) return null;
   const year = String(deathday).slice(0, 4);
   return (
-    <span
-      title={`Fallecido${year ? ` en ${year}` : ''}`}
-      className={`text-[11px] px-1.5 py-0.5 rounded bg-ink-700 text-zinc-400 ${className}`}
-    >
+    <span title={`Fallecido${year ? ` en ${year}` : ''}`} className={`badge-quiet shrink-0 ${className}`}>
       ✝ {year}
     </span>
   );

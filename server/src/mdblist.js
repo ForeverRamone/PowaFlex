@@ -95,6 +95,8 @@ function parseItem(item) {
     rt_critic: val('tomatoes'),
     rt_audience: val('tomatoesaudience'),
     metacritic: val('metacritic'),
+    // MDBList hands Letterboxd over already doubled to 0–10 (its 4.2 stars = 8.4),
+    // so it is stored and displayed as-is: never scale it again.
     letterboxd: val('letterboxd'),
     trakt: val('trakt'),
     score: item.score_average ?? item.score ?? null,
@@ -268,12 +270,13 @@ export function insights() {
        WHERE ${MINE} IS NOT NULL AND ${MINE} <= 5 AND r.score >= 75
        ORDER BY r.score DESC LIMIT 24`
     ),
-    // your taste vs the letterboxd community
+    // your taste vs the letterboxd community — both sides on 0–10: yours is the
+    // 0–5 star rating doubled, theirs already arrives 0–10 from MDBList
     letterboxdDivergence: all(
       `SELECT m.rating_key, m.title, m.year, m.thumb, ${MINE} AS my_rating, r.letterboxd, r.imdb, r.score AS mdb_score,
-              ABS(${MINE} - r.letterboxd * 2) AS diff
+              ABS(${MINE} - r.letterboxd) AS diff
        FROM movies m JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
-       WHERE ${MINE} IS NOT NULL AND r.letterboxd IS NOT NULL AND ABS(${MINE} - r.letterboxd * 2) >= 3
+       WHERE ${MINE} IS NOT NULL AND r.letterboxd IS NOT NULL AND ABS(${MINE} - r.letterboxd) >= 3
        ORDER BY diff DESC LIMIT 24`
     ),
   };

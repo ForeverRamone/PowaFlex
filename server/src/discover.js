@@ -1,7 +1,7 @@
 import { db, cacheRead, cacheWrite, getSetting } from './db.js';
 import {
   personCredits, findPersonInfo, resolvePerson, enrichRuntimes, setBuildProgress, clearBuildProgress,
-  buildRoleItems, roleStats,
+  buildRoleItems, roleStats, classifyGenres,
 } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { matchMovie, watchedIndex, isWatched } from './letterboxd.js';
@@ -20,12 +20,7 @@ function applyWatched(items) {
 // otherwise makes owned films show up as "missing" (#15).
 const ownsFilm = (c, inLib) => inLib.has(c.id) || !!matchMovie({ title: c.title, year: c.release_date ? Number(c.release_date.slice(0, 4)) : null, tmdbId: c.id });
 
-export const genreFlags = (ids = []) => ({
-  genre_ids: ids,
-  isDocumentary: ids.includes(99),
-  isTvMovie: ids.includes(10770),
-  isShort: false,
-});
+export const genreFlags = (ids = []) => classifyGenres({ isShort: false }, ids);
 
 // prefer the mdblist multi-platform score; fall back to TMDB vote volume
 const rankKey = (i) => (i.mdb?.score != null ? i.mdb.score * 10000 : Math.min(9999, i.votes || 0));
@@ -50,9 +45,9 @@ const minVotesFor = (role) =>
 const dismissedIds = () =>
   new Set(db.prepare('SELECT tmdb_id FROM dismissed_movies').all().map((r) => r.tmdb_id));
 
-// Shorts, documentaries, TV movies and cameos are not gaps a completist has to
-// fill: they never take a slot in the per-person quota.
-export const isNoise = (m) => !!(m.isShort || m.isDocumentary || m.isTvMovie || m.isCameo);
+// Shorts, documentaries, concert films, TV movies and cameos are not gaps a
+// completist has to fill: they never take a slot in the per-person quota.
+export const isNoise = (m) => !!(m.isShort || m.isDocumentary || m.isMusic || m.isTvMovie || m.isCameo);
 
 /** Features first (up to `perPerson`), then the same number of noise items at
  *  most, so the client-side toggles still have something to reveal. */
@@ -102,7 +97,7 @@ function today() {
  * not-owned) films, ranked by TMDB vote count.
  */
 export async function libraryGaps({ role = 'director', people = 20, perPerson = 8, offset = 0, refresh = false } = {}) {
-  const cacheKey = `discover_gaps:v3:${role}:${people}:${perPerson}:${offset}`;
+  const cacheKey = `discover_gaps:v4:${role}:${people}:${perPerson}:${offset}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 12 * HOUR);
     if (hit) return hit;
@@ -223,7 +218,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
  * "top by count", and strictly in the role you follow them for.
  */
 export async function favoritesGaps({ perPerson = 8, refresh = false, role: onlyRole = null } = {}) {
-  const cacheKey = `discover_favorites:v4:${onlyRole || 'all'}:${perPerson}`;
+  const cacheKey = `discover_favorites:v5:${onlyRole || 'all'}:${perPerson}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 6 * HOUR);
     if (hit) return hit;

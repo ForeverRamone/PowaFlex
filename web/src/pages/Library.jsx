@@ -149,8 +149,10 @@ export default function Library() {
             options={[['6', 'IMDb 6+'], ['7', 'IMDb 7+'], ['8', 'IMDb 8+']]} />
           <Select value={q.rtMin || ''} onChange={(v) => set('rtMin', v)} placeholder="RT crítica mín."
             options={[['60', '🍅 60%+'], ['75', '🍅 75%+'], ['90', '🍅 90%+']]} />
+          {/* la nota de Letterboxd que guarda MDBList va de 0 a 10, no en estrellas:
+              con umbrales 3.5/4/4.3 este filtro no descartaba prácticamente nada */}
           <Select value={q.lbMin || ''} onChange={(v) => set('lbMin', v)} placeholder="Letterboxd mín."
-            options={[['3.5', 'LB 3.5+'], ['4', 'LB 4+'], ['4.3', 'LB 4.3+']]} />
+            options={[['7', 'LB 7+'], ['8', 'LB 8+'], ['8.6', 'LB 8.6+']]} />
         </div>
       )}
 

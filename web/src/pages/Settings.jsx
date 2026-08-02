@@ -159,7 +159,7 @@ export default function Settings() {
                   >
                     <input
                       type="checkbox"
-                      className="accent-[#e8b53a]"
+                      className="accent-gold-500"
                       checked={isChecked(sec.id)}
                       onChange={() => toggleSection(sec.id)}
                     />
@@ -291,7 +291,7 @@ export default function Settings() {
           <label className="flex items-center gap-2 text-sm text-zinc-200 cursor-pointer">
             <input
               type="checkbox"
-              className="accent-[#e8b53a]"
+              className="accent-gold-500"
               checked={s.auto_radarr_enabled === '1'}
               onChange={(e) => setS({ ...s, auto_radarr_enabled: e.target.checked ? '1' : '0' })}
             />
@@ -344,7 +344,7 @@ export default function Settings() {
           <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer mt-2 ml-6">
             <input
               type="checkbox"
-              className="accent-[#e8b53a]"
+              className="accent-gold-500"
               checked={s.auto_radarr_include_docs === '1'}
               onChange={(e) => setS({ ...s, auto_radarr_include_docs: e.target.checked ? '1' : '0' })}
             />
@@ -487,7 +487,7 @@ export default function Settings() {
             <div className="flex flex-wrap gap-2">
               {ALL.map(([k, label]) => (
                 <label key={k} className={`btn-ghost !py-1.5 flex items-center gap-2 select-none cursor-pointer ${enabled.includes(k) ? '!border-gold-400 text-gold-400' : 'opacity-60'}`}>
-                  <input type="checkbox" className="accent-[#e8b53a]" checked={enabled.includes(k)} onChange={() => toggle(k)} />
+                  <input type="checkbox" className="accent-gold-500" checked={enabled.includes(k)} onChange={() => toggle(k)} />
                   {label}
                 </label>
               ))}
