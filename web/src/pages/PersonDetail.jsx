@@ -121,7 +121,7 @@ export default function PersonDetail() {
         )}
         <div className="flex-1 min-w-60">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-zinc-100">{person.name}</h1>
+            <h1 className="font-display text-3xl text-zinc-100 leading-tight">{person.name}</h1>
             <DeathBadge deathday={person.deathday} />
             <button
               onClick={toggleTrack}

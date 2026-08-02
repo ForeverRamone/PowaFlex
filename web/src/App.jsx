@@ -1,10 +1,10 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy, Layers,
   Eye, HardDrive, Settings as SettingsIcon, HelpCircle, Search, Menu, X,
 } from 'lucide-react';
-import { Spinner, Toaster, GlobalSearch, LetterboxdLogo } from './components.jsx';
+import { Spinner, Toaster, GlobalSearch, LetterboxdLogo, ErrorBoundary } from './components.jsx';
 import { api, applyTheme } from './api.js';
 import { ScrollMemory } from './scroll.js';
 
@@ -65,9 +65,19 @@ const Wordmark = ({ className = '' }) => (
 
 function Shell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [setup, setSetup] = useState(null);
   const [version, setVersion] = useState(null);
   const [open, setOpen] = useState(false); // mobile drawer
+  // el menú lateral es un cajón solo por debajo de md; hay que saberlo para no
+  // marcarlo inerte en escritorio, donde está siempre a la vista
+  const [enMovil, setEnMovil] = useState(() => window.matchMedia('(max-width: 767px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const on = (e) => setEnMovil(e.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
 
   useEffect(() => {
     api('/setup-state').then((s) => {
@@ -104,6 +114,9 @@ function Shell() {
       {open && <div className="md:hidden fixed inset-0 bg-black/60 z-40" onClick={() => setOpen(false)} />}
 
       <aside
+        /* cerrado en móvil sigue estando en el orden de tabulación: al tabular
+           desde la barra superior recorrías trece enlaces invisibles */
+        inert={enMovil && !open}
         className={`app-nav w-56 shrink-0 border-r border-ink-700 bg-ink-900 py-4 flex flex-col z-50 fixed md:sticky top-0 h-screen overflow-y-auto transition-transform ${
           open ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0`}
@@ -175,6 +188,9 @@ function Shell() {
       )}
       <main className="flex-1 p-4 pt-20 md:p-6 max-w-[1600px] min-w-0">
         <Suspense fallback={<Spinner />}>
+        {/* la clave hace que la barrera se reinicie al cambiar de página: si no,
+            una vez rota se quedaba rota aunque navegaras a otro sitio */}
+        <ErrorBoundary key={location.pathname}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/biblioteca" element={<Library />} />
@@ -191,6 +207,7 @@ function Shell() {
           <Route path="/letterboxd" element={<Letterboxd />} />
           <Route path="/ajustes" element={<Settings />} />
         </Routes>
+        </ErrorBoundary>
         </Suspense>
       </main>
       <Toaster />

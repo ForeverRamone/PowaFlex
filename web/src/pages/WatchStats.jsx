@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { api } from '../api.js';
-import { Spinner, Section, MovieCard, Empty, PageHeader } from '../components.jsx';
+import { Spinner, Section, MovieCard, Empty, PageHeader, ErrorBox } from '../components.jsx';
 import { MovieModal } from '../components.jsx';
 import { useChartTheme } from '../charts.js';
 
@@ -56,6 +56,7 @@ export default function WatchStats() {
     load();
   };
 
+  if (data?.error) return <ErrorBox error={data.error} />;
   if (!data) return <Spinner />;
 
   const s = data.summary;
@@ -70,7 +71,7 @@ export default function WatchStats() {
           <div className="card p-4">
             <div className="text-2xl font-bold text-gold-400">{s.total.toLocaleString('es-ES')}</div>
             <div className="text-sm text-zinc-400 mt-1">Marcadas como vistas</div>
-            <div className="text-xs text-zinc-500 mt-1">{Math.round((s.total / s.library) * 100)}% de tu biblioteca</div>
+            <div className="text-xs text-zinc-500 mt-1">{s.library ? `${Math.round((s.total / s.library) * 100)}% de tu biblioteca` : 'sin biblioteca sincronizada'}</div>
           </div>
           <div className="card p-4">
             <div className="text-2xl font-bold text-zinc-200">{s.plex.toLocaleString('es-ES')}</div>
@@ -108,28 +109,38 @@ export default function WatchStats() {
       )}
 
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
-        <Section title="Visto vs. pendiente por década">
-          <div className="card p-4 h-72">
+        <Section title="Visto vs. pendiente por década" className="min-w-0">
+          <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
               <BarChart data={data.watchedByDecade} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
                 <XAxis dataKey="decade" stroke={ch.axis} fontSize={12} tickMargin={6} />
                 <YAxis stroke={ch.axis} fontSize={12} width={38} />
                 <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
-                <Legend wrapperStyle={{ fontSize: 12, color: ch.axis }} />
+                {/* el formatter es necesario: recharts pinta cada rótulo del color de su
+                    serie, y el gris claro de «Total» era ilegible sobre el papel */}
+                <Legend
+                  wrapperStyle={{ fontSize: 12 }}
+                  formatter={(v) => <span style={{ color: ch.axis }}>{v}</span>}
+                />
                 <Bar dataKey="watched" name="Vistas" stackId="a" fill={ch.positive} />
                 <Bar dataKey="total" name="Total" fill={ch.muted} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Section>
-        <Section title="Visto vs. total por género">
-          <div className="card p-4 h-72">
+        <Section title="Visto vs. total por género" className="min-w-0">
+          <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
               <BarChart data={data.watchedByGenre} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
                 <XAxis type="number" stroke={ch.axis} fontSize={12} />
                 <YAxis type="category" dataKey="name" width={104} stroke={ch.axis} fontSize={11} interval={0} tickMargin={4} />
                 <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
-                <Legend wrapperStyle={{ fontSize: 12, color: ch.axis }} />
+                {/* el formatter es necesario: recharts pinta cada rótulo del color de su
+                    serie, y el gris claro de «Total» era ilegible sobre el papel */}
+                <Legend
+                  wrapperStyle={{ fontSize: 12 }}
+                  formatter={(v) => <span style={{ color: ch.axis }}>{v}</span>}
+                />
                 <Bar dataKey="watched" name="Vistas" fill={ch.positive} />
                 <Bar dataKey="total" name="Total" fill={ch.muted} />
               </BarChart>
@@ -152,6 +163,37 @@ export default function WatchStats() {
               </Link>
             ))}
           </div>
+        )}
+      </Section>
+
+      <Section title="Directores/as que más has visto">
+        {!data.directorsMostWatched?.length ? (
+          <Empty>Aún no hay visionados registrados.</Empty>
+        ) : (
+          <>
+            <p className="text-xs text-zinc-500 -mt-2 mb-3 max-w-3xl">
+              Por número de películas suyas que has visto, contando lo reproducido en Plex y lo que
+              tienes marcado en Letterboxd. Solo entran las que están emparejadas con tu biblioteca:
+              de una entrada de Letterboxd suelta no se sabe quién la dirigió.
+            </p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+              {data.directorsMostWatched.map((d, i) => (
+                <Link
+                  key={d.id}
+                  to={`/biblioteca?personId=${d.id}&personRole=director&watched=yes`}
+                  className="card p-3 flex items-baseline gap-2 hover:border-gold-400 transition-colors"
+                >
+                  <span className="text-[11px] text-zinc-600 tabular w-5 shrink-0">{i + 1}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="text-sm font-medium text-zinc-200 block truncate">{d.name}</span>
+                    <span className="text-xs text-zinc-500">
+                      <b className="text-gold-400 tabular">{d.watched}</b> vistas de {d.total} suyas que tienes
+                    </span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </>
         )}
       </Section>
 

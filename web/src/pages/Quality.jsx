@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Legend } from 'recharts';
 import { api, fmtBytes } from '../api.js';
-import { Spinner, Section, MovieCard, MovieModal, Empty, RadarrButton, useRadarrIds, JustWatchCheck, PageHeader, ProgressBar } from '../components.jsx';
+import { Spinner, Section, MovieCard, MovieModal, Empty, RadarrButton, useRadarrIds, JustWatchCheck, PageHeader, ProgressBar, ErrorBox} from '../components.jsx';
 import { toast } from '../toast.js';
 import { useChartTheme } from '../charts.js';
 
 export default function Quality() {
+  const pollRef = useRef(null);
+  useEffect(() => () => clearInterval(pollRef.current), []);
   const ch = useChartTheme();
   const [ov, setOv] = useState(null);
   const [upgrades, setUpgrades] = useState(null);
@@ -38,13 +40,20 @@ export default function Quality() {
     const ids = (upgrades || []).map((m) => m.tmdb_id).filter(Boolean);
     if (!ids.length) return;
     setJw((j) => ({ ...j, busy: true, done: 0, total: ids.length }));
+    // el clearInterval va en un finally: si la petición larga fallaba o te ibas
+    // de la página, el temporizador se quedaba vivo
     const poll = setInterval(() => {
       api('/build-progress').then((p) => {
         if (p?.active && p.job === 'justwatch') setJw((j) => ({ ...j, done: p.done, total: p.total }));
       });
     }, 900);
-    const r = await api('/justwatch/batch', { method: 'POST', body: { tmdbIds: ids } });
-    clearInterval(poll);
+    pollRef.current = poll;
+    let r;
+    try {
+      r = await api('/justwatch/batch', { method: 'POST', body: { tmdbIds: ids } });
+    } finally {
+      clearInterval(poll);
+    }
     if (r.error) {
       setJw((j) => ({ ...j, busy: false }));
       toast(`⚠️ ${r.error}`, 'error');
@@ -78,6 +87,7 @@ export default function Quality() {
     );
   };
 
+  if (ov?.error) return <ErrorBox error={ov.error} />;
   if (!ov) return <Spinner />;
 
   const sizeByDecade = ov.sizeByDecade.map((d) => ({ ...d, gb: +(d.size / 1073741824).toFixed(1) }));
@@ -95,9 +105,10 @@ export default function Quality() {
           <Section
             key={title}
             title={title}
+            className="min-w-0"
             action={clickable && <span className="text-[11px] text-zinc-500">clic para filtrar</span>}
           >
-            <div className="card p-4 h-80">
+            <div className="card p-4 h-80 min-w-0">
               <ResponsiveContainer>
                 <PieChart>
                   <Pie
@@ -139,7 +150,7 @@ export default function Quality() {
       </div>
 
       <Section title="Espacio en disco por década">
-        <div className="card p-4 h-64 mb-8">
+        <div className="card p-4 h-64 mb-8 min-w-0">
           <ResponsiveContainer>
             <BarChart data={sizeByDecade}>
               <XAxis dataKey="decade" stroke={ch.axis} fontSize={12} />
@@ -174,7 +185,7 @@ export default function Quality() {
                   <span className="text-[11px] text-zinc-500">
                     {jw.upgradeable} de {jw.checked} con mejor versión en el mercado
                   </span>
-                  <span className="mx-1 text-ink-600">·</span>
+                  <span className="mx-1 text-zinc-600">·</span>
                   {[
                     ['todas', `Todas (${upgrades.length})`],
                     ['mejor', `Con mejor versión (${upgradeableCount})`],

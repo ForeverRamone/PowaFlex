@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Star, Clapperboard, Drama, Search, Scissors, RotateCw, ArrowLeftRight, X, Cross } from 'lucide-react';
-import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature } from '../components.jsx';
+import { Star, Clapperboard, Drama, Search, Scissors, RotateCw, ArrowLeftRight, X } from 'lucide-react';
+import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature, ErrorBox } from '../components.jsx';
 import { toast } from '../toast.js';
 
 // The whole page is scoped to ONE role at a time: a director you follow is
@@ -36,7 +36,7 @@ function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
       <button
         onClick={() => (isTracked ? onRemove(person) : onAdd(person))}
         title={isTracked ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-        className={`text-lg cursor-pointer shrink-0 ${isTracked ? 'text-gold-400' : 'text-ink-600 hover:text-zinc-400'}`}
+        className={`text-lg cursor-pointer shrink-0 ${isTracked ? 'text-gold-400' : 'text-zinc-600 hover:text-gold-400'}`}
       >
         ★
       </button>
@@ -99,6 +99,12 @@ function FavoriteCard({ p, role, selectable, selected, onSelect, onRemove, onSwi
               )}
             </div>
           </div>
+        ) : p.tmdbBlank ? (
+          // tienes películas suyas pero TMDB no le devuelve filmografía: casi
+          // siempre es un homónimo mal emparejado, no una carrera vacía
+          <div className="text-[11px] text-orange-300 mt-2" title="Se reintentará el emparejado en la próxima actualización">
+            Sin ficha de TMDB fiable · no se puede calcular su completismo
+          </div>
         ) : (
           <div className="text-[11px] text-zinc-600 mt-2">
             Huecos sin calcular · <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir</Link>
@@ -122,13 +128,99 @@ function FavoriteCard({ p, role, selectable, selected, onSelect, onRemove, onSwi
 }
 
 // accent palette per curated pack (#9)
+// `borderL` pinta SOLO el filete izquierdo: con `border-<color>` a secas, y las
+// utilidades ya encapadas, el recuadro entero se teñía del color del paquete.
+// Los tonos 300 no los redefine «Cartelera», así que el texto va en los 400/500.
 const ACCENTS = {
-  red: { border: 'border-red-500', bg: 'bg-red-500/15', text: 'text-red-300' },
-  gold: { border: 'border-gold-400', bg: 'bg-gold-400/15', text: 'text-gold-400' },
-  emerald: { border: 'border-emerald-500', bg: 'bg-emerald-500/15', text: 'text-emerald-300' },
-  sky: { border: 'border-sky-500', bg: 'bg-sky-500/15', text: 'text-sky-300' },
-  orange: { border: 'border-orange-500', bg: 'bg-orange-500/15', text: 'text-orange-300' },
+  red: { borderL: '!border-l-red-400', bg: 'bg-red-400/15', text: 'text-red-400' },
+  gold: { borderL: '!border-l-gold-400', bg: 'bg-gold-400/15', text: 'text-gold-400' },
+  emerald: { borderL: '!border-l-emerald-400', bg: 'bg-emerald-400/15', text: 'text-emerald-400' },
+  sky: { borderL: '!border-l-sky-300', bg: 'bg-sky-300/15', text: 'text-sky-300' },
+  orange: { borderL: '!border-l-orange-400', bg: 'bg-orange-400/15', text: 'text-orange-400' },
 };
+
+/**
+ * Los cánones de «Grandes ausentes» (TSPDT, los 501 del libro, «en boga» y tus
+ * listas pegadas) también se pueden volcar a favoritos desde aquí: son las
+ * mismas listas, y buscarlos uno a uno en la otra página era absurdo.
+ *
+ * Resolver 500 nombres contra TMDB lleva su rato, así que el servidor lo hace en
+ * segundo plano y aquí se sigue el progreso.
+ */
+function CanonPacks({ role, onDone }) {
+  const [canons, setCanons] = useState([]);
+  const [estado, setEstado] = useState(null);
+
+  useEffect(() => {
+    api('/discover/canons').then((r) => Array.isArray(r) && setCanons(r));
+    api('/tracked/from-canon').then((r) => !r.error && r.running && setEstado(r));
+  }, []);
+
+  // mientras corre, se pregunta cada segundo y medio
+  useEffect(() => {
+    if (!estado?.running) return undefined;
+    const t = setInterval(async () => {
+      const r = await api('/tracked/from-canon');
+      if (r.error) return;
+      setEstado(r);
+      if (!r.running) {
+        clearInterval(t);
+        onDone();
+        toast(
+          `⭐ ${r.added} añadidos de «${r.canon}»` +
+            (r.skipped ? ` · ${r.skipped} ya estaban o los habías quitado` : '') +
+            (r.notFound?.length ? ` · ${r.notFound.length} sin ficha en TMDB` : ''),
+          'success'
+        );
+      }
+    }, 1500);
+    return () => clearInterval(t);
+  }, [estado?.running]);
+
+  const añadir = async (c) => {
+    const r = await api('/tracked/from-canon', { method: 'POST', body: { canon: c.key, role } });
+    if (r.error) return toast(`⚠️ ${r.error}`, 'error');
+    setEstado({ running: true, canon: c.label, added: 0, total: r.total });
+  };
+
+  if (!canons.length) return null;
+  return (
+    <Section title="Listas y cánones">
+      <p className="text-xs text-zinc-500 -mt-2 mb-3 max-w-3xl">
+        Las mismas listas de <Link to="/descubrir" className="text-gold-400 hover:underline">Grandes ausentes</Link>,
+        para volcarlas de golpe a tus favoritos. A quien hayas quitado con la ✕ no vuelve a entrar.
+      </p>
+      {estado?.running && (
+        <div className="card p-3 mb-3">
+          <div className="text-sm text-zinc-300 mb-2">
+            Añadiendo «{estado.canon}»… <span className="tabular">{estado.added || 0}</span> de {estado.total}
+          </div>
+          <ProgressBar pct={estado.total ? Math.round(((estado.added || 0) / estado.total) * 100) : 0} />
+        </div>
+      )}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {canons.map((c) => (
+          <div key={c.key} className="card p-3 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-zinc-200 truncate">{c.label}</div>
+              <div className="text-[11px] text-zinc-500">
+                {c.count != null ? `${c.count} nombres` : 'se actualiza sola con TMDB'}
+              </div>
+            </div>
+            <button
+              className="btn-ghost !py-1 text-xs shrink-0"
+              disabled={estado?.running}
+              onClick={() => añadir(c)}
+              title={`Añadir a tus ${roleLabel(role).toLowerCase()}`}
+            >
+              Añadir
+            </button>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
 
 export default function Favorites() {
   const [tracked, setTracked] = useState(null);
@@ -157,12 +249,16 @@ export default function Favorites() {
   const [preview, setPreview] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
+  const [loadError, setLoadError] = useState(null);
   const loadTracked = () =>
     api('/tracked/health').then((r) => {
       if (Array.isArray(r?.people)) {
         setTracked(r.people);
         setHealth(r.cached || {});
+        setLoadError(null);
       } else if (Array.isArray(r)) setTracked(r);
+      // si no, el spinner se quedaba girando indefinidamente sin decir nada
+      else setLoadError(r?.error || 'No se han podido cargar tus favoritos');
     });
 
   useEffect(() => {
@@ -304,7 +400,7 @@ export default function Favorites() {
     setConfirmClear(false);
     const ids = shownFavs.map((t) => t.id);
     await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids } });
-    toast(`Vaciados los ${ids.length} favoritos de ${roleLabel(role).toLowerCase()}`);
+    toast(`Quitados ${ids.length} ${favSearch.trim() ? 'favoritos de los que se ven ahora' : `favoritos de ${roleLabel(role).toLowerCase()}`}`);
     loadTracked();
   };
 
@@ -331,6 +427,7 @@ export default function Favorites() {
       return next;
     });
 
+  if (loadError) return <ErrorBox error={loadError} />;
   if (!tracked) return <Spinner />;
 
   // everything below is scoped to the active role — no mixed counts, ever
@@ -574,7 +671,7 @@ export default function Favorites() {
                               : `Seguir como ${role === 'director' ? 'director/a' : 'actor/actriz'}`
                         }
                         className={`text-lg cursor-pointer transition-colors shrink-0 ${
-                          here ? 'text-gold-400' : elsewhere ? 'text-gold-400/30 hover:text-gold-400' : 'text-ink-600 hover:text-zinc-400'
+                          here ? 'text-gold-400' : elsewhere ? 'text-gold-400/30 hover:text-gold-400' : 'text-zinc-600 hover:text-gold-400'
                         }`}
                       >
                         {elsewhere ? <ArrowLeftRight size={15} /> : '★'}
@@ -644,13 +741,15 @@ export default function Favorites() {
             )}
           </div>
 
+          <CanonPacks role={role} onDone={loadTracked} />
+
           {suggest?.packs && (
             <div className="mb-8 space-y-5">
               {suggest.packs.map((pack) => {
                 const pending = pack.people.filter((p) => !p.tracked && !trackedTmdb.has(p.tmdb_id)).length;
                 const accent = ACCENTS[pack.accent] || ACCENTS.gold;
                 return (
-                  <section key={pack.key} className={`card p-0 overflow-hidden border-l-4 ${accent.border}`}>
+                  <section key={pack.key} className={`card p-0 overflow-hidden border-l-4 ${accent.borderL}`}>
                     <div className="flex items-start gap-3 p-4 pb-3 flex-wrap">
                       <div className={`text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${accent.bg}`}>{pack.emoji}</div>
                       <div className="min-w-0 flex-1">

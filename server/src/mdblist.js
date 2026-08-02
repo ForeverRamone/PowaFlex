@@ -52,7 +52,7 @@ function dailyBudget() {
 }
 
 function usage() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('en-CA'); // el día cambia a tu medianoche
   try {
     const u = JSON.parse(getSetting('mdblist_usage') || '{}');
     if (u.date === today) return u;
@@ -138,13 +138,17 @@ export async function fetchRatingsBatch(tmdbIds) {
     }
   } finally {
     if (used) addUsage(used);
+    // Guardar va en el finally a propósito: un 429 a mitad de lote se lleva por
+    // delante el resto, pero las que YA se descargaron están pagadas del
+    // presupuesto del día y tirarlas obligaba a volver a pedirlas mañana.
+    if (items?.length) {
+      const parsed = items.map(parseItem).filter(Boolean);
+      db.transaction(() => {
+        for (const p of parsed) upsertRating.run(p);
+      })();
+    }
   }
-  const parsed = items.map(parseItem).filter(Boolean);
-  const tx = db.transaction(() => {
-    for (const p of parsed) upsertRating.run(p);
-  });
-  tx();
-  return parsed;
+  return items.map(parseItem).filter(Boolean);
 }
 
 export const mdbSyncStatus = {

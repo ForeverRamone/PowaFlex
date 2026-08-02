@@ -204,8 +204,35 @@ const isOfficialSlug = (slug) => OFFICIAL_HINTS.some((h) => slug.includes(h));
 
 // --- zip import -------------------------------------------------------------
 
+// Tope de lo que se descomprime de una tacada. Sin él, un zip preparado de 800 KB
+// se expandía a 765 MB en memoria y tumbaba el contenedor: `unzipSync` saca TODAS
+// las entradas antes de que nadie mire si son .csv. El export real de Letterboxd
+// de una filmoteca grande no llega a 30 MB.
+const MAX_UNZIPPED = 200 * 1024 * 1024;
+const MAX_ENTRIES = 500;
+
 export function importLetterboxdZip(buffer) {
-  const files = unzipSync(new Uint8Array(buffer));
+  // El tope se aplica DENTRO del filtro, que fflate consulta antes de inflar
+  // cada entrada: comprobarlo después no sirve de nada, porque para entonces la
+  // memoria ya está gastada (40 CSV de 150 MB llevaban el proceso a 2 GB antes
+  // de que nadie dijera nada). Devolviendo `false` no se descomprime, y el
+  // motivo se guarda para avisar al terminar.
+  let acumulado = 0;
+  let entradas = 0;
+  let motivo = null;
+  const files = unzipSync(new Uint8Array(buffer), {
+    filter: (f) => {
+      if (motivo) return false;
+      if (!f.name.toLowerCase().endsWith('.csv')) return false;
+      if (++entradas > MAX_ENTRIES) { motivo = `el zip trae más de ${MAX_ENTRIES} ficheros`; return false; }
+      acumulado += f.originalSize || 0;
+      if (acumulado > MAX_UNZIPPED) { motivo = 'el zip se expande muchísimo al abrirlo'; return false; }
+      return true;
+    },
+  });
+  if (motivo) {
+    throw new Error(`No se puede abrir: ${motivo}. ¿Seguro que es el export de Letterboxd?`);
+  }
   const results = [];
   const lists = [];
   const base = (p) => p.split('/').pop().toLowerCase();
@@ -304,6 +331,70 @@ export async function importLetterboxdRss(username) {
 
 // --- pasted letterboxd list (public page scrape, best-effort) ---------------
 
+const ENTIDADES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'", '#039': "'" };
+const desescapar = (t) =>
+  String(t || '').replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (todo, e) => {
+    const k = e.toLowerCase();
+    if (ENTIDADES[k]) return ENTIDADES[k];
+    if (k.startsWith('#x')) return String.fromCodePoint(parseInt(k.slice(2), 16));
+    if (k.startsWith('#')) return String.fromCodePoint(Number(k.slice(1)));
+    return todo;
+  });
+
+/**
+ * Saca las películas de una página de lista de Letterboxd.
+ *
+ * Letterboxd cambia su marcado cada cierto tiempo y esto se rompe en silencio:
+ * en agosto de 2026 renombró `data-film-slug`/`data-film-name` a
+ * `data-item-slug`/`data-item-name`, y desde entonces cualquier lista daba «No
+ * se pudieron leer películas de esa lista». Se aceptan los dos juegos de
+ * atributos, y como último recurso el propio slug, que es lo más estable de
+ * todo. Devuelve cuántas nuevas encontró.
+ *
+ * El nombre viene con el año pegado: «The Cabinet of Dr. Caligari (1920)».
+ */
+export function parseListPage(html, seen = new Set(), items = []) {
+  const re = /data-(?:item|film)-slug="([^"]+)"/gi;
+  let m;
+  let nuevas = 0;
+  while ((m = re.exec(html))) {
+    const slug = m[1];
+    if (!slug || seen.has(slug)) continue;
+    // La ventana se acota a la ETIQUETA que contiene el slug, no a un número de
+    // caracteres alrededor: los pósters van pegados unos a otros y una ventana
+    // ancha se traía el nombre del vecino de al lado.
+    const ini = html.lastIndexOf('<', m.index);
+    const fin = html.indexOf('>', m.index);
+    const etiqueta = html.slice(ini < 0 ? 0 : ini, fin < 0 ? m.index + 400 : fin);
+    const crudo = desescapar(
+      (etiqueta.match(/data-(?:item|film)-name="([^"]+)"/i) || [])[1] ||
+        (etiqueta.match(/data-item-full-display-name="([^"]+)"/i) || [])[1] ||
+        (etiqueta.match(/\balt="([^"]+)"/i) || [])[1] ||
+        ''
+    );
+    const conAnyo = /^(.*?)\s*\((\d{4})\)\s*$/.exec(crudo);
+    let title = (conAnyo ? conAnyo[1] : crudo).trim();
+    let year = conAnyo ? Number(conAnyo[2]) : null;
+    if (!year) {
+      // los slugs de Letterboxd desempatan homónimas con el año al final
+      const y = /-(\d{4})$/.exec(slug);
+      if (y) year = Number(y[1]);
+      const attr = (etiqueta.match(/data-film-release-year="(\d{4})"/i) || [])[1];
+      if (attr) year = Number(attr);
+    }
+    if (!title) title = decodeURIComponent(slug).replace(/-\d{4}$/, '').replace(/-/g, ' ');
+    seen.add(slug);
+    items.push({
+      position: items.length + 1,
+      title,
+      year: year || null,
+      uri: `https://letterboxd.com/film/${slug}/`,
+    });
+    nuevas++;
+  }
+  return nuevas;
+}
+
 export async function importLetterboxdListUrl(url) {
   const m = /letterboxd\.com\/([^/]+)\/list\/([^/?#]+)/i.exec(url || '');
   if (!m) throw new Error('URL no reconocida (esperaba letterboxd.com/usuario/list/slug/)');
@@ -311,6 +402,7 @@ export async function importLetterboxdListUrl(url) {
   const slug = `lb:${user}/${listSlug}`;
   const items = [];
   const seen = new Set();
+  let nombre = decodeURIComponent(listSlug).replace(/-/g, ' ');
   for (let page = 1; page <= 20; page++) {
     const res = await fetch(`https://letterboxd.com/${user}/list/${listSlug}/page/${page}/`, {
       headers: { 'User-Agent': 'PowaFlex' },
@@ -318,36 +410,19 @@ export async function importLetterboxdListUrl(url) {
     });
     if (!res.ok) { if (page === 1) throw new Error(`Letterboxd ${res.status}`); break; }
     const html = await res.text();
-    // Letterboxd markup shifts over time, so parse each poster block tolerantly:
-    // the film slug is stable; the name comes from data-film-name or the <img alt>,
-    // and the release year (when present) sits in a nearby data attribute.
-    const blocks = html.split(/data-film-slug="/i).slice(1);
-    let found = 0;
-    for (const raw of blocks) {
-      const slug = (raw.match(/^([^"]+)"/) || [])[1];
-      if (!slug || seen.has(slug)) continue;
-      const chunk = raw.slice(0, 600);
-      const name =
-        (chunk.match(/data-film-name="([^"]+)"/i) || [])[1] ||
-        (chunk.match(/<img[^>]*\balt="([^"]+)"/i) || [])[1] ||
-        decodeURIComponent(slug).replace(/-/g, ' ');
-      const year =
-        (chunk.match(/data-film-release-year="(\d{4})"/i) || [])[1] ||
-        (chunk.match(/\b(19|20)\d{2}\b/) || [])[0];
-      seen.add(slug);
-      items.push({
-        position: items.length + 1,
-        title: name,
-        year: year ? Number(year) : null,
-        uri: `https://letterboxd.com/film/${slug}/`,
-      });
-      found++;
-    }
+    // el nombre de verdad de la lista está en og:title; el slug daba cosas como
+    // «edgar wrights 1000 favorite movies»
+    if (page === 1) nombre = desescapar((html.match(/property="og:title" content="([^"]+)"/i) || [])[1] || '') || nombre;
+    const found = parseListPage(html, seen, items);
     if (!found) break;
   }
-  if (!items.length) throw new Error('No se pudieron leer películas de esa lista');
-  const name = decodeURIComponent(listSlug).replace(/-/g, ' ');
-  const listId = saveChallengeList({ slug, name, url, source: 'url', official: 0, items });
+  if (!items.length) {
+    throw new Error(
+      'No se pudieron leer películas de esa lista. Comprueba que la lista es pública y que la ' +
+      'dirección es la de la lista (letterboxd.com/usuario/list/nombre-de-la-lista/).'
+    );
+  }
+  const listId = saveChallengeList({ slug, name: nombre, url, source: 'url', official: 0, items });
   return { listId, items: items.length };
 }
 

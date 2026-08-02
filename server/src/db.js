@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
+import { staleCacheSql } from './cache-versions.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
@@ -254,6 +255,15 @@ ensureColumn('people', 'continent', 'continent TEXT');
 // distinct people with the same name impossible, so the table is rebuilt
 // without it (SQLite cannot drop a constraint in place).
 ensureColumn('people', 'plex_tag_id', 'plex_tag_id TEXT');
+// El nombre tal cual lo da Plex, antes de normalizarlo a alfabeto latino
+// (`深田晃司` → `Kôji Fukada`): `name` es el que se muestra y este el suyo.
+ensureColumn('people', 'plex_name', 'plex_name TEXT');
+// 1 cuando el emparejado con TMDB está probado contra tus películas (ver
+// resolvePerson): sin esto ganaba el homónimo más popular de la búsqueda.
+ensureColumn('people', 'tmdb_verified', 'tmdb_verified INTEGER');
+// cuándo se intentó verificar por última vez, para no repetir a diario un
+// emparejado que ya falló (ver resolvePerson)
+ensureColumn('people', 'tmdb_checked_at', 'tmdb_checked_at INTEGER');
 
 function dropPeopleNameUnique() {
   const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'people'").get()?.sql || '';
@@ -341,15 +351,28 @@ db.exec(`
   UPDATE tracked_people SET role = 'director' WHERE role IS NULL;
 `);
 
-// Drop caches built under superseded rules on boot: the pre-v4 calendar mixed
-// in library-top people and both facets of every favorite, so upgrading used to
-// leave "ghost" entries from people you no longer follow.
-db.prepare(
-  `DELETE FROM tmdb_cache
-   WHERE key LIKE 'calendar:v_' AND key <> 'calendar:v5'
-      OR (key LIKE 'discover_favorites:%' AND key NOT LIKE 'discover_favorites:v6:%')
-      OR (key LIKE 'discover_gaps:%' AND key NOT LIKE 'discover_gaps:v5:%')`
-).run();
+// Al arrancar, fuera todo lo cacheado con reglas ya superadas. La lista de
+// versiones buenas vive en cache-versions.js, junto a las claves que las
+// escriben, para que no puedan descuadrarse.
+// Relleno para las filas que ya existían: sin él, `plex_name` queda NULL y la
+// siguiente sincronización no reconoce a quien se haya renombrado al alfabeto
+// latino (busca por name O plex_name), y crea un duplicado partiéndole la
+// filmografía. Solo corre una vez, cuando la columna acaba de nacer.
+db.prepare('UPDATE people SET plex_name = name WHERE plex_name IS NULL AND name IS NOT NULL').run();
+db.prepare('UPDATE movies SET plex_title = title WHERE plex_title IS NULL AND title IS NOT NULL').run();
+
+db.prepare(`DELETE FROM tmdb_cache WHERE ${staleCacheSql()}`).run();
+
+// Cánones propios de «Grandes ausentes»: listas de directores/as pegadas por el
+// usuario (la de IMDb «501 Directors», la de un libro, la que sea). Los nombres
+// se guardan como JSON; se resuelven contra TMDB al construir la página.
+db.exec(`CREATE TABLE IF NOT EXISTS custom_canons (
+  key TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  names TEXT NOT NULL,
+  source TEXT,
+  created_at INTEGER
+)`);
 
 // Films explicitly marked "no me interesa" in the gaps flow: excluded from
 // missing counts and suggestions until un-dismissed.

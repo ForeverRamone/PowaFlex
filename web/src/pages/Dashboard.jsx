@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line,
 } from 'recharts';
 import { api, fmtBytes, fmtDate, tmdbImg } from '../api.js';
-import { Spinner, StatCard, Section, PersonCard, Empty, MovieModal, LetterboxdLogo, PageHeader } from '../components.jsx';
+import { Spinner, StatCard, Section, PersonCard, Empty, MovieModal, LetterboxdLogo, PageHeader, ErrorBox} from '../components.jsx';
 import { useChartTheme } from '../charts.js';
 
 // small poster tile used across the "recent" strips
@@ -85,6 +85,9 @@ export default function Dashboard() {
     api('/people?role=actor&limit=10').then((r) => Array.isArray(r) && setActors(r));
   }, []);
 
+  // un error del servidor NO es «no hay nada»: antes el Dashboard decía «aún no
+  // hay películas sincronizadas» a alguien con 12.400
+  if (ov?.error || charts?.error) return <ErrorBox error={ov?.error || charts?.error} />;
   if (!ov || !charts) return <Spinner />;
   if (!ov.movies)
     return (
@@ -139,8 +142,8 @@ export default function Dashboard() {
       )}
 
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
-        <Section title="Películas por década">
-          <div className="card p-4 h-72">
+        <Section title="Películas por década" className="min-w-0">
+          <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
               <BarChart data={charts.byDecade} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
                 <XAxis dataKey="decade" stroke={ch.axis} fontSize={12} tickMargin={6} />
@@ -151,8 +154,8 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </Section>
-        <Section title="Géneros principales">
-          <div className="card p-4 h-72">
+        <Section title="Géneros principales" className="min-w-0">
+          <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
               <BarChart data={charts.byGenre.slice(0, 12)} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
                 <XAxis type="number" stroke={ch.axis} fontSize={12} />
@@ -163,8 +166,8 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </Section>
-        <Section title="Crecimiento de la biblioteca (añadidas por mes)">
-          <div className="card p-4 h-72">
+        <Section title="Crecimiento de la biblioteca (añadidas por mes)" className="min-w-0">
+          <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
               <LineChart data={charts.addedByMonth} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
                 <XAxis dataKey="month" stroke={ch.axis} fontSize={10} tickMargin={6} minTickGap={24} />

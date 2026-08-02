@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Spinner, Section, Empty, StatCard, Dropzone, PageHeader } from '../components.jsx';
+import { Spinner, Section, Empty, StatCard, Dropzone, PageHeader, ErrorBox} from '../components.jsx';
 
 export default function Letterboxd() {
   const [summary, setSummary] = useState(null);
@@ -61,6 +61,7 @@ export default function Letterboxd() {
     }
   };
 
+  if (summary?.error) return <ErrorBox error={summary.error} />;
   if (!summary) return <Spinner />;
 
   const counts = summary.counts || {};

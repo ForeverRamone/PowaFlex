@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
 import { Plus, RotateCw } from 'lucide-react';
 import {
-  Spinner, ErrorBox, RadarrButton, Empty, useRadarrIds, MediaModal, BuildProgress,
+  ErrorBox, RadarrButton, Empty, useRadarrIds, MediaModal, BuildProgress,
   useTypeFilters, matchesTypeFilters, TypeFilterBar,
 } from '../components.jsx';
 
@@ -17,10 +17,10 @@ function monthLabel(ym) {
 // los temas oscuros y quedaban como manchas sobre el papel de «Cartelera»
 function typeBadges(ev) {
   const badges = [];
-  if (ev.isShort) badges.push(['Corto', 'text-orange-300']);
-  if (ev.isDocumentary) badges.push(['Documental', 'text-sky-300']);
-  if (ev.isMusic) badges.push(['Concierto', 'text-gold-400']);
-  if (ev.isTvMovie) badges.push(['TV', 'text-red-400']);
+  if (ev.isShort) badges.push(['Corto', 'tag text-orange-300']);
+  if (ev.isDocumentary) badges.push(['Documental', 'tag text-sky-300']);
+  if (ev.isMusic) badges.push(['Concierto', 'tag text-yellow-500']);
+  if (ev.isTvMovie) badges.push(['TV', 'tag text-red-400']);
   return badges;
 }
 
@@ -110,7 +110,7 @@ export default function Calendar() {
   if (error)
     return (
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100 mb-4">Cine venidero</h1>
+        <h1 className="font-display text-3xl md:text-4xl text-zinc-100 leading-tight">Cine venidero</h1>
         <ErrorBox error={`${error} — comprueba la API key de TMDB en Ajustes.`} />
       </div>
     );
@@ -169,7 +169,7 @@ export default function Calendar() {
   return (
     <div>
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-zinc-100">Cine venidero</h1>
+        <h1 className="font-display text-3xl md:text-4xl text-zinc-100 leading-tight">Cine venidero</h1>
         <button className="btn-ghost inline-flex items-center gap-2" onClick={() => load(true)} disabled={refreshing}>
           {refreshing ? 'Actualizando…' : <><RotateCw size={14} strokeWidth={2} /> Actualizar desde TMDB</>}
         </button>

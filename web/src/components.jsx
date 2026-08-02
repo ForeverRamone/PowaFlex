@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { api, fmtDuration, tmdbImg, ratingLinks, primaryRating } from './api.js';
@@ -46,7 +46,7 @@ export function StatusLegend({ className = '' }) {
       <span className="flex items-center gap-1.5">
         <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,.9)]" /> En Plex
       </span>
-      <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-ink-600" /> Te falta</span>
+      <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border border-zinc-500" /> Te falta</span>
       <span className="flex items-center gap-1.5"><span className="text-gold-400">★</span> Vista</span>
     </div>
   );
@@ -78,7 +78,7 @@ export function PageHeader({ eyebrow, title, subtitle, action, children }) {
 function WatchedStar({ watched }) {
   if (!watched) return null;
   return (
-    <span className="absolute top-1.5 left-1.5 bg-black/70 text-gold-400 text-[11px] leading-none px-1.5 py-1 rounded" title="Vista (Plex o Letterboxd)">
+    <span className="on-art on-art-gold top-1.5 left-1.5" title="Vista (Plex o Letterboxd)">
       ★
     </span>
   );
@@ -107,14 +107,23 @@ export function GlobalSearch() {
     const t = setTimeout(() => api(`/search?q=${encodeURIComponent(q.trim())}`).then((r) => !r.error && setRes(r)), 200);
     return () => clearTimeout(t);
   }, [q]);
-  if (!open) return null;
+  // el hook va SIEMPRE (no se pueden llamar a medias) y no hace nada si está cerrado
+  const dialogo = useFocusTrap(() => setOpen(false), open);
   const go = (path) => { setOpen(false); setQ(''); navigate(path); };
+  if (!open) return null;
   return (
     <div
       className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-start justify-center p-4 pt-24"
       onClick={() => setOpen(false)}
     >
-      <div className="card-float w-full max-w-xl p-3" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogo}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Buscar en tu biblioteca"
+        className="card-float w-full max-w-xl p-3"
+        onClick={(e) => e.stopPropagation()}
+      >
         <input autoFocus className="input" placeholder="Buscar película o persona…" value={q} onChange={(e) => setQ(e.target.value)} />
         {res && (
           <div className="mt-2 max-h-[60vh] overflow-y-auto">
@@ -170,28 +179,34 @@ export function GlobalSearch() {
 // Unified toast notifications, mounted once in the shell.
 export function Toaster() {
   const [items, setItems] = useState([]);
-  useEffect(
-    () =>
-      onToast((t) => {
-        setItems((x) => [...x, t]);
-        setTimeout(() => setItems((x) => x.filter((i) => i.id !== t.id)), 3500);
-      }),
-    []
-  );
+  const timers = useRef([]);
+  useEffect(() => {
+    const off = onToast((t) => {
+      setItems((x) => [...x, t]);
+      // los que llevan acción duran más: no da tiempo a pulsar «Deshacer» en 3,5 s
+      const ms = t.action ? 8000 : 3500;
+      timers.current.push(setTimeout(() => setItems((x) => x.filter((i) => i.id !== t.id)), ms));
+    });
+    return () => { off(); timers.current.forEach(clearTimeout); timers.current = []; };
+  }, []);
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] flex flex-col gap-2 items-center pointer-events-none">
       {items.map((t) => (
         <div
           key={t.id}
-          className={`px-4 py-2 rounded-lg text-sm shadow-lg border ${
-            t.type === 'error'
-              ? 'bg-red-950 border-red-800 text-red-200'
-              : t.type === 'success'
-                ? 'bg-emerald-950 border-emerald-800 text-emerald-200'
-                : 'bg-ink-800 border-ink-600 text-zinc-200'
+          className={`card-raised px-4 py-2 text-sm ${
+            t.type === 'error' ? 'text-red-400' : t.type === 'success' ? 'text-emerald-400' : 'text-zinc-200'
           }`}
         >
           {t.message}
+          {t.action && (
+            <button
+              className="ml-3 underline underline-offset-2 pointer-events-auto font-medium"
+              onClick={() => { t.action.onClick(); setItems((x) => x.filter((i) => i.id !== t.id)); }}
+            >
+              {t.action.label}
+            </button>
+          )}
         </div>
       ))}
     </div>
@@ -210,16 +225,35 @@ export function Dropzone({ accept, multiple = true, onFiles, busy = false, label
     }
   };
   return (
+    // Es un botón de verdad: era un div con un onClick y el campo de fichero en
+    // `hidden`, así que importar el zip de Letterboxd era imposible sin ratón y
+    // un lector de pantalla no anunciaba nada.
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={label || 'Elegir archivos para importar'}
+      aria-busy={busy || undefined}
       onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files); }}
       onClick={() => inputRef.current?.click()}
-      className={`cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click(); }
+      }}
+      className={`cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-400 ${
         drag ? 'border-gold-400 bg-ink-800' : 'border-ink-600 hover:border-gold-400 bg-ink-900'
       }`}
     >
-      <input ref={inputRef} type="file" accept={accept} multiple={multiple} className="hidden" onChange={(e) => pick(e.target.files)} />
+      {/* sr-only y no `hidden`: display:none lo saca del árbol de accesibilidad */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(e) => pick(e.target.files)}
+      />
       <div className="text-3xl mb-2">{busy ? '⏳' : '📥'}</div>
       <div className="text-sm text-zinc-200">{busy ? 'Importando…' : label || 'Arrastra aquí tus archivos o haz clic para elegir'}</div>
       {hint && <div className="text-xs text-zinc-500 mt-1">{hint}</div>}
@@ -269,9 +303,53 @@ export function Spinner({ label = 'Cargando…' }) {
   );
 }
 
+/**
+ * Barrera de errores. Sin ella, cualquier excepción al pintar dejaba la página
+ * completamente en blanco y sin pista de qué había pasado.
+ */
+export class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    console.error('[PowaFlex] fallo al pintar', error, info);
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    const msg = String(this.state.error?.message || this.state.error);
+    // Tras actualizar el contenedor, una pestaña abierta pide trozos de código
+    // de la versión anterior, que ya no existen. Eso no es un error de la app:
+    // es que hay una versión nueva esperando.
+    const versionNueva = /dynamically imported module|Importing a module script failed|Failed to fetch/i.test(msg);
+    if (versionNueva) {
+      return (
+        <div className="alert my-6">
+          <div className="font-semibold mb-1">Hay una versión nueva de PowaFlex</div>
+          <p className="text-sm">Esta pestaña se quedó con la anterior. Recárgala y sigues donde estabas.</p>
+          <button className="btn-gold mt-3" onClick={() => window.location.reload()}>Recargar</button>
+        </div>
+      );
+    }
+    return (
+      <div className="alert my-6">
+        <div className="font-semibold mb-1">Esta página se ha roto.</div>
+        <p className="text-sm">{msg}</p>
+        <div className="flex gap-2 mt-3">
+          <button className="btn-ghost" onClick={() => this.setState({ error: null })}>Reintentar</button>
+          <button className="btn-ghost" onClick={() => window.location.reload()}>Recargar la app</button>
+        </div>
+      </div>
+    );
+  }
+}
+
 export function ErrorBox({ error }) {
   return (
-    <div className="card p-4 border-red-800 bg-red-950/40 text-red-300 text-sm my-4">
+    <div className="alert my-4">
       ⚠️ {error}
     </div>
   );
@@ -289,9 +367,9 @@ export function StatCard({ label, value, sub }) {
   );
 }
 
-export function Section({ title, action, children }) {
+export function Section({ title, action, children, className = '' }) {
   return (
-    <section className="mb-8">
+    <section className={`mb-8 ${className}`}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold text-zinc-100">{title}</h2>
         {action}
@@ -326,14 +404,10 @@ export function MovieCard({ movie, onClick }) {
         )}
         <WatchedStar watched={movie.watched != null ? movie.watched : movie.view_count > 0} />
         {movie.resolution === '4k' && (
-          <span className="absolute bottom-1.5 left-1.5 bg-black/70 text-zinc-100 text-[11px] px-1.5 py-0.5 rounded font-semibold">
-            4K
-          </span>
+          <span className="on-art bottom-1.5 left-1.5 font-semibold">4K</span>
         )}
         {movie.hdr && (
-          <span className="absolute bottom-1.5 right-1.5 bg-black/70 text-zinc-300 text-[11px] px-1.5 py-0.5 rounded">
-            {movie.hdr === 'Dolby Vision' ? 'DV' : 'HDR'}
-          </span>
+          <span className="on-art bottom-1.5 right-1.5">{movie.hdr === 'Dolby Vision' ? 'DV' : 'HDR'}</span>
         )}
       </div>
       <div className="mt-1.5 text-xs text-zinc-300 truncate group-hover:text-zinc-100 transition-colors">{movie.title}</div>
@@ -466,7 +540,7 @@ export function JustWatchCheck({ tmdbId, result = null }) {
     );
   }
   return (
-    <button onClick={check} disabled={busy} className="text-[11px] text-sky-400 hover:underline cursor-pointer">
+    <button onClick={check} disabled={busy} className="text-[11px] text-sky-300 hover:underline cursor-pointer">
       {busy ? 'Consultando…' : '¿existe mejor versión?'}
     </button>
   );
@@ -508,7 +582,7 @@ export function PersonCard({ person, role }) {
 
 export function ProgressBar({ pct }) {
   return (
-    <div className="h-2 bg-ink-700 rounded-full overflow-hidden">
+    <div className="h-2 bg-ink-800 rounded-full overflow-hidden">
       <div
         className="h-full bg-gold-400 transition-all"
         style={{ width: `${Math.min(100, pct)}%` }}
@@ -656,13 +730,38 @@ export function DeathBadge({ deathday, className = '' }) {
   );
 }
 
-// Close-on-Escape for modals.
+// Cierre con Escape y trampa de foco: sin ella, con Tab te ibas paseando por la
+// página de detrás mientras el diálogo seguía abierto, y al cerrarlo el foco se
+// quedaba en el limbo.
 function useEsc(onClose) {
   useEffect(() => {
     const h = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [onClose]);
+}
+
+function useFocusTrap(onClose, activo = true) {
+  const ref = useRef(null);
+  useEsc(onClose);
+  useEffect(() => {
+    if (!activo) return undefined;
+    const previo = document.activeElement;
+    const foco = () =>
+      [...(ref.current?.querySelectorAll('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])') || [])];
+    foco()[0]?.focus();
+    const onKey = (e) => {
+      if (e.key !== 'Tab' || !ref.current) return;
+      const f = foco();
+      if (!f.length) return;
+      const [primero, ultimo] = [f[0], f[f.length - 1]];
+      if (e.shiftKey && document.activeElement === primero) { e.preventDefault(); ultimo.focus(); }
+      else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('keydown', onKey); previo?.focus?.(); };
+  }, [activo]);
+  return ref;
 }
 
 export function MovieModal({ id, onClose }) {
@@ -720,7 +819,7 @@ function toViewModel({ ratingKey, movie, media }) {
 export function Ficha({ ratingKey, tmdbId, onClose }) {
   const [vm, setVm] = useState(null);
   const [err, setErr] = useState(null);
-  useEsc(onClose);
+  const dialogo = useFocusTrap(onClose);
   useEffect(() => {
     setVm(null); setErr(null);
     if (ratingKey) {
@@ -748,7 +847,14 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="card-float max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6 flex gap-6 relative" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogo}
+        role="dialog"
+        aria-modal="true"
+        aria-label={vm?.title || 'Ficha de película'}
+        className="card-float max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6 flex gap-6 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           aria-label="Cerrar"

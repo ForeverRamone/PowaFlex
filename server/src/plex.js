@@ -47,6 +47,8 @@ export const syncStatus = {
   startedAt: null,
   finishedAt: null,
   error: null,
+  // aviso no fatal (p. ej. limpieza omitida por barrido sospechoso)
+  warning: null,
 };
 
 function guidToIds(guids = []) {
@@ -89,13 +91,15 @@ ON CONFLICT(rating_key) DO UPDATE SET
   updated_at = excluded.updated_at
 `);
 
-const personIdByName = db.prepare('SELECT id FROM people WHERE name = ? ORDER BY id LIMIT 1');
+const personIdByName = db.prepare('SELECT id FROM people WHERE name = ? OR plex_name = ? ORDER BY id LIMIT 1');
 const personIdByTag = db.prepare('SELECT id FROM people WHERE plex_tag_id = ?');
 // only rows predating the tag-key identity can be adopted by a tag key
+// también por plex_name: si el nombre se normalizó al alfabeto latino, Plex
+// sigue mandando el suyo y por `name` ya no lo encontraríamos
 const untaggedPersonByName = db.prepare(
-  'SELECT id FROM people WHERE name = ? AND plex_tag_id IS NULL ORDER BY id LIMIT 1'
+  'SELECT id FROM people WHERE (name = ? OR plex_name = ?) AND plex_tag_id IS NULL ORDER BY id LIMIT 1'
 );
-const insertPerson = db.prepare('INSERT INTO people (name, thumb, plex_tag_id) VALUES (?, ?, ?)');
+const insertPerson = db.prepare('INSERT INTO people (name, plex_name, thumb, plex_tag_id) VALUES (?, ?, ?, ?)');
 const setPersonTag = db.prepare('UPDATE people SET plex_tag_id = ? WHERE id = ?');
 const updatePersonThumb = db.prepare('UPDATE people SET thumb = COALESCE(?, thumb) WHERE id = ?');
 const insertMoviePerson = db.prepare(
@@ -123,20 +127,20 @@ export function ensurePerson(name, thumb, tagKey = null) {
       return tagged.id;
     }
     // first time we see this key: adopt the pre-tag-key row of that name, if any
-    const legacy = untaggedPersonByName.get(name);
+    const legacy = untaggedPersonByName.get(name, name);
     if (legacy) {
       setPersonTag.run(tagKey, legacy.id);
       if (thumb) updatePersonThumb.run(thumb, legacy.id);
       return legacy.id;
     }
-    return insertPerson.run(name, thumb || null, tagKey).lastInsertRowid;
+    return insertPerson.run(name, name, thumb || null, tagKey).lastInsertRowid;
   }
-  const row = personIdByName.get(name);
+  const row = personIdByName.get(name, name);
   if (row) {
     if (thumb) updatePersonThumb.run(thumb, row.id);
     return row.id;
   }
-  return insertPerson.run(name, thumb || null, null).lastInsertRowid;
+  return insertPerson.run(name, name, thumb || null, null).lastInsertRowid;
 }
 
 function ensureTag(type, name) {
@@ -255,6 +259,7 @@ export async function runSync({ force = false } = {}) {
   if (syncStatus.running) return syncStatus;
   Object.assign(syncStatus, {
     running: true,
+    warning: null,
     phase: 'listing',
     total: 0,
     done: 0,
@@ -324,15 +329,32 @@ export async function runSync({ force = false } = {}) {
     // remove movies no longer in Plex
     syncStatus.phase = 'cleanup';
     const existing = db.prepare('SELECT rating_key FROM movies').all();
-    const removeTx = db.transaction((keys) => {
-      const delM = db.prepare('DELETE FROM movies WHERE rating_key = ?');
-      for (const k of keys) {
-        delM.run(k);
-        deleteMoviePeople.run(k);
-        deleteMovieTags.run(k);
-      }
-    });
-    removeTx(existing.map((r) => r.rating_key).filter((k) => !seen.has(k)));
+    // Plex puede responder 200 con la biblioteca vacía mientras la reescanea, o
+    // si se le cae el disco donde vive: eso NO es «has borrado tus películas».
+    // Sin este freno, un barrido en falso se llevaba por delante las 12.400 con
+    // sus personas, etiquetas y enlaces de Letterboxd.
+    const aBorrar = existing.map((r) => r.rating_key).filter((k) => !seen.has(k));
+    // `force` es la salida: una sincronización completa lanzada a mano SÍ borra.
+    // Sin ella el aviso mentía —repetir la sincronización daba los mismos
+    // números y la volvía a omitir—, así que quien de verdad hubiera partido su
+    // biblioteca en dos se quedaba sin manera de limpiarla.
+    const desaparecenDemasiadas = !force && existing.length > 5 && seen.size < existing.length * 0.5;
+    if (desaparecenDemasiadas) {
+      syncStatus.warning =
+        `Limpieza omitida: Plex ha devuelto ${seen.size} películas y aquí hay ${existing.length}. ` +
+        `Si de verdad has quitado tantas, usa «Sincronización completa» en Ajustes para confirmarlo.`;
+      console.warn(`[PowaFlex] ${syncStatus.warning}`);
+    } else {
+      const removeTx = db.transaction((keys) => {
+        const delM = db.prepare('DELETE FROM movies WHERE rating_key = ?');
+        for (const k of keys) {
+          delM.run(k);
+          deleteMoviePeople.run(k);
+          deleteMovieTags.run(k);
+        }
+      });
+      removeTx(aBorrar);
+    }
 
     // per-item details for full cast/crew/streams
     syncStatus.phase = 'details';

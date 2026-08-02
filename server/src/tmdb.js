@@ -1,6 +1,7 @@
 import { db, getSetting, cacheRead, cacheWrite } from './db.js';
 import { watchedIndex, isWatched, normTitle } from './letterboxd.js';
 import { needsLatin, readableTitle } from './titles.js';
+import { cachePrefix } from './cache-versions.js';
 
 const DAY = 24 * 3600 * 1000;
 
@@ -40,15 +41,36 @@ const tmdbLimit = createLimiter(Number(process.env.TMDB_CONCURRENCY) || 10);
 
 // Shared progress for long TMDB-building pages (calendar, descubrir), polled by
 // the frontend to show a real progress bar instead of a mute spinner (#5).
-export const buildProgress = { active: false, job: '', label: '', done: 0, total: 0 };
+export const buildProgress = { active: false, job: '', label: '', done: 0, total: 0, at: 0 };
 export function setBuildProgress(job, label, done, total) {
-  Object.assign(buildProgress, { active: true, job, label, done, total });
+  Object.assign(buildProgress, { active: true, job, label, done, total, at: Date.now() });
 }
 export function clearBuildProgress(job) {
   if (buildProgress.job === job) buildProgress.active = false;
 }
+// Caduca sola. Ninguno de los constructores protege su clearBuildProgress con un
+// finally, así que cualquier excepción que se escape dejaba la barra de progreso
+// girando para siempre. Si nadie la toca en un minuto, es que ya no hay nadie.
+const PROGRESS_TTL = 60 * 1000;
+export function currentProgress() {
+  if (buildProgress.active && Date.now() - buildProgress.at > PROGRESS_TTL) {
+    return { ...buildProgress, active: false, stale: true };
+  }
+  return buildProgress;
+}
 
-export async function tmdbGet(path, params = {}, { cacheKey = null, cacheMs = DAY } = {}) {
+// Cuántas veces se reintenta un 429 antes de rendirse. Sin tope, un TMDB que
+// corta el grifo dejaba la promesa sin resolver NUNCA: el refresco se quedaba
+// con la marca de «en marcha» puesta y el cron nocturno no volvía a arrancar.
+const MAX_429_RETRIES = 3;
+
+// Un resultado construido con fallos se sirve, pero solo un rato: pasado esto se
+// reconstruye aunque su caché siga «fresca».
+const PARCIAL_MS = 20 * 60 * 1000;
+export const esParcialCaducado = (hit) =>
+  !!(hit?.partial && hit.generatedAt && Date.now() - hit.generatedAt > PARCIAL_MS);
+
+export async function tmdbGet(path, params = {}, { cacheKey = null, cacheMs = DAY, attempt = 0 } = {}) {
   if (cacheKey) {
     const hit = cacheRead(cacheKey, cacheMs);
     if (hit) return hit;
@@ -65,9 +87,12 @@ export async function tmdbGet(path, params = {}, { cacheKey = null, cacheMs = DA
     })
   );
   if (res.status === 429) {
+    if (attempt >= MAX_429_RETRIES) throw new Error(`TMDB 429 en ${path} (reintentos agotados)`);
+    // espera creciente: si los cinco trabajadores reintentan a la vez y a la
+    // misma hora, el siguiente 429 está garantizado
     const retryAfter = Number(res.headers.get('retry-after')) || 2;
-    await new Promise((r) => setTimeout(r, retryAfter * 1000));
-    return tmdbGet(path, params, { cacheKey, cacheMs });
+    await new Promise((r) => setTimeout(r, retryAfter * 1000 * (attempt + 1)));
+    return tmdbGet(path, params, { cacheKey, cacheMs, attempt: attempt + 1 });
   }
   if (!res.ok) throw new Error(`TMDB ${res.status} en ${path}`);
   const data = await res.json();
@@ -83,7 +108,9 @@ export async function tmdbTest() {
 // --- person matching --------------------------------------------------------
 
 export async function findPersonInfo(name, knownForHint = null) {
-  const cacheKey = `person_search:${name.toLowerCase()}`;
+  // La faceta ENTRA en la clave: sin ella, buscar «Richard Brooks» como actor
+  // dejaba cacheado al actor treinta días, y el canon de directores se lo creía.
+  const cacheKey = `person_search:${name.toLowerCase()}:${knownForHint || ''}`;
   const cached = cacheRead(cacheKey, 30 * DAY);
   if (cached) return cached;
 
@@ -192,19 +219,90 @@ export async function enrichPeopleLife(personIds, { concurrency = 5 } = {}) {
 /**
  * Resolve the TMDB person id for a library person (by DB id), persisting it.
  */
+// Las películas suyas que YA tienes, por id de TMDB: son la prueba de que un
+// candidato de TMDB es la persona correcta y no un homónimo.
+const libraryFilmsOf = (personId) =>
+  db
+    .prepare(
+      `SELECT DISTINCT m.tmdb_id FROM movie_people mp
+       JOIN movies m ON m.rating_key = mp.movie_id
+       WHERE mp.person_id = ? AND m.tmdb_id IS NOT NULL`
+    )
+    .all(personId)
+    .map((r) => r.tmdb_id);
+
+/**
+ * Empareja a alguien de tu biblioteca con su ficha de TMDB.
+ *
+ * Buscar por nombre y quedarse con el primer resultado es lo que hacía que
+ * Alberto Rodríguez saliera con «Ozzy» o Richard Brooks con «Johnny B Good»:
+ * hay varias personas con el mismo nombre y ganaba la más popular. Ahora el
+ * candidato tiene que DEMOSTRARLO — al menos una de las películas suyas que
+ * tienes en Plex debe aparecer en su filmografía—, y solo entonces se da por
+ * bueno (`tmdb_verified`). Si ninguno lo demuestra se guarda el mejor intento
+ * sin marcarlo, para volver a probar más adelante.
+ */
 export async function resolvePerson(personId) {
   const person = db.prepare('SELECT * FROM people WHERE id = ?').get(personId);
   if (!person) return null;
-  if (person.tmdb_id) return person;
+  if (person.tmdb_id && person.tmdb_verified) return person;
+  // se reintenta, pero no todos los días: una semana entre intentos
+  if (person.tmdb_id && person.tmdb_checked_at && Date.now() - person.tmdb_checked_at < 7 * DAY) return person;
+
   const roles = db
     .prepare('SELECT DISTINCT role FROM movie_people WHERE person_id = ?')
     .all(personId)
     .map((r) => r.role);
   const hint = roles.includes('director') ? 'Directing' : roles.includes('actor') ? 'Acting' : null;
-  const tmdbId = await findPersonId(person.name, hint);
-  if (tmdbId) {
-    db.prepare('UPDATE people SET tmdb_id = ? WHERE id = ?').run(tmdbId, personId);
-    person.tmdb_id = tmdbId;
+  const mine = new Set(libraryFilmsOf(personId));
+
+  const save = (tmdbId, verified) => {
+    db.prepare('UPDATE people SET tmdb_id = ?, tmdb_verified = ? WHERE id = ?').run(tmdbId ?? null, verified, personId);
+    person.tmdb_id = tmdbId ?? null;
+    person.tmdb_verified = verified;
+  };
+
+  // Un favorito añadido a mano desde TMDB (o alguien de quien no tienes nada)
+  // no tiene con qué contrastarse: se deja como está.
+  if (!mine.size) {
+    if (!person.tmdb_id) {
+      const tmdbId = await findPersonId(person.name, hint);
+      if (tmdbId) save(tmdbId, 0);
+    }
+    return person;
+  }
+
+  const candidates = [];
+  if (person.tmdb_id) candidates.push(person.tmdb_id);
+  try {
+    const data = await tmdbGet(
+      '/search/person',
+      { query: person.name },
+      { cacheKey: `person_search_all:${person.name.toLowerCase()}`, cacheMs: 30 * DAY }
+    );
+    for (const r of (data.results || []).slice(0, 5)) if (!candidates.includes(r.id)) candidates.push(r.id);
+  } catch {}
+
+  let best = null;
+  for (const id of candidates) {
+    try {
+      const credits = await personCredits(id);
+      const theirs = new Set([...(credits.crew || []), ...(credits.cast || [])].map((c) => c.id));
+      let hits = 0;
+      for (const t of mine) if (theirs.has(t)) hits++;
+      if (!best || hits > best.hits) best = { id, hits };
+      if (hits >= 3) break; // tres coincidencias no son casualidad
+    } catch {}
+  }
+
+  if (best?.hits > 0) {
+    save(best.id, 1);
+  } else {
+    // Nadie lo demostró. Se anota el intento fallido con su fecha para no
+    // repetir la búsqueda entera (una consulta + hasta cinco filmografías) en
+    // CADA construcción de calendario y de huecos, todos los días.
+    save(person.tmdb_id ?? candidates[0] ?? null, 0);
+    db.prepare('UPDATE people SET tmdb_checked_at = ? WHERE id = ?').run(Date.now(), personId);
   }
   return person;
 }
@@ -215,7 +313,7 @@ const libraryTmdbIds = () =>
   new Set(db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((r) => r.tmdb_id));
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toLocaleDateString('en-CA');
 }
 
 /**
@@ -414,11 +512,11 @@ export async function normalizeLibraryTitles({ concurrency = 6 } = {}) {
       if (!en || needsLatin(en)) continue;
       upd.run(en, en, row.rating_key);
       renamed++;
-      setBuildProgress('titles', 'Normalizando títulos…', renamed, pending.length);
+      setBuildProgress('titles:movies', 'Normalizando títulos…', renamed, pending.length);
     }
   }
   await Promise.all(Array.from({ length: concurrency }, worker));
-  clearBuildProgress('titles');
+  clearBuildProgress('titles:movies');
   return { checked: pending.length, renamed };
 }
 
@@ -462,6 +560,74 @@ export async function latinizeTitles(items, { concurrency = 6 } = {}) {
   return items;
 }
 
+/**
+ * Lo mismo que con los títulos, pero con la gente: en el calendario salía
+ * «Dirige 深田晃司» en vez de «Kôji Fukada». TMDB no traduce el nombre —es un
+ * solo campo—, pero guarda las transcripciones en `also_known_as`, así que de
+ * ahí se saca la primera que esté en alfabeto latino.
+ */
+export async function latinPersonName(tmdbId, name) {
+  if (!tmdbId || !needsLatin(name)) return name;
+  try {
+    const det = await personDetails(tmdbId);
+    return (det?.also_known_as || []).find((n) => n && !needsLatin(n)) || name;
+  } catch {
+    return name;
+  }
+}
+
+/**
+ * Arregla en el sitio los nombres de una tanda de personas. Cada una tiene que
+ * traer su id de TMDB, con la clave que sea (`tmdb_id` o `tmdbId`).
+ */
+export async function latinizeNames(entries, { concurrency = 6 } = {}) {
+  const pending = entries.filter((e) => e && needsLatin(e.name) && (e.tmdb_id || e.tmdbId));
+  if (!pending.length) return entries;
+  let i = 0;
+  async function worker() {
+    for (;;) {
+      const idx = i++;
+      if (idx >= pending.length) return;
+      const e = pending[idx];
+      e.name = await latinPersonName(e.tmdb_id || e.tmdbId, e.name);
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  return entries;
+}
+
+/**
+ * Los nombres de la gente de tu biblioteca, en alfabeto latino. Mismo trato que
+ * `normalizeLibraryTitles`: Plex guarda lo que le da su agente, el nombre
+ * original queda en `plex_name` y el emparejado sigue yendo por id.
+ */
+export async function normalizePeopleNames({ concurrency = 6 } = {}) {
+  const pending = db
+    .prepare('SELECT id, tmdb_id, name FROM people WHERE name IS NOT NULL AND tmdb_id IS NOT NULL')
+    .all()
+    .filter((r) => needsLatin(r.name));
+  if (!pending.length) return { checked: 0, renamed: 0 };
+
+  const upd = db.prepare('UPDATE people SET name = ? WHERE id = ?');
+  let renamed = 0;
+  let i = 0;
+  async function worker() {
+    for (;;) {
+      const idx = i++;
+      if (idx >= pending.length) return;
+      const row = pending[idx];
+      const latin = await latinPersonName(row.tmdb_id, row.name);
+      if (latin === row.name) continue;
+      upd.run(latin, row.id);
+      renamed++;
+      setBuildProgress('titles:people', 'Normalizando nombres…', renamed, pending.length);
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  clearBuildProgress('titles:people');
+  return { checked: pending.length, renamed };
+}
+
 /** Full TMDB movie detail with credits (cached). */
 export async function tmdbMovieDetail(tmdbId) {
   const det = await tmdbGet(
@@ -503,6 +669,12 @@ export function classifyGenres(item, ids = []) {
   return item;
 }
 
+// Un puesto muy abajo en el reparto o un personaje tipo «Self» es un cameo, no
+// un papel que un completista tenga que rellenar. Vive aquí, y no en discover.js,
+// porque buildRoleItems lo necesita y discover.js ya importa de este módulo.
+const CAMEO_RE = /^(self|himself|herself|uncredited|cameo|archive)/i;
+export const isCameoCredit = (c) => (c.order ?? 99) >= 15 || CAMEO_RE.test(c.character || '');
+
 const roleRaw = (credits, role) => {
   if (role === 'director') return (credits.crew || []).filter((c) => c.job === 'Director');
   if (role === 'writer') return (credits.crew || []).filter((c) => c.department === 'Writing');
@@ -532,6 +704,7 @@ export function buildRoleItems(credits, role, inLib, widx) {
       popularity: c.popularity,
       character: c.character || null,
       job: c.job || null,
+      isCameo: role === 'actor' ? isCameoCredit(c) : false,
       isShort: false, // set after runtime enrichment
       isCoral: false, // set for directors after credits enrichment
     }, c.genre_ids || []));
@@ -544,6 +717,26 @@ export function buildRoleItems(credits, role, inLib, widx) {
 // kind: below it they are side projects, above it they ARE the filmography.
 const SPECIALITY_MIN = 4;
 
+/**
+ * Qué cuenta como largometraje de alguien. Una sola respuesta para la barra de
+ * completismo y para las películas insignia, que si no acabarían discrepando:
+ * fuera cortos, telefilmes, dirección coral y cameos, y fuera documentales y
+ * conciertos salvo que sean la especialidad de esa persona.
+ *
+ * Recibe TODA su obra estrenada, porque «es documentalista» solo se puede
+ * decidir mirando la filmografía entera, no un puñado de títulos.
+ */
+export function featureRule(released) {
+  const documentarian = released.filter((i) => i.isDocumentary).length >= SPECIALITY_MIN;
+  // quien filma el concierto suelto no se juzga por él; quien vive de ellos, sí
+  const concertFilmmaker = released.filter((i) => i.isMusic).length >= SPECIALITY_MIN;
+  const isFeature = (i) =>
+    !i.isShort && !i.isTvMovie && !i.isCoral && !i.isCameo &&
+    (!i.isDocumentary || documentarian) &&
+    (!i.isMusic || concertFilmmaker);
+  return { isFeature, documentarian, concertFilmmaker };
+}
+
 // Completeness bar. For directors it counts features only (#6): no shorts, no
 // TV movies, no "coral" 3+ director films (#7), and no documentaries or concert
 // films unless that is the person's speciality. Other roles count every release.
@@ -555,14 +748,7 @@ export function roleStats(items, role) {
     return { ...base, released: released.length, owned: owned.length,
       pct: released.length ? Math.round((owned.length / released.length) * 100) : 0 };
   }
-  const documentarian = released.filter((i) => i.isDocumentary).length >= SPECIALITY_MIN;
-  // a director who films the odd concert isn't judged on those; one who lives
-  // off them (a Jonathan Demme of the genre) is
-  const concertFilmmaker = released.filter((i) => i.isMusic).length >= SPECIALITY_MIN;
-  const isFeature = (i) =>
-    !i.isShort && !i.isTvMovie && !i.isCoral &&
-    (!i.isDocumentary || documentarian) &&
-    (!i.isMusic || concertFilmmaker);
+  const { isFeature, documentarian, concertFilmmaker } = featureRule(released);
   const feats = released.filter(isFeature);
   const owned = feats.filter((i) => i.owned);
   return { ...base, released: feats.length, owned: owned.length,
@@ -713,7 +899,7 @@ export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays 
             if (!ev.followedDirectors.some((x) => x.id === p.id))
               ev.followedDirectors.push({ id: p.id, name: p.name, tmdb_id: resolved.tmdb_id });
           } else if (!ev.followedActors.some((x) => x.id === p.id)) {
-            ev.followedActors.push({ id: p.id, name: p.name, order: c.order ?? 999 });
+            ev.followedActors.push({ id: p.id, name: p.name, tmdb_id: resolved.tmdb_id, order: c.order ?? 999 });
           }
           events.set(c.id, ev);
         }
@@ -762,20 +948,22 @@ export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays 
       for (const d of dirSource) {
         if (seenDir.has(d.name)) continue;
         seenDir.add(d.name);
-        dirEntries.push({ id: peopleByTmdb.get(d.tmdbId) ?? null, name: d.name, credit: 'Dirige' });
+        dirEntries.push({ id: peopleByTmdb.get(d.tmdbId) ?? null, tmdb_id: d.tmdbId, name: d.name, credit: 'Dirige' });
       }
       const topActor = ev.followedActors
         .filter((a) => !seenDir.has(a.name))
         .sort((a, b) => a.order - b.order)[0];
 
       ev.people = dirEntries;
-      if (topActor) ev.people.push({ id: topActor.id, name: topActor.name, credit: 'Actúa' });
+      if (topActor) ev.people.push({ id: topActor.id, tmdb_id: topActor.tmdb_id, name: topActor.name, credit: 'Actúa' });
       delete ev.followedDirectors;
       delete ev.followedActors;
     }
   }
   await Promise.all(Array.from({ length: 5 }, enrichWorker));
   await latinizeTitles(out);
+  // «Dirige 深田晃司» → «Dirige Kôji Fukada»
+  await latinizeNames(out.flatMap((e) => e.people || []));
   clearBuildProgress('calendar');
 
   out.sort((a, b) => (a.date || '9999-99-99').localeCompare(b.date || '9999-99-99'));
@@ -789,17 +977,23 @@ export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays 
 }
 
 export async function getCalendarCached({ refresh = false } = {}) {
-  // v4: favorites-only by default and one role per person, so any calendar
-  // built under the old rules is discarded instead of showing ghost people
-  const key = 'calendar:v5';
-  if (!refresh) {
-    const hit = cacheRead(key, 12 * 3600 * 1000);
-    if (hit) return hit;
-  }
   const topDirectors = Number(getSetting('cal_top_directors') || 0);
   const topActors = Number(getSetting('cal_top_actors') || 0);
+  // el tamaño del radar entra en la clave: cambiarlo tenía que notarse ya, no
+  // doce horas después
+  const key = `${cachePrefix('calendar')}:${topDirectors}:${topActors}`;
+  if (!refresh) {
+    const hit = cacheRead(key, 12 * 3600 * 1000);
+    // el «hoy» se recalcula al servir: uno construido a las 23:00 repartía mal
+    // «estrena hoy» a la mañana siguiente
+    if (hit && !esParcialCaducado(hit)) return { ...hit, today: today() };
+  }
   const cal = await buildCalendar({ topDirectors, topActors });
-  if (cal.events.length || !cal.errors.length) cacheWrite(key, cal);
+  // Si TODO fue bien se guarda con su vida normal; si algo falló se guarda
+  // igualmente marcado como parcial y con vida corta (20 min). No guardar nada
+  // era peor: una sola persona que falle obligaba a reconstruir la página
+  // entera en cada visita, con más peticiones y más probabilidad de fallar.
+  if (cal.events.length || !cal.errors.length) cacheWrite(key, { ...cal, partial: cal.errors.length > 0 });
   return cal;
 }
 
@@ -899,6 +1093,9 @@ export async function suggestedPeople() {
     description: 'Los más populares ahora mismo según el ranking de TMDB/IMDb.', people: trending,
   });
 
+  // el nombre principal de TMDB puede venir en su alfabeto original
+  await latinizeNames(packs.flatMap((pk) => pk.people));
+
   // keep `spanish`/`popular` keys for backward compatibility with older clients
   return { packs, spanish: packs.find((p) => p.key === 'spanish')?.people || [], popular: trending };
 }
@@ -910,14 +1107,14 @@ export async function searchPeople(query) {
     db.prepare(`SELECT p.tmdb_id FROM tracked_people t JOIN people p ON p.id = t.person_id WHERE p.tmdb_id IS NOT NULL`)
       .all().map((r) => r.tmdb_id)
   );
-  return (data.results || []).slice(0, 12).map((p) => ({
+  return latinizeNames((data.results || []).slice(0, 12).map((p) => ({
     tmdb_id: p.id,
     name: p.name,
     profile_path: p.profile_path || null,
     dept: p.known_for_department || null,
     knownFor: (p.known_for || []).map((k) => k.title || k.name).filter(Boolean).slice(0, 2),
     tracked: trackedTmdb.has(p.id),
-  }));
+  })));
 }
 
 /** Add someone to favorites by TMDB person id, creating a people row if needed. */
@@ -943,14 +1140,6 @@ export function trackByTmdb({ tmdbId, name, profilePath = null, role = 'director
 
 // --- collections ------------------------------------------------------------
 
-export async function searchCollection(name) {
-  const data = await tmdbGet(
-    '/search/collection',
-    { query: name },
-    { cacheKey: `coll_search:${name.toLowerCase()}:${lang()}`, cacheMs: 30 * DAY }
-  );
-  return data.results?.[0] || null;
-}
 
 export async function collectionDetails(id) {
   return tmdbGet(`/collection/${id}`, {}, { cacheKey: `coll:${id}:${lang()}`, cacheMs: 7 * DAY });

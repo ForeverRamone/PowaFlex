@@ -1,7 +1,7 @@
 import { db, getSetting, setSetting } from './db.js';
 import { runSync, syncStatus } from './plex.js';
 import { rematchLetterboxd, resolveUnmatchedLb, importLetterboxdRss } from './letterboxd.js';
-import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles } from './tmdb.js';
+import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames } from './tmdb.js';
 import { syncRatings } from './mdblist.js';
 import { radarrSyncMovies } from './radarr.js';
 import { runAutoRadarr } from './automation.js';
@@ -49,11 +49,15 @@ function buildSteps({ includeAutoRadarr }) {
       // justo después de Plex: la sincronización reescribe `title` con lo que
       // diga su agente, así que hay que volver a normalizar cada vez
       key: 'titles',
-      label: 'Normalizar títulos al alfabeto latino',
+      label: 'Normalizar títulos y nombres al alfabeto latino',
       enabled: () => has('tmdb_key'),
       run: async () => {
-        const r = await normalizeLibraryTitles();
-        return r.renamed ? `${r.renamed} de ${r.checked} títulos traducidos` : 'nada que traducir';
+        const t = await normalizeLibraryTitles();
+        const n = await normalizePeopleNames();
+        const bits = [];
+        if (t.renamed) bits.push(`${t.renamed} de ${t.checked} títulos`);
+        if (n.renamed) bits.push(`${n.renamed} de ${n.checked} nombres`);
+        return bits.length ? `${bits.join(' · ')} traducidos` : 'nada que traducir';
       },
     },
     {

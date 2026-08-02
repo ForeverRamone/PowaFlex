@@ -1,5 +1,94 @@
 # Changelog
 
+## Alpha 0.9.3 (0.9.3-alpha) — 2026-08-02
+
+Versión de repaso a fondo: cuatro revisiones del código encontraron una lista larga de cosas
+que fallaban en silencio, y esto las arregla. Lo que más se nota:
+
+### Lo que se ve
+
+- **Media hoja de estilos no se estaba aplicando.** Cualquier color puesto sobre una tarjeta o un
+  botón se descartaba sin más, así que: la caja de avisos —justo la que dice «falta la API key de
+  TMDB»— era casi invisible, los seis chips de notas de la ficha salían todos del mismo color, las
+  etiquetas del calendario también, lo seleccionado apenas se distinguía de lo no seleccionado, el
+  botón «Vaciar» no se veía rojo y los paquetes de directores habían perdido su franja de color.
+- **Todas las barras de progreso se leían al revés**: la parte vacía era negra y la llena roja, así
+  que un 12 % de completismo parecía una barra casi llena.
+- «Calidad y disco» **ya no se descuadra al girar el móvil**.
+- Los avisos de error se leen en los tres aspectos, no solo sobre papel.
+- Las cápsulas sobre las carátulas (**4K, HDR, ★**) se veían como manchas grises: iban con tinta
+  oscura sobre un velo negro. Ahora son blancas, como debían.
+- Las leyendas de las gráficas tomaban el color de su propia barra y desaparecían sobre el papel.
+- Si actualizas el contenedor con una pestaña abierta, PowaFlex lo detecta y te dice que recargues,
+  en vez de soltarte un error incomprensible.
+
+### Lo que contaba mal
+
+- **«Próximos estrenos» de cada favorito decía siempre 0**, con toda la seguridad, aunque tuvieras
+  estrenos en el calendario.
+- **Un actor con muchos cameos ya no los cuenta como huecos** en su ficha ni en Favoritos. Antes
+  Descubrir los descartaba y las otras dos pantallas no: tres sitios, dos respuestas.
+- **Una lista de actores pegada podía envenenar el canon de directores** durante un mes: la búsqueda
+  de personas se guardaba sin distinguir si buscabas a alguien como director o como actor.
+- El recuento de «ocultas por tus filtros» se calculaba antes de saber cuáles eran cortos, así que
+  decía tres y aparecían ocho.
+- Las sagas contaban archivos en vez de películas: con dos ediciones de la misma salía «4 de 3».
+- **«Directores/as que más has visto»**, una sección nueva en Visionado con quién te has visto más,
+  contando Plex y Letterboxd.
+- En **«Grandes ausentes»**, el nombre de cada director/a abre su ficha y hay un botón para
+  **añadirlo a favoritos** sin salir de la página.
+- Y en **Favoritos → Añadir**, un bloque nuevo de **«Listas y cánones»**: vuelca de golpe los 250 de
+  They Shoot Pictures, los 501 del libro, los que están en boga o cualquier lista tuya. A quien
+  hayas quitado con la ✕ no vuelve a entrar.
+
+### Lo que se rompía sin avisar
+
+- **Añadir listas de Letterboxd por dirección volvía a funcionar.** Letterboxd renombró las
+  etiquetas de su página y PowaFlex dejó de reconocer las películas: cualquier lista daba «no se
+  pudieron leer películas». Ahora entiende el formato nuevo y el viejo, coge el nombre real de la
+  lista y explica qué mirar cuando de verdad falla.
+- **Si TMDB corta el grifo, la aplicación ya no se queda colgada.** Reintentaba sin fin: el refresco
+  se quedaba a medias «en marcha» y el trabajo nocturno no volvía a arrancar hasta reiniciar.
+- **Una biblioteca de Plex que responde vacía ya no borra tu colección.** Pasa mientras Plex
+  reescanea o si se le cae el disco; ahora se omite la limpieza y se avisa. Para vaciarla de verdad,
+  «Sincronización completa».
+- Un corte de MDBList ya no tira las notas que ya se habían descargado y pagado del cupo del día.
+- Si algo falla a mitad de construir una página, ya no se guarda como si estuviera completa durante
+  doce horas: se guarda marcada y se rehace a los veinte minutos.
+- Cambiar los umbrales de Descubrir o el tamaño del calendario **se nota al momento**, no al cabo de
+  medio día.
+
+### Cuando algo va mal, se nota
+
+- Un error del servidor ya no se disfraza de «aún no hay películas sincronizadas» ni de «¡lista
+  completa!». Y si algo se rompe de verdad, sale un aviso con botón de reintentar en vez de una
+  página en blanco.
+- Descartar una película de Descubrir **se puede deshacer** desde el propio aviso.
+- Guardar ajustes, seguir a alguien o descartar una película solo se dan por hechos si el servidor
+  lo confirma.
+- Si el servidor no responde, se dice; antes el spinner giraba para siempre.
+
+### Seguridad
+
+- **Los ajustes solo aceptan las claves que existen.** Antes se podía cambiar la dirección de Plex
+  por otra cualquiera y pedirle a la app que «probara la conexión», con lo que mandaba tu token a
+  esa dirección.
+- **Un zip preparado ya no puede tumbar el contenedor**: se rechaza antes de descomprimirlo, no
+  después.
+- La contraseña de `POWAFLEX_AUTH` ya no revela su longitud y aguanta la fuerza bruta, sin dejar
+  fuera a quien sí la sabe.
+- Sin contraseña puesta, el registro lo dice claramente al arrancar.
+- Las claves y tokens se escriben en campos ocultos.
+
+### Por dentro
+
+- **Pruebas de extremo a extremo**: arrancan el servidor de verdad y comprueban que las páginas
+  responden, que la interfaz se sirve, que la autenticación protege y que no falta ninguna ruta que
+  la aplicación llame. Con eso se cazaron dos fallos de esta misma versión.
+- Los nombres de personas en otros alfabetos se normalizan también en las fichas y buscadores.
+- El menú móvil cerrado ya no atrapa el tabulador; la zona para soltar el zip de Letterboxd se puede
+  usar con teclado; las fichas y el buscador se comportan como diálogos de verdad.
+
 ## Alpha 0.9.2 (0.9.2-alpha) — 2026-08-02
 
 - **Las dos películas más conocidas de cada director/a aparecen también en Favoritos**, no solo en

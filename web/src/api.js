@@ -1,9 +1,21 @@
+/**
+ * Llama a la API y SIEMPRE resuelve. Si el servidor no responde —contenedor
+ * parado, wifi caída— antes se rechazaba la promesa: ningún `.then` llegaba a
+ * ejecutarse y la pantalla se quedaba con el spinner girando para siempre, sin
+ * un mensaje. Ahora eso también es un `{ error }`, que es lo que las pantallas
+ * saben pintar.
+ */
 export async function api(path, opts = {}) {
-  const res = await fetch(`/api${path}`, {
-    headers: opts.body ? { 'Content-Type': 'application/json' } : {},
-    ...opts,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(`/api${path}`, {
+      headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+      ...opts,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+  } catch {
+    return { error: 'No hay respuesta del servidor de PowaFlex. ¿Está encendido?', offline: true };
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok && !data.error) data.error = `HTTP ${res.status}`;
   return data;

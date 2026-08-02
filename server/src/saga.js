@@ -3,7 +3,7 @@ import { tmdbGet, collectionDetails, latinizeTitles } from './tmdb.js';
 
 const DAY = 24 * 3600 * 1000;
 const lang = () => getSetting('language') || 'es-ES';
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => new Date().toLocaleDateString('en-CA');
 
 export const sagaScanStatus = {
   running: false,
@@ -87,7 +87,7 @@ export function sagaScanState() {
 export function sagaList() {
   return db
     .prepare(
-      `SELECT s.collection_id, s.collection_name, COUNT(*) owned,
+      `SELECT s.collection_id, s.collection_name, COUNT(DISTINCT s.tmdb_id) owned,
               st.released, st.missing, st.upcoming, st.missing_titles
        FROM movie_saga s JOIN movies m ON m.rating_key = s.movie_id
        LEFT JOIN saga_stats st ON st.collection_id = s.collection_id

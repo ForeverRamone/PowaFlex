@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid, StatusLegend, PageHeader } from '../components.jsx';
+import { toast } from '../toast.js';
+import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid, PageHeader, ErrorBox } from '../components.jsx';
 
 const SORT_OPTIONS = [
   ['added', 'Añadida (reciente)'],
@@ -78,13 +79,26 @@ export default function Library() {
     setParams(next, { replace: true });
   };
 
+  // el guardia evita que un doble clic pida dos veces el mismo tramo y añada las
+  // mismas 60 películas repetidas (con claves duplicadas incluidas)
+  const [loadingMore, setLoadingMore] = useState(false);
   const loadMore = async () => {
-    const offset = movies.length;
-    const qs = new URLSearchParams({ limit: '60', ...q, offset: String(offset) });
-    const d = await api(`/movies?${qs}`);
-    setMovies((prev) => [...prev, ...(d.movies || [])]);
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const qs = new URLSearchParams({ limit: '60', ...q, offset: String(movies.length) });
+      const d = await api(`/movies?${qs}`);
+      if (d.error) return toast(`⚠️ ${d.error}`, 'error');
+      setMovies((prev) => {
+        const vistas = new Set(prev.map((m) => m.rating_key));
+        return [...prev, ...(d.movies || []).filter((m) => !vistas.has(m.rating_key))];
+      });
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
+  if (filters?.error || data?.error) return <ErrorBox error={filters?.error || data?.error} />;
   if (!filters) return <Spinner />;
 
   // active filters (everything but the free-text search and the sort/paging)
@@ -112,7 +126,8 @@ export default function Library() {
         )}
         {data && <span className="text-sm text-zinc-400 ml-auto">{data.total.toLocaleString('es-ES')} películas</span>}
       </div>
-      <StatusLegend className="mb-3" />
+      {/* aquí todo está en tu Plex: la única marca que aplica es la estrella */}
+      <p className="text-[11px] text-zinc-500 mb-3"><span className="text-gold-400">★</span> vista (en Plex o en Letterboxd)</p>
 
       {(activeKeys.length > 0 || q.search) && (
         <div className="flex flex-wrap gap-1.5 mb-3">
@@ -169,8 +184,10 @@ export default function Library() {
           </div>
           {data && movies.length < data.total && (
             <div className="text-center mt-6">
-              <button className="btn-ghost" onClick={loadMore}>
-                Cargar más ({movies.length} / {data.total.toLocaleString('es-ES')})
+              <button className="btn-ghost" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore
+                  ? 'Cargando…'
+                  : `Cargar más (${movies.length} / ${(data?.total ?? 0).toLocaleString('es-ES')})`}
               </button>
             </div>
           )}

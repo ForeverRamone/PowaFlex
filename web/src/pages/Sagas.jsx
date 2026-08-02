@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, fmtDate } from '../api.js';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, useRadarrIds, PageHeader } from '../components.jsx';
@@ -66,13 +66,20 @@ export default function Sagas() {
   }, []);
 
   // compute "what you're missing" counts per franchise from TMDB (#H)
+  // el temporizador vive en un ref y se limpia al desmontar: si te ibas de la
+  // página mientras calculaba, seguía preguntando cada segundo y medio el resto
+  // de la sesión
+  const pollRef = useRef(null);
+  useEffect(() => () => clearInterval(pollRef.current), []);
   const computeStats = async () => {
     setStatsBusy(true);
-    await api('/sagas/stats', { method: 'POST' });
-    const t = setInterval(async () => {
+    const r = await api('/sagas/stats', { method: 'POST' });
+    if (r?.error) { setStatsBusy(false); return; }
+    clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
       const st = await api('/sagas/status');
-      if (!st.statsStatus?.running) {
-        clearInterval(t);
+      if (st?.error || !st.statsStatus?.running) {
+        clearInterval(pollRef.current);
         setStatsBusy(false);
         load();
       }
@@ -98,6 +105,7 @@ export default function Sagas() {
     setScan({ ...st, running: true });
   };
 
+  if (data?.error) return <ErrorBox error={data.error} />;
   if (!data) return <Spinner />;
 
   const { state, sagas } = data;

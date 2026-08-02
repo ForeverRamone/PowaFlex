@@ -101,8 +101,8 @@ export default function About() {
             <div className="text-zinc-200 font-medium mb-1">Conocer tu colección</div>
             <ul className="list-disc pl-5 space-y-1">
               <li>Ver totales: cuántas películas, horas de cine, disco ocupado y % visto.</li>
-              <li>Explorar gráficas por década, género, país y resolución.</li>
-              <li>Filtrar la biblioteca al estilo Letterboxd (género, país, década, metraje, HDR, notas de IMDb/RT/Letterboxd…) con código de color 🟢 en Plex · ★ vista, y ordenarla por cualquiera de esas notas.</li>
+              <li>Explorar gráficas por década y género, el ritmo al que crece la colección y, en «Calidad y disco», el reparto de resoluciones.</li>
+              <li>Filtrar la biblioteca al estilo Letterboxd (género, país, década, metraje, HDR, notas de IMDb/RT/Letterboxd…) y ordenarla por cualquiera de esas notas. La estrella dorada marca lo que ya has visto.</li>
               <li>Abrir la ficha de cualquier película con reparto, notas de varias webs y datos técnicos, y elegir qué nota sale en cada póster.</li>
               <li>Ver rankings de directores/as, actores/actrices y guionistas por presencia, y filtrarlos por género, país, continente o si están vivos.</li>
             </ul>
@@ -165,13 +165,13 @@ export default function About() {
         <Block icon="📊" title="Dashboard" to="/">
           <p>
             La foto general: cuántas películas tienes, cuántas horas de cine suman, cuánto disco ocupan, y
-            gráficas por década, género, país y resolución, además del ritmo al que crece la biblioteca y los
+            gráficas por década y por género, además del ritmo al que crece la biblioteca y los
             directores/as y actores/actrices con más presencia.
           </p>
         </Block>
         <Block icon="🎞️" title="Biblioteca" to="/biblioteca">
           <p>
-            Toda tu colección en una parrilla de pósters (con código de color 🟢 en Plex · ★ vista) y filtros al
+            Toda tu colección en una parrilla de pósters (con ★ dorada en las vistas) y filtros al
             estilo Letterboxd: género, país, década, visto/sin ver, largometraje o corto (menos de 40 minutos),
             resolución, HDR/Dolby Vision, notas mínimas de IMDb/RT/Letterboxd… y ordenación por fecha añadida,
             estreno, esas notas, duración, tamaño o aleatorio. La nota que sale en cada póster la eliges tú.
@@ -182,7 +182,7 @@ export default function About() {
             Ranking de directores/as, actores/actrices y guionistas por presencia en tu biblioteca. La ficha de
             cada persona cruza su filmografía completa de TMDB con lo que tienes: porcentaje de completismo (solo
             largometrajes, con filtros para cortos, documentales, TV y dirección coral), lo que te falta (con
-            botón directo a Radarr) y sus proyectos anunciados. Quien dirige y actúa tiene dos barras. Con
+            botón directo a Radarr) y sus proyectos anunciados. Quien dirige y actúa tiene una pestaña por faceta. Con
             «☆ Seguir» la fijas en el calendario.
           </p>
         </Block>
@@ -245,7 +245,7 @@ export default function About() {
         </Block>
         <Block icon="⚙️" title="Ajustes" to="/ajustes">
           <p>
-            Las tres conexiones (Plex, TMDB, Radarr) con guías paso a paso para conseguir cada credencial, el
+            Las conexiones (Plex, TMDB, Radarr y MDBList) con guías paso a paso para conseguir cada credencial, el aspecto de la app, qué notas quieres ver, el
             perfil de calidad y carpeta que usará Radarr, el tamaño del radar del calendario y el control de
             sincronización manual.
           </p>

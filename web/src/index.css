@@ -82,6 +82,17 @@
 
 /* «Cinemateca»: carbón neutro, titulares en Bodoni y oro reservado. */
 :root[data-ui='cinemateca'] {
+  /* Los tonos de estado del bloque @theme están calculados para el papel de
+     «Cartelera» (tintas oscuras). Sobre carbón hacen falta los claros, o el
+     aviso de error queda ladrillo sobre negro. */
+  --color-emerald-400: #4ade80;
+  --color-emerald-500: #34d399;
+  --color-orange-300: #fdba74;
+  --color-orange-400: #fb923c;
+  --color-sky-300: #7dd3fc;
+  --color-red-400: #f87171;
+  --color-yellow-500: #facc15;
+
   --color-ink-950: #0c0c0e;
   --color-ink-900: #141416;
   --color-ink-800: #1c1c1f;
@@ -125,6 +136,17 @@
 /* «Clásico»: la paleta y la tipografía de PowaFlex antes del rediseño —
    carbón azulado, texto slate y la pila de fuentes del sistema. */
 :root[data-ui='clasico'] {
+  /* Los tonos de estado del bloque @theme están calculados para el papel de
+     «Cartelera» (tintas oscuras). Sobre carbón hacen falta los claros, o el
+     aviso de error queda ladrillo sobre negro. */
+  --color-emerald-400: #4ade80;
+  --color-emerald-500: #34d399;
+  --color-orange-300: #fdba74;
+  --color-orange-400: #fb923c;
+  --color-sky-300: #7dd3fc;
+  --color-red-400: #f87171;
+  --color-yellow-500: #facc15;
+
   --color-gold-400: #e8b53a;
   --color-gold-500: #d9a021;
   --radius-sm: 2px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px; --radius-2xl: 16px;
@@ -205,76 +227,125 @@ body {
   background: transparent;
 }
 
-/* Surfaces. The border (not a ring) is deliberate: active states across the app
-   mark themselves with `!border-gold-400`, which needs a border to paint. */
-.card {
-  @apply bg-ink-900 rounded-xl;
-  border: var(--border-w) solid var(--color-ink-700);
-}
-.card-raised {
-  @apply bg-ink-900 rounded-xl;
-  border: var(--border-w) solid var(--color-ink-700);
-  box-shadow: var(--shadow-hard, 0 10px 20px rgba(0, 0, 0, 0.3));
-}
-.card-float {
-  @apply bg-ink-900 rounded-2xl shadow-2xl shadow-black/60;
-  border: var(--border-w) solid var(--color-ink-700);
-}
+/* Las clases de componente van DENTRO de @layer components a propósito.
+   Fuera de toda capa ganarían siempre a las utilidades de Tailwind, que sí van
+   encapadas, y entonces cualquier `bg-red-950/40` o `text-red-400` que se les
+   ponga encima se descarta en silencio: así era como la caja de errores salía
+   color papel y los seis chips de notas de la ficha salían todos del mismo
+   color. Encapadas, las utilidades vuelven a mandar. */
+@layer components {
+  /* Surfaces. The border (not a ring) is deliberate: active states across the app
+     mark themselves with `!border-gold-400`, which needs a border to paint. */
+  .card {
+    @apply bg-ink-900 rounded-xl;
+    border: var(--border-w) solid var(--color-ink-700);
+  }
+  .card-raised {
+    @apply bg-ink-900 rounded-xl;
+    border: var(--border-w) solid var(--color-ink-700);
+    box-shadow: var(--shadow-hard, 0 10px 20px rgba(0, 0, 0, 0.3));
+  }
+  .card-float {
+    @apply bg-ink-900 rounded-2xl shadow-2xl shadow-black/60;
+    border: var(--border-w) solid var(--color-ink-700);
+  }
 
-.input {
-  @apply bg-ink-800 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-400 w-full;
-  border: var(--border-w) solid var(--color-ink-600);
-}
+  .input {
+    @apply bg-ink-800 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-400 w-full;
+    border: var(--border-w) solid var(--color-ink-600);
+  }
 
-.btn,
-.btn-gold,
-.btn-ghost {
-  @apply px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
-}
-.btn-gold {
-  @apply bg-gold-500 text-ink-950 hover:bg-gold-400;
-}
-/* hover stays neutral so gold keeps meaning "primary action / selected" */
-.btn-ghost {
-  @apply bg-ink-800 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100;
-  border: var(--border-w) solid var(--color-ink-600);
-}
+  .btn,
+  .btn-gold,
+  .btn-ghost {
+    @apply px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-gold {
+    @apply bg-gold-500 text-ink-950 hover:bg-gold-400;
+  }
+  /* hover stays neutral so gold keeps meaning "primary action / selected" */
+  .btn-ghost {
+    @apply bg-ink-800 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100;
+    border: var(--border-w) solid var(--color-ink-600);
+  }
 
-/* Poster tiles: quiet by default, lift on hover. Used by every grid. */
-.poster {
-  @apply aspect-[2/3] rounded-lg overflow-hidden bg-ink-800 relative transition duration-200
-         group-hover:ring-gold-400/70 group-hover:shadow-xl group-hover:shadow-black/50;
-  box-shadow: 0 0 0 var(--border-w) var(--ring-art);
-}
-/* artwork thumbnails share the poster's edge treatment */
-.ring-art {
-  box-shadow: 0 0 0 var(--border-w) var(--ring-art);
-}
+  /* Poster tiles: quiet by default, lift on hover. Used by every grid. */
+  .poster {
+    @apply aspect-[2/3] rounded-lg overflow-hidden bg-ink-800 relative transition duration-200
+           group-hover:ring-gold-400/70 group-hover:shadow-xl group-hover:shadow-black/50;
+    box-shadow: 0 0 0 var(--border-w) var(--ring-art);
+  }
+  /* artwork thumbnails share the poster's edge treatment */
+  .ring-art {
+    box-shadow: 0 0 0 var(--border-w) var(--ring-art);
+  }
 
-/* Quiet badge (fallecimiento, tipo de película, versión). NUNCA usar
-   `bg-ink-700 + text-zinc-*`: en «Cartelera» ink-700 es la tinta oscura y las
-   zinc-* también son tintas, así que el resultado es oscuro sobre oscuro. Esta
-   clase se apoya en el relleno de campo, que sí contrasta en los tres temas. */
-.badge-quiet {
-  @apply text-[11px] px-1.5 py-0.5 rounded bg-ink-800 text-zinc-300;
-  border: 1px solid var(--color-ink-600);
-}
+  /* Quiet badge (fallecimiento, tipo de película, versión). NUNCA usar
+     `bg-ink-700 + text-zinc-*`: en «Cartelera» ink-700 es la tinta oscura y las
+     zinc-* también son tintas, así que el resultado es oscuro sobre oscuro. Esta
+     clase se apoya en el relleno de campo, que sí contrasta en los tres temas. */
+  .badge-quiet {
+    @apply text-[11px] px-1.5 py-0.5 rounded bg-ink-800 text-zinc-300;
+    border: 1px solid var(--color-ink-600);
+  }
 
-/* Filter chips: pill in the dark looks, stamped rectangle on paper. */
-.chip {
-  @apply rounded-full px-3 py-1 text-xs cursor-pointer transition-colors text-zinc-500;
-  border: var(--border-w) solid var(--color-ink-600);
-}
-.chip:hover {
-  @apply text-zinc-300;
-}
-.chip-on {
-  @apply text-gold-400;
-  border-color: var(--color-gold-400);
-  background: color-mix(in srgb, var(--color-gold-400) 12%, transparent);
-}
-.poster img {
-  @apply w-full h-full object-cover transition duration-300 group-hover:scale-105;
+  /* Filter chips: pill in the dark looks, stamped rectangle on paper. */
+  .chip {
+    @apply rounded-full px-3 py-1 text-xs cursor-pointer transition-colors text-zinc-500;
+    border: var(--border-w) solid var(--color-ink-600);
+  }
+  .chip:hover {
+    @apply text-zinc-300;
+  }
+  .chip-on {
+    @apply text-gold-400;
+    border-color: var(--color-gold-400);
+    background: color-mix(in srgb, var(--color-gold-400) 12%, transparent);
+  }
+  .poster img {
+    @apply w-full h-full object-cover transition duration-300 group-hover:scale-105;
+  }
+
+  /* Aviso de error. No usa red-950/red-300: esos tonos solo existen en la paleta
+     por defecto de Tailwind, pensada para fondo oscuro, y sobre el papel de
+     «Cartelera» quedaban de otro planeta. red-400 sí lo redefine cada tema. */
+  .alert {
+    @apply rounded-xl p-4 text-sm;
+    color: var(--color-red-400);
+    border: var(--border-w) solid var(--color-red-400);
+    background: color-mix(in srgb, var(--color-red-400) 12%, transparent);
+  }
+
+  /* Con 12.400 películas, ir pulsando «Cargar más» acumulaba miles de nodos que
+     el navegador seguía maquetando y pintando. `content-visibility` le deja
+     saltarse lo que está fuera de pantalla; el tamaño estimado evita que la
+     barra de desplazamiento pegue saltos. */
+  .poster {
+    content-visibility: auto;
+    /* solo el alto: con un tamaño estimado en los dos ejes, la contención anula
+       el aspect-[2/3] y las baldosas de fuera de pantalla se maquetan a un ancho
+       fijo, con lo que la barra de desplazamiento pega saltos al bajar */
+    contain-intrinsic-width: auto none;
+    contain-intrinsic-height: auto 280px;
+  }
+
+  /* Cápsulas encima de la carátula (4K, HDR, ★). Van sobre un velo negro, así
+     que su color NO puede salir de los tokens: en «Cartelera» las tintas son
+     oscuras y quedaba gris sobre gris (1,2:1). Aquí manda el blanco. */
+  .on-art {
+    @apply absolute text-[11px] leading-none px-1.5 py-1 rounded;
+    background: rgb(0 0 0 / 0.72);
+    color: #fff;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+  }
+  .on-art-gold { color: #f0c04a; }
+
+  /* Etiquetas de tipo (calendario). Mismo motivo: todo sale de tokens que los
+     tres aspectos redefinen, así que se leen igual sobre papel y sobre carbón. */
+  .tag {
+    @apply text-[11px] px-1.5 py-0.5 rounded;
+    background: color-mix(in srgb, currentColor 15%, transparent);
+  }
 }
 
 /* --- «Cartelera»: los gestos que hacen que parezca impreso ------------------ */
@@ -347,7 +418,7 @@ body {
 }
 :root:not([data-ui]) .app-nav .nav-group,
 :root[data-ui='cartelera'] .app-nav .nav-group {
-  color: rgba(246, 236, 216, 0.65);
+  color: rgba(246, 236, 216, 0.88);
 }
 /* el buscador y el contador viven sobre el rojo */
 :root:not([data-ui]) .app-nav button,
@@ -364,7 +435,7 @@ body {
 :root:not([data-ui]) .app-nav .text-zinc-600,
 :root[data-ui='cartelera'] .app-nav .text-zinc-500,
 :root[data-ui='cartelera'] .app-nav .text-zinc-600 {
-  color: rgba(246, 236, 216, 0.7);
+  color: rgba(246, 236, 216, 0.88);
 }
 /* el wordmark invierte: crema sobre rojo, con el remate en ocre */
 :root:not([data-ui]) .app-nav .font-display,

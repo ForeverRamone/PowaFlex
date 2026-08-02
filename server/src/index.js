@@ -15,7 +15,7 @@ import {
   tmdbPoster,
   searchMovieId,
   tmdbMovieDetail,
-  buildProgress,
+  currentProgress,
   setBuildProgress,
   clearBuildProgress,
   suggestedPeople,
@@ -23,6 +23,8 @@ import {
   searchPeople,
   findPersonInfo,
   normalizeLibraryTitles,
+  normalizePeopleNames,
+  latinizeNames,
 } from './tmdb.js';
 import {
   radarrTest,
@@ -33,7 +35,7 @@ import {
   radarrOwnedIds,
   radarrRecent,
 } from './radarr.js';
-import { libraryGaps, favoritesGaps, absentGreats } from './discover.js';
+import { libraryGaps, favoritesGaps, absentGreats, listCanons, saveCanon, deleteCanon, canonNames } from './discover.js';
 import {
   mdbTest,
   syncRatings,
@@ -82,16 +84,50 @@ if (process.env.POWAFLEX_AUTH) {
   const raw = process.env.POWAFLEX_AUTH.includes(':')
     ? process.env.POWAFLEX_AUTH
     : `powaflex:${process.env.POWAFLEX_AUTH}`;
-  const expected = Buffer.from(`Basic ${Buffer.from(raw, 'utf-8').toString('base64')}`, 'utf-8');
+  // Se comparan RESÚMENES, no las credenciales. timingSafeEqual exige la misma
+  // longitud, y comprobarla antes era un chivato: probando cabeceras de distinto
+  // tamaño se deducía cuántos caracteres tiene la contraseña. Un sha256 mide
+  // siempre 32 bytes, así que ya no hay nada que medir.
+  const digest = (v) => crypto.createHash('sha256').update(v || '', 'utf-8').digest();
+  const expected = digest(`Basic ${Buffer.from(raw, 'utf-8').toString('base64')}`);
+
+  // Freno de fuerza bruta por IP: sin él, una contraseña corta cae sola en una
+  // tarde. Ventana deslizante en memoria, que basta para lo que esto es.
+  const FAILS_MAX = 10;
+  const FAILS_WINDOW = 5 * 60 * 1000;
+  const fails = new Map();
+  const tooManyFails = (ip) => {
+    const hits = (fails.get(ip) || []).filter((t) => Date.now() - t < FAILS_WINDOW);
+    if (hits.length) fails.set(ip, hits);
+    else fails.delete(ip); // sin esto el mapa crecía con cada IP que dejó de fallar
+    return hits.length >= FAILS_MAX;
+  };
+
   app.addHook('onRequest', async (req, reply) => {
     if (AUTH_OPEN_PATHS.has((req.raw.url || '').split('?')[0])) return;
-    const got = Buffer.from(req.headers.authorization || '', 'utf-8');
-    // timingSafeEqual needs equal lengths, so the length check goes first
-    if (got.length === expected.length && crypto.timingSafeEqual(got, expected)) return;
+    const ip = req.ip || 'desconocida';
+    // Las credenciales se comprueban PRIMERO: si son buenas, se entra aunque
+    // haya bloqueo. Detrás de un proxy inverso todo el mundo comparte IP, y al
+    // revés dejaba fuera al dueño de la casa por los intentos de otro.
+    if (crypto.timingSafeEqual(digest(req.headers.authorization), expected)) {
+      fails.delete(ip);
+      return;
+    }
+    if (tooManyFails(ip)) {
+      reply.header('Retry-After', '300');
+      return reply.code(429).send({ error: 'Demasiados intentos, prueba en unos minutos' });
+    }
+    fails.set(ip, [...(fails.get(ip) || []), Date.now()]);
     reply.header('WWW-Authenticate', 'Basic realm="PowaFlex", charset="UTF-8"');
     return reply.code(401).send({ error: 'No autorizado' });
   });
   console.log('[PowaFlex] Autenticación básica activada (POWAFLEX_AUTH)');
+} else {
+  console.warn(
+    '[PowaFlex] SIN autenticación: cualquiera que alcance este puerto puede leer y CAMBIAR tus\n' +
+    '           ajustes, y con ello hacer que PowaFlex mande tu token de Plex a otra dirección.\n' +
+    '           Define POWAFLEX_AUTH="usuario:contraseña" si esto no está solo en tu red de casa.'
+  );
 }
 
 app.get('/api/version', async () => ({
@@ -100,11 +136,31 @@ app.get('/api/version', async () => ({
   repo: 'https://github.com/ForeverRamone/PowaFlex',
 }));
 
-await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } });
+await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024, files: 8 } });
 
 // --- settings ----------------------------------------------------------------
 
 const SECRET_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key', 'mdblist_key']);
+
+// Solo estas claves se pueden escribir desde fuera. El destino de todas las
+// peticiones salientes (Plex, Radarr) sale de aquí, así que dejar la puerta
+// abierta permitía apuntar la app a otro sitio y quedarse con las credenciales.
+const WRITABLE_SETTINGS = new Set([
+  'plex_url', 'plex_token', 'plex_sections',
+  'tmdb_key', 'language',
+  'radarr_url', 'radarr_key', 'radarr_quality_profile', 'radarr_root_folder', 'radarr_tag',
+  'mdblist_key', 'mdblist_tier',
+  'letterboxd_rss',
+  'auto_radarr_enabled', 'auto_radarr_months', 'auto_radarr_lookback_days', 'auto_radarr_include_docs',
+  'cal_top_directors', 'cal_top_actors',
+  'gaps_min_votes_director', 'gaps_min_votes_actor',
+  'ratings_sources', 'primary_rating', 'ui_theme', 'jw_country',
+]);
+
+// Ajustes cuyo cambio deja obsoletas las páginas ya calculadas.
+const CACHE_BUSTING_SETTINGS = new Set([
+  'gaps_min_votes_director', 'gaps_min_votes_actor', 'cal_top_directors', 'cal_top_actors', 'language',
+]);
 
 app.get('/api/settings', async () => {
   const all = getAllSettings();
@@ -118,12 +174,24 @@ app.get('/api/settings', async () => {
 
 app.put('/api/settings', async (req) => {
   const body = req.body || {};
+  const ignoradas = [];
+  let invalidar = false;
   for (const [k, v] of Object.entries(body)) {
     if (typeof v !== 'string' && v !== null) continue;
+    if (!WRITABLE_SETTINGS.has(k)) { ignoradas.push(k); continue; }
     if (SECRET_KEYS.has(k) && typeof v === 'string' && v.startsWith('••••')) continue; // masked, unchanged
+    if (CACHE_BUSTING_SETTINGS.has(k) && String(getSetting(k) ?? '') !== String(v ?? '')) invalidar = true;
     setSetting(k, v);
   }
-  return { ok: true };
+  // los umbrales y el tamaño del radar deciden lo que sale en Descubrir y en el
+  // calendario: sin esto, cambiarlos no se notaba hasta que caducara la caché
+  if (invalidar) {
+    db.prepare(
+      `DELETE FROM tmdb_cache WHERE key LIKE 'discover_gaps:%' OR key LIKE 'discover_favorites:%'
+         OR key LIKE 'discover_absent:%' OR key LIKE 'calendar:%'`
+    ).run();
+  }
+  return { ok: true, ignoradas: ignoradas.length ? ignoradas : undefined, cachesInvalidadas: invalidar || undefined };
 });
 
 app.post('/api/settings/test/:service', async (req, reply) => {
@@ -168,7 +236,10 @@ app.post('/api/sync', async (req) => {
     runSync({ force })
       .then(() => rematchLetterboxd())
       .then(() => (getSetting('tmdb_key') ? normalizeLibraryTitles() : null))
-      .catch(() => {});
+      .then(() => (getSetting('tmdb_key') ? normalizePeopleNames() : null))
+      // no se traga el fallo: runSync lo deja en syncStatus.error, pero los pasos
+      // siguientes desaparecían sin dejar rastro ni en el log
+      .catch((err) => app.log.error({ err }, 'post-sincronización'));
   }
   return syncStatus;
 });
@@ -178,7 +249,16 @@ app.get('/api/sync/status', async () => {
   return { ...syncStatus, last };
 });
 
-app.get('/api/plex/sections', async () => movieSections());
+app.get('/api/plex/sections', async (req, reply) => {
+  // sin Plex configurado esto lanza, y sin el try salía un 500 crudo de Fastify
+  // con su traza en el log en vez de un error que el cliente pueda enseñar
+  try {
+    return await movieSections();
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
 
 // --- dashboard / library ---------------------------------------------------------
 
@@ -334,6 +414,69 @@ app.post('/api/tracked/by-names', async (req, reply) => {
 
 // add a whole pack of directors to favorites in one click (#9). Skips anyone the
 // user explicitly removed with the ✕ — those only come back via a manual add (C).
+// Añadir a favoritos un canon entero (TSPDT, los 501, «en boga» o una lista
+// tuya). Resolver 500 nombres contra TMDB lleva su rato aunque la búsqueda esté
+// cacheada, así que corre en segundo plano y la interfaz sigue el progreso por
+// /api/build-progress, como el resto de tareas largas.
+export const canonAddStatus = { running: false, canon: null, added: 0, skipped: 0, notFound: [], total: 0, error: null, finishedAt: null };
+
+app.post('/api/tracked/from-canon', async (req, reply) => {
+  if (canonAddStatus.running) return { started: false, ...canonAddStatus };
+  const canon = String(req.body?.canon || '');
+  const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : 'director';
+  let nombres;
+  try {
+    nombres = await canonNames(canon);
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+  if (!nombres?.length) {
+    reply.code(400);
+    return { error: 'Esa lista no existe o está vacía' };
+  }
+
+  Object.assign(canonAddStatus, {
+    running: true, canon, added: 0, skipped: 0, notFound: [], total: nombres.length, error: null, finishedAt: null,
+  });
+
+  (async () => {
+    const hint = role === 'director' ? 'Directing' : 'Acting';
+    const bloqueados = new Set(db.prepare('SELECT person_id FROM unfollowed_people').all().map((r) => r.person_id));
+    try {
+      for (let i = 0; i < nombres.length; i++) {
+        setBuildProgress('canon', `Añadiendo «${canon}» a favoritos`, i + 1, nombres.length);
+        const name = nombres[i];
+        try {
+          const info = await findPersonInfo(name, hint);
+          if (!info?.id) { canonAddStatus.notFound.push(name); continue; }
+          // quien quitaste a mano con la ✕ no vuelve por un añadido masivo
+          const ya = db.prepare('SELECT id FROM people WHERE tmdb_id = ? OR name = ?').get(info.id, name);
+          if (ya && bloqueados.has(ya.id)) { canonAddStatus.skipped++; continue; }
+          const antes = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
+          trackByTmdb({ tmdbId: info.id, name: info.name || name, profilePath: info.profile_path, role });
+          const despues = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
+          if (despues > antes) canonAddStatus.added++;
+          else canonAddStatus.skipped++;
+        } catch {
+          canonAddStatus.notFound.push(name);
+        }
+      }
+      if (canonAddStatus.added) invalidateFavoritesCaches();
+    } catch (err) {
+      canonAddStatus.error = String(err.message || err);
+    } finally {
+      canonAddStatus.running = false;
+      canonAddStatus.finishedAt = Date.now();
+      clearBuildProgress('canon');
+    }
+  })();
+
+  return { started: true, total: nombres.length };
+});
+
+app.get('/api/tracked/from-canon', async () => canonAddStatus);
+
 app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
   try {
     const people = Array.isArray(req.body?.people) ? req.body.people : [];
@@ -405,6 +548,8 @@ app.get('/api/media/:tmdbId', async (req, reply) => {
     const mapPerson = (c) => ({ id: peopleByTmdb.get(c.id) ?? null, tmdb_id: c.id, name: c.name, character: c.character || null });
     const directors = crew.map(mapPerson);
     const cast = castCredits.map(mapPerson);
+    // los créditos de TMDB traen el nombre en su alfabeto original
+    await latinizeNames([...directors, ...cast]);
     return {
       tmdb_id: tmdbId,
       title: det.title,
@@ -434,7 +579,7 @@ app.get('/api/media/:tmdbId', async (req, reply) => {
 });
 
 // progress for long TMDB-building pages, polled by the frontend (#5)
-app.get('/api/build-progress', async () => buildProgress);
+app.get('/api/build-progress', async () => currentProgress());
 
 // "Actualizar todo": one button for the whole routine (same code as the nightly)
 app.get('/api/refresh-all', async () => ({
@@ -632,11 +777,15 @@ app.get('/api/tracked/health', async () => {
   }
   const upcomingBy = new Map();
   try {
-    const now = new Date().toISOString().slice(0, 10);
+    const now = new Date().toLocaleDateString('en-CA'); // local, como el resto de la app
     for (const ev of (JSON.parse(calRow?.json || '{}').events || [])) {
       if (ev.date && ev.date < now) continue; // future or still-undated (announced)
-      for (const per of [...(ev.followedDirectors || []), ...(ev.followedActors || [])])
-        upcomingBy.set(per.id, (upcomingBy.get(per.id) || 0) + 1);
+      // OJO: `followedDirectors`/`followedActors` NO existen aquí — buildCalendar
+      // los borra antes de guardar el calendario. Lo que sobrevive es `people`,
+      // con el id de biblioteca de cada uno. Contar los otros daba siempre 0.
+      for (const per of ev.people || []) {
+        if (per.id) upcomingBy.set(per.id, (upcomingBy.get(per.id) || 0) + 1);
+      }
     }
   } catch {}
   return {
@@ -648,15 +797,23 @@ app.get('/api/tracked/health', async () => {
       // 50/50. When the gaps cache knows this facet, take its feature-only count
       // so both screens tell the same story; keep the raw one for the tooltip.
       const sameFacet = g && (g.role || 'director') === (f.role || 'director');
+      // si TMDB no le conoce filmografía (mal emparejado, homónimo), el conteo
+      // de largometrajes sería 0 y quedaría como «0 dirigidas · ✓ completa»
+      // teniendo sus películas en Plex: en ese caso manda el conteo de Plex
+      const trust = sameFacet && g.released > 0;
       return {
         ...f,
-        movies: sameFacet ? g.owned : f.movies,
+        movies: trust ? g.owned : f.movies,
         moviesAll: f.movies,
+        released: sameFacet ? g.released ?? null : null,
+        tmdbBlank: !!(sameFacet && !g.released && f.movies > 0),
         // sus dos películas más reconocibles, igual que en Descubrir
         signature: sameFacet ? g.signature || null : null,
         // null = still unknown; only a person present in a cache has a real number
-        gaps: g ? g.missingTotal : null,
-        pct: g?.pct ?? null,
+        // null = no se sabe. Un 0 aquí significa «lo tienes todo», y eso no se
+        // puede afirmar cuando la filmografía que devolvió TMDB está vacía.
+        gaps: trust ? g.missingTotal : null,
+        pct: trust ? g.pct : null,
         gapRole: g?.role ?? null,
         upcoming: calRow ? (upcomingBy.get(f.id) || 0) : null,
       };
@@ -711,19 +868,6 @@ app.post('/api/tracked/:personId', async (req) => {
   invalidateFavoritesCaches();
   return { ok: true, role: guessed };
 });
-app.delete('/api/tracked/all', async () => {
-  db.prepare('DELETE FROM tracked_people').run();
-  invalidateFavoritesCaches();
-  return { ok: true };
-});
-app.delete('/api/tracked/:personId', async (req) => {
-  const id = Number(req.params.personId);
-  const r = db.prepare('DELETE FROM tracked_people WHERE person_id = ?').run(id);
-  // remember the explicit ✕ so bulk/automatic adds skip this person (C)
-  db.prepare('INSERT OR IGNORE INTO unfollowed_people (person_id, at) VALUES (?, ?)').run(id, Date.now());
-  if (r.changes) invalidateFavoritesCaches();
-  return { ok: true };
-});
 app.get('/api/tracked', async (req) => {
   const role = ['director', 'actor'].includes(req.query.role) ? req.query.role : null;
   return db
@@ -743,6 +887,34 @@ app.get('/api/tracked', async (req) => {
     .all(role, role);
 });
 
+app.delete('/api/tracked/:personId', async (req) => {
+  const id = Number(req.params.personId);
+  const r = db.prepare('DELETE FROM tracked_people WHERE person_id = ?').run(id);
+  // remember the explicit ✕ so bulk/automatic adds skip this person (C)
+  db.prepare('INSERT OR IGNORE INTO unfollowed_people (person_id, at) VALUES (?, ?)').run(id, Date.now());
+  if (r.changes) invalidateFavoritesCaches();
+  return { ok: true };
+});
+
+// Ficha local de alguien que solo existe en TMDB (los «grandes ausentes»), para
+// poder abrir su página sin obligar a seguirlo primero. Si ya existe, la
+// devuelve; si no, la crea.
+app.post('/api/people/from-tmdb', async (req, reply) => {
+  const tmdbId = Number(req.body?.tmdbId);
+  const name = String(req.body?.name || '').trim();
+  if (!tmdbId || !name) {
+    reply.code(400);
+    return { error: 'Faltan datos de la persona' };
+  }
+  const ya = db.prepare('SELECT id FROM people WHERE tmdb_id = ?').get(tmdbId);
+  if (ya) return { personId: ya.id };
+  const thumb = req.body?.profilePath ? `https://image.tmdb.org/t/p/w185${req.body.profilePath}` : null;
+  const id = db
+    .prepare('INSERT INTO people (name, plex_name, thumb, tmdb_id, tmdb_verified) VALUES (?, NULL, ?, ?, 1)')
+    .run(name, thumb, tmdbId).lastInsertRowid;
+  return { personId: id };
+});
+
 // switch which facet of a person you follow (director <-> actor)
 app.patch('/api/tracked/:personId/role', async (req, reply) => {
   const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : null;
@@ -756,23 +928,6 @@ app.patch('/api/tracked/:personId/role', async (req, reply) => {
 });
 
 // remove every deceased person from favorites in one go ("vivos y muertos")
-app.delete('/api/tracked/deceased', async () => {
-  // block them from automatic re-adds too (C)
-  db.prepare(
-    `INSERT OR IGNORE INTO unfollowed_people (person_id, at)
-     SELECT t.person_id, ? FROM tracked_people t JOIN people p ON p.id = t.person_id
-     WHERE p.deathday IS NOT NULL`
-  ).run(Date.now());
-  const r = db
-    .prepare(
-      `DELETE FROM tracked_people WHERE person_id IN (
-         SELECT id FROM people WHERE deathday IS NOT NULL)`
-    )
-    .run();
-  if (r.changes) db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%'`).run();
-  return { ok: true, removed: r.changes };
-});
-
 app.get('/api/discover/gaps', async (req, reply) => {
   try {
     return await libraryGaps({
@@ -802,12 +957,26 @@ app.get('/api/discover/favorites', async (req, reply) => {
   }
 });
 
+// cánones de «Grandes ausentes»: los de serie, el dinámico de TMDB y los tuyos
+app.get('/api/discover/canons', async () => listCanons());
+
+app.post('/api/discover/canons', async (req, reply) => {
+  try {
+    return saveCanon({ label: req.body?.label, names: req.body?.names, source: req.body?.source || null });
+  } catch (err) {
+    reply.code(400);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.delete('/api/discover/canons/:key', async (req) => deleteCanon(req.params.key));
+
 app.get('/api/discover/absent', async (req, reply) => {
   try {
     return await absentGreats({
       perPerson: Math.min(Number(req.query.perPerson) || 6, 12),
       refresh: req.query.refresh === '1',
-      canon: ['alltime', '21c'].includes(req.query.canon) ? req.query.canon : 'alltime',
+      canon: String(req.query.canon || 'alltime').slice(0, 60),
     });
   } catch (err) {
     reply.code(502);
@@ -974,7 +1143,24 @@ app.get('/api/quality/upgrades', async (req) =>
 );
 app.get('/api/quality/duplicates', async () => q.duplicates());
 
+// Los formularios con fichero son de los pocos que un navegador manda a otro
+// sitio sin pedir permiso antes, así que una web cualquiera podría hacerte
+// importar un zip. Los demás endpoints se salvan porque solo aceptan JSON.
+function origenAjeno(req) {
+  const origen = req.headers.origin;
+  if (!origen) return false; // curl, la propia app: no hay navegador de por medio
+  try {
+    return new URL(origen).host !== req.headers.host;
+  } catch {
+    return true;
+  }
+}
+
 app.post('/api/letterboxd/import', async (req, reply) => {
+  if (origenAjeno(req)) {
+    reply.code(403);
+    return { error: 'Petición desde otro sitio web' };
+  }
   const results = [];
   let lists = [];
   for await (const part of req.files()) {
@@ -1085,9 +1271,6 @@ app.delete('/api/letterboxd/lists/:id', async (req) => {
   return { ok: true };
 });
 
-app.get('/api/letterboxd/summary', async () => letterboxdSummary());
-app.post('/api/letterboxd/rematch', async () => rematchLetterboxd());
-// resolve still-unmatched watched entries via TMDB search, then link to library (#1)
 app.post('/api/letterboxd/resolve', async (req, reply) => {
   try {
     return await resolveUnmatchedLb();
@@ -1096,11 +1279,13 @@ app.post('/api/letterboxd/resolve', async (req, reply) => {
     return { error: String(err.message || err) };
   }
 });
+
 app.delete('/api/letterboxd', async () => {
   db.prepare('DELETE FROM lb_entries').run();
   return { ok: true };
 });
 
+app.get('/api/letterboxd/summary', async () => letterboxdSummary());
 // --- plex image proxy (with tiny disk cache) ----------------------------------------------
 
 app.get('/img/:key/:kind', async (req, reply) => {

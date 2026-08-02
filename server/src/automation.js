@@ -3,7 +3,7 @@ import { resolvePerson, personCredits, enrichRuntimes } from './tmdb.js';
 import { radarrAdd, radarrOwnedIds } from './radarr.js';
 
 const DAY = 24 * 3600 * 1000;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => new Date().toLocaleDateString('en-CA');
 
 export const autoRadarrStatus = {
   running: false,
@@ -64,7 +64,10 @@ export async function runAutoRadarr({ months = 6, lookbackDays = 0, dryRun = fal
           if (inLib.has(c.id) || owned.has(c.id)) continue;
           if (!toAdd.has(c.id)) toAdd.set(c.id, { tmdb_id: c.id, title: c.title, date, director: d.name });
         }
-      } catch {}
+      } catch (err) {
+        // sin esto, «0 candidatas» podía significar «TMDB estaba caído»
+        autoRadarrStatus.log.push(`⚠️ ${d.name}: ${String(err.message || err)}`);
+      }
     }
 
     // runtime is not in credit lists: one cached pass to drop known shorts

@@ -465,5 +465,17 @@ export function watchStats() {
        GROUP BY p.id HAVING total >= 3 AND watched < total
        ORDER BY (total - watched) DESC LIMIT 20`
     ),
+    // De quién has visto más cine. Cuenta las vistas —reproducidas en Plex o
+    // marcadas en Letterboxd— de las que tienen director en tu biblioteca: una
+    // entrada de Letterboxd sin emparejar no sabe de quién es.
+    directorsMostWatched: all(
+      `SELECT p.id, p.name, p.deathday, COUNT(*) total, SUM(${W}) watched,
+              SUM(CASE WHEN m.rating_key IN ${LB_WATCHED_KEYS} THEN 1 ELSE 0 END) lb
+       FROM movie_people mp JOIN people p ON p.id = mp.person_id
+       JOIN movies m ON m.rating_key = mp.movie_id
+       WHERE mp.role = 'director'
+       GROUP BY p.id HAVING watched > 0
+       ORDER BY watched DESC, total DESC LIMIT 30`
+    ),
   };
 }

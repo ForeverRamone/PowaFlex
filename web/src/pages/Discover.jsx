@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid } from 'lucide-react';
+import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid, X } from 'lucide-react';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
-  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge, PageHeader, Signature } from '../components.jsx';
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, PageHeader, Signature } from '../components.jsx';
 import { toast } from '../toast.js';
 
 const TABS = [
@@ -95,7 +95,7 @@ function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, 
           </span>
           {pendingIds.length > 1 && (
             <button className="btn-ghost !py-1 text-xs shrink-0 inline-flex items-center gap-1.5" onClick={() => sendBulk(pendingIds, addRadarrId)}>
-<Plus size={13} strokeWidth={2.5} /> Añadir las {pendingIds.length} visibles a Radarr
+<Plus size={13} strokeWidth={2.5} /> Añadir {pendingIds.length > 300 ? '300 de las ' + pendingIds.length : 'las ' + pendingIds.length} visibles a Radarr
             </button>
           )}
         </div>
@@ -318,16 +318,151 @@ function GapsView({
   );
 }
 
-const CANONS = [
-  ['alltime', 'Top 250 de siempre', 'https://theyshootpictures.com/gf1000_top250directors.htm'],
-  ['21c', 'Top 100 del siglo XXI', 'https://theyshootpictures.com/21stcentury_top100directors.htm'],
-];
+const CANON_URLS = {
+  alltime: 'https://theyshootpictures.com/gf1000_top250directors.htm',
+  '21c': 'https://theyshootpictures.com/21stcentury_top100directors.htm',
+  'tmdb-popular': 'https://www.themoviedb.org/person',
+  imdb501: 'https://www.imdb.com/list/ls000774551/',
+};
+
+/** Pegar una lista de nombres (la de IMDb, la de un libro…) como canon propio. */
+function NewCanonForm({ onSaved }) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState('');
+  const [names, setNames] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    const r = await api('/discover/canons', { method: 'POST', body: { label, names } });
+    setBusy(false);
+    if (r.error) return toast(`⚠️ ${r.error}`, 'error');
+    toast(`✓ «${r.label}» guardada con ${r.count} nombres`, 'success');
+    setLabel(''); setNames(''); setOpen(false);
+    onSaved(r.key);
+  };
+
+  if (!open) {
+    return (
+      <button className="btn-ghost !py-1 text-sm inline-flex items-center gap-1.5" onClick={() => setOpen(true)}>
+        <Plus size={13} strokeWidth={2.5} /> Lista propia
+      </button>
+    );
+  }
+  return (
+    <div className="card p-4 mb-4 w-full">
+      <div className="text-sm text-zinc-300 mb-2">
+        Pega aquí cualquier lista de directores/as —una por línea— y se convierte en un canon más.
+        Vale copiada de IMDb, de un libro o escrita a mano; la numeración («12. Chantal Akerman») se ignora sola.
+      </div>
+      <input
+        className="input mb-2"
+        placeholder="Nombre de la lista (p. ej. «IMDb · 501 Directors»)"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+      />
+      <textarea
+        className="input h-40 font-mono text-xs"
+        placeholder={'Chantal Akerman\nRobert Aldrich\nTomás Gutiérrez Alea\n…'}
+        value={names}
+        onChange={(e) => setNames(e.target.value)}
+      />
+      <div className="flex gap-2 mt-2">
+        <button className="btn-gold" onClick={save} disabled={busy || !names.trim()}>
+          {busy ? 'Guardando…' : 'Guardar canon'}
+        </button>
+        <button className="btn-ghost" onClick={() => setOpen(false)}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * El nombre de un «gran ausente» abre su ficha. Como no está en tu biblioteca,
+ * puede que no tenga fila propia todavía: la primera vez se crea al vuelo (solo
+ * la ficha, seguirlo es otra cosa) y luego se navega.
+ */
+function AbsentName({ person }) {
+  const navigate = useNavigate();
+  const [yendo, setYendo] = useState(false);
+  const abrir = async () => {
+    if (person.personId) return navigate(`/personas/${person.personId}?role=director`);
+    setYendo(true);
+    const r = await api('/people/from-tmdb', {
+      method: 'POST',
+      body: { tmdbId: person.tmdb_id, name: person.name, profilePath: person.profile_path },
+    });
+    setYendo(false);
+    if (r.personId) navigate(`/personas/${r.personId}?role=director`);
+    else toast(`⚠️ ${r.error || 'No se ha podido abrir su ficha'}`, 'error');
+  };
+  return (
+    <button
+      onClick={abrir}
+      disabled={yendo}
+      className="font-semibold text-zinc-100 hover:text-gold-400 transition-colors text-left truncate block max-w-full"
+      title={`Ver la ficha de ${person.name}`}
+    >
+      {person.name} {yendo ? '…' : '→'}
+    </button>
+  );
+}
+
+/** Añadir a favoritos sin salir de la página. */
+function FollowButton({ person, seguido, onSeguir }) {
+  const [ocupado, setOcupado] = useState(false);
+  if (seguido) {
+    return (
+      <span className="text-xs text-gold-400 shrink-0 inline-flex items-center gap-1" title="Ya lo sigues">
+        <Star size={13} strokeWidth={2.5} /> En favoritos
+      </span>
+    );
+  }
+  return (
+    <button
+      className="btn-ghost !py-1 text-xs shrink-0 inline-flex items-center gap-1.5"
+      disabled={ocupado}
+      title="Añadir a tus directores/as favoritos: entrará en el calendario y en los huecos"
+      onClick={async () => { setOcupado(true); await onSeguir(person); setOcupado(false); }}
+    >
+      <Star size={13} strokeWidth={2.5} /> {ocupado ? 'Añadiendo…' : 'Seguir'}
+    </button>
+  );
+}
 
 function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
+  const [canons, setCanons] = useState([]);
   const [canon, setCanon] = useState('alltime');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const loadCanons = () => api('/discover/canons').then((r) => Array.isArray(r) && setCanons(r));
+  useEffect(() => { loadCanons(); }, []);
+
+  // quiénes sigues ya, para no ofrecer «Seguir» a quien está en favoritos
+  const [seguidos, setSeguidos] = useState(new Set());
+  useEffect(() => {
+    api('/tracked').then((r) => Array.isArray(r) && setSeguidos(new Set(r.map((t) => t.tmdb_id).filter(Boolean))));
+  }, []);
+  const onSeguir = async (person) => {
+    const r = await api('/tracked/tmdb-bulk', {
+      method: 'POST',
+      body: {
+        role: 'director',
+        people: [{ tmdbId: person.tmdb_id, name: person.name, profilePath: person.profile_path }],
+      },
+    });
+    if (r.error) return toast(`⚠️ ${r.error}`, 'error');
+    setSeguidos((prev) => new Set(prev).add(person.tmdb_id));
+    toast(`⭐ ${person.name} añadido a tus directores/as favoritos`, 'success');
+  };
+
+  const removeCanon = async (key) => {
+    await api(`/discover/canons/${encodeURIComponent(key)}`, { method: 'DELETE' });
+    if (canon === key) setCanon('alltime');
+    loadCanons();
+  };
 
   const load = (refresh = false) => {
     setError(null);
@@ -341,16 +476,33 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
   };
   useEffect(() => { load(); }, [canon]);
 
-  const canonUrl = CANONS.find(([k]) => k === canon)?.[2];
+  const canonUrl = CANON_URLS[canon];
+  const activo = canons.find((c) => c.key === canon);
 
   return (
     <div>
-      <div className="flex gap-2 mb-3">
-        {CANONS.map(([k, label]) => (
-          <button key={k} onClick={() => setCanon(k)} className={`btn-ghost !py-1 text-sm ${canon === k ? '!border-gold-400 text-gold-400' : ''}`}>
-            {label}
-          </button>
+      <div className="flex gap-2 mb-3 flex-wrap items-center">
+        {canons.map((c) => (
+          <span key={c.key} className="inline-flex items-center">
+            <button
+              onClick={() => setCanon(c.key)}
+              title={c.count ? `${c.count} nombres` : 'Se actualiza solo con el ranking de TMDB'}
+              className={`btn-ghost !py-1 text-sm ${canon === c.key ? '!border-gold-400 text-gold-400' : ''}`}
+            >
+              {c.label}
+            </button>
+            {!c.builtin && (
+              <button
+                onClick={() => removeCanon(c.key)}
+                title="Borrar esta lista"
+                className="text-zinc-600 hover:text-red-400 ml-1"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </span>
         ))}
+        <NewCanonForm onSaved={(key) => { loadCanons(); setCanon(key); }} />
       </div>
 
       {error ? (
@@ -361,8 +513,15 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
       <>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
         <p className="text-sm text-zinc-500">
-          Del canon de {data.checked} grandes directores/as de{' '}
-          <a href={canonUrl} target="_blank" rel="noreferrer" className="underline hover:text-gold-400">They Shoot Pictures</a>,{' '}
+          De los {data.checked} directores/as de{' '}
+          {canonUrl ? (
+            <a href={canonUrl} target="_blank" rel="noreferrer" className="underline hover:text-gold-400">
+              {activo?.label || 'la lista'}
+            </a>
+          ) : (
+            <b className="text-zinc-300">{activo?.label || 'tu lista'}</b>
+          )}
+          ,{' '}
           <b className="text-gold-400">{data.absent.length} no tienen ni una película en tu Plex</b> ({data.present.length} sí están).
         </p>
         <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={() => load(true)} disabled={refreshing}>
@@ -384,10 +543,11 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
               ) : (
                 <div className="w-12 h-12 rounded-full bg-ink-800 flex items-center justify-center text-zinc-500"><Clapperboard size={18} /></div>
               )}
-              <div className="flex-1">
-                <div className="font-semibold text-zinc-100">{d.name}</div>
+              <div className="flex-1 min-w-0">
+                <AbsentName person={d} />
                 <div className="text-xs text-zinc-500">{d.filmCount} películas dirigidas · 0 en tu Plex</div>
               </div>
+              <FollowButton person={d} seguido={seguidos.has(d.tmdb_id)} onSeguir={onSeguir} />
               {pendingIds.length > 1 && (
                 <button className="btn-ghost !py-1 text-xs shrink-0 inline-flex items-center gap-1.5" onClick={() => sendBulk(pendingIds, addRadarrId)}>
 <Plus size={13} strokeWidth={2.5} /> Añadir las {pendingIds.length} a Radarr
@@ -437,10 +597,23 @@ export default function Discover() {
   useEffect(() => {
     api('/discover/dismissed').then((r) => Array.isArray(r) && setDismissed(new Set(r.map((d) => d.tmdb_id))));
   }, []);
-  const onDismiss = (f) => {
+  // Descartar es reversible: el aviso lleva un «deshacer», porque antes una
+  // película descartada por error no volvía a aparecer nunca.
+  const undismiss = async (f) => {
+    const r = await api(`/discover/dismiss/${f.tmdb_id}`, { method: 'DELETE' });
+    if (r.error) return toast(`⚠️ ${r.error}`, 'error');
+    setDismissed((prev) => { const n = new Set(prev); n.delete(f.tmdb_id); return n; });
+    toast(`↩︎ «${f.title}» vuelve a la lista`);
+  };
+  const onDismiss = async (f) => {
     setDismissed((prev) => new Set(prev).add(f.tmdb_id));
-    api('/discover/dismiss', { method: 'POST', body: { tmdbId: f.tmdb_id, title: f.title } });
-    toast(`✕ «${f.title}» descartada — no volverá a aparecer en los huecos`);
+    const r = await api('/discover/dismiss', { method: 'POST', body: { tmdbId: f.tmdb_id, title: f.title } });
+    // si el servidor no la aceptó, no se puede cantar que está descartada
+    if (r.error) {
+      setDismissed((prev) => { const n = new Set(prev); n.delete(f.tmdb_id); return n; });
+      return toast(`⚠️ No se ha podido descartar: ${r.error}`, 'error');
+    }
+    toast(`✕ «${f.title}» descartada`, 'info', { label: 'Deshacer', onClick: () => undismiss(f) });
   };
   const setFavRolePref = (r) => { setFavRole(r); localStorage.setItem('gaps_fav_role', r); };
 

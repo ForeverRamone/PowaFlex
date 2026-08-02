@@ -2,9 +2,10 @@
 let listeners = [];
 let seq = 0;
 
-export function toast(message, type = 'info') {
+/** `action` = { label, onClick }: p. ej. el «Deshacer» de un descarte. */
+export function toast(message, type = 'info', action = null) {
   if (!message) return;
-  const t = { id: ++seq, message, type };
+  const t = { id: ++seq, message, type, action };
   listeners.forEach((l) => l(t));
 }
 

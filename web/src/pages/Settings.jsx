@@ -71,16 +71,20 @@ export default function Settings() {
 
   const startFullRefresh = async () => {
     const r = await api('/refresh-all', { method: 'POST' });
-    if (r.error && !r.started) return;
+    // sin el aviso, pulsabas y no pasaba nada sin saber por qué
+    if (r.error && !r.started) { toast(`⚠️ ${r.error}`, 'error'); return; }
     setRefresh({ ...(refresh || {}), running: true, steps: [], step: 'Preparando…' });
   };
 
   const save = async () => {
-    await api('/settings', { method: 'PUT', body: s });
+    const r = await api('/settings', { method: 'PUT', body: s });
+    // antes decía «✓ Guardado» pasara lo que pasara, incluso con el servidor caído
+    if (r?.error) { toast(`⚠️ No se ha podido guardar: ${r.error}`, 'error'); return r; }
     // mirror the display pref so poster cards can read it synchronously (#5)
     localStorage.setItem('primary_rating', s.primary_rating || 'score');
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+    return r;
   };
 
   const test = async (service) => {
@@ -128,7 +132,7 @@ export default function Settings() {
           </div>
           <div>
             <label className="text-xs text-zinc-400">X-Plex-Token</label>
-            <input className="input mt-1" placeholder="Pega aquí tu token" value={s.plex_token || ''} onChange={set('plex_token')} />
+            <input className="input mt-1" type="password" autoComplete="off" placeholder="Pega aquí tu token" value={s.plex_token || ''} onChange={set('plex_token')} />
           </div>
         </div>
         <div className="mt-3 flex gap-2">
@@ -190,7 +194,7 @@ export default function Settings() {
         </div>
         <div className="mt-3">
           <label className="text-xs text-zinc-400">API key (v3) o token de lectura (v4)</label>
-          <input className="input mt-1" placeholder="Pega aquí tu API key de TMDB" value={s.tmdb_key || ''} onChange={set('tmdb_key')} />
+          <input className="input mt-1" type="password" autoComplete="off" placeholder="Pega aquí tu API key de TMDB" value={s.tmdb_key || ''} onChange={set('tmdb_key')} />
         </div>
         <div className="mt-3 flex gap-2">
           <button className="btn-ghost" onClick={() => test('tmdb')}>Probar conexión</button>
@@ -215,7 +219,7 @@ export default function Settings() {
           </div>
           <div>
             <label className="text-xs text-zinc-400">API key</label>
-            <input className="input mt-1" placeholder="Radarr → Settings → General" value={s.radarr_key || ''} onChange={set('radarr_key')} />
+            <input className="input mt-1" type="password" autoComplete="off" placeholder="Radarr → Settings → General" value={s.radarr_key || ''} onChange={set('radarr_key')} />
           </div>
         </div>
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
@@ -386,7 +390,7 @@ export default function Settings() {
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           <div>
             <label className="text-xs text-zinc-400">API key</label>
-            <input className="input mt-1" placeholder="mdblist.com → Preferences → API Access" value={s.mdblist_key || ''} onChange={set('mdblist_key')} />
+            <input className="input mt-1" type="password" autoComplete="off" placeholder="mdblist.com → Preferences → API Access" value={s.mdblist_key || ''} onChange={set('mdblist_key')} />
           </div>
           <div>
             <label className="text-xs text-zinc-400">Tipo de cuenta</label>
@@ -572,7 +576,7 @@ export default function Settings() {
       </div>
 
       {/* ACTUALIZAR TODO */}
-      <section className="card p-5 mb-5 border-l-4 border-gold-400">
+      <section className="card p-5 mb-5 border-l-4 !border-l-gold-400">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0 flex-1">
             <h2 className="font-semibold text-zinc-100">Actualizar todo</h2>

@@ -115,6 +115,7 @@ function ChallengeDetail({ listId, onChanged }) {
 
   const reload = () => api(`/letterboxd/lists/${listId}`).then(setData);
   useEffect(() => { setData(null); reload(); }, [listId]);
+  if (data?.error) return <ErrorBox error={data.error} />;
   if (!data) return <Spinner />;
 
   const items = data.items || [];
@@ -328,6 +329,7 @@ function ListDetail({ listId, onChanged }) {
     api(`/mdblist/lists/${listId}`).then(setData);
   }, [listId]);
 
+  if (data?.error) return <ErrorBox error={data.error} />;
   if (!data) return <Spinner />;
   const items = data.items || [];
   const missing = items.filter((i) => !i.owned);
