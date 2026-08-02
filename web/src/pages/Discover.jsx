@@ -4,7 +4,7 @@ import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid } from 'lucide-react';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
-  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge, PageHeader } from '../components.jsx';
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge, PageHeader, Signature } from '../components.jsx';
 import { toast } from '../toast.js';
 
 const TABS = [
@@ -58,24 +58,6 @@ function GapCard({ f, radarrIds, addRadarrId, onDismiss, person }) {
         </button>
       </div>
     </TmdbCard>
-  );
-}
-
-// «¿y este quién era?»: sus dos películas más reconocibles junto al nombre, para
-// no tener que abrir la ficha de cada director/a de la lista
-function Signature({ films }) {
-  if (!films?.length) return null;
-  return (
-    <span className="text-xs text-zinc-500 font-normal">
-      {' ('}
-      {films.map((f, i) => (
-        <span key={f.tmdb_id ?? i}>
-          {i > 0 && ', '}
-          <i>{f.title}</i>
-        </span>
-      ))}
-      {')'}
-    </span>
   );
 }
 

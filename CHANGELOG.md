@@ -1,5 +1,13 @@
 # Changelog
 
+## Alpha 0.9.2 (0.9.2-alpha) — 2026-08-02
+
+- **Las dos películas más conocidas de cada director/a aparecen también en Favoritos**, no solo en
+  «Directores/as top», y terminan en puntos suspensivos —*(Annie Hall, Manhattan…)*— para dejar
+  claro que detrás hay más obra.
+- Si venías de la 0.9.1 y en «Tus favoritos» no salían, era porque esa pestaña seguía leyendo los
+  huecos calculados antes de la actualización. Ya se recalculan solos.
+
 ## Alpha 0.9.1 (0.9.1-alpha) — 2026-08-02
 
 - **Al volver atrás, la página se queda donde la dejaste.** Bajabas por una lista, entrabas en la

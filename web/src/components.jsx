@@ -625,6 +625,27 @@ export function TypeFilterBar({ show, toggle, counts }) {
   );
 }
 
+/**
+ * «¿y este quién era?»: las dos películas por las que se reconoce a alguien,
+ * junto a su nombre, para no tener que abrir su ficha. Los puntos suspensivos
+ * dejan claro que hay más obra detrás de esas dos.
+ */
+export function Signature({ films, className = '' }) {
+  if (!films?.length) return null;
+  return (
+    <span className={`text-xs text-zinc-500 font-normal ${className}`}>
+      {' ('}
+      {films.map((f, i) => (
+        <span key={f.tmdb_id ?? i}>
+          {i > 0 && ', '}
+          <i>{f.title}</i>
+        </span>
+      ))}
+      {'…)'}
+    </span>
+  );
+}
+
 export function DeathBadge({ deathday, className = '' }) {
   if (!deathday) return null;
   const year = String(deathday).slice(0, 4);

@@ -652,6 +652,8 @@ app.get('/api/tracked/health', async () => {
         ...f,
         movies: sameFacet ? g.owned : f.movies,
         moviesAll: f.movies,
+        // sus dos películas más reconocibles, igual que en Descubrir
+        signature: sameFacet ? g.signature || null : null,
         // null = still unknown; only a person present in a cache has a real number
         gaps: g ? g.missingTotal : null,
         pct: g?.pct ?? null,

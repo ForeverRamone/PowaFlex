@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Search, Scissors, RotateCw, ArrowLeftRight, X, Cross } from 'lucide-react';
-import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader } from '../components.jsx';
+import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature } from '../components.jsx';
 import { toast } from '../toast.js';
 
 // The whole page is scoped to ONE role at a time: a director you follow is
@@ -66,12 +66,13 @@ function FavoriteCard({ p, role, selectable, selected, onSelect, onRemove, onSwi
         <Avatar person={p} />
       </Link>
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-1.5 min-w-0">
-          <Link to={`/personas/${p.id}?role=${role}`} className="text-sm font-medium text-zinc-100 hover:text-gold-400 truncate">
+        <div className="flex items-baseline gap-1.5 min-w-0 flex-wrap">
+          <Link to={`/personas/${p.id}?role=${role}`} className="text-sm font-medium text-zinc-100 hover:text-gold-400">
             {p.name}
           </Link>
           <DeathBadge deathday={p.deathday} />
         </div>
+        <Signature films={p.signature} className="block leading-snug" />
         {/* el mismo criterio que la ficha: largometrajes. El conteo bruto de
             Plex (cortos, documentales, TV, conciertos) va en el tooltip */}
         <div

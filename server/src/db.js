@@ -347,8 +347,8 @@ db.exec(`
 db.prepare(
   `DELETE FROM tmdb_cache
    WHERE key LIKE 'calendar:v_' AND key <> 'calendar:v5'
-      OR (key LIKE 'discover_favorites:%' AND key NOT LIKE 'discover_favorites:v5:%')
-      OR (key LIKE 'discover_gaps:%' AND key NOT LIKE 'discover_gaps:v4:%')`
+      OR (key LIKE 'discover_favorites:%' AND key NOT LIKE 'discover_favorites:v6:%')
+      OR (key LIKE 'discover_gaps:%' AND key NOT LIKE 'discover_gaps:v5:%')`
 ).run();
 
 // Films explicitly marked "no me interesa" in the gaps flow: excluded from

@@ -114,7 +114,7 @@ function today() {
  * not-owned) films, ranked by TMDB vote count.
  */
 export async function libraryGaps({ role = 'director', people = 20, perPerson = 8, offset = 0, refresh = false } = {}) {
-  const cacheKey = `discover_gaps:v4:${role}:${people}:${perPerson}:${offset}`;
+  const cacheKey = `discover_gaps:v5:${role}:${people}:${perPerson}:${offset}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 12 * HOUR);
     if (hit) return hit;
@@ -241,7 +241,7 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
  * "top by count", and strictly in the role you follow them for.
  */
 export async function favoritesGaps({ perPerson = 8, refresh = false, role: onlyRole = null } = {}) {
-  const cacheKey = `discover_favorites:v5:${onlyRole || 'all'}:${perPerson}`;
+  const cacheKey = `discover_favorites:v6:${onlyRole || 'all'}:${perPerson}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 6 * HOUR);
     if (hit) return hit;
