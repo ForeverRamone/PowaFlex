@@ -1,7 +1,7 @@
 import { db, getSetting, setSetting } from './db.js';
 import { runSync, syncStatus } from './plex.js';
 import { rematchLetterboxd, resolveUnmatchedLb, importLetterboxdRss } from './letterboxd.js';
-import { getCalendarCached, enrichPeopleLife } from './tmdb.js';
+import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles } from './tmdb.js';
 import { syncRatings } from './mdblist.js';
 import { radarrSyncMovies } from './radarr.js';
 import { runAutoRadarr } from './automation.js';
@@ -43,6 +43,17 @@ function buildSteps({ includeAutoRadarr }) {
         const r = await runSync(); // resolves to syncStatus
         if (r?.error) throw new Error(r.error);
         return `${r?.done ?? 0} películas · ${Number(getSetting('last_sync_added') || 0)} nuevas`;
+      },
+    },
+    {
+      // justo después de Plex: la sincronización reescribe `title` con lo que
+      // diga su agente, así que hay que volver a normalizar cada vez
+      key: 'titles',
+      label: 'Normalizar títulos al alfabeto latino',
+      enabled: () => has('tmdb_key'),
+      run: async () => {
+        const r = await normalizeLibraryTitles();
+        return r.renamed ? `${r.renamed} de ${r.checked} títulos traducidos` : 'nada que traducir';
       },
     },
     {

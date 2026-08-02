@@ -1,5 +1,6 @@
 import { db, getSetting, cacheRead, cacheWrite } from './db.js';
 import { watchedIndex, isWatched, normTitle } from './letterboxd.js';
+import { needsLatin, readableTitle } from './titles.js';
 
 const DAY = 24 * 3600 * 1000;
 
@@ -257,6 +258,10 @@ export async function enrichRuntimes(items, { concurrency = 6, withCredits = fal
     }
   }
   await Promise.all(Array.from({ length: concurrency }, worker));
+  // punto único por el que pasan filmografías, huecos y favoritos: si TMDB no
+  // tenía traducción y devolvió el título original en otro alfabeto, aquí se
+  // cambia por el internacional
+  await latinizeTitles(items, { concurrency });
   return items;
 }
 
@@ -378,13 +383,95 @@ export async function backfillEnglishTitles({ budget = 3000 } = {}) {
   return { done, remaining: pending - done };
 }
 
+/**
+ * Deja legibles los títulos de la biblioteca. Plex guarda lo que le da su
+ * agente, así que una película china aparece como «志愿军：雄兵出击» en toda la
+ * app; aquí se cambia por el título internacional, que es el que enseñan
+ * Letterboxd y Radarr. El de Plex queda intacto en `plex_title`, y como el
+ * emparejado va por id (tmdb_id / rating_key), esto no toca nada más.
+ *
+ * Se vuelve a pasar después de cada sincronización, porque Plex reescribe
+ * `title` con el suyo cada vez.
+ */
+export async function normalizeLibraryTitles({ concurrency = 6 } = {}) {
+  const pending = db
+    .prepare('SELECT rating_key, tmdb_id, title, english_title FROM movies WHERE title IS NOT NULL')
+    .all()
+    .filter((r) => needsLatin(r.title));
+  if (!pending.length) return { checked: 0, renamed: 0 };
+
+  const upd = db.prepare('UPDATE movies SET title = ?, english_title = ? WHERE rating_key = ?');
+  let renamed = 0;
+  let i = 0;
+  async function worker() {
+    for (;;) {
+      const idx = i++;
+      if (idx >= pending.length) return;
+      const row = pending[idx];
+      // el backfill de títulos en inglés ya puede tenerlo; si no, se pide
+      let en = row.english_title || null;
+      if (!en && row.tmdb_id) en = await englishTitle(row.tmdb_id);
+      if (!en || needsLatin(en)) continue;
+      upd.run(en, en, row.rating_key);
+      renamed++;
+      setBuildProgress('titles', 'Normalizando títulos…', renamed, pending.length);
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  clearBuildProgress('titles');
+  return { checked: pending.length, renamed };
+}
+
+/** El título internacional (inglés) de una película, cacheado 30 días. */
+export async function englishTitle(tmdbId) {
+  if (!tmdbId) return null;
+  try {
+    const en = await tmdbGet(
+      `/movie/${tmdbId}`,
+      { language: 'en-US' },
+      { cacheKey: `movie_en:${tmdbId}`, cacheMs: 30 * DAY }
+    );
+    return en.title || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Deja legibles los títulos de una tanda de fichas de TMDB: solo pide el título
+ * internacional de las que no están en alfabeto latino, así que en una
+ * filmografía normal no sale ni una petición de más. Ver `titles.js`.
+ */
+export async function latinizeTitles(items, { concurrency = 6 } = {}) {
+  const pending = items.filter((i) => i?.tmdb_id && needsLatin(i.title));
+  if (!pending.length) return items;
+  let i = 0;
+  async function worker() {
+    for (;;) {
+      const idx = i++;
+      if (idx >= pending.length) return;
+      const it = pending[idx];
+      const en = await englishTitle(it.tmdb_id);
+      if (en) {
+        it.original_title = it.original_title || it.title;
+        it.title = readableTitle(it.title, en);
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  return items;
+}
+
 /** Full TMDB movie detail with credits (cached). */
 export async function tmdbMovieDetail(tmdbId) {
-  return tmdbGet(
+  const det = await tmdbGet(
     `/movie/${tmdbId}`,
     { append_to_response: 'credits' },
     { cacheKey: `movie_cr:${tmdbId}:${lang()}`, cacheMs: 7 * DAY }
   );
+  if (!needsLatin(det.title)) return det;
+  // la ficha sigue enseñando el original debajo: solo cambia el titular
+  return { ...det, title: readableTitle(det.title, await englishTitle(tmdbId)) };
 }
 
 /** Poster path for a TMDB movie id (cached). Null if unknown. */
@@ -688,6 +775,7 @@ export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays 
     }
   }
   await Promise.all(Array.from({ length: 5 }, enrichWorker));
+  await latinizeTitles(out);
   clearBuildProgress('calendar');
 
   out.sort((a, b) => (a.date || '9999-99-99').localeCompare(b.date || '9999-99-99'));

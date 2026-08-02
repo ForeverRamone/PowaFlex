@@ -1,5 +1,5 @@
 import { db, getSetting } from './db.js';
-import { tmdbGet, collectionDetails } from './tmdb.js';
+import { tmdbGet, collectionDetails, latinizeTitles } from './tmdb.js';
 
 const DAY = 24 * 3600 * 1000;
 const lang = () => getSetting('language') || 'es-ES';
@@ -150,6 +150,10 @@ export async function enrichSagaStats({ force = false } = {}) {
           const released = parts.filter((p) => p.release_date && p.release_date <= now);
           const owned = released.filter((p) => inLib.has(p.id));
           const missing = released.filter((p) => !inLib.has(p.id));
+          // los títulos de la saga se guardan ya legibles: esta lista se enseña
+          // tal cual y no vuelve a pasar por TMDB
+          await latinizeTitles(missing.map((p) => ({ tmdb_id: p.id, title: p.title, ref: p })))
+            .then((fixed) => fixed.forEach((f) => { f.ref.title = f.title; }));
           ins.run(
             cid, released.length, owned.length, missing.length,
             parts.filter((p) => !p.release_date || p.release_date > now).length,
@@ -180,6 +184,7 @@ export async function sagaComplete(collectionId) {
     .map((p) => ({
       tmdb_id: p.id,
       title: p.title,
+      original_title: p.original_title,
       date: p.release_date || null,
       released: !!p.release_date && p.release_date <= now,
       owned: inLib.has(p.id),
@@ -187,6 +192,7 @@ export async function sagaComplete(collectionId) {
       vote: p.vote_average,
     }))
     .sort((a, b) => (a.date || '9999') < (b.date || '9999') ? -1 : 1);
+  await latinizeTitles(parts);
   const released = parts.filter((p) => p.released);
   return {
     collection_id: det.id,

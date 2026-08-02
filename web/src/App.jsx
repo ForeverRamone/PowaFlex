@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Spinner, Toaster, GlobalSearch, LetterboxdLogo } from './components.jsx';
 import { api, applyTheme } from './api.js';
+import { ScrollMemory } from './scroll.js';
 
 // lazy per route so heavy pages (and recharts) don't weigh down the first paint
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
@@ -85,6 +86,7 @@ function Shell() {
 
   return (
     <div className="flex min-h-screen">
+      <ScrollMemory />
       {/* mobile top bar */}
       <div className="app-nav md:hidden fixed top-0 inset-x-0 z-30 flex items-center gap-3 bg-ink-900 border-b border-ink-700 px-4 h-14">
         <button onClick={() => setOpen(true)} className="text-zinc-300 hover:text-zinc-100" aria-label="Menú">

@@ -61,6 +61,24 @@ function GapCard({ f, radarrIds, addRadarrId, onDismiss, person }) {
   );
 }
 
+// «¿y este quién era?»: sus dos películas más reconocibles junto al nombre, para
+// no tener que abrir la ficha de cada director/a de la lista
+function Signature({ films }) {
+  if (!films?.length) return null;
+  return (
+    <span className="text-xs text-zinc-500 font-normal">
+      {' ('}
+      {films.map((f, i) => (
+        <span key={f.tmdb_id ?? i}>
+          {i > 0 && ', '}
+          <i>{f.title}</i>
+        </span>
+      ))}
+      {')'}
+    </span>
+  );
+}
+
 function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, addRadarrId }) {
   const shown = visibleMissing(p, show, minScore, dismissed);
   const alive = (p.missing || []).filter((f) => !dismissed.has(f.tmdb_id));
@@ -73,7 +91,7 @@ function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, 
     return (
       <section className="card p-3 mb-3 flex items-center justify-between flex-wrap gap-2 text-sm">
         <Link to={`/personas/${p.id}?role=${p.role || role}`} className="font-semibold text-zinc-300 hover:text-gold-400">
-          {p.name} →
+          {p.name} →<Signature films={p.signature} />
         </Link>
         <span className="text-xs text-zinc-500">
           {p.missingTotal === 0 ? '✓ filmografía completa' : `${p.missingTotal} te faltan · todas ocultas por tus filtros`}
@@ -85,8 +103,8 @@ function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, 
   return (
     <section className="card p-4 mb-5">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-        <Link to={`/personas/${p.id}?role=${p.role || role}`} className="font-semibold text-zinc-100 hover:text-gold-400">
-          {p.name} →
+        <Link to={`/personas/${p.id}?role=${p.role || role}`} className="font-semibold text-zinc-100 hover:text-gold-400 min-w-0">
+          {p.name} →<Signature films={p.signature} />
         </Link>
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs text-zinc-400">

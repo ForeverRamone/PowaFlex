@@ -1,5 +1,19 @@
 # Changelog
 
+## Alpha 0.9.1 (0.9.1-alpha) — 2026-08-02
+
+- **Al volver atrás, la página se queda donde la dejaste.** Bajabas por una lista, entrabas en la
+  ficha de un director y al volver aparecías arriba del todo. Ahora se recupera el sitio exacto,
+  también cuando la página tarda en cargar. Y al entrar en una ficha se empieza por arriba, en vez
+  de heredar el desplazamiento de la lista anterior.
+- **Títulos legibles en toda la app.** Las películas sin traducción salían en su alfabeto original
+  («志愿军：雄兵出击»). Ahora, cuando un título no está en alfabeto latino, se muestra el
+  internacional, el mismo que ves en Letterboxd y en Radarr. Las españolas —y cualquiera con
+  traducción— se quedan como están, el título original sigue visible en la ficha y nada de esto
+  toca el emparejado con Plex, Radarr o Letterboxd, que va por identificador.
+- **En «Descubrir huecos», cada director/a lleva al lado sus dos películas más conocidas**, para
+  saber de quién se trata sin abrir su ficha.
+
 ## Alpha 0.9 (0.9.0-alpha) — 2026-08-02
 
 ### Notas de Letterboxd

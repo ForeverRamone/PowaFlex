@@ -61,18 +61,19 @@ function guidToIds(guids = []) {
 }
 
 const upsertMovie = db.prepare(`
-INSERT INTO movies (rating_key, section_id, title, sort_title, original_title, year, release_date,
+INSERT INTO movies (rating_key, section_id, title, plex_title, sort_title, original_title, year, release_date,
   added_at, updated_at, last_viewed_at, view_count, user_rating, audience_rating, critic_rating,
   duration_ms, content_rating, studio, tagline, summary, tmdb_id, imdb_id, thumb, art,
   resolution, video_codec, audio_codec, audio_channels, container, size_bytes, bitrate, media_count, edition, file_path, full_synced)
-VALUES (@rating_key, @section_id, @title, @sort_title, @original_title, @year, @release_date,
+VALUES (@rating_key, @section_id, @title, @title, @sort_title, @original_title, @year, @release_date,
   @added_at, @updated_at, @last_viewed_at, @view_count, @user_rating, @audience_rating, @critic_rating,
   @duration_ms, @content_rating, @studio, @tagline, @summary, @tmdb_id, @imdb_id, @thumb, @art,
   @resolution, @video_codec, @audio_codec, @audio_channels, @container, @size_bytes, @bitrate, @media_count, @edition, @file_path,
   COALESCE((SELECT CASE WHEN full_synced = 1 AND updated_at = @updated_at THEN 1 ELSE 0 END
             FROM movies WHERE rating_key = @rating_key), 0))
 ON CONFLICT(rating_key) DO UPDATE SET
-  section_id = excluded.section_id, title = excluded.title, sort_title = excluded.sort_title,
+  section_id = excluded.section_id, title = excluded.title, plex_title = excluded.plex_title,
+  sort_title = excluded.sort_title,
   original_title = excluded.original_title, year = excluded.year, release_date = excluded.release_date,
   added_at = excluded.added_at, last_viewed_at = excluded.last_viewed_at,
   view_count = excluded.view_count, user_rating = excluded.user_rating,

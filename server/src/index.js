@@ -22,6 +22,7 @@ import {
   trackByTmdb,
   searchPeople,
   findPersonInfo,
+  normalizeLibraryTitles,
 } from './tmdb.js';
 import {
   radarrTest,
@@ -162,7 +163,12 @@ app.get('/api/setup-state', async () => {
 app.post('/api/sync', async (req) => {
   const force = !!req.body?.force;
   if (!syncStatus.running) {
-    runSync({ force }).then(() => rematchLetterboxd()).catch(() => {});
+    // Plex reescribe `title` con lo que diga su agente, así que los títulos en
+    // otros alfabetos se vuelven a normalizar en cuanto termina de sincronizar
+    runSync({ force })
+      .then(() => rematchLetterboxd())
+      .then(() => (getSetting('tmdb_key') ? normalizeLibraryTitles() : null))
+      .catch(() => {});
   }
   return syncStatus;
 });

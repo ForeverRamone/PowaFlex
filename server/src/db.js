@@ -318,6 +318,9 @@ ensureColumn('lb_lists', 'hidden', 'hidden INTEGER DEFAULT 0');
 // TMDB English title: Plex only knows the Spanish + original titles, so
 // English-titled sources (Letterboxd lists/CSVs) miss third-language films
 ensureColumn('movies', 'english_title', 'english_title TEXT');
+// El título de Plex tal cual, antes de normalizarlo a alfabeto latino: `title`
+// es el que se muestra y este el que dice Plex, para no perderlo nunca.
+ensureColumn('movies', 'plex_title', 'plex_title TEXT');
 
 // One-time repair: the RSS import used to store rating 0 for watched-without-
 // rating entries (Letterboxd's minimum is 0.5, so 0 can only be that bug)

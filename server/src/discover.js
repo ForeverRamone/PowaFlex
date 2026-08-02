@@ -1,7 +1,7 @@
 import { db, cacheRead, cacheWrite, getSetting } from './db.js';
 import {
   personCredits, findPersonInfo, resolvePerson, enrichRuntimes, setBuildProgress, clearBuildProgress,
-  buildRoleItems, roleStats, classifyGenres,
+  buildRoleItems, roleStats, classifyGenres, latinizeTitles,
 } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { matchMovie, watchedIndex, isWatched } from './letterboxd.js';
@@ -44,6 +44,23 @@ const minVotesFor = (role) =>
 
 const dismissedIds = () =>
   new Set(db.prepare('SELECT tmdb_id FROM dismissed_movies').all().map((r) => r.tmdb_id));
+
+/**
+ * Las dos películas por las que se reconoce a alguien, para no tener que abrir
+ * su ficha y adivinar quién es. Manda la nota, pero solo entre las que tienen
+ * votos suficientes: un 9,4 con doce votos no identifica a nadie. Si ninguna
+ * llega al mínimo (gente con poca obra en TMDB), deciden los votos.
+ */
+const SIGNATURE_MIN_VOTES = 300;
+export function signatureFilms(items, n = 2) {
+  const released = items.filter((i) => i && i.title && i.released !== false);
+  const solid = released.filter((i) => (i.votes || 0) >= SIGNATURE_MIN_VOTES);
+  const pool = solid.length >= n ? solid : released;
+  return [...pool]
+    .sort((a, b) => (b.vote || 0) - (a.vote || 0) || (b.votes || 0) - (a.votes || 0))
+    .slice(0, n)
+    .map((i) => ({ tmdb_id: i.tmdb_id, title: i.title, year: i.date ? Number(String(i.date).slice(0, 4)) : null }));
+}
 
 // Shorts, documentaries, concert films, TV movies and cameos are not gaps a
 // completist has to fill: they never take a slot in the per-person quota.
@@ -145,12 +162,14 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
         let owned = 0;
         let dismissedN = 0;
         const missing = [];
+        const releasedCredits = [];
         for (const c of raw) {
           if (c.video || seen.has(c.id)) continue;
           seen.add(c.id);
           const isReleased = !!c.release_date && c.release_date <= now;
           if (!isReleased) continue;
           released++;
+          releasedCredits.push({ tmdb_id: c.id, title: c.title, date: c.release_date, vote: c.vote_average, votes: c.vote_count });
           if (ownsFilm(c, inLib)) {
             owned++;
             continue;
@@ -189,6 +208,8 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
             missingTotal: missing.length,
             noiseTotal: missing.filter(isNoise).length,
             dismissed: dismissedN,
+            // «¿quién era este?»: sus dos títulos más reconocibles
+            signature: signatureFilms(releasedCredits),
             // keep a few extra so the score re-rank + noise partition can refill
             missing: missing.slice(0, perPerson * 3),
           });
@@ -202,6 +223,8 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
 
   out.sort((a, b) => b.inLibrary - a.inLibrary);
   await finishMissing(out, perPerson);
+  // los títulos insignia vienen crudos de los créditos, no de enrichRuntimes
+  await latinizeTitles(out.flatMap((p) => p.signature || []));
   clearBuildProgress('discover');
   const result = {
     generatedAt: Date.now(), role, people: out,
@@ -290,6 +313,7 @@ export async function favoritesGaps({ perPerson = 8, refresh = false, role: only
           missingTotal: Math.max(0, stats.released - stats.owned),
           noiseTotal: missing.filter(isNoise).length,
           dismissed: dismissedN,
+          signature: signatureFilms(items),
           missing: missing.slice(0, perPerson * 3),
         });
       } catch (err) {
