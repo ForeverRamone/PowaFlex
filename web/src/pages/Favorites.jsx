@@ -262,6 +262,18 @@ export default function Favorites() {
   const [favSort, setFavSortState] = useState(() => localStorage.getItem('fav_sort') || 'titulos');
   const setFavSort = (v) => { setFavSortState(v); localStorage.setItem('fav_sort', v); };
   const limpiarFiltros = () => { setFavSearch(''); setFavSort('titulos'); setHideDead(false); };
+  // un nombre por línea, listo para pegarlo en «añadir por nombres» de otra
+  // instalación de PowaFlex — todo en el navegador, sin servidor
+  const exportarTxt = () => {
+    const nombres = roleFavs.map((t) => t.name).join('\n');
+    const blob = new Blob([nombres + '\n'], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `powaflex-${role === 'director' ? 'directores' : 'actores'}-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast(`⬇ ${roleFavs.length} nombres exportados`);
+  };
   const hayFiltros = () => favSearch.trim() || favSort !== 'titulos' || hideDead;
   const [pruneMode, setPruneMode] = useState(false);
   const [selected, setSelected] = useState(new Set());
@@ -572,6 +584,13 @@ export default function Favorites() {
                 {hayFiltros() && (
                   <button className="btn-ghost !py-1.5 text-xs" onClick={limpiarFiltros}>✕ Limpiar filtros</button>
                 )}
+                <button
+                  className="btn-ghost !py-1.5 text-xs"
+                  onClick={exportarTxt}
+                  title="Un nombre por línea, listo para pegarlo en «añadir por nombres» de otra instalación"
+                >
+                  ⬇ Exportar .txt
+                </button>
               </div>
 
               {pruneMode && (

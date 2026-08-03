@@ -212,9 +212,10 @@ export default function About() {
           <p>
             Las secciones oficiales de los grandes festivales —los seis de la vía directa al Óscar internacional
             (Cannes, Venecia, Berlinale, Sundance, Toronto y Busan) más San Sebastián y sus Horizontes Latinos—,
-            edición a edición, el palmarés histórico de cada premio, los grandes premios anuales (Goya, César,
-            BAFTA, Cine Europeo y el Óscar internacional) y el canon <b>Sight &amp; Sound 2022</b> de la
-            crítica al completo. Todo casado con tu Plex: manda a Radarr lo que falte y sigue a sus directores/as
+            edición a edición, el palmarés histórico de cada premio, los grandes premios anuales con palmarés y
+            nominadas por año (Goya, César, BAFTA, Cine Europeo, Óscar a la mejor película y Óscar
+            internacional) y el canon <b>Sight &amp; Sound 2022</b> de la crítica al completo. Cualquier
+            emparejado con TMDB se corrige a mano desde la propia tarjeta (✎). Todo casado con tu Plex: manda a Radarr lo que falte y sigue a sus directores/as
             —de una en una o la sección entera— para que sus estrenos entren en el calendario. El pase nocturno
             vigila las ediciones nuevas y te lo cuenta en el Dashboard en cuanto un festival publica su selección.
           </p>

@@ -1,5 +1,27 @@
 # Changelog
 
+## Alpha 0.9.11 (0.9.11-alpha) — 2026-08-03
+
+- **La página pasa a llamarse «Festivales y premios»**, con los premios ganando su segunda vista:
+  además del palmarés, las **nominadas de cada año** con la ganadora marcada (🏆) — incluidos los
+  ex aequo, como el doble Goya de 2024.
+- **El Óscar a la mejor película, completo**: las 600 nominadas de la historia (1927–2025) con sus
+  97 ganadoras. Wikipedia retiró las tablas de ese artículo en 2026, así que viaja como dataset de
+  Wikidata empaquetado con la app — con los TMDB id resueltos de origen: cero emparejado, cero
+  fallos posibles.
+- **Corrección manual de emparejados**: el ✎ de cada tarjeta abre un buscador de TMDB con
+  carteles; eliges la ficha correcta y la corrección se recuerda para siempre (y manda sobre el
+  automático). Para ese caso raro que ninguna regla cazará nunca.
+- **Los «(ex-æquo)» de las tablas viejas de BAFTA ya no rompen la búsqueda**: los empates y los
+  títulos originales pegados entre paréntesis en la misma celda se limpian antes de buscar
+  (Ballad of a Soldier, The Hustler…).
+- **Exportar favoritos a .txt** desde Favoritos: un nombre por línea, listo para pegarlo en
+  «añadir por nombres» de otra instalación de PowaFlex.
+- Sobre las fichas blancas en cadena que reportaste (Amour, The Artist, Cold War→otra…): eran los
+  bucles de reintento y los agujeros de los sin-créditos ya corregidos en la 0.9.9 y la 0.9.10 —
+  esta versión añade además una guarda para que un año roto en la tabla nunca deje como únicos
+  candidatos a la morralla sin fecha.
+
 ## Alpha 0.9.10 (0.9.10-alpha) — 2026-08-03
 
 - **Las fichas de TMDB sin equipo cargado solo valen como último recurso.** Una «Undercover»

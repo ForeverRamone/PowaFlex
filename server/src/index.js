@@ -23,6 +23,7 @@ import {
   suggestedPeople,
   trackByTmdb,
   followFacets,
+  searchMovieCandidates,
   searchPeople,
   findPersonInfo,
   normalizeLibraryTitles,
@@ -70,7 +71,7 @@ import {
   letterboxdSummary,
 } from './letterboxd.js';
 import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
-import { festivalsIndex, festivalEdition, festivalWinners } from './festivals.js';
+import { festivalsIndex, festivalEdition, festivalWinners, festivalOverrideKey } from './festivals.js';
 import { dataHealth } from './datahealth.js';
 import { runFullRefresh, refreshStatus, refreshHistory, nightlyHealth } from './refresh.js';
 import { availability, isUpgradeable } from './justwatch.js';
@@ -242,6 +243,41 @@ app.get('/api/setup-state', async () => {
 // --- festivales ----------------------------------------------------------------
 
 app.get('/api/festivals', async () => festivalsIndex());
+
+// buscador para corregir a mano un emparejado (candidatos con cartel)
+app.get('/api/festivals/match-candidates', async (req, reply) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (!q) return { candidates: [] };
+    const year = Number(req.query.year) || null;
+    return { candidates: (await searchMovieCandidates(q, year)).slice(0, 8) };
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// fijar (o borrar, con tmdbId null) una corrección manual de emparejado
+app.post('/api/festivals/match', async (req, reply) => {
+  const { title, year, director = null, tmdbId = null } = req.body || {};
+  if (!title || !Number(year)) {
+    reply.code(400);
+    return { error: 'Faltan el título o el año de la fila a corregir' };
+  }
+  const key = festivalOverrideKey(title, Number(year), director);
+  if (tmdbId) {
+    db.prepare(
+      `INSERT INTO match_overrides (key, tmdb_id, set_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET tmdb_id = excluded.tmdb_id, set_at = excluded.set_at`
+    ).run(key, Number(tmdbId), Date.now());
+  } else {
+    db.prepare('DELETE FROM match_overrides WHERE key = ?').run(key);
+  }
+  // las páginas ya calculadas no saben del cambio: fuera, que se rehagan (es
+  // barato: el resto de emparejados sale de la caché film_match)
+  db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'festival:%'`).run();
+  return { ok: true };
+});
 
 // palmarés histórico del premio que clasifica (antes que :year para no chocar)
 app.get('/api/festivals/:key/palmares', async (req, reply) => {

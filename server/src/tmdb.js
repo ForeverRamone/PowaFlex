@@ -449,7 +449,7 @@ export async function searchMovieId(title, year = null) {
  */
 export async function searchMovieCandidates(title, year = null) {
   if (!title) return [];
-  const key = `movie_cands:${title.toLowerCase()}:${year || ''}`;
+  const key = `movie_cands2:${title.toLowerCase()}:${year || ''}`;
   const cached = cacheRead(key, 30 * DAY);
   if (cached) return cached.list || [];
   try {
@@ -459,7 +459,7 @@ export async function searchMovieCandidates(title, year = null) {
       for (const r of results || []) {
         if (!r?.id || seen.has(r.id)) continue;
         seen.add(r.id);
-        list.push({ id: r.id, title: r.title, original_title: r.original_title, date: r.release_date || null });
+        list.push({ id: r.id, title: r.title, original_title: r.original_title, date: r.release_date || null, poster_path: r.poster_path || null });
       }
     };
     if (year) add((await tmdbGet('/search/movie', { query: title, primary_release_year: year }, { cacheKey: null })).results);

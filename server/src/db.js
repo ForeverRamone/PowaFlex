@@ -119,6 +119,14 @@ CREATE TABLE IF NOT EXISTS refresh_runs (
   steps TEXT
 );
 
+-- Correcciones manuales de emparejado en Festivales/premios/cánones: la clave
+-- es título+año+director normalizados y manda sobre la resolución automática.
+CREATE TABLE IF NOT EXISTS match_overrides (
+  key TEXT PRIMARY KEY,
+  tmdb_id INTEGER,
+  set_at INTEGER
+);
+
 -- Novedades: cosas que el pase nocturno detecta y merecen contarse (una
 -- edición de festival publicada, una pedida que pasa a digital…). El UNIQUE
 -- (type, ref) es la deduplicación: cada hecho se cuenta UNA vez.

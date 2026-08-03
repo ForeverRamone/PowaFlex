@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { api } from '../api.js';
+import { api, tmdbImg } from '../api.js';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, Empty, StatusLegend, PageHeader, useRadarrIds,
 } from '../components.jsx';
@@ -30,6 +30,11 @@ export default function Festivals() {
   const [dirBusy, setDirBusy] = useState(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [followAllBusy, setFollowAllBusy] = useState(false);
+  // corrector manual de emparejado: película en edición + buscador
+  const [editar, setEditar] = useState(null);
+  const [busca, setBusca] = useState('');
+  const [candidatos, setCandidatos] = useState(null);
+  const [buscando, setBuscando] = useState(false);
 
   useEffect(() => {
     api('/festivals').then((r) => !r.error && setIndex(r));
@@ -113,12 +118,40 @@ export default function Festivals() {
     toast(`⭐ ${r.added} directores/as añadidos a favoritos${r.notFound?.length ? ` · ${r.notFound.length} sin resolver` : ''}`, 'success');
   };
 
+  const abrirCorrector = (f) => {
+    setEditar(f);
+    setBusca(f.title || '');
+    setCandidatos(null);
+  };
+  const buscarCandidatos = async () => {
+    if (!busca.trim()) return;
+    setBuscando(true);
+    const keyYear = view === 'palmares' ? editar.year : data?.year;
+    const r = await api(`/festivals/match-candidates?q=${encodeURIComponent(busca.trim())}&year=${keyYear || ''}`);
+    setBuscando(false);
+    setCandidatos(r.error ? [] : r.candidates || []);
+  };
+  const fijarMatch = async (tmdbId) => {
+    const keyYear = view === 'palmares' ? editar.year : data?.year;
+    const r = await api('/festivals/match', {
+      method: 'POST',
+      body: { title: editar.title, year: keyYear, director: editar.director, tmdbId },
+    });
+    if (r.error) {
+      toast(`⚠️ ${r.error}`, 'error');
+      return;
+    }
+    toast(tmdbId ? '✓ Emparejado corregido' : '✓ Corrección quitada');
+    setEditar(null);
+    load(fest, year, view);
+  };
+
   return (
     <div>
       <PageHeader
         eyebrow="La caza"
-        title="Festivales"
-        subtitle="Las secciones oficiales de los grandes festivales: los seis de la vía directa al Óscar internacional (reglas del 99.º Óscar) más San Sebastián y sus Horizontes Latinos."
+        title="Festivales y premios"
+        subtitle="Las secciones oficiales de los grandes festivales (los seis de la vía Óscar más San Sebastián), el palmarés y las nominadas de los premios de cada año, y los cánones de la crítica."
       />
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
@@ -173,7 +206,7 @@ export default function Festivals() {
         {!soloPalmares && (
           <div className="flex gap-2">
             <button onClick={() => setView('seleccion')} className={`${view === 'seleccion' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
-              Sección oficial por año
+              {info?.awardNominees ? 'Nominadas por año' : 'Sección oficial por año'}
             </button>
             <button onClick={() => setView('palmares')} className={`${view === 'palmares' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
               🏆 Palmarés histórico
@@ -239,7 +272,14 @@ export default function Festivals() {
               {films.map((f, i) => (
                 <div key={f.tmdb_id || `${f.title}-${i}`}>
                   {f.tmdb_id ? (
-                    <TmdbCard item={f}>
+                    <TmdbCard
+                      item={f}
+                      badge={
+                        f.winner ? (
+                          <span className="absolute top-1.5 right-1.5 on-art bg-black/70 text-[11px] px-1.5 py-0.5 rounded">🏆 Ganadora</span>
+                        ) : undefined
+                      }
+                    >
                       {f.mdb?.score > 0 && (
                         <div className="text-[11px] text-gold-400/90 tabular">
                           Σ {f.mdb.score}
@@ -256,6 +296,13 @@ export default function Festivals() {
                     </div>
                   )}
                   <div className="flex items-baseline gap-1.5">
+                    <button
+                      onClick={() => abrirCorrector(f)}
+                      title="Corregir el emparejado con TMDB a mano"
+                      className="text-[11px] text-zinc-600 hover:text-gold-400 shrink-0 cursor-pointer"
+                    >
+                      ✎
+                    </button>
                     {f.rank && (
                       <span className="text-[11px] text-gold-400 font-semibold tabular shrink-0" title={f.tied ? `Puesto ${f.rank} (empate)` : `Puesto ${f.rank}`}>
                         #{f.rank}
@@ -277,6 +324,65 @@ export default function Festivals() {
             </div>
           )}
         </>
+      )}
+
+      {editar && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto" onClick={() => setEditar(null)}>
+          <div className="card-raised p-4 w-full max-w-lg mt-16" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h3 className="font-semibold text-zinc-100 text-sm">
+                Corregir emparejado · «{editar.title}»{editar.director ? ` — ${editar.director}` : ''}
+              </h3>
+              <button className="text-zinc-500 hover:text-zinc-200" onClick={() => setEditar(null)}>✕</button>
+            </div>
+            <p className="text-[11px] text-zinc-500 mb-3">
+              Busca en TMDB y elige la ficha correcta. La corrección se recuerda y manda sobre el
+              emparejado automático.
+            </p>
+            <form
+              className="flex gap-2 mb-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                buscarCandidatos();
+              }}
+            >
+              <input className="input flex-1" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Título a buscar en TMDB…" />
+              <button type="submit" className="btn-gold" disabled={buscando}>
+                {buscando ? '…' : 'Buscar'}
+              </button>
+            </form>
+            {candidatos && candidatos.length === 0 && <Empty>Nada en TMDB con ese título.</Empty>}
+            {candidatos?.length > 0 && (
+              <div className="divide-y divide-ink-800 max-h-80 overflow-y-auto">
+                {candidatos.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => fijarMatch(c.id)}
+                    className="w-full flex items-center gap-3 py-2 text-left hover:bg-ink-800 px-2 cursor-pointer"
+                  >
+                    {c.poster_path ? (
+                      <img src={tmdbImg(c.poster_path, 'w92')} alt="" className="w-10 rounded border border-ink-700 shrink-0" />
+                    ) : (
+                      <span className="w-10 h-14 shrink-0 border border-ink-700 rounded flex items-center justify-center text-[9px] text-zinc-500">sin cartel</span>
+                    )}
+                    <span className="min-w-0">
+                      <span className="block text-sm text-zinc-200 truncate">{c.title}</span>
+                      <span className="block text-[11px] text-zinc-500 truncate">
+                        {c.date ? c.date.slice(0, 4) : 'sin fecha'}
+                        {c.original_title && c.original_title !== c.title ? ` · ${c.original_title}` : ''}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {editar.tmdb_id && (
+              <button className="btn-ghost !py-1 text-xs mt-3" onClick={() => fijarMatch(null)}>
+                Quitar corrección / volver al automático
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

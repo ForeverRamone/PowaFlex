@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { REGISTRY, parseSelectionTable, parseSundanceWinners, stripTags, directorsMatch } from '../src/festivals.js';
+import {
+  REGISTRY, parseSelectionTable, parseSundanceWinners, parseWinnersTables, stripTags, directorsMatch, cleanTableTitle,
+} from '../src/festivals.js';
 import { SIGHT_AND_SOUND_2022 } from '../src/data/sight-and-sound-2022.js';
 
 /**
@@ -166,6 +168,45 @@ test('el dataset de Sight & Sound 2022 está completo y bien formado', () => {
   assert.equal(n1.director, 'Chantal Akerman');
   assert.ok(REGISTRY.sightsound.onlyWinners);
   assert.equal(REGISTRY.sightsound.staticList, SIGHT_AND_SOUND_2022);
+});
+
+// Las tablas viejas de BAFTA pegan el «(ex-æquo)» y hasta el título original
+// entre paréntesis en la MISMA celda: sin limpiarlos, la búsqueda en TMDB no
+// encontraba nada (visto en producción).
+test('cleanTableTitle pela ex-æquo, títulos originales entre paréntesis y dagas', () => {
+  assert.equal(cleanTableTitle('The Hustler (ex-æquo)'), 'The Hustler');
+  assert.equal(
+    cleanTableTitle('Ballad of a Soldier (Баллада о солдате, Ballada o soldate) (ex-æquo)'),
+    'Ballad of a Soldier'
+  );
+  assert.equal(cleanTableTitle('Nomadland †'), 'Nomadland');
+  assert.equal(cleanTableTitle('Alpha (QP)'), 'Alpha');
+  // un título QUE ES un paréntesis no se queda en nada
+  assert.equal(cleanTableTitle('(Untitled)'), '(Untitled)');
+});
+
+// tabla mixta de premio (ganadora sombreada entre nominadas): keepAll devuelve
+// todas con su bandera, y el modo normal solo la ganadora
+const TABLA_PREMIO = `
+<table class="wikitable">
+<tr><th>Year</th><th>English title</th><th>Original title</th><th>Director(s)</th></tr>
+<tr><td rowspan="3">2024 (39th)</td><td style="background:#eedd82"><b>The 47</b></td><td style="background:#eedd82"><i>El 47</i></td><td style="background:#eedd82">Marcel Barrena</td></tr>
+<tr><td><i>Saturn Return</i></td><td><i>Segundo premio</i></td><td>Isaki Lacuesta</td></tr>
+<tr><td><i>The Red Virgin</i></td><td><i>La virgen roja</i></td><td>Paula Ortiz</td></tr>
+</table>`;
+
+test('parseWinnersTables: keepAll marca la ganadora entre las nominadas', () => {
+  const ganadoras = parseWinnersTables(TABLA_PREMIO);
+  assert.equal(ganadoras.length, 1);
+  assert.equal(ganadoras[0].title, 'The 47');
+  const todas = parseWinnersTables(TABLA_PREMIO, { keepAll: true });
+  assert.equal(todas.length, 3);
+  assert.deepEqual(todas.map((r) => [r.title, r.winner]), [
+    ['The 47', true],
+    ['Saturn Return', false],
+    ['The Red Virgin', false],
+  ]);
+  assert.ok(todas.every((r) => r.year === 2024));
 });
 
 test('stripTags limpia notas, estilos y entidades', () => {

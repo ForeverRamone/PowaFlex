@@ -46,7 +46,7 @@ const NAV_GROUPS = [
       { to: '/favoritos', label: 'Favoritos', Icon: Star },
       { to: '/descubrir', label: 'Descubrir huecos', Icon: Compass },
       { to: '/calendario', label: 'Cine venidero', Icon: CalendarDays },
-      { to: '/festivales', label: 'Festivales', Icon: Award },
+      { to: '/festivales', label: 'Festivales y premios', Icon: Award },
       { to: '/listas', label: 'Listas y retos', Icon: Trophy },
     ],
   },

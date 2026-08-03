@@ -19,6 +19,7 @@ import { searchMovieCandidates, movieDirectors, movieSummary } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { watchedIndex, isWatched } from './letterboxd.js';
 import { SIGHT_AND_SOUND_2022 } from './data/sight-and-sound-2022.js';
+import { OSCAR_BEST_PICTURE } from './data/oscar-best-picture.js';
 
 const DAY = 24 * 3600 * 1000;
 
@@ -122,14 +123,16 @@ export const REGISTRY = {
     onlyWinners: true,
     staticList: SIGHT_AND_SOUND_2022,
   },
-  // --- premios anuales: solo palmarés, del artículo-lista de cada premio.
-  // Sus tablas mezclan ganadora y nominadas con la ganadora sombreada: el
-  // filtro de resaltadas de parseWinnersTables se queda solo con el palmarés.
+  // --- premios anuales, del artículo-lista de cada premio. Sus tablas llevan
+  // la ganadora sombreada entre las nominadas: el palmarés es el sombreado, y
+  // la vista por año (`awardNominees`) enseña TODAS las candidatas del año con
+  // su 🏆 en la ganadora.
   goya: {
     name: 'Premios Goya',
     award: 'Goya a la mejor película',
     group: 'premio',
-    onlyWinners: true,
+    awardNominees: true,
+    sinceYear: 1986,
     awardPage: 'Goya Award for Best Film',
     awardSection: /^winners and nominees$/i,
   },
@@ -137,7 +140,8 @@ export const REGISTRY = {
     name: 'Premios César',
     award: 'César a la mejor película',
     group: 'premio',
-    onlyWinners: true,
+    awardNominees: true,
+    sinceYear: 1976,
     awardPage: 'César Award for Best Film',
     awardSection: /^winners and nominees$/i,
   },
@@ -145,7 +149,8 @@ export const REGISTRY = {
     name: 'BAFTA',
     award: 'BAFTA a la mejor película',
     group: 'premio',
-    onlyWinners: true,
+    awardNominees: true,
+    sinceYear: 1948,
     awardPage: 'BAFTA Award for Best Film',
     awardSection: /^winners and nominees$/i,
   },
@@ -153,15 +158,27 @@ export const REGISTRY = {
     name: 'Cine Europeo (EFA)',
     award: 'Premio del Cine Europeo a la mejor película',
     group: 'premio',
-    onlyWinners: true,
+    awardNominees: true,
+    sinceYear: 1988,
     awardPage: 'European Film Award for Best Film',
     awardSection: /^winners and nominees$/i,
+  },
+  // El artículo de Wikipedia perdió sus tablas en 2026: este premio viaja como
+  // dataset de Wikidata empaquetado, con los TMDB id ya resueltos de origen.
+  oscar: {
+    name: 'Óscar a la mejor película',
+    award: 'Óscar a la mejor película (Best Picture)',
+    group: 'premio',
+    awardNominees: true,
+    sinceYear: 1927,
+    staticAward: OSCAR_BEST_PICTURE,
   },
   oscarint: {
     name: 'Óscar internacional',
     award: 'Óscar a la mejor película internacional',
     group: 'premio',
-    onlyWinners: true,
+    awardNominees: true,
+    sinceYear: 1947,
     awardPage: 'List of Academy Award winners and nominees for Best International Feature Film',
     awardSection: /^winners and nominees$/i,
   },
@@ -192,6 +209,7 @@ export function festivalsIndex() {
       group: f.group || 'festival',
       sinceYear: f.sinceYear ?? null,
       onlyWinners: !!f.onlyWinners,
+      awardNominees: !!f.awardNominees,
     })),
   };
 }
@@ -233,6 +251,24 @@ export function stripTags(html) {
 }
 
 /**
+ * Limpia un título de celda de tabla: marcadores de premio («Alpha (QP)»), el
+ * «(ex-æquo)» de los empates de BAFTA, dagas, y los paréntesis finales con el
+ * título original que las tablas viejas pegan en la misma celda («Ballad of a
+ * Soldier (Баллада о солдате, Ballada o soldate)»). Los grupos finales de
+ * paréntesis se pelan repetidamente: un título real no termina en paréntesis.
+ */
+export function cleanTableTitle(s) {
+  if (!s) return null;
+  let t = String(s).replace(/†/g, '').trim();
+  for (let i = 0; i < 3; i++) {
+    const pelado = t.replace(/\s*\([^()]*\)$/, '').trim();
+    if (pelado === t || !pelado) break;
+    t = pelado;
+  }
+  return t || String(s).replace(/†/g, '').trim();
+}
+
+/**
  * Saca de la sección la primera wikitable que parezca una selección: necesita
  * una columna de director/a y otra de título. Las tablas de estos artículos
  * llevan cabeceras tipo «English title / Original title / Director(s) /
@@ -268,11 +304,9 @@ export function parseSelectionTable(html, { all = false } = {}) {
       };
       const rawTitle = cell(idxTitle) || (sinOriginal ? null : cell(idxOrig));
       if (!rawTitle) continue;
-      // fuera los marcadores de premio pegados al título: «Alpha (QP)», «(CdO)»
-      const clean = (s) => (s ? s.replace(/\s*\([A-Z][A-Za-z'’.]{0,4}\)\s*$/, '').trim() : null);
       out.push({
-        title: clean(rawTitle),
-        original_title: sinOriginal ? clean(rawTitle) : clean(cell(idxOrig)),
+        title: cleanTableTitle(rawTitle),
+        original_title: sinOriginal ? cleanTableTitle(rawTitle) : cleanTableTitle(cell(idxOrig)),
         director: cell(idxDir) || null,
         country: cell(idxCountry) || null,
       });
@@ -294,7 +328,7 @@ export function parseSelectionTable(html, { all = false } = {}) {
  * se recoloca aquí. Devuelve filas {year, title, original_title, director,
  * country}, de la más reciente a la más antigua.
  */
-export function parseWinnersTables(html) {
+export function parseWinnersTables(html, { keepAll = false } = {}) {
   const out = [];
   const tables = String(html || '').match(/<table[^>]*wikitable[\s\S]*?<\/table>/gi) || [];
   for (const t of tables) {
@@ -339,9 +373,8 @@ export function parseWinnersTables(html) {
         const j = sinOriginal && i > idxOrig ? i - 1 : i;
         return j < cells.length ? cells[j] : null;
       };
-      const clean = (s) => (s ? s.replace(/†/g, '').replace(/\s*\([A-Z][A-Za-z'’.]{0,4}\)\s*$/, '').trim() : null);
       const director = cell(idxDir);
-      const title = clean(cell(idxTitle));
+      const title = cleanTableTitle(cell(idxTitle));
       // años sin premio (COVID, festival cancelado) vienen sin director
       if (!lastYear || !title || !director) continue;
       delTable.push({
@@ -351,14 +384,22 @@ export function parseWinnersTables(html) {
         film: {
           year: lastYear,
           title,
-          original_title: sinOriginal ? title : clean(cell(idxOrig)) || title,
+          original_title: sinOriginal ? title : cleanTableTitle(cell(idxOrig)) || title,
           director,
           country: cell(idxCountry),
         },
       });
     }
     const hi = delTable.filter((r) => r.highlighted);
-    for (const r of hi.length && hi.length < delTable.length ? hi : delTable) out.push(r.film);
+    // tabla mixta (ganadora sombreada entre nominadas) vs tabla de solo
+    // ganadoras (Palme): en la mixta, «winner» es el sombreado; en la de solo
+    // ganadoras lo son todas
+    const mixta = hi.length && hi.length < delTable.length;
+    if (keepAll) {
+      for (const r of delTable) out.push({ ...r.film, winner: mixta ? r.highlighted : true });
+    } else {
+      for (const r of mixta ? hi : delTable) out.push(r.film);
+    }
   }
   return out.sort((a, b) => b.year - a.year);
 }
@@ -491,9 +532,19 @@ export function directorsMatch(wikiDirector, tmdbDirectors) {
  * coincide con la de la tabla de Wikipedia; si ninguno la demuestra, mejor sin
  * ficha que con la ficha equivocada.
  */
+/** Clave estable de un emparejado (título+año+director normalizados): la usan
+ *  la caché film_match y las correcciones manuales de match_overrides. */
+export function festivalOverrideKey(title, year, director) {
+  return `${normName(title)}:${Number(year)}:${normName(director || '')}`;
+}
+
 async function resolveFilms(rows, yearOf) {
   const films = new Array(rows.length);
   let errors = 0; // fallos de RED (429 de TMDB…): quien llama no debe cachear
+  // correcciones manuales del usuario: mandan sobre todo lo demás
+  const overrides = new Map(
+    db.prepare('SELECT key, tmdb_id FROM match_overrides').all().map((o) => [o.key, o.tmdb_id])
+  );
   // para desempatar dobles legítimos (Fanny y Alexander cine vs TV, ambos de
   // Bergman): entre candidatos verificados, gana el que YA está en tu Plex
   const inLib = new Set(db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((m) => m.tmdb_id));
@@ -510,8 +561,11 @@ async function resolveFilms(rows, yearOf) {
       // entero y CADA visita relanzaba la ráfaga completa contra TMDB — que
       // volvía a cortar. Con la caché por película, cada reintento solo toca
       // lo que falló y converge en un par de cargas.
-      const matchKey = `film_match:v2:${normName(r.title)}:${y}:${normName(r.director || '')}`;
-      const matchHit = cacheRead(matchKey, 30 * DAY);
+      const claveBase = festivalOverrideKey(r.title, y, r.director);
+      const matchKey = `film_match:v2:${claveBase}`;
+      // corrección manual: ni búsqueda ni verificación, lo que dijo el usuario
+      const override = overrides.has(claveBase) ? overrides.get(claveBase) : undefined;
+      const matchHit = override !== undefined ? { id: override } : cacheRead(matchKey, 30 * DAY);
       if (matchHit?.id) {
         let sum = null;
         try {
@@ -529,6 +583,23 @@ async function resolveFilms(rows, yearOf) {
         continue;
       }
 
+      // filas con TMDB id de origen (dataset de Wikidata): nada que verificar
+      if (r.tmdb_id) {
+        let sum = null;
+        try {
+          sum = await movieSummary(r.tmdb_id);
+        } catch {
+          errors++;
+        }
+        films[idx] = {
+          ...r,
+          poster_path: sum?.poster_path || null,
+          date: sum?.date || null,
+          year: r.year ?? (sum?.date ? Number(sum.date.slice(0, 4)) : null),
+        };
+        continue;
+      }
+
       const cands = [...(await searchMovieCandidates(r.title, y))];
       if (r.original_title && r.original_title !== r.title) {
         const vistos = new Set(cands.map((c) => c.id));
@@ -538,13 +609,17 @@ async function resolveFilms(rows, yearOf) {
       }
       // el estreno puede bailar un año respecto al festival; sin fecha aún
       // (película recién anunciada) también vale como candidata
-      const enVentana = cands.filter((c) => !c.date || Math.abs(Number(c.date.slice(0, 4)) - y) <= 1);
+      // si el año de la fila viniera roto, filtrar por ventana descartaría a
+      // TODOS los candidatos con fecha y solo quedaría morralla sin fecha
+      const enVentana = Number.isFinite(y)
+        ? cands.filter((c) => !c.date || Math.abs(Number(c.date.slice(0, 4)) - y) <= 1)
+        : cands;
       // Título clavado primero y, a igualdad, el del año EXACTO: el making-of
       // «@ In the Mood for Love» (2001, también de Wong Kar Wai) normaliza al
       // mismo título que el largometraje (2000) y solo el año los separa.
       const wanted = normName(r.title);
       const tituloClavado = (c) => normName(c.title) === wanted || normName(c.original_title) === wanted;
-      const distAño = (c) => (c.date ? Math.abs(Number(c.date.slice(0, 4)) - y) : 0.5);
+      const distAño = (c) => (c.date && Number.isFinite(y) ? Math.abs(Number(c.date.slice(0, 4)) - y) : 0.5);
       enVentana.sort(
         (a, b) =>
           (tituloClavado(a) ? 0 : 1) - (tituloClavado(b) ? 0 : 1) ||
@@ -613,6 +688,8 @@ async function resolveFilms(rows, yearOf) {
 // --- edición de un festival ----------------------------------------------------
 
 async function buildEdition(key, f, year) {
+  // los premios sí tienen «edición por año»: sus nominadas
+  if (f.awardNominees) return buildAwardYear(key, f, year);
   if (f.onlyWinners) throw new Error(`${f.name} no tiene ediciones por año: mira su palmarés.`);
   const special = SPECIAL_EDITIONS[`${key}:${year}`];
   if (special?.unavailable) throw new Error(special.unavailable);
@@ -765,6 +842,59 @@ async function decorateLive(films) {
 }
 
 /**
+ * Filas del artículo-lista de un premio. La sección «Winners» suele incluir
+ * sus décadas como subsecciones, pero en algunos artículos (Goya, BAFTA) son
+ * secciones HERMANAS y la de Winners llega vacía: respaldo de página entera,
+ * y que el parser descarte las tablas que no son de películas.
+ */
+async function getAwardRows(f, { keepAll = false } = {}) {
+  const meta = await wikiParse({ page: f.awardPage, prop: 'sections' });
+  const sec = (meta.sections || []).find((s) => f.awardSection.test(stripTags(s.line)));
+  if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
+  const parsed = await wikiParse({ page: f.awardPage, section: String(sec.index), prop: 'text' });
+  let rows = parseWinnersTables(parsed.text, { keepAll });
+  if (!rows.length) {
+    const full = await wikiParse({ page: f.awardPage, prop: 'text' });
+    rows = parseWinnersTables(full.text, { keepAll });
+  }
+  return rows;
+}
+
+/**
+ * La «edición» de un premio: todas las NOMINADAS de ese año, con la ganadora
+ * marcada (🏆). Sale del mismo artículo-lista que el palmarés, sin el filtro
+ * de sombreadas.
+ */
+async function buildAwardYear(key, f, year) {
+  const rows = f.staticAward
+    ? f.staticAward.filter((r) => r.year === year)
+    : (await getAwardRows(f, { keepAll: true })).filter((r) => r.year === year);
+  if (!rows.length) {
+    throw new Error(
+      year >= new Date().getFullYear()
+        ? `Wikipedia aún no lista las nominadas de ${f.name} ${year}.`
+        : `Wikipedia no tiene nominadas de ${f.name} en ${year}.`
+    );
+  }
+  const { films, errors } = await resolveFilms(rows, () => year);
+  return {
+    festival: key,
+    name: f.name,
+    award: f.award,
+    year,
+    section: 'Nominadas',
+    note: null,
+    source: f.staticAward
+      ? 'https://www.wikidata.org/wiki/Q102427'
+      : `https://en.wikipedia.org/wiki/${f.awardPage.replace(/ /g, '_')}`,
+    fetchedAt: Date.now(),
+    films,
+    unresolved: films.filter((x) => !x.tmdb_id).length,
+    resolveErrors: errors,
+  };
+}
+
+/**
  * El palmarés histórico del premio que clasifica (todas las ganadoras, de la
  * más reciente a la más antigua), desde el artículo del premio en Wikipedia.
  * Cacheado 30 días: solo cambia una vez al año.
@@ -772,7 +902,7 @@ async function decorateLive(films) {
 export async function festivalWinners(key, { refresh = false } = {}) {
   const f = REGISTRY[key];
   if (!f) throw new Error('Festival desconocido');
-  if (!f.awardPage && !f.staticList) {
+  if (!f.awardPage && !f.staticList && !f.staticAward) {
     throw new Error(
       `El palmarés de ${f.name} aún no tiene artículo utilizable en Wikipedia` +
         (key === 'busan' ? ' (el premio nació en 2025: mira la edición del 2025)' : '') +
@@ -785,7 +915,12 @@ export async function festivalWinners(key, { refresh = false } = {}) {
     let rows;
     let source = f.awardPage ? `https://en.wikipedia.org/wiki/${f.awardPage.replace(/ /g, '_')}` : null;
     let note = null;
-    if (f.staticList) {
+    if (f.staticAward) {
+      // solo las ganadoras del dataset (las nominadas viven en la vista por año)
+      rows = f.staticAward.filter((r) => r.winner);
+      source = 'https://www.wikidata.org/wiki/Q102427';
+      note = `Las ${rows.length} ganadoras de la historia; en «Nominadas por año» están las ${f.staticAward.length} candidatas completas.`;
+    } else if (f.staticList) {
       // dataset fijo empaquetado con la app (Sight & Sound se renueva en 2032)
       rows = f.staticList.map((r) => ({
         year: r.year, title: r.title, original_title: r.title, director: r.director, country: null, rank: r.rank,
@@ -797,19 +932,7 @@ export async function festivalWinners(key, { refresh = false } = {}) {
       const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
       rows = parseSundanceWinners(parsed.text).filter((r) => r.year >= f.sinceYear);
     } else {
-      const meta = await wikiParse({ page: f.awardPage, prop: 'sections' });
-      const sec = (meta.sections || []).find((s) => f.awardSection.test(stripTags(s.line)));
-      if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
-      // la sección «Winners» suele incluir sus subsecciones por década…
-      const parsed = await wikiParse({ page: f.awardPage, section: String(sec.index), prop: 'text' });
-      rows = parseWinnersTables(parsed.text);
-      if (!rows.length) {
-        // …pero en algunos artículos (Goya, BAFTA) las décadas son secciones
-        // HERMANAS y la de «Winners» llega vacía: página entera, y que el
-        // parser descarte las tablas que no son palmarés
-        const full = await wikiParse({ page: f.awardPage, prop: 'text' });
-        rows = parseWinnersTables(full.text);
-      }
+      rows = await getAwardRows(f);
     }
     if (!rows.length) throw new Error(`El artículo «${f.awardPage}» no tiene una lista de ganadoras reconocible.`);
     const { films, errors } = await resolveFilms(rows, (r) => r.year);

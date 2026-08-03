@@ -27,7 +27,9 @@ export const CACHE_VERSIONS = {
   // película cacheado para que los reintentos no relancen la ráfaga entera
   // v5: las fichas sin créditos solo valen como ÚLTIMO recurso (la Undercover
   // ajena se colaba por delante de la de Echevarría por orden de búsqueda)
-  festival: 5,
+  // v6: títulos con «(ex-æquo)» y título original inline limpiados, y premios
+  // con vista de nominadas por año
+  festival: 6,
 };
 
 /** Prefijo con versión de una caché: `calendar:v7`, `discover_gaps:v7`… */
