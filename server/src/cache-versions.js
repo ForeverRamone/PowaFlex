@@ -22,7 +22,10 @@ export const CACHE_VERSIONS = {
   // título genérico enganchaba otra película del mismo año)
   // v3: nombres insensibles al orden (Imamura Shōhei), fichas sin equipo aún
   // aceptadas por título clavado, y los 429 ya no se cachean como «sin ficha»
-  festival: 3,
+  // v4: abreviaturas (Carl Th. Dreyer), desempate por año exacto y por «ya en
+  // tu Plex» (ITMFL vs su making-of, Fanny cine vs TV), y emparejado por
+  // película cacheado para que los reintentos no relancen la ráfaga entera
+  festival: 4,
 };
 
 /** Prefijo con versión de una caché: `calendar:v7`, `discover_gaps:v7`… */

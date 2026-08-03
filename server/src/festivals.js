@@ -453,8 +453,9 @@ const sameName = (a, b) => {
   const tb = nameTokens(b);
   if (!ta.length || !tb.length) return false;
   const [corto, largo] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
-  const set = new Set(largo);
-  return corto.every((t) => set.has(t));
+  // cada token del nombre corto debe estar en el largo, o ser su abreviatura:
+  // «Carl Th. Dreyer» ≡ «Carl Theodor Dreyer» (el S&S y las tablas abrevian)
+  return corto.every((t) => largo.some((l) => l === t || l.startsWith(t)));
 };
 
 /**
@@ -493,6 +494,9 @@ export function directorsMatch(wikiDirector, tmdbDirectors) {
 async function resolveFilms(rows, yearOf) {
   const films = new Array(rows.length);
   let errors = 0; // fallos de RED (429 de TMDB…): quien llama no debe cachear
+  // para desempatar dobles legítimos (Fanny y Alexander cine vs TV, ambos de
+  // Bergman): entre candidatos verificados, gana el que YA está en tu Plex
+  const inLib = new Set(db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((m) => m.tmdb_id));
   let i = 0;
   async function worker() {
     for (;;) {
@@ -500,6 +504,30 @@ async function resolveFilms(rows, yearOf) {
       if (idx >= rows.length) return;
       const r = rows[idx];
       const y = yearOf(r);
+
+      // Emparejado verificado YA cacheado (30 días): ni búsquedas ni créditos.
+      // Clave: sin esto, un palmarés grande con un solo 429 no se cacheaba
+      // entero y CADA visita relanzaba la ráfaga completa contra TMDB — que
+      // volvía a cortar. Con la caché por película, cada reintento solo toca
+      // lo que falló y converge en un par de cargas.
+      const matchKey = `film_match:${normName(r.title)}:${y}:${normName(r.director || '')}`;
+      const matchHit = cacheRead(matchKey, 30 * DAY);
+      if (matchHit?.id) {
+        let sum = null;
+        try {
+          sum = await movieSummary(matchHit.id);
+        } catch {
+          errors++; // ficha coja por la red: que no se cachee la página y se reintente
+        }
+        films[idx] = {
+          ...r,
+          tmdb_id: matchHit.id,
+          poster_path: sum?.poster_path || null,
+          date: sum?.date || null,
+          year: r.year ?? (sum?.date ? Number(sum.date.slice(0, 4)) : null),
+        };
+        continue;
+      }
 
       const cands = [...(await searchMovieCandidates(r.title, y))];
       if (r.original_title && r.original_title !== r.title) {
@@ -511,21 +539,30 @@ async function resolveFilms(rows, yearOf) {
       // el estreno puede bailar un año respecto al festival; sin fecha aún
       // (película recién anunciada) también vale como candidata
       const enVentana = cands.filter((c) => !c.date || Math.abs(Number(c.date.slice(0, 4)) - y) <= 1);
-      // los títulos clavados primero: entre dos candidatos verificables, gana
-      // el que además se llama igual
+      // Título clavado primero y, a igualdad, el del año EXACTO: el making-of
+      // «@ In the Mood for Love» (2001, también de Wong Kar Wai) normaliza al
+      // mismo título que el largometraje (2000) y solo el año los separa.
       const wanted = normName(r.title);
       const tituloClavado = (c) => normName(c.title) === wanted || normName(c.original_title) === wanted;
-      enVentana.sort((a, b) => (tituloClavado(a) ? 0 : 1) - (tituloClavado(b) ? 0 : 1));
+      const distAño = (c) => (c.date ? Math.abs(Number(c.date.slice(0, 4)) - y) : 0.5);
+      enVentana.sort(
+        (a, b) =>
+          (tituloClavado(a) ? 0 : 1) - (tituloClavado(b) ? 0 : 1) ||
+          (inLib.has(a.id) ? 0 : 1) - (inLib.has(b.id) ? 0 : 1) ||
+          distAño(a) - distAño(b)
+      );
 
       let tmdbId = null;
       let fallosRed = false;
       for (const c of enVentana) {
-        // null = fallo de red (no «sin créditos»): probar el siguiente y, si la
-        // película acaba sin ficha por esto, avisar para que NO se cachee
+        // null = fallo de red (no «sin créditos»). Se ABORTA la resolución de
+        // esta película: seguir probando dejaría ganar a un candidato peor
+        // solo porque al bueno le tocó el 429 (pasó con el canon de S&S), y
+        // encima el resultado se cachearía como válido.
         const dirs = await movieDirectors(c.id).catch(() => null);
         if (dirs === null) {
           fallosRed = true;
-          continue;
+          break;
         }
         // Recién anunciadas: TMDB puede tener la ficha SIN equipo todavía. Sin
         // director que comprobar, el título clavado basta (los dobles como la
@@ -536,14 +573,19 @@ async function resolveFilms(rows, yearOf) {
           break;
         }
       }
-      if (!tmdbId && fallosRed) errors++;
+      // el emparejado limpio se guarda por película: los reintentos tras un
+      // corte de red solo tocan lo que falló
+      if (tmdbId && !fallosRed) cacheWrite(matchKey, { id: tmdbId });
 
       let sum = null;
       if (tmdbId) {
         try {
           sum = await movieSummary(tmdbId);
-        } catch {}
+        } catch {
+          fallosRed = true; // ficha coja: no cachear la página, reintentar luego
+        }
       }
+      if (fallosRed) errors++;
       films[idx] = {
         ...r,
         tmdb_id: tmdbId,

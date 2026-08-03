@@ -91,8 +91,12 @@ test('directorsMatch: insensible al orden de las palabras del nombre', () => {
   assert.ok(directorsMatch('Ozu Yasujirō', ['Yasujirō Ozu']));
   assert.ok(directorsMatch('Kore-eda Hirokazu', ['Hirokazu Koreeda']));
   assert.ok(directorsMatch('Joseph L. Mankiewicz', ['Joseph Mankiewicz']));
+  // abreviaturas: el S&S y las tablas escriben «Carl Th. Dreyer»
+  assert.ok(directorsMatch('Carl Th. Dreyer', ['Carl Theodor Dreyer']));
+  assert.ok(directorsMatch('Wong Kar Wai', ['Wong Kar-wai']));
   // pero el orden no convierte a un tercero en válido
   assert.equal(directorsMatch('Imamura Shōhei', ['Sohei Imamoto']), false);
+  assert.equal(directorsMatch('Carl Th. Dreyer', ['Carla Theron']), false);
 });
 
 test('directorsMatch: rechaza a otro director/a aunque el título y el año casen', () => {

@@ -43,7 +43,10 @@ export default function Festivals() {
     setLoading(true);
     setError(null);
     setData(null);
-    const path = v === 'palmares' ? `/festivals/${k}/palmares` : `/festivals/${k}/${y}`;
+    // las entradas de solo-palmarés (cánones, premios) no tienen ediciones:
+    // se clique desde la vista que se clique, siempre va al palmarés
+    const soloP = index?.festivals?.find((f) => f.key === k)?.onlyWinners;
+    const path = soloP || v === 'palmares' ? `/festivals/${k}/palmares` : `/festivals/${k}/${y}`;
     api(`${path}${refresh ? '?refresh=1' : ''}`).then((r) => {
       setLoading(false);
       if (r.error) setError(r.error);
@@ -63,6 +66,18 @@ export default function Festivals() {
   useEffect(() => {
     if (soloPalmares && view !== 'palmares') setView('palmares');
   }, [soloPalmares, view]);
+
+  // años del desplegable, de la edición que viene a la primera; al cambiar a
+  // un festival más joven (Busan), el año se recoloca solo dentro de su rango
+  const añoMax = (index?.currentYear || new Date().getFullYear()) + 1;
+  const añoMin = info?.sinceYear || 1946;
+  const años = [];
+  for (let y = añoMax; y >= añoMin; y--) años.push(y);
+  useEffect(() => {
+    if (soloPalmares || !info) return;
+    if (year < añoMin) setYear(añoMin);
+    else if (year > añoMax) setYear(añoMax);
+  }, [fest, info, soloPalmares, year, añoMin, añoMax]);
   const films = data?.films || [];
   const missingIds = films.filter((f) => f.tmdb_id && !f.owned && !radarrIds.has(f.tmdb_id)).map((f) => f.tmdb_id);
 
@@ -118,7 +133,15 @@ export default function Festivals() {
             <div key={g} className="flex gap-2 items-center flex-wrap">
               <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{label}:</span>
               {del.map((f) => (
-                <button key={f.key} onClick={() => setFest(f.key)} className={fest === f.key ? 'btn-gold' : 'btn-ghost'} title={f.award}>
+                <button
+                  key={f.key}
+                  onClick={() => {
+                    setFest(f.key);
+                    if (f.onlyWinners) setView('palmares');
+                  }}
+                  className={fest === f.key ? 'btn-gold' : 'btn-ghost'}
+                  title={f.award}
+                >
                   {f.name}
                 </button>
               ))}
@@ -129,14 +152,18 @@ export default function Festivals() {
         {view === 'seleccion' && (
           <div className="flex items-center gap-1 ml-auto">
             <button className="btn-ghost !py-1" onClick={() => setYear((y) => y - 1)} title="Edición anterior">←</button>
-            <input
-              type="number"
-              className="input !w-24 text-center !py-1 tabular"
+            {/* desplegable en vez de campo numérico: el centro es clicable y
+                fuera las flechitas de arriba/abajo (ya están ← →) */}
+            <select
+              className="input !w-24 text-center !py-1 tabular cursor-pointer"
               value={year}
-              min={info?.sinceYear || 1946}
-              max={(index?.currentYear || new Date().getFullYear()) + 1}
-              onChange={(e) => Number(e.target.value) > 1900 && setYear(Number(e.target.value))}
-            />
+              onChange={(e) => setYear(Number(e.target.value))}
+              title="Elegir edición"
+            >
+              {años.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
             <button className="btn-ghost !py-1" onClick={() => setYear((y) => y + 1)} title="Edición siguiente">→</button>
           </div>
         )}

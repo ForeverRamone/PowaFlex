@@ -1,5 +1,26 @@
 # Changelog
 
+## Alpha 0.9.9 (0.9.9-alpha) — 2026-08-03
+
+- **Cuarta ronda del emparejado de festivales y cánones, con tus capturas de producción como
+  guía.** Tres causas distintas: (1) *In the Mood for Love* acababa siendo su propio making-of de
+  50 minutos —que también dirige Wong Kar Wai— cuando un corte de TMDB se saltaba al candidato
+  bueno: ahora un fallo de red ABORTA la resolución de esa película (nadie gana por incomparecencia
+  del rival) y, a igualdad de título, gana el año exacto y **lo que ya está en tu Plex** (que
+  también desempata el Fanny y Alexander de cine frente al de TV). (2) *Carl Th. Dreyer* no casaba
+  con «Carl Theodor Dreyer»: el comparador entiende ahora las abreviaturas. (3) Las fichas cojas
+  («Sin fecha», sin cartel) eran carteles perdidos en un 429 que no contaba como error y se
+  cacheaban 30 días: ya cuentan y se reintentan.
+- **Cada emparejado verificado se guarda por película** (30 días): antes, un palmarés grande con
+  un solo fallo de red no se cacheaba entero y cada visita relanzaba la ráfaga completa contra
+  TMDB, que volvía a cortar — el pez que se muerde la cola. Ahora los reintentos solo tocan lo que
+  falló y la página converge en un par de cargas.
+- **El selector de año de Festivales es un desplegable**: el centro se pulsa y eliges el año
+  directamente, sin las flechitas de arriba/abajo (ya están ← →), y al cambiar a un festival más
+  joven el año se recoloca solo dentro de su rango.
+- **Clicar un canon o un premio desde cualquier vista ya no da error**: se clique desde donde se
+  clique, va derecho a su palmarés.
+
 ## Alpha 0.9.8 (0.9.8-alpha) — 2026-08-03
 
 - **Arreglado el paso «Detectar filmografías cambiadas en TMDB»**, que en la 0.9.7 moría con
