@@ -126,6 +126,7 @@ export default function About() {
               <li>Añadir a Radarr cualquier película que te falte con un clic, con perfil y carpeta configurables.</li>
               <li>Añadir en bloque toda una lista, saga o el cine venidero de un plazo.</li>
               <li>Automatizar el día a día: lanzar solo cada noche los estrenos de tus directores/as favoritos/as vivos.</li>
+              <li>Ver en el Dashboard qué pedidas han llegado por fin (capturas), y en Calidad cuáles siguen sin aparecer o llegaron por debajo de tu perfil, con re-búsqueda en un clic.</li>
               <li>Pedir upgrades de las películas por debajo de 1080p.</li>
             </ul>
           </div>
@@ -207,10 +208,11 @@ export default function About() {
         </Block>
         <Block icon="🎪" title="Festivales" to="/festivales">
           <p>
-            Las secciones oficiales de los seis festivales cuyo gran premio clasifica directamente para el Óscar
-            internacional (Cannes, Venecia, Berlinale, Sundance, Toronto y Busan), edición a edición, y el
-            palmarés histórico de cada premio. Todo casado con tu Plex: manda a Radarr lo que falte y sigue a sus
-            directores/as —de una en una o la sección entera— para que sus estrenos entren en el calendario.
+            Las secciones oficiales de los grandes festivales —los seis de la vía directa al Óscar internacional
+            (Cannes, Venecia, Berlinale, Sundance, Toronto y Busan) más San Sebastián y sus Horizontes Latinos—,
+            edición a edición, y el palmarés histórico de cada premio. Todo casado con tu Plex: manda a Radarr lo
+            que falte y sigue a sus directores/as —de una en una o la sección entera— para que sus estrenos
+            entren en el calendario.
           </p>
         </Block>
         <Block icon="🧭" title="Descubrir huecos" to="/descubrir">

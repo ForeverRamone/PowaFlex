@@ -108,6 +108,18 @@ CREATE TABLE IF NOT EXISTS tracked_people (
   PRIMARY KEY (person_id, role)
 );
 
+-- Historial de capturas: cada vez que una monitorizada de Radarr pasa de «sin
+-- archivo» a «con archivo». El snapshot radarr_movies se pisa en cada sync;
+-- esto es lo único que recuerda QUÉ llegó y cuándo.
+CREATE TABLE IF NOT EXISTS radarr_captures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tmdb_id INTEGER NOT NULL,
+  title TEXT,
+  year INTEGER,
+  quality TEXT,
+  captured_at INTEGER NOT NULL
+);
+
 -- People the user explicitly removed from favorites with the "✕". Bulk/automatic
 -- add operations (top-N, packs) skip these; a manual single add clears the block.
 CREATE TABLE IF NOT EXISTS unfollowed_people (

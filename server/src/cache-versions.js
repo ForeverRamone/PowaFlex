@@ -18,7 +18,9 @@ export const CACHE_VERSIONS = {
   discover_gaps: 8,
   discover_favorites: 9,
   discover_absent: 5,
-  festival: 1,
+  // v2: el emparejado con TMDB se verifica contra el director/a (antes un
+  // título genérico enganchaba otra película del mismo año)
+  festival: 2,
 };
 
 /** Prefijo con versión de una caché: `calendar:v7`, `discover_gaps:v7`… */

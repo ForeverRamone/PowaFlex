@@ -403,6 +403,48 @@ export async function searchMovieId(title, year = null) {
   }
 }
 
+/**
+ * Candidatos de /search/movie para el emparejado VERIFICADO de festivales: la
+ * búsqueda acotada al año y la abierta, juntas y sin duplicados, para que quien
+ * llama pueda comprobar el director/a antes de quedarse con ninguno. Con
+ * títulos genéricos («Bunker», «Company») quedarse con el primero del año, como
+ * hace pickSearchResult, engancha la película equivocada.
+ */
+export async function searchMovieCandidates(title, year = null) {
+  if (!title) return [];
+  const key = `movie_cands:${title.toLowerCase()}:${year || ''}`;
+  const cached = cacheRead(key, 30 * DAY);
+  if (cached) return cached.list || [];
+  try {
+    const seen = new Set();
+    const list = [];
+    const add = (results) => {
+      for (const r of results || []) {
+        if (!r?.id || seen.has(r.id)) continue;
+        seen.add(r.id);
+        list.push({ id: r.id, title: r.title, original_title: r.original_title, date: r.release_date || null });
+      }
+    };
+    if (year) add((await tmdbGet('/search/movie', { query: title, primary_release_year: year }, { cacheKey: null })).results);
+    add((await tmdbGet('/search/movie', { query: title }, { cacheKey: null })).results);
+    const out = list.slice(0, 10);
+    cacheWrite(key, { list: out });
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** Directores/as de una película, con la misma caché movie_cr que enrichRuntimes. */
+export async function movieDirectors(tmdbId) {
+  const det = await tmdbGet(
+    `/movie/${tmdbId}`,
+    { append_to_response: 'credits' },
+    { cacheKey: `movie_cr:${tmdbId}:${lang()}`, cacheMs: 7 * DAY }
+  );
+  return (det.credits?.crew || []).filter((c) => c.job === 'Director').map((c) => c.name);
+}
+
 /** Ficha mínima de una película (cartel, fecha, títulos), con la misma caché
  *  de 7 días que usa enrichRuntimes para no pedir dos veces lo mismo. */
 export async function movieSummary(tmdbId) {

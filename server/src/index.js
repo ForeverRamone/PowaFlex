@@ -36,6 +36,10 @@ import {
   radarrSyncMovies,
   radarrOwnedIds,
   radarrRecent,
+  radarrCaptures,
+  radarrWanted,
+  radarrCutoffUnmet,
+  radarrSearchAgain,
 } from './radarr.js';
 import { libraryGaps, favoritesGaps, absentGreats, listCanons, saveCanon, deleteCanon, canonNames } from './discover.js';
 import {
@@ -1127,6 +1131,36 @@ app.get('/api/radarr/context', async (req, reply) => {
 
 // local snapshot of what Radarr already has (fast, no network) + refresh
 app.get('/api/radarr/ids', async () => radarrOwnedIds());
+
+// historial de capturas (del snapshot local: sin red)
+app.get('/api/radarr/captures', async (req) =>
+  radarrCaptures(Math.min(Number(req.query.days) || 30, 365), Math.min(Number(req.query.limit) || 60, 200)));
+
+// lo que Radarr aún debe: pedidas sin archivo y con archivo bajo el corte
+app.get('/api/radarr/wanted', async (req, reply) => {
+  try {
+    return { items: await radarrWanted() };
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+app.get('/api/radarr/cutoff', async (req, reply) => {
+  try {
+    return { items: await radarrCutoffUnmet() };
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+app.post('/api/radarr/search-again', async (req, reply) => {
+  try {
+    return await radarrSearchAgain(Number(req.body?.tmdbId));
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
 app.post('/api/radarr/sync', async (req, reply) => {
   try {
     return await radarrSyncMovies();

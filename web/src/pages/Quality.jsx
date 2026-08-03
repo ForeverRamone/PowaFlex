@@ -18,6 +18,9 @@ export default function Quality() {
   const [jw, setJw] = useState({ busy: false, done: 0, total: 0, checked: 0, upgradeable: 0, results: {} });
   const [jwFilter, setJwFilter] = useState('todas');
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [wanted, setWanted] = useState(null);
+  const [cutoff, setCutoff] = useState(null);
+  const [searchBusy, setSearchBusy] = useState(null);
   const navigate = useNavigate();
 
   // the resolutions donut lives here (its natural home) and keeps the
@@ -31,7 +34,24 @@ export default function Quality() {
     api('/quality/overview').then(setOv);
     api('/quality/upgrades?limit=60').then((r) => setUpgrades(Array.isArray(r) ? r : []));
     api('/quality/duplicates').then(setDups);
+    // la deuda de Radarr: sin configurar, las llamadas fallan y las secciones
+    // simplemente no se pintan
+    api('/radarr/wanted').then((r) => setWanted(r.error ? { error: r.error } : r.items || []));
+    api('/radarr/cutoff').then((r) => setCutoff(r.error ? { error: r.error } : r.items || []));
   }, []);
+
+  const searchAgain = async (m) => {
+    setSearchBusy(m.tmdb_id);
+    const r = await api('/radarr/search-again', { method: 'POST', body: { tmdbId: m.tmdb_id } });
+    setSearchBusy(null);
+    if (r.error) toast(`⚠️ ${r.error}`, 'error');
+    else toast(`🔍 Radarr vuelve a buscar «${m.title}»`);
+  };
+  const antiguedad = (added) => {
+    if (!added) return null;
+    const dias = Math.floor((Date.now() - Date.parse(added)) / 86400000);
+    return dias >= 365 ? `${Math.floor(dias / 365)} a` : dias >= 30 ? `${Math.floor(dias / 30)} m` : `${dias} d`;
+  };
 
   // Ask JustWatch about every candidate at once, so the list can be filtered by
   // "there really is something better out there". Answers are cached 3 days
@@ -225,6 +245,62 @@ export default function Quality() {
           </>
         )}
       </Section>
+
+      {/* la deuda de Radarr: qué pediste que nunca llegó, y qué llegó peor que tu perfil */}
+      {Array.isArray(wanted) && wanted.length > 0 && (
+        <Section title={`Pedidas a Radarr que siguen sin aparecer (${wanted.length})`}>
+          <p className="text-xs text-zinc-500 mb-2 max-w-3xl">
+            Monitorizadas sin archivo, las más antiguas primero: son las que piden una decisión
+            (volver a buscar, esperar al estreno digital o quitar de Radarr).
+          </p>
+          <div className="card divide-y divide-ink-800 max-h-96 overflow-y-auto">
+            {wanted.map((m) => (
+              <div key={m.tmdb_id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
+                <span className="text-zinc-200 truncate flex-1">
+                  {m.title} <span className="text-zinc-500">({m.year ?? '¿?'})</span>
+                </span>
+                {antiguedad(m.added) && (
+                  <span className="text-[11px] text-zinc-500 shrink-0 tabular" title="Tiempo en Radarr sin conseguirse">
+                    hace {antiguedad(m.added)}
+                  </span>
+                )}
+                <button
+                  className="btn-ghost !py-0.5 text-xs shrink-0"
+                  disabled={searchBusy === m.tmdb_id}
+                  onClick={() => searchAgain(m)}
+                >
+                  {searchBusy === m.tmdb_id ? '…' : '🔍 Buscar de nuevo'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+      {Array.isArray(cutoff) && cutoff.length > 0 && (
+        <Section title={`Por debajo del corte de tu perfil de Radarr (${cutoff.length})`}>
+          <p className="text-xs text-zinc-500 mb-2 max-w-3xl">
+            Tienen archivo, pero de menos calidad de la que pide tu perfil: Radarr las mejorará si
+            aparece algo mejor, y puedes forzar la búsqueda ya.
+          </p>
+          <div className="card divide-y divide-ink-800 max-h-96 overflow-y-auto">
+            {cutoff.map((m) => (
+              <div key={m.tmdb_id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
+                <span className="text-zinc-200 truncate flex-1">
+                  {m.title} <span className="text-zinc-500">({m.year ?? '¿?'})</span>
+                </span>
+                {m.quality && <span className="badge-quiet shrink-0">{m.quality}</span>}
+                <button
+                  className="btn-ghost !py-0.5 text-xs shrink-0"
+                  disabled={searchBusy === m.tmdb_id}
+                  onClick={() => searchAgain(m)}
+                >
+                  {searchBusy === m.tmdb_id ? '…' : '🔍 Buscar mejor'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {dups && (dups.multiVersion.length > 0 || dups.sameTmdb.length > 0) && (
         <Section title="Duplicados y versiones múltiples">

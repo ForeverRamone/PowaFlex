@@ -1,5 +1,34 @@
 # Changelog
 
+## Alpha 0.9.6 (0.9.6-alpha) — 2026-08-03
+
+- **Arreglado el emparejado de Festivales.** Con títulos genéricos («Bunker», «Company», «The
+  Class», «Happening»… y hasta Parasite) la búsqueda por título y año enganchaba OTRA película del
+  mismo año, con su cartel y su ficha equivocados. Ahora cada candidato de TMDB tiene que
+  **demostrar su director/a** contra el que dice Wikipedia (con manga ancha para guiones y acentos:
+  Kore-eda ≡ Koreeda); si ninguno lo demuestra, la película queda sin ficha, que siempre es mejor
+  que la ficha de otra. Las ediciones ya guardadas se recalculan solas al actualizar.
+- **Capturas: por fin sabes qué llegó.** El Dashboard estrena «Capturadas esta semana»: cada vez
+  que una película pedida a Radarr pasa de «sin archivo» a «con archivo», queda apuntada con su
+  calidad y si ya está sincronizada en Plex. Antes la app pedía de maravilla y luego se quedaba
+  muda.
+- **La deuda de Radarr, a la vista.** Dos secciones nuevas en «Calidad y disco»: las pedidas que
+  siguen sin aparecer (las más antiguas primero, que son las que piden decisión) y las que llegaron
+  por debajo del corte de tu perfil de calidad, ambas con «buscar de nuevo» en un clic.
+- **San Sebastián en Festivales**, con su sección oficial, sus **Horizontes Latinos** (lo mejor
+  iberoamericano del año, ya filtrado) y el palmarés histórico de la Concha de Oro. Es el festival
+  del que más cine acaba llegando a distribución española.
+- **El palmarés de Sundance ya funciona**: sale de la lista global de premiados de Wikipedia
+  (viñetas por año, con tres épocas de formato distintas) quedándose solo con el World Cinema
+  Grand Jury Prize, el premio de la vía Óscar.
+- **Las ediciones que no se celebraron ya no parecen un fallo**: Cannes 2020 enseña su «Selección
+  Oficial» simbólica completa con una nota que explica la cancelación, TIFF 2020 dice por qué no
+  hubo Platform, y pedir un año sin edición distingue entre «aún no hay programa» (futuro) y
+  «ese año no se celebró» (pasado).
+- **En la ficha de un/a documentalista, sus documentales llegan visibles** aunque el filtro global
+  de tipos los tenga ocultos (y lo mismo con los conciertos de quien los filma). El chip los
+  conmuta solo en esa ficha, sin tocar el filtro del resto de páginas.
+
 ## Alpha 0.9.5 (0.9.5-alpha) — 2026-08-03
 
 - **Página nueva: Festivales** (en «La caza»). Las secciones oficiales de los seis festivales cuyo

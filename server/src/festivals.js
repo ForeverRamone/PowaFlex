@@ -15,7 +15,7 @@
  */
 import { db, cacheRead, cacheWrite } from './db.js';
 import { cachePrefix } from './cache-versions.js';
-import { searchMovieId, movieSummary } from './tmdb.js';
+import { searchMovieCandidates, movieDirectors, movieSummary } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { watchedIndex, isWatched } from './letterboxd.js';
 
@@ -68,6 +68,10 @@ export const REGISTRY = {
     article: (y) => `${y} Sundance Film Festival`,
     section: /world cinema dramatic competition/i,
     sinceYear: 2005,
+    // el palmarés no tiene artículo propio del premio: sale de la lista global
+    // de premiados, que va por AÑOS con viñetas en vez de tablas
+    awardPage: 'List of Sundance Film Festival award winners',
+    awardParse: 'sundanceList',
   },
   tiff: {
     name: 'Toronto (TIFF)',
@@ -84,6 +88,43 @@ export const REGISTRY = {
     article: (y) => `${nth(y - 1995)} Busan International Film Festival`,
     section: /^competition/i,
     sinceYear: 2025, // la sección competitiva se estrenó en el 30.º BIFF
+  },
+  // San Sebastián no está en la vía Óscar, pero para un cinéfilo español es el
+  // festival que más cine acaba llegando a distribución en España. El artículo
+  // de la 73.ª edición = 2025 → año − 1952. La sección de jurado «Latin
+  // Horizons» de algunos años no lleva la palabra “jury” y no la filtra el
+  // /jur/i: no importa, su tabla (nombres, no películas) no pasa el parser y
+  // el bucle salta a la sección buena.
+  sansebastian: {
+    name: 'San Sebastián',
+    award: 'Concha de Oro',
+    article: (y) => `${nth(y - 1952)} San Sebastián International Film Festival`,
+    section: /^in competition/i,
+    sinceYear: 1953,
+    awardPage: 'Golden Shell',
+    awardSection: /^winners$/i,
+  },
+  horizontes: {
+    name: 'S.S. · Horizontes Latinos',
+    award: 'Premio Horizontes',
+    article: (y) => `${nth(y - 1952)} San Sebastián International Film Festival`,
+    section: /latin horizons|horizontes latinos/i,
+    sinceYear: 2002, // la sección nació en 2002
+  },
+};
+
+// Ediciones que se salieron del molde, casi todas por la pandemia: o no hubo
+// sección de competición, o la selección se publicó con otro nombre. Mejor una
+// explicación exacta que un «no se encontró la sección» que suena a fallo.
+const SPECIAL_EDITIONS = {
+  'cannes:2020': {
+    section: /^official sections/i,
+    allTables: true, // la selección simbólica va repartida en varias tablas temáticas
+    note:
+      'Edición cancelada por la pandemia: no hubo competición ni premios, solo una «Selección Oficial 2020» simbólica. Esta es esa lista.',
+  },
+  'tiff:2020': {
+    unavailable: 'En 2020 la sección Platform no se celebró: el programa quedó reducido por la pandemia.',
   },
 };
 
@@ -142,7 +183,8 @@ export function stripTags(html) {
  * Production country» y varían poco entre festivales; se localiza cada columna
  * por su cabecera en vez de por posición para aguantar los cambios de orden.
  */
-export function parseSelectionTable(html) {
+export function parseSelectionTable(html, { all = false } = {}) {
+  const acumulado = [];
   const tables = String(html || '').match(/<table[^>]*wikitable[\s\S]*?<\/table>/gi) || [];
   for (const t of tables) {
     const rows = t.match(/<tr[\s\S]*?<\/tr>/gi) || [];
@@ -179,9 +221,12 @@ export function parseSelectionTable(html) {
         country: cell(idxCountry) || null,
       });
     }
-    if (out.length) return out;
+    // con `all`, la selección vive repartida en varias tablas (Cannes 2020,
+    // que publicó su lista simbólica por bloques temáticos): se suman todas
+    if (out.length && !all) return out;
+    acumulado.push(...out);
   }
-  return [];
+  return acumulado;
 }
 
 /**
@@ -246,8 +291,101 @@ export function parseWinnersTables(html) {
   return out.sort((a, b) => b.year - a.year);
 }
 
-// Casa cada fila con TMDB y le cuelga cartel y fecha. `yearOf` da el año de
-// búsqueda por fila (el de la edición, o el propio de cada ganadora).
+/**
+ * Palmarés de Sundance: «List of Sundance Film Festival award winners» no
+ * lleva tablas sino viñetas por año, con los Grand Jury Prize en el PRIMER
+ * bloque («World Cinema Dramatic – Título by Director»). Nos quedamos solo con
+ * el premio gordo de la vía Óscar: la primera línea de cada año que casa con
+ * ese patrón (las siguientes apariciones de «World Cinema Dramatic» son el
+ * premio del público y el de dirección, que además usa «for» en vez de «by»).
+ */
+export function parseSundanceWinners(html) {
+  const out = [];
+  const src = String(html || '');
+  const headings = [...src.matchAll(/<h[23][^>]*>[\s\S]*?<\/h[23]>/gi)];
+  // la etiqueta del premio ha cambiado tres veces: «World Cinema Jury Prize
+  // Dramatic» (2005-2012), «World Cinema Grand Jury Prize: Dramatic
+  // [Competition]» (2013-2022) y el «World Cinema Dramatic» a secas de ahora.
+  // La forma explícita manda (el premio del público a veces se lista ANTES);
+  // la corta solo vale como respaldo, fiándose de que el bloque del jurado va
+  // primero. Fuera dirección/guion/montaje y documentales.
+  const esGranPremio = (label) =>
+    /world cinema/.test(label) &&
+    /dramatic/.test(label) &&
+    !/documentary|directing|special|cinematography|editing|screenwriting|audience/.test(label) &&
+    /jury prize/.test(label);
+  const esFormaCorta = (label) => /^world cinema dramatic$/.test(label);
+
+  for (let h = 0; h < headings.length; h++) {
+    const year = Number((stripTags(headings[h][0]).match(/^((?:19|20)\d{2})/) || [])[1]);
+    if (!year) continue;
+    const chunk = src.slice(
+      headings[h].index + headings[h][0].length,
+      h + 1 < headings.length ? headings[h + 1].index : src.length
+    );
+    let ganadora = null;
+    for (const li of chunk.match(/<li[\s\S]*?<\/li>/gi) || []) {
+      const texto = stripTags(li);
+      const m = /^(.+?)\s*[–—-]\s*(.+)$/.exec(texto);
+      if (!m) continue;
+      const label = m[1].trim().toLowerCase();
+      if (!esGranPremio(label) && !esFormaCorta(label)) continue;
+      // el crédito de dirección ha ido variando: «Título by Director»,
+      // «Título (Director)» o, en los primeros años, solo el título
+      const resto = m[2].trim();
+      let title = resto;
+      let director = null;
+      const porBy = /^(.+?)\s+by\s+(.+)$/.exec(resto);
+      const porParens = /^(.+?)\s*\(([^)]+)\)$/.exec(resto);
+      if (porBy) [, title, director] = porBy;
+      else if (porParens && /[a-z]\s+[a-z]/i.test(porParens[2])) [, title, director] = porParens;
+      const fila = { year, title: title.trim(), original_title: title.trim(), director: director?.trim() || null, country: null };
+      if (esGranPremio(label)) {
+        ganadora = fila;
+        break; // la etiqueta explícita es inequívoca
+      }
+      if (!ganadora) ganadora = fila; // forma corta: la primera aparición
+    }
+    if (ganadora) out.push(ganadora);
+  }
+  return out.sort((a, b) => b.year - a.year);
+}
+
+// nombres comparables entre Wikipedia y TMDB: sin acentos, sin guiones ni
+// espacios («Hirokazu Kore-eda» y «Hirokazu Koreeda» son la misma persona)
+const normName = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+
+/**
+ * ¿La dirección que dice Wikipedia casa con la de TMDB? La celda puede traer
+ * varios nombres («Ludovic and Zoran Boukherma», «A, B»); basta con que uno
+ * coincida. Sin director en la tabla no hay contra qué verificar: pasa.
+ */
+export function directorsMatch(wikiDirector, tmdbDirectors) {
+  if (!wikiDirector) return true;
+  const wiki = String(wikiDirector)
+    .split(/,|&| and | y /i)
+    .map(normName)
+    .filter((s) => s.length >= 4);
+  if (!wiki.length) return true;
+  const tm = (tmdbDirectors || []).map(normName).filter(Boolean);
+  return wiki.some((w) => tm.some((t) => t === w || t.includes(w) || w.includes(t)));
+}
+
+/**
+ * Casa cada fila con TMDB y le cuelga cartel y fecha. `yearOf` da el año de
+ * búsqueda por fila (el de la edición, o el propio de cada ganadora).
+ *
+ * El emparejado se VERIFICA contra el director/a: con títulos genéricos
+ * («Bunker», «Company», «Look Back») la búsqueda por título+año devolvía otra
+ * película del mismo año. Ahora un candidato solo vale si su dirección en TMDB
+ * coincide con la de la tabla de Wikipedia; si ninguno la demuestra, mejor sin
+ * ficha que con la ficha equivocada.
+ */
 async function resolveFilms(rows, yearOf) {
   const films = new Array(rows.length);
   let i = 0;
@@ -257,9 +395,34 @@ async function resolveFilms(rows, yearOf) {
       if (idx >= rows.length) return;
       const r = rows[idx];
       const y = yearOf(r);
-      const tmdbId =
-        (await searchMovieId(r.title, y)) ||
-        (r.original_title && r.original_title !== r.title ? await searchMovieId(r.original_title, y) : null);
+
+      const cands = [...(await searchMovieCandidates(r.title, y))];
+      if (r.original_title && r.original_title !== r.title) {
+        const vistos = new Set(cands.map((c) => c.id));
+        for (const c of await searchMovieCandidates(r.original_title, y)) {
+          if (!vistos.has(c.id)) cands.push(c);
+        }
+      }
+      // el estreno puede bailar un año respecto al festival; sin fecha aún
+      // (película recién anunciada) también vale como candidata
+      const enVentana = cands.filter((c) => !c.date || Math.abs(Number(c.date.slice(0, 4)) - y) <= 1);
+      // los títulos clavados primero: entre dos candidatos verificables, gana
+      // el que además se llama igual
+      const wanted = normName(r.title);
+      enVentana.sort((a, b) => {
+        const ex = (c) => (normName(c.title) === wanted || normName(c.original_title) === wanted ? 0 : 1);
+        return ex(a) - ex(b);
+      });
+
+      let tmdbId = null;
+      for (const c of enVentana) {
+        const dirs = await movieDirectors(c.id).catch(() => []);
+        if (dirs.length ? directorsMatch(r.director, dirs) : !r.director) {
+          tmdbId = c.id;
+          break;
+        }
+      }
+
       let sum = null;
       if (tmdbId) {
         try {
@@ -284,26 +447,43 @@ async function resolveFilms(rows, yearOf) {
 // --- edición de un festival ----------------------------------------------------
 
 async function buildEdition(key, f, year) {
+  const special = SPECIAL_EDITIONS[`${key}:${year}`];
+  if (special?.unavailable) throw new Error(special.unavailable);
+  const sectionRe = special?.section || f.section;
+
   const page = f.article(year);
-  const meta = await wikiParse({ page, prop: 'sections' });
+  // el mismo síntoma significa cosas distintas según el año: hacia delante,
+  // programa aún sin publicar; hacia atrás, edición que no se celebró
+  const sinEdicion =
+    year >= new Date().getFullYear()
+      ? `Wikipedia aún no tiene el programa de ${f.name} ${year}. Vuelve cuando se anuncie la selección.`
+      : `Wikipedia no tiene la edición de ${f.name} de ${year}: seguramente ese año no se celebró.`;
+  let meta;
+  try {
+    meta = await wikiParse({ page, prop: 'sections' });
+  } catch (err) {
+    if (/doesn'?t exist|missingtitle/i.test(String(err.message || ''))) throw new Error(sinEdicion);
+    throw err;
+  }
   // «Main Competition» puede aparecer tres veces en el mismo artículo (jurado,
   // sección oficial, palmarés): fuera los jurados, y del resto se queda la
   // primera candidata que tenga una tabla de películas de verdad. El palmarés
   // no cuela porque la sección oficial siempre va antes en el artículo.
   const candidates = (meta.sections || []).filter(
-    (s) => f.section.test(stripTags(s.line)) && !/jur/i.test(stripTags(s.line))
+    (s) => sectionRe.test(stripTags(s.line)) && !/jur/i.test(stripTags(s.line))
   );
   if (!candidates.length) {
     throw new Error(
-      `No se encontró la sección de competición en «${page}» de Wikipedia. ` +
-        `Puede que esa edición aún no tenga el programa publicado.`
+      year >= new Date().getFullYear()
+        ? `No se encontró la sección de competición en «${page}» de Wikipedia. Puede que esa edición aún no tenga el programa publicado.`
+        : `El artículo «${page}» de Wikipedia no tiene sección de competición: esa edición pudo no celebrarse o quedarse sin competición (pasó en los años de la pandemia).`
     );
   }
   let rows = [];
   let sec = candidates[0];
   for (const cand of candidates) {
     const parsed = await wikiParse({ page, section: String(cand.index), prop: 'text' });
-    const r = parseSelectionTable(parsed.text);
+    const r = parseSelectionTable(parsed.text, { all: !!special?.allTables });
     if (r.length) {
       rows = r;
       sec = cand;
@@ -324,6 +504,7 @@ async function buildEdition(key, f, year) {
     award: f.award,
     year,
     section: stripTags(sec.line),
+    note: special?.note || null,
     source: `https://en.wikipedia.org/wiki/${page.replace(/ /g, '_')}`,
     fetchedAt: Date.now(),
     films,
@@ -387,13 +568,20 @@ export async function festivalWinners(key, { refresh = false } = {}) {
   const cacheKey = `${cachePrefix('festival')}:${key}:palmares`;
   let base = refresh ? null : cacheRead(cacheKey, 30 * DAY);
   if (!base) {
-    const meta = await wikiParse({ page: f.awardPage, prop: 'sections' });
-    const sec = (meta.sections || []).find((s) => f.awardSection.test(stripTags(s.line)));
-    if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
-    // la sección «Winners» incluye sus subsecciones por década, cada una con su tabla
-    const parsed = await wikiParse({ page: f.awardPage, section: String(sec.index), prop: 'text' });
-    const rows = parseWinnersTables(parsed.text);
-    if (!rows.length) throw new Error(`El artículo «${f.awardPage}» no tiene tablas de ganadoras reconocibles.`);
+    let rows;
+    if (f.awardParse === 'sundanceList') {
+      // la lista de Sundance va por años con viñetas: página entera de una vez
+      const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
+      rows = parseSundanceWinners(parsed.text).filter((r) => r.year >= f.sinceYear);
+    } else {
+      const meta = await wikiParse({ page: f.awardPage, prop: 'sections' });
+      const sec = (meta.sections || []).find((s) => f.awardSection.test(stripTags(s.line)));
+      if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
+      // la sección «Winners» incluye sus subsecciones por década, cada una con su tabla
+      const parsed = await wikiParse({ page: f.awardPage, section: String(sec.index), prop: 'text' });
+      rows = parseWinnersTables(parsed.text);
+    }
+    if (!rows.length) throw new Error(`El artículo «${f.awardPage}» no tiene una lista de ganadoras reconocible.`);
     base = {
       festival: key,
       name: f.name,

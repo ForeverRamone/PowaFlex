@@ -68,6 +68,7 @@ export default function Dashboard() {
   const [ov, setOv] = useState(null);
   const [charts, setCharts] = useState(null);
   const [recent, setRecent] = useState(null);
+  const [captures, setCaptures] = useState(null);
   const [directors, setDirectors] = useState([]);
   const [actors, setActors] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -81,6 +82,7 @@ export default function Dashboard() {
     api('/stats/overview').then(setOv);
     api('/stats/charts').then(setCharts);
     api('/stats/recent').then(setRecent);
+    api('/radarr/captures?days=7').then((r) => Array.isArray(r) && setCaptures(r));
     api('/people?role=director&limit=10').then((r) => Array.isArray(r) && setDirectors(r));
     api('/people?role=actor&limit=10').then((r) => Array.isArray(r) && setActors(r));
   }, []);
@@ -109,6 +111,33 @@ export default function Dashboard() {
         <StatCard label="Directores/as" value={ov.directors.toLocaleString('es-ES')} />
         <StatCard label="En 4K" value={ov.fourK.toLocaleString('es-ES')} />
       </div>
+
+      {/* pedidas que POR FIN han llegado: el cierre del ciclo de captura */}
+      {captures?.length > 0 && (
+        <Section
+          title={`🎬 Capturadas esta semana (${captures.length})`}
+          action={<Link to="/calidad" className="text-xs text-gold-400 hover:underline">Pendientes →</Link>}
+        >
+          <div className="card divide-y divide-ink-800 max-h-72 overflow-y-auto">
+            {captures.map((c) => (
+              <div key={c.id ?? `${c.tmdb_id}-${c.captured_at}`} className="flex items-center gap-2 px-3 py-2 text-sm">
+                <span className="text-emerald-400">✓</span>
+                <span className="text-zinc-200 truncate flex-1">
+                  {c.title} <span className="text-zinc-500">({c.year ?? '¿?'})</span>
+                </span>
+                {c.quality && <span className="badge-quiet shrink-0">{c.quality}</span>}
+                <span
+                  className={`text-[11px] shrink-0 ${c.rating_key ? 'text-emerald-400' : 'text-zinc-500'}`}
+                  title={c.rating_key ? 'Ya sincronizada en tu Plex' : 'Descargada; entrará en Plex en la próxima sincronización'}
+                >
+                  {c.rating_key ? 'en Plex' : 'aún sin sincronizar'}
+                </span>
+                <span className="text-[11px] text-zinc-500 shrink-0 tabular">{fmtDate(c.captured_at)}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* recent activity (#8) */}
       {recent && (

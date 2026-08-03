@@ -91,7 +91,7 @@ export default function Festivals() {
       <PageHeader
         eyebrow="La caza"
         title="Festivales"
-        subtitle="Las secciones oficiales de los seis festivales cuyo gran premio clasifica directamente para el Óscar internacional (reglas del 99.º Óscar)."
+        subtitle="Las secciones oficiales de los grandes festivales: los seis de la vía directa al Óscar internacional (reglas del 99.º Óscar) más San Sebastián y sus Horizontes Latinos."
       />
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
@@ -166,6 +166,9 @@ export default function Festivals() {
               )}
             </div>
           </div>
+          {data.note && (
+            <p className="text-xs text-sky-300 mb-3 max-w-3xl">ℹ️ {data.note}</p>
+          )}
           <StatusLegend className="mb-4" />
 
           {films.length === 0 ? (

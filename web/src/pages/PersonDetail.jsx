@@ -44,6 +44,7 @@ export default function PersonDetail() {
   const [trackedRoles, setTrackedRoles] = useState(new Set()); // facetas seguidas
   const [radarrIds, addRadarrId] = useRadarrIds();
   const [show, toggle, resetTypes] = useTypeFilters();
+  const [localShow, setLocalShow] = useState({}); // anulaciones SOLO de esta ficha (documentalistas)
   const [bulkBusy, setBulkBusy] = useState(false);
   const [sort, setSort] = useState(() => localStorage.getItem('person_film_sort') || 'reciente');
   const [minScore, setMinScore] = useState(() => Number(localStorage.getItem('person_min_score') || 0));
@@ -54,6 +55,7 @@ export default function PersonDetail() {
     setViewPref('all');
     setSortPref('reciente');
     setMinScorePref(0);
+    setLocalShow({});
     resetTypes();
   };
   const hayFiltros = view !== 'all' || sort !== 'reciente' || minScore > 0;
@@ -62,6 +64,7 @@ export default function PersonDetail() {
     setData(null);
     setError(null);
     setRole(null);
+    setLocalShow({});
     api(`/people/${id}/filmography?role=${wantRole}`).then((d) => {
       if (d.error) setError(d.error);
       else {
@@ -119,6 +122,17 @@ export default function PersonDetail() {
     );
   const { stats, items } = roles[active];
 
+  // En la ficha de un/a documentalista (o de quien filma conciertos), su obra
+  // principal no puede llegar escondida por el filtro global de tipos: aquí
+  // esos tipos arrancan visibles y el chip los conmuta SOLO en esta ficha,
+  // sin tocar el filtro global del resto de páginas.
+  const specialistDefaults = {};
+  if (stats.documentarian) specialistDefaults.docs = true;
+  if (stats.concertFilmmaker) specialistDefaults.music = true;
+  const showEff = { ...show, ...specialistDefaults, ...localShow };
+  const toggleEff = (k) =>
+    k in specialistDefaults ? setLocalShow((p) => ({ ...p, [k]: !showEff[k] })) : toggle(k);
+
   const typeCounts = {
     shorts: items.filter((i) => i.isShort).length,
     docs: items.filter((i) => i.isDocumentary).length,
@@ -128,7 +142,7 @@ export default function PersonDetail() {
   };
   const filtered = items
     .filter((i) => {
-      if (!matchesTypeFilters(i, show) || !passesScore(i, minScore)) return false;
+      if (!matchesTypeFilters(i, showEff) || !passesScore(i, minScore)) return false;
       if (view === 'owned') return i.owned;
       if (view === 'missing') return i.released && !i.owned;
       if (view === 'upcoming') return !i.released;
@@ -138,12 +152,12 @@ export default function PersonDetail() {
 
   // bulk-add what's visible in "Te faltan" instead of one click per film
   const missingPendingIds = items
-    .filter((i) => matchesTypeFilters(i, show) && passesScore(i, minScore) && i.released && !i.owned && !radarrIds.has(i.tmdb_id))
+    .filter((i) => matchesTypeFilters(i, showEff) && passesScore(i, minScore) && i.released && !i.owned && !radarrIds.has(i.tmdb_id))
     .map((i) => i.tmdb_id);
   // …y decir cuántas dejan fuera los filtros de tipo y nota, para que el número
   // del botón no parezca que se come parte de la filmografía
   const hiddenMissing = items.filter(
-    (i) => !(matchesTypeFilters(i, show) && passesScore(i, minScore)) && i.released && !i.owned && !radarrIds.has(i.tmdb_id)
+    (i) => !(matchesTypeFilters(i, showEff) && passesScore(i, minScore)) && i.released && !i.owned && !radarrIds.has(i.tmdb_id)
   ).length;
   const bulkAddMissing = async () => {
     setBulkBusy(true);
@@ -261,7 +275,7 @@ export default function PersonDetail() {
       </div>
 
       {Object.values(typeCounts).some((n) => n > 0) && (
-        <TypeFilterBar show={show} toggle={toggle} counts={typeCounts} />
+        <TypeFilterBar show={showEff} toggle={toggleEff} counts={typeCounts} />
       )}
 
       {/* orden y listón de nota, con las notas de MDBList que trae el servidor */}

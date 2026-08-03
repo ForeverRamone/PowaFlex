@@ -54,22 +54,94 @@ export async function radarrContext() {
 // Cached so pages can show "✓ en Radarr" instantly and bulk-add never fires a
 // wasteful 400 "already added". Refreshed from Ajustes or nightly.
 
-function storeRadarrMovies(movies) {
+export function storeRadarrMovies(movies) {
   const tx = db.transaction(() => {
+    // ANTES de pisar el snapshot: qué monitorizadas seguían sin archivo. El
+    // paso 0→1 de has_file es una captura — el momento más gratificante del
+    // completismo, que hasta ahora se tiraba con el DELETE.
+    const sinArchivo = new Map(
+      db.prepare('SELECT tmdb_id, title FROM radarr_movies WHERE has_file = 0').all().map((r) => [r.tmdb_id, r])
+    );
     db.prepare('DELETE FROM radarr_movies').run();
     const ins = db.prepare(
       `INSERT OR REPLACE INTO radarr_movies (tmdb_id, title, year, added, has_file, monitored, synced_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    const cap = db.prepare(
+      'INSERT INTO radarr_captures (tmdb_id, title, year, quality, captured_at) VALUES (?, ?, ?, ?, ?)'
     );
     const now = Date.now();
     for (const m of movies) {
       if (!m.tmdbId) continue;
       ins.run(m.tmdbId, m.title || '', m.year || null, m.added || null,
         m.hasFile ? 1 : 0, m.monitored ? 1 : 0, now);
+      if (m.hasFile && sinArchivo.has(m.tmdbId)) {
+        cap.run(m.tmdbId, m.title || '', m.year || null, m.movieFile?.quality?.quality?.name || null, now);
+      }
     }
   });
   tx();
   setSetting('radarr_synced_at', String(Date.now()));
+}
+
+/** Capturas recientes (pedidas que POR FIN tienen archivo), con su rating_key
+ *  de Plex si ya llegaron también a la biblioteca. */
+export function radarrCaptures(days = 30, limit = 60) {
+  return db
+    .prepare(
+      `SELECT c.tmdb_id, c.title, c.year, c.quality, c.captured_at, m.rating_key
+       FROM radarr_captures c
+       LEFT JOIN (SELECT tmdb_id, MIN(rating_key) rating_key FROM movies WHERE tmdb_id IS NOT NULL GROUP BY tmdb_id) m
+         ON m.tmdb_id = c.tmdb_id
+       WHERE c.captured_at >= ?
+       ORDER BY c.captured_at DESC LIMIT ?`
+    )
+    .all(Date.now() - days * 24 * 3600 * 1000, limit);
+}
+
+// --- pendientes: lo que Radarr aún debe --------------------------------------
+
+async function fetchWantedPages(kind) {
+  const out = [];
+  for (let page = 1; page <= 15; page++) {
+    const res = await radarrFetch(`/wanted/${kind}?page=${page}&pageSize=200&monitored=true`);
+    const recs = res.records || [];
+    for (const m of recs) {
+      if (!m.tmdbId) continue;
+      out.push({
+        tmdb_id: m.tmdbId,
+        title: m.title || '',
+        year: m.year || null,
+        added: m.added || null,
+        // solo en cutoff: la calidad que tiene y no llega a tu perfil
+        quality: m.movieFile?.quality?.quality?.name || null,
+      });
+    }
+    if (recs.length < 200 || out.length >= (res.totalRecords || 0)) break;
+  }
+  return out;
+}
+
+/** Monitorizadas sin archivo: lo pedido que sigue sin aparecer. */
+export async function radarrWanted() {
+  const items = await fetchWantedPages('missing');
+  // las más antiguas primero: son las atascadas que piden decisión
+  return items.sort((a, b) => String(a.added || '9999').localeCompare(String(b.added || '9999')));
+}
+
+/** Con archivo por debajo del corte del perfil de calidad. */
+export async function radarrCutoffUnmet() {
+  const items = await fetchWantedPages('cutoff');
+  return items.sort((a, b) => String(a.added || '9999').localeCompare(String(b.added || '9999')));
+}
+
+/** Reordena a Radarr buscar una película concreta ya monitorizada. */
+export async function radarrSearchAgain(tmdbId) {
+  const found = await radarrFetch(`/movie?tmdbId=${tmdbId}`);
+  const movie = Array.isArray(found) ? found[0] : null;
+  if (!movie?.id) throw new Error('Radarr no tiene esa película');
+  await radarrFetch('/command', { method: 'POST', body: { name: 'MoviesSearch', movieIds: [movie.id] } });
+  return { ok: true, title: movie.title };
 }
 
 export async function radarrSyncMovies() {
