@@ -1,5 +1,14 @@
 # Changelog
 
+## Alpha 0.9.10 (0.9.10-alpha) — 2026-08-03
+
+- **Las fichas de TMDB sin equipo cargado solo valen como último recurso.** Una «Undercover»
+  ajena y sin créditos se colaba por delante de *La infiltrada* de Arantxa Echevarría solo por el
+  orden de búsqueda: la aceptación por título clavado de las películas recién anunciadas (sin
+  equipo aún en TMDB) ahora espera a que TODOS los candidatos con créditos hayan declarado — y
+  solo si ninguno demuestra su director/a entra en juego. Las ediciones y palmarés guardados se
+  recalculan solos al actualizar.
+
 ## Alpha 0.9.9 (0.9.9-alpha) — 2026-08-03
 
 - **Cuarta ronda del emparejado de festivales y cánones, con tus capturas de producción como

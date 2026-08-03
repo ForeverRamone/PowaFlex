@@ -25,7 +25,9 @@ export const CACHE_VERSIONS = {
   // v4: abreviaturas (Carl Th. Dreyer), desempate por año exacto y por «ya en
   // tu Plex» (ITMFL vs su making-of, Fanny cine vs TV), y emparejado por
   // película cacheado para que los reintentos no relancen la ráfaga entera
-  festival: 4,
+  // v5: las fichas sin créditos solo valen como ÚLTIMO recurso (la Undercover
+  // ajena se colaba por delante de la de Echevarría por orden de búsqueda)
+  festival: 5,
 };
 
 /** Prefijo con versión de una caché: `calendar:v7`, `discover_gaps:v7`… */

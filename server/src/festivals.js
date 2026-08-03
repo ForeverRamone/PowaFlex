@@ -510,7 +510,7 @@ async function resolveFilms(rows, yearOf) {
       // entero y CADA visita relanzaba la ráfaga completa contra TMDB — que
       // volvía a cortar. Con la caché por película, cada reintento solo toca
       // lo que falló y converge en un par de cargas.
-      const matchKey = `film_match:${normName(r.title)}:${y}:${normName(r.director || '')}`;
+      const matchKey = `film_match:v2:${normName(r.title)}:${y}:${normName(r.director || '')}`;
       const matchHit = cacheRead(matchKey, 30 * DAY);
       if (matchHit?.id) {
         let sum = null;
@@ -554,6 +554,7 @@ async function resolveFilms(rows, yearOf) {
 
       let tmdbId = null;
       let fallosRed = false;
+      const sinCreditos = [];
       for (const c of enVentana) {
         // null = fallo de red (no «sin créditos»). Se ABORTA la resolución de
         // esta película: seguir probando dejaría ganar a un candidato peor
@@ -564,14 +565,22 @@ async function resolveFilms(rows, yearOf) {
           fallosRed = true;
           break;
         }
-        // Recién anunciadas: TMDB puede tener la ficha SIN equipo todavía. Sin
-        // director que comprobar, el título clavado basta (los dobles como la
-        // otra «Bunker» sí tienen créditos y caen en la comprobación normal).
-        const vale = dirs.length ? directorsMatch(r.director, dirs) : !r.director || tituloClavado(c);
-        if (vale) {
-          tmdbId = c.id;
-          break;
+        if (dirs.length) {
+          if (directorsMatch(r.director, dirs)) {
+            tmdbId = c.id;
+            break;
+          }
+        } else {
+          sinCreditos.push(c);
         }
+      }
+      // Solo si NADIE con créditos lo demostró (y sin cortes de red a medias),
+      // valen las fichas sin equipo por título clavado — recién anunciadas.
+      // Nunca antes: una «Undercover» ajena y sin créditos se colaba por
+      // delante de la de Arantxa Echevarría solo por el orden de búsqueda.
+      if (!tmdbId && !fallosRed) {
+        const c = sinCreditos.find((c) => !r.director || tituloClavado(c));
+        if (c) tmdbId = c.id;
       }
       // el emparejado limpio se guarda por película: los reintentos tras un
       // corte de red solo tocan lo que falló
