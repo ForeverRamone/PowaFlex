@@ -69,6 +69,7 @@ export default function Dashboard() {
   const [charts, setCharts] = useState(null);
   const [recent, setRecent] = useState(null);
   const [captures, setCaptures] = useState(null);
+  const [events, setEvents] = useState(null);
   const [directors, setDirectors] = useState([]);
   const [actors, setActors] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -83,6 +84,7 @@ export default function Dashboard() {
     api('/stats/charts').then(setCharts);
     api('/stats/recent').then(setRecent);
     api('/radarr/captures?days=7').then((r) => Array.isArray(r) && setCaptures(r));
+    api('/events?days=14').then((r) => Array.isArray(r) && setEvents(r));
     api('/people?role=director&limit=10').then((r) => Array.isArray(r) && setDirectors(r));
     api('/people?role=actor&limit=10').then((r) => Array.isArray(r) && setActors(r));
   }, []);
@@ -111,6 +113,27 @@ export default function Dashboard() {
         <StatCard label="Directores/as" value={ov.directors.toLocaleString('es-ES')} />
         <StatCard label="En 4K" value={ov.fourK.toLocaleString('es-ES')} />
       </div>
+
+      {/* lo que el pase nocturno ha detectado desde tu última visita */}
+      {events?.length > 0 && (
+        <Section title={`🔔 Novedades (${events.length} en 14 días)`}>
+          <div className="card divide-y divide-ink-800 max-h-72 overflow-y-auto">
+            {events.map((e) => (
+              <div key={e.id} className="px-3 py-2 text-sm">
+                <div className="flex items-baseline gap-2">
+                  {e.url ? (
+                    <Link to={e.url} className="text-zinc-200 hover:text-gold-400 font-medium truncate">{e.title}</Link>
+                  ) : (
+                    <span className="text-zinc-200 font-medium truncate">{e.title}</span>
+                  )}
+                  <span className="text-[11px] text-zinc-500 shrink-0 ml-auto tabular">{fmtDate(e.created_at)}</span>
+                </div>
+                {e.body && <div className="text-[12px] text-zinc-500 mt-0.5">{e.body}</div>}
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* pedidas que POR FIN han llegado: el cierre del ciclo de captura */}
       {captures?.length > 0 && (

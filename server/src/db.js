@@ -108,6 +108,31 @@ CREATE TABLE IF NOT EXISTS tracked_people (
   PRIMARY KEY (person_id, role)
 );
 
+-- Historial del pase nocturno / «Actualizar todo». Se escribe DESPUÉS de cada
+-- paso, no al final: un crash a las 03:10 deja rastro del paso exacto en que
+-- murió (antes el estado vivía solo en memoria y un reinicio lo borraba todo).
+CREATE TABLE IF NOT EXISTS refresh_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  started_at INTEGER NOT NULL,
+  trigger_kind TEXT,
+  finished_at INTEGER,
+  steps TEXT
+);
+
+-- Novedades: cosas que el pase nocturno detecta y merecen contarse (una
+-- edición de festival publicada, una pedida que pasa a digital…). El UNIQUE
+-- (type, ref) es la deduplicación: cada hecho se cuenta UNA vez.
+CREATE TABLE IF NOT EXISTS app_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL,
+  ref TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  url TEXT,
+  created_at INTEGER NOT NULL,
+  UNIQUE (type, ref)
+);
+
 -- Historial de capturas: cada vez que una monitorizada de Radarr pasa de «sin
 -- archivo» a «con archivo». El snapshot radarr_movies se pisa en cada sync;
 -- esto es lo único que recuerda QUÉ llegó y cuándo.

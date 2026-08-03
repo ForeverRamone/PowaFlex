@@ -262,6 +262,15 @@ export function insights() {
        WHERE ${MINE} >= 8 AND r.rt_critic IS NOT NULL AND r.rt_critic <= 55
        ORDER BY my_rating DESC, r.rt_critic ASC LIMIT 24`
     ),
+    // el listón «Must-See» de Metacritic (metascore ≥ 81) con volumen de votos
+    // de IMDb como aval de que no son cuatro reseñas: consenso crítico exigente
+    // que aún no has visto, sin gastar ni una petición (todo está en la tabla)
+    mustSee: all(
+      `SELECT m.rating_key, m.title, m.year, m.thumb, r.metacritic, r.imdb, r.letterboxd, r.score AS mdb_score
+       FROM movies m JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
+       WHERE ${UNWATCHED} AND r.metacritic >= 81 AND COALESCE(r.imdb_votes, 0) >= 5000
+       ORDER BY r.metacritic DESC, COALESCE(r.imdb_votes, 0) DESC LIMIT 24`
+    ),
     // critical consensus you haven't watched — "watched" means Plex views OR a
     // Letterboxd diary/watched/ratings entry, same as everywhere else in the app
     consensusUnwatched: all(

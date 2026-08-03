@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Legend } from 'recharts';
-import { api, fmtBytes } from '../api.js';
+import { api, fmtBytes, fmtDate } from '../api.js';
 import { Spinner, Section, MovieCard, MovieModal, Empty, RadarrButton, useRadarrIds, JustWatchCheck, PageHeader, ProgressBar, ErrorBox} from '../components.jsx';
 import { toast } from '../toast.js';
 import { useChartTheme } from '../charts.js';
@@ -51,6 +51,28 @@ export default function Quality() {
     if (!added) return null;
     const dias = Math.floor((Date.now() - Date.parse(added)) / 86400000);
     return dias >= 365 ? `${Math.floor(dias / 365)} a` : dias >= 30 ? `${Math.floor(dias / 30)} m` : `${dias} d`;
+  };
+  // la fase de estreno explica POR QUÉ una pedida no aparece
+  const hoy = new Date().toLocaleDateString('en-CA');
+  const FasePill = ({ phases }) => {
+    if (!phases) return null;
+    if (phases.digital) {
+      const ya = phases.digital <= hoy;
+      return (
+        <span className={`text-[11px] shrink-0 ${ya ? 'text-emerald-400' : 'text-sky-300'}`}
+          title={ya ? 'Ya existe copia digital: debería poder conseguirse' : 'Aún no ha salido en digital'}>
+          💿 {ya ? 'en digital' : `digital ${fmtDate(phases.digital)}`}
+        </span>
+      );
+    }
+    if (phases.theatrical) {
+      return (
+        <span className="text-[11px] text-zinc-500 shrink-0" title="Estrenada en salas, sin fecha digital anunciada: normal que no aparezca todavía">
+          🎬 solo cines
+        </span>
+      );
+    }
+    return <span className="text-[11px] text-zinc-600 shrink-0" title="Sin fechas de estreno en TMDB">sin fecha</span>;
   };
 
   // Ask JustWatch about every candidate at once, so the list can be filtered by
@@ -259,6 +281,7 @@ export default function Quality() {
                 <span className="text-zinc-200 truncate flex-1">
                   {m.title} <span className="text-zinc-500">({m.year ?? '¿?'})</span>
                 </span>
+                <FasePill phases={m.phases} />
                 {antiguedad(m.added) && (
                   <span className="text-[11px] text-zinc-500 shrink-0 tabular" title="Tiempo en Radarr sin conseguirse">
                     hace {antiguedad(m.added)}

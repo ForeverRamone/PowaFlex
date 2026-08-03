@@ -2,7 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy, Layers,
-  Eye, HardDrive, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award,
+  Eye, HardDrive, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award, HeartPulse,
 } from 'lucide-react';
 import { Spinner, Toaster, GlobalSearch, LetterboxdLogo, ErrorBoundary } from './components.jsx';
 import { api, applyTheme } from './api.js';
@@ -22,6 +22,7 @@ const Discover = lazy(() => import('./pages/Discover.jsx'));
 const Favorites = lazy(() => import('./pages/Favorites.jsx'));
 const Lists = lazy(() => import('./pages/Lists.jsx'));
 const Festivals = lazy(() => import('./pages/Festivals.jsx'));
+const Salud = lazy(() => import('./pages/Salud.jsx'));
 const About = lazy(() => import('./pages/About.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
@@ -36,6 +37,7 @@ const NAV_GROUPS = [
       { to: '/colecciones', label: 'Sagas', Icon: Layers },
       { to: '/visionado', label: 'Visionado', Icon: Eye },
       { to: '/calidad', label: 'Calidad y disco', Icon: HardDrive },
+      { to: '/salud', label: 'Salud de los datos', Icon: HeartPulse },
     ],
   },
   {
@@ -158,6 +160,17 @@ function Shell() {
               >
                 <Icon size={16} strokeWidth={1.75} className="shrink-0" />
                 <span className="truncate">{label}</span>
+                {/* el pase nocturno falló o lleva 26+ h sin correr: avísalo donde se mira */}
+                {to === '/ajustes' && setup?.nightly && (setup.nightly.errores > 0 || setup.nightly.stale) && (
+                  <span
+                    className="ml-auto w-2 h-2 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,.9)] shrink-0"
+                    title={
+                      setup.nightly.stale
+                        ? 'La última actualización completa tiene más de 26 horas: el pase nocturno puede no estar corriendo'
+                        : `La última pasada terminó con ${setup.nightly.errores} error(es): mira el histórico en Ajustes`
+                    }
+                  />
+                )}
               </NavLink>
             ))}
           </div>
@@ -205,6 +218,7 @@ function Shell() {
           <Route path="/favoritos" element={<Favorites />} />
           <Route path="/listas" element={<Lists />} />
           <Route path="/festivales" element={<Festivals />} />
+          <Route path="/salud" element={<Salud />} />
           <Route path="/acerca" element={<About />} />
           <Route path="/calidad" element={<Quality />} />
           <Route path="/letterboxd" element={<Letterboxd />} />

@@ -106,6 +106,11 @@ export default function Settings() {
     setSync({ ...st, running: true });
   };
 
+  const [historial, setHistorial] = useState(null);
+  useEffect(() => {
+    api('/refresh-history').then((r) => Array.isArray(r) && setHistorial(r));
+  }, []);
+
   const importarAjustes = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // que se pueda reelegir el mismo fichero
@@ -695,6 +700,53 @@ export default function Settings() {
                 Última: {new Date(sync.last.finished_at).toLocaleString('es-ES')}
               </span>
             )}
+          </div>
+        )}
+      </section>
+
+      {/* HISTÓRICO DEL PASE NOCTURNO */}
+      <section className="card p-5 mb-5">
+        <h2 className="font-semibold text-zinc-100 mb-1">Histórico de actualizaciones (30 días)</h2>
+        <p className="text-xs text-zinc-500 mb-3">
+          Cada pasada del cron nocturno o de «Actualizar todo», con lo que hizo cada paso. Se guarda
+          paso a paso: si el contenedor se reinicia a mitad, aquí queda hasta dónde llegó.
+        </p>
+        {!historial ? (
+          <p className="text-sm text-zinc-500">Cargando…</p>
+        ) : historial.length === 0 ? (
+          <p className="text-sm text-zinc-500">Aún no hay pasadas registradas.</p>
+        ) : (
+          <div className="divide-y divide-ink-800 max-h-96 overflow-y-auto text-sm">
+            {historial.map((r) => {
+              const hechos = r.steps.filter((s) => s.state === 'done').length;
+              const errores = r.steps.filter((s) => s.state === 'error');
+              const min = Math.round(r.steps.reduce((n, s) => n + (s.ms || 0), 0) / 60000);
+              return (
+                <details key={r.id} className="py-1.5">
+                  <summary className="cursor-pointer flex items-center gap-2 flex-wrap list-none">
+                    <span className={errores.length ? 'text-red-400' : r.finished_at ? 'text-emerald-400' : 'text-orange-300'}>
+                      {errores.length ? '✗' : r.finished_at ? '✓' : '⏸'}
+                    </span>
+                    <span className="text-zinc-200">{new Date(r.started_at).toLocaleString('es-ES')}</span>
+                    <span className="badge-quiet">{r.trigger_kind === 'nightly' ? 'nocturna' : 'manual'}</span>
+                    <span className="text-zinc-500 text-xs">
+                      {hechos} ✓{errores.length > 0 && ` · ${errores.length} ✗ (${errores.map((s) => s.key).join(', ')})`}
+                      {!r.finished_at && ' · interrumpida'} · {min} min
+                    </span>
+                  </summary>
+                  <div className="mt-1 pl-6 text-xs text-zinc-500 space-y-0.5">
+                    {r.steps.filter((s) => s.state !== 'skipped').map((s) => (
+                      <div key={s.key}>
+                        <span className={s.state === 'error' ? 'text-red-400' : s.state === 'done' ? 'text-emerald-400' : 'text-orange-300'}>
+                          {s.state === 'error' ? '✗' : s.state === 'done' ? '✓' : '…'}
+                        </span>{' '}
+                        {s.label}: {s.detail || '—'} <span className="text-zinc-600">({Math.round((s.ms || 0) / 1000)}s)</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              );
+            })}
           </div>
         )}
       </section>

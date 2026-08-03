@@ -136,12 +136,49 @@ export async function findPersonId(name, knownForHint = null) {
   return (await findPersonInfo(name, knownForHint)).id;
 }
 
+// Siete días de caché en vez de uno: la partida más cara de TMDB era re-pedir
+// TODAS las filmografías de tus favoritos cada noche. syncPersonChanges (abajo)
+// invalida cada día las de quien de verdad cambió, y los 7 días son la
+// re-pasada completa de seguridad por si el feed de cambios omite algo.
 export async function personCredits(tmdbPersonId) {
   return tmdbGet(
     `/person/${tmdbPersonId}/movie_credits`,
     {},
-    { cacheKey: `person_credits:${tmdbPersonId}:${lang()}`, cacheMs: DAY }
+    { cacheKey: `person_credits:${tmdbPersonId}:${lang()}`, cacheMs: 7 * DAY }
   );
+}
+
+/**
+ * El feed GLOBAL de cambios de personas de TMDB (quién ha cambiado desde la
+ * última pasada), cruzado con TU gente: solo se invalida la caché de créditos
+ * de quien cambió, y personCredits re-pide únicamente esas. Ventana máxima del
+ * endpoint: 14 días.
+ */
+export async function syncPersonChanges() {
+  const nuestras = new Set(
+    db.prepare('SELECT tmdb_id FROM people WHERE tmdb_id IS NOT NULL').all().map((r) => r.tmdb_id)
+  );
+  if (!nuestras.size) return { changed: 0, invalidated: 0 };
+  const since = Number(getSetting('person_changes_since') || 0);
+  const start = new Date(Math.max(since || Date.now() - DAY, Date.now() - 13 * DAY)).toISOString().slice(0, 10);
+  const del = db.prepare('DELETE FROM tmdb_cache WHERE key LIKE ?');
+  let changed = 0;
+  let invalidated = 0;
+  let page = 1;
+  for (;;) {
+    const data = await tmdbGet('/person/changes', { start_date: start, page }, { cacheKey: null });
+    for (const r of data.results || []) {
+      changed++;
+      if (r.id && nuestras.has(r.id)) {
+        if (del.run(`person_credits:${r.id}:%`).changes) invalidated++;
+        del.run(`person:${r.id}:%`);
+      }
+    }
+    if (page >= Math.min(data.total_pages || 1, 300)) break;
+    page++;
+  }
+  setSetting('person_changes_since', String(Date.now()));
+  return { pages: page, changed, invalidated };
 }
 
 export async function personDetails(tmdbPersonId) {
@@ -433,6 +470,55 @@ export async function searchMovieCandidates(title, year = null) {
   } catch {
     return [];
   }
+}
+
+/**
+ * Fases de estreno de una película (salas / digital / físico), del endpoint
+ * oficial de TMDB. Se toma la fecha MÍNIMA de cada tipo entre todos los
+ * países: para saber si EXISTE copia digital, el país da igual. Caché 3 días
+ * (una película sin fecha digital hoy puede anunciarla mañana).
+ */
+export async function movieReleaseInfo(tmdbId) {
+  const data = await tmdbGet(`/movie/${tmdbId}/release_dates`, {}, { cacheKey: `movie_rel:${tmdbId}`, cacheMs: 3 * DAY });
+  const min = {};
+  for (const c of data.results || []) {
+    for (const r of c.release_dates || []) {
+      const d = (r.release_date || '').slice(0, 10);
+      if (!d) continue;
+      if (!min[r.type] || d < min[r.type]) min[r.type] = d;
+    }
+  }
+  // tipos TMDB: 1 premiere, 2 salas limitado, 3 salas, 4 digital, 5 físico
+  return {
+    premiere: min[1] || null,
+    theatrical: min[3] || min[2] || null,
+    digital: min[4] || null,
+    physical: min[5] || null,
+  };
+}
+
+/**
+ * Cuelga `phases` (fases de estreno) a una lista de items con tmdb_id. Lo ya
+ * cacheado se lee entero; de lo que falta solo se piden `maxFetch` (el pase
+ * nocturno rellena el resto con un tope alto).
+ */
+export async function enrichReleasePhases(items, { maxFetch = 60, concurrency = 6 } = {}) {
+  const conId = items.filter((i) => i.tmdb_id);
+  const enCache = conId.filter((i) => cacheRead(`movie_rel:${i.tmdb_id}`, 3 * DAY));
+  const sinCache = conId.filter((i) => !cacheRead(`movie_rel:${i.tmdb_id}`, 3 * DAY)).slice(0, maxFetch);
+  const targets = [...enCache, ...sinCache];
+  let i = 0;
+  async function worker() {
+    for (;;) {
+      const it = targets[i++];
+      if (!it) return;
+      try {
+        it.phases = await movieReleaseInfo(it.tmdb_id);
+      } catch {}
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  return items;
 }
 
 /** Directores/as de una película, con la misma caché movie_cr que enrichRuntimes. */

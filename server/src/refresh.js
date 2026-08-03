@@ -1,12 +1,13 @@
 import { db, getSetting, setSetting } from './db.js';
 import { runSync, syncStatus } from './plex.js';
 import { rematchLetterboxd, resolveUnmatchedLb, importLetterboxdRss } from './letterboxd.js';
-import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames } from './tmdb.js';
+import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames, syncPersonChanges } from './tmdb.js';
 import { syncRatings } from './mdblist.js';
-import { radarrSyncMovies } from './radarr.js';
+import { radarrSyncMovies, checkDigitalReleases } from './radarr.js';
 import { runAutoRadarr } from './automation.js';
 import { scanSagas } from './saga.js';
 import { favoritesGaps } from './discover.js';
+import { watchFestivalEditions } from './festivals.js';
 
 /**
  * The whole "make PowaFlex current" routine, in dependency order: library first,
@@ -115,6 +116,36 @@ function buildSteps({ includeAutoRadarr }) {
       run: async () => `${(await radarrSyncMovies())?.count ?? 0} películas en Radarr`,
     },
     {
+      // detrás del refresco de Radarr: trabaja sobre la lista de pedidas viva
+      key: 'digital',
+      label: 'Vigilar estrenos digitales de las pedidas',
+      enabled: () => has('radarr_url', 'radarr_key', 'tmdb_key'),
+      run: async () => {
+        const r = await checkDigitalReleases();
+        return `${r.wanted} pedidas revisadas · ${r.nuevas} recién en digital`;
+      },
+    },
+    {
+      key: 'festivalWatch',
+      label: 'Vigilar ediciones nuevas de festivales',
+      enabled: () => has('tmdb_key'),
+      run: async () => {
+        const r = await watchFestivalEditions();
+        return r.checked ? `${r.checked} ediciones comprobadas · ${r.found} publicadas` : 'todo visto ya';
+      },
+    },
+    {
+      // antes del calendario y los huecos: invalida las filmografías de quien
+      // cambió en TMDB para que esos pasos re-pidan SOLO lo que toca
+      key: 'personChanges',
+      label: 'Detectar filmografías cambiadas en TMDB',
+      enabled: () => has('tmdb_key'),
+      run: async () => {
+        const r = await syncPersonChanges();
+        return `${r.changed} cambios en TMDB · ${r.invalidated} fichas tuyas a refrescar`;
+      },
+    },
+    {
       key: 'calendar',
       label: 'Reconstruir el calendario de cine venidero',
       enabled: () => has('tmdb_key'),
@@ -151,6 +182,46 @@ function buildSteps({ includeAutoRadarr }) {
   ];
 }
 
+// Un paso colgado no puede comerse la ventana nocturna entera. Ojo: el trabajo
+// subyacente no se puede abortar (sigue en segundo plano); lo que se corta es
+// la ESPERA, y el paso queda registrado como error con su motivo.
+const STEP_TIMEOUT_MS = 20 * 60 * 1000;
+const conTimeout = (promesa) =>
+  Promise.race([
+    promesa,
+    new Promise((_, rej) => {
+      const t = setTimeout(
+        () => rej(new Error('agotó los 20 minutos: se salta y seguirá en segundo plano')),
+        STEP_TIMEOUT_MS
+      );
+      t.unref?.();
+    }),
+  ]);
+
+/** Últimas pasadas (30 días), para el histórico de Ajustes y el aviso lateral. */
+export function refreshHistory(days = 30) {
+  return db
+    .prepare('SELECT * FROM refresh_runs WHERE started_at >= ? ORDER BY started_at DESC LIMIT 60')
+    .all(Date.now() - days * 24 * 3600 * 1000)
+    .map((r) => ({ ...r, steps: JSON.parse(r.steps || '[]') }));
+}
+
+/** Estado de la última pasada para el aviso de la barra lateral. */
+export function nightlyHealth() {
+  const last = db.prepare('SELECT * FROM refresh_runs ORDER BY started_at DESC LIMIT 1').get();
+  if (!last) return { lastRunAt: null, ok: null, stale: false };
+  const steps = JSON.parse(last.steps || '[]');
+  const errores = steps.filter((s) => s.state === 'error').length;
+  return {
+    lastRunAt: last.started_at,
+    finished: !!last.finished_at,
+    ok: !!last.finished_at && errores === 0,
+    errores,
+    // >26 h sin pasada terminada = el cron nocturno no está corriendo
+    stale: Date.now() - (last.finished_at || last.started_at) > 26 * 3600 * 1000,
+  };
+}
+
 export async function runFullRefresh({ trigger = 'manual', includeAutoRadarr = true } = {}) {
   if (refreshStatus.running) return refreshStatus;
   if (syncStatus.running) {
@@ -179,6 +250,12 @@ export async function runFullRefresh({ trigger = 'manual', includeAutoRadarr = t
     trigger,
   });
 
+  // la fila se abre YA y se reescribe tras CADA paso: un crash deja rastro
+  const runId = db
+    .prepare('INSERT INTO refresh_runs (started_at, trigger_kind, steps) VALUES (?, ?, ?)')
+    .run(Date.now(), trigger, JSON.stringify(steps)).lastInsertRowid;
+  const persist = db.prepare('UPDATE refresh_runs SET steps = ?, finished_at = ? WHERE id = ?');
+
   let done = 0;
   for (let i = 0; i < all.length; i++) {
     const entry = steps[i];
@@ -188,7 +265,7 @@ export async function runFullRefresh({ trigger = 'manual', includeAutoRadarr = t
     refreshStatus.step = entry.label;
     refreshStatus.stepIndex = done;
     try {
-      entry.detail = (await all[i].run()) || 'hecho';
+      entry.detail = (await conTimeout(all[i].run())) || 'hecho';
       entry.state = 'done';
     } catch (err) {
       entry.state = 'error';
@@ -196,6 +273,7 @@ export async function runFullRefresh({ trigger = 'manual', includeAutoRadarr = t
     }
     entry.ms = Date.now() - startedAt;
     done++;
+    persist.run(JSON.stringify(steps), null, runId);
   }
 
   const failed = steps.filter((s) => s.state === 'error');
@@ -206,6 +284,8 @@ export async function runFullRefresh({ trigger = 'manual', includeAutoRadarr = t
     stepIndex: done,
     lastError: failed.length ? `${failed.length} paso(s) con error: ${failed.map((s) => s.key).join(', ')}` : null,
   });
+  persist.run(JSON.stringify(steps), Date.now(), runId);
+  db.prepare('DELETE FROM refresh_runs WHERE started_at < ?').run(Date.now() - 30 * 24 * 3600 * 1000);
   setSetting('full_refresh_last_run', String(Date.now()));
   return refreshStatus;
 }

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { REGISTRY, parseSelectionTable, parseSundanceWinners, stripTags, directorsMatch } from '../src/festivals.js';
+import { SIGHT_AND_SOUND_2022 } from '../src/data/sight-and-sound-2022.js';
 
 /**
  * Festivales: la convención de títulos de artículo y el parser de wikitables.
@@ -83,6 +84,17 @@ test('directorsMatch: acepta la dirección correcta, con o sin guiones y acentos
   assert.ok(directorsMatch('Joachim Trier, Otro Nombre', ['Joachim Trier']));
 });
 
+// las tablas de Wikipedia usan a veces el orden japonés de apellido primero:
+// «The Eel» de Imamura quedaba sin ficha por esto (visto en producción)
+test('directorsMatch: insensible al orden de las palabras del nombre', () => {
+  assert.ok(directorsMatch('Imamura Shōhei', ['Shohei Imamura']));
+  assert.ok(directorsMatch('Ozu Yasujirō', ['Yasujirō Ozu']));
+  assert.ok(directorsMatch('Kore-eda Hirokazu', ['Hirokazu Koreeda']));
+  assert.ok(directorsMatch('Joseph L. Mankiewicz', ['Joseph Mankiewicz']));
+  // pero el orden no convierte a un tercero en válido
+  assert.equal(directorsMatch('Imamura Shōhei', ['Sohei Imamoto']), false);
+});
+
 test('directorsMatch: rechaza a otro director/a aunque el título y el año casen', () => {
   assert.equal(directorsMatch('Florian Zeller', ['Otra Persona']), false);
   assert.equal(directorsMatch('Casey Affleck', ['Jason Laurits']), false);
@@ -137,6 +149,19 @@ test('parseSundanceWinners: solo el Grand Jury de cada año, en sus tres épocas
       [2006, '13 Tzameti', null],
     ]
   );
+});
+
+// El canon de Sight & Sound viaja empaquetado (dataset fijo hasta 2032): si un
+// retoque del fichero lo rompe, mejor que lo diga un test y no la página.
+test('el dataset de Sight & Sound 2022 está completo y bien formado', () => {
+  assert.ok(SIGHT_AND_SOUND_2022.length >= 250, `solo ${SIGHT_AND_SOUND_2022.length} entradas`);
+  assert.ok(SIGHT_AND_SOUND_2022.every((r) => r.rank && r.title && r.year && r.director));
+  const n1 = SIGHT_AND_SOUND_2022[0];
+  assert.equal(n1.rank, 1);
+  assert.ok(/Jeanne Dielman/.test(n1.title));
+  assert.equal(n1.director, 'Chantal Akerman');
+  assert.ok(REGISTRY.sightsound.onlyWinners);
+  assert.equal(REGISTRY.sightsound.staticList, SIGHT_AND_SOUND_2022);
 });
 
 test('stripTags limpia notas, estilos y entidades', () => {

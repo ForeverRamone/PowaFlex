@@ -1,5 +1,48 @@
 # Changelog
 
+## Alpha 0.9.7 (0.9.7-alpha) — 2026-08-03
+
+- **Novedades en el Dashboard.** El pase nocturno ahora deja rastro de lo que detecta, y el
+  Dashboard lo cuenta arriba del todo: cada aviso llega una sola vez, con enlace directo.
+- **Vigía de festivales**: en cuanto un festival publica la sección de su edición nueva en
+  Wikipedia, aparece la novedad con deep-link a esa edición, donde ya esperan los botones de
+  «seguir a toda su dirección» y «mandar a Radarr las que faltan». Se acabó enterarse por la
+  prensa.
+- **Fases de estreno en las pedidas.** Cada película de «pedidas que siguen sin aparecer» dice
+  ahora POR QUÉ no aparece: 💿 ya en digital (debería caer), 💿 digital con fecha, 🎬 solo en
+  cines o sin fecha — con la API oficial de TMDB. Y cuando una pedida pasa a digital, PowaFlex
+  lo avisa como novedad y reordena su búsqueda en Radarr él solo (solo estrenos digitales
+  recientes: nada de machacar indexers con lo que lleva años sin aparecer).
+- **El canon Sight & Sound 2022 completo** en Festivales: las 264 películas de la lista extendida
+  de la encuesta de la crítica (empates incluidos), con su puesto, casadas con tu Plex y con
+  Radarr y «seguir al director/a» en cada una. Dataset empaquetado con la app: no depende de
+  nadie y no cambia hasta 2032.
+- **«Must-see» de Metacritic en Visionado**: lo que tienes sin ver con metascore ≥ 81 y volumen
+  de votos de aval — el listón de consenso crítico más exigente, sin gastar ni una petición.
+- **Los grandes premios anuales en Festivales**: el palmarés completo de los **Goya** (con sus ex
+  aequo), los **César**, los **BAFTA**, el **Premio del Cine Europeo** y el **Óscar a la mejor
+  película internacional** desde 1947 — todo con el mismo motor, verificado contra el director/a,
+  y con el selector de la página agrupado en Festivales · Premios · Cánones.
+- **Página nueva: Salud de los datos** (en «Tu colección»). Con 12.000 películas los emparejados
+  malos son estadísticamente seguros y solo se descubrían por casualidad: auditorías locales de
+  películas sin ficha TMDB, identidades repetidas, entradas de Letterboxd sin casar, peticiones
+  zombis de Radarr (6+ meses) y personas cuyo emparejado no se pudo demostrar — cada hallazgo con
+  su remedio al lado. Cero red: todo sale de tu propia base de datos.
+- **El pase nocturno ya no puede morir en silencio.** Cada pasada se guarda paso a paso (un
+  reinicio a mitad deja rastro de hasta dónde llegó), ningún paso puede colgarse más de 20
+  minutos, Ajustes enseña el histórico de 30 días con duraciones y errores por paso, y la barra
+  lateral avisa con un punto rojo si la última pasada falló o lleva más de 26 horas sin correr.
+- **Las filmografías solo se re-piden cuando cambian.** La partida más cara de TMDB era volver a
+  pedir TODAS las filmografías de tus favoritos cada noche; ahora el feed de cambios de TMDB dice
+  quién cambió y solo se refrescan esas (con re-pasada completa cada 7 días como red de
+  seguridad).
+- **El emparejado de festivales, más fino todavía** (con tus ejemplos de producción como tests):
+  los nombres ya casan aunque Wikipedia use el orden japonés («Imamura Shōhei» ≡ «Shohei
+  Imamura» — el caso de *The Eel*), las películas recién anunciadas sin equipo en TMDB entran
+  por título clavado (Hamaguchi, Zvyagintsev, Fukada…), y un corte de TMDB a mitad de
+  comprobación ya no se cachea como «sin ficha»: la página avisa y se cura sola al recargar.
+  Las «Σ 0» sin sentido de las películas sin estrenar ya no se pintan.
+
 ## Alpha 0.9.6 (0.9.6-alpha) — 2026-08-03
 
 - **Arreglado el emparejado de Festivales.** Con títulos genéricos («Bunker», «Company», «The

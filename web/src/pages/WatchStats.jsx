@@ -217,6 +217,13 @@ export default function WatchStats() {
       {ins && (
         <>
           <InsightGrid
+            title="🏅 «Must-see» de Metacritic que tienes sin ver (metascore ≥ 81)"
+            hint="El listón de consenso crítico más exigente, avalado por volumen de votos en IMDb. Todo sale de las notas de MDBList ya descargadas."
+            items={ins.mustSee}
+            caption={(m) => `MC ${m.metacritic}${m.imdb != null ? ` · IMDb ${Number(m.imdb).toFixed(1)}` : ''}`}
+            onSelect={setSelected}
+          />
+          <InsightGrid
             title="💎 Joyas tuyas que la crítica no entendió (tu nota LB ≥ 8, RT ≤ 55%)"
             items={ins.hiddenGems}
             caption={(m) => `Tú: ${Number(m.my_rating).toFixed(1)} · 🍅 ${m.rt_critic}%`}

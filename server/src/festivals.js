@@ -18,6 +18,7 @@ import { cachePrefix } from './cache-versions.js';
 import { searchMovieCandidates, movieDirectors, movieSummary } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { watchedIndex, isWatched } from './letterboxd.js';
+import { SIGHT_AND_SOUND_2022 } from './data/sight-and-sound-2022.js';
 
 const DAY = 24 * 3600 * 1000;
 
@@ -111,6 +112,59 @@ export const REGISTRY = {
     section: /latin horizons|horizontes latinos/i,
     sinceYear: 2002, // la sección nació en 2002
   },
+  // No es un festival: es EL canon de la crítica, fijo hasta 2032. Vive aquí
+  // porque la vista de palmarés le da gratis todo lo que necesita (tengo/vista,
+  // notas, Radarr en bloque, seguir directores/as).
+  sightsound: {
+    name: 'Sight & Sound 2022',
+    award: 'The Greatest Films of All Time (encuesta de la crítica del BFI)',
+    group: 'canon',
+    onlyWinners: true,
+    staticList: SIGHT_AND_SOUND_2022,
+  },
+  // --- premios anuales: solo palmarés, del artículo-lista de cada premio.
+  // Sus tablas mezclan ganadora y nominadas con la ganadora sombreada: el
+  // filtro de resaltadas de parseWinnersTables se queda solo con el palmarés.
+  goya: {
+    name: 'Premios Goya',
+    award: 'Goya a la mejor película',
+    group: 'premio',
+    onlyWinners: true,
+    awardPage: 'Goya Award for Best Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  cesar: {
+    name: 'Premios César',
+    award: 'César a la mejor película',
+    group: 'premio',
+    onlyWinners: true,
+    awardPage: 'César Award for Best Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  bafta: {
+    name: 'BAFTA',
+    award: 'BAFTA a la mejor película',
+    group: 'premio',
+    onlyWinners: true,
+    awardPage: 'BAFTA Award for Best Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  efa: {
+    name: 'Cine Europeo (EFA)',
+    award: 'Premio del Cine Europeo a la mejor película',
+    group: 'premio',
+    onlyWinners: true,
+    awardPage: 'European Film Award for Best Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  oscarint: {
+    name: 'Óscar internacional',
+    award: 'Óscar a la mejor película internacional',
+    group: 'premio',
+    onlyWinners: true,
+    awardPage: 'List of Academy Award winners and nominees for Best International Feature Film',
+    awardSection: /^winners and nominees$/i,
+  },
 };
 
 // Ediciones que se salieron del molde, casi todas por la pandemia: o no hubo
@@ -135,7 +189,9 @@ export function festivalsIndex() {
       key,
       name: f.name,
       award: f.award,
-      sinceYear: f.sinceYear,
+      group: f.group || 'festival',
+      sinceYear: f.sinceYear ?? null,
+      onlyWinners: !!f.onlyWinners,
     })),
   };
 }
@@ -246,7 +302,7 @@ export function parseWinnersTables(html) {
     if (rows.length < 2) continue;
     const headers = (rows[0].match(/<th[\s\S]*?<\/th>/gi) || []).map((c) => stripTags(c).toLowerCase());
     const idxYear = headers.findIndex((h) => /year/.test(h));
-    const idxTitle = headers.findIndex((h) => /english title|^title/.test(h));
+    const idxTitle = headers.findIndex((h) => /english title|^film\b|^title/.test(h));
     const idxOrig = headers.findIndex((h) => /original title/.test(h));
     const idxDir = headers.findIndex((h) => /director/.test(h));
     const idxCountry = headers.findIndex((h) => /countr/.test(h));
@@ -255,11 +311,27 @@ export function parseWinnersTables(html) {
     let lastYear = null;
     const delTable = [];
     for (const row of rows.slice(1)) {
-      let cells = (row.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || []).map(stripTags);
+      const rawCells = row.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || [];
+      let cells = rawCells.map(stripTags);
       if (!cells.length) continue;
-      // ex aequo: el año va con rowspan y la segunda ganadora llega sin él
-      if (/^(19|20)\d{2}$/.test(cells[0])) lastYear = Number(cells[0]);
-      else cells = [String(lastYear ?? ''), ...cells];
+      // El año abre la fila de la ganadora — como <th> (Palma), como <td
+      // rowspan> que abraza a las nominadas (Goya, BAFTA) o con adorno
+      // («2020 (35th)»)— y desaparece en ex aequo y nominadas. OJO con las
+      // películas tituladas «1917»: un año pelado en <td> solo cuenta si la
+      // fila trae TODAS las columnas (las nominadas van a una de menos).
+      const y0 = cells[0].match(/^((?:19|20)\d{2})\b/);
+      const esFilaDeAño =
+        !!y0 &&
+        (/^<th/i.test(rawCells[0]) ||
+          /rowspan/i.test(rawCells[0]) ||
+          /^(?:19|20)\d{2}\s*[([]/.test(cells[0]) ||
+          (/^(?:19|20)\d{2}$/.test(cells[0]) && cells.length === headers.length));
+      if (esFilaDeAño) {
+        lastYear = Number(y0[1]);
+        cells = [String(lastYear), ...cells.slice(1)];
+      } else {
+        cells = [String(lastYear ?? ''), ...cells];
+      }
       // sin celda de título original (coincide con el inglés): recolocar
       const sinOriginal = idxOrig >= 0 && cells.length === headers.length - 1;
       const cell = (i) => {
@@ -360,6 +432,31 @@ const normName = (s) =>
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]/g, '');
 
+// tokens de un nombre: guiones fusionados («Kore-eda» → «koreeda»), sin
+// acentos, y fuera iniciales sueltas («Joseph L. Mankiewicz» → joseph,
+// mankiewicz)
+const nameTokens = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/-/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 2);
+
+// ¿Mismo nombre? Insensible al ORDEN de las palabras: las tablas de Wikipedia
+// usan a veces el orden japonés («Imamura Shōhei») donde TMDB dice «Shohei
+// Imamura». Basta con que los tokens del nombre corto estén todos en el largo
+// (cubre también segundos nombres e iniciales).
+const sameName = (a, b) => {
+  const ta = nameTokens(a);
+  const tb = nameTokens(b);
+  if (!ta.length || !tb.length) return false;
+  const [corto, largo] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
+  const set = new Set(largo);
+  return corto.every((t) => set.has(t));
+};
+
 /**
  * ¿La dirección que dice Wikipedia casa con la de TMDB? La celda puede traer
  * varios nombres («Ludovic and Zoran Boukherma», «A, B»); basta con que uno
@@ -369,11 +466,18 @@ export function directorsMatch(wikiDirector, tmdbDirectors) {
   if (!wikiDirector) return true;
   const wiki = String(wikiDirector)
     .split(/,|&| and | y /i)
-    .map(normName)
-    .filter((s) => s.length >= 4);
+    .filter((s) => normName(s).length >= 4);
   if (!wiki.length) return true;
-  const tm = (tmdbDirectors || []).map(normName).filter(Boolean);
-  return wiki.some((w) => tm.some((t) => t === w || t.includes(w) || w.includes(t)));
+  const tm = (tmdbDirectors || []).filter(Boolean);
+  return wiki.some((w) =>
+    tm.some((t) => {
+      if (sameName(w, t)) return true;
+      // respaldo pegado: cubre grafías fusionadas en cualquiera de los lados
+      const nw = normName(w);
+      const nt = normName(t);
+      return nt === nw || nt.includes(nw) || nw.includes(nt);
+    })
+  );
 }
 
 /**
@@ -388,6 +492,7 @@ export function directorsMatch(wikiDirector, tmdbDirectors) {
  */
 async function resolveFilms(rows, yearOf) {
   const films = new Array(rows.length);
+  let errors = 0; // fallos de RED (429 de TMDB…): quien llama no debe cachear
   let i = 0;
   async function worker() {
     for (;;) {
@@ -409,19 +514,29 @@ async function resolveFilms(rows, yearOf) {
       // los títulos clavados primero: entre dos candidatos verificables, gana
       // el que además se llama igual
       const wanted = normName(r.title);
-      enVentana.sort((a, b) => {
-        const ex = (c) => (normName(c.title) === wanted || normName(c.original_title) === wanted ? 0 : 1);
-        return ex(a) - ex(b);
-      });
+      const tituloClavado = (c) => normName(c.title) === wanted || normName(c.original_title) === wanted;
+      enVentana.sort((a, b) => (tituloClavado(a) ? 0 : 1) - (tituloClavado(b) ? 0 : 1));
 
       let tmdbId = null;
+      let fallosRed = false;
       for (const c of enVentana) {
-        const dirs = await movieDirectors(c.id).catch(() => []);
-        if (dirs.length ? directorsMatch(r.director, dirs) : !r.director) {
+        // null = fallo de red (no «sin créditos»): probar el siguiente y, si la
+        // película acaba sin ficha por esto, avisar para que NO se cachee
+        const dirs = await movieDirectors(c.id).catch(() => null);
+        if (dirs === null) {
+          fallosRed = true;
+          continue;
+        }
+        // Recién anunciadas: TMDB puede tener la ficha SIN equipo todavía. Sin
+        // director que comprobar, el título clavado basta (los dobles como la
+        // otra «Bunker» sí tienen créditos y caen en la comprobación normal).
+        const vale = dirs.length ? directorsMatch(r.director, dirs) : !r.director || tituloClavado(c);
+        if (vale) {
           tmdbId = c.id;
           break;
         }
       }
+      if (!tmdbId && fallosRed) errors++;
 
       let sum = null;
       if (tmdbId) {
@@ -441,12 +556,13 @@ async function resolveFilms(rows, yearOf) {
     }
   }
   await Promise.all(Array.from({ length: 5 }, worker));
-  return films;
+  return { films, errors };
 }
 
 // --- edición de un festival ----------------------------------------------------
 
 async function buildEdition(key, f, year) {
+  if (f.onlyWinners) throw new Error(`${f.name} no tiene ediciones por año: mira su palmarés.`);
   const special = SPECIAL_EDITIONS[`${key}:${year}`];
   if (special?.unavailable) throw new Error(special.unavailable);
   const sectionRe = special?.section || f.section;
@@ -494,9 +610,8 @@ async function buildEdition(key, f, year) {
     throw new Error(`Las secciones de competición de «${page}» no tienen una tabla de películas reconocible.`);
   }
 
-  // resolver cada título contra TMDB (searchMovieId cachea aciertos 30 días y
-  // reintenta sin año cuando el año de estreno no coincide con el del festival)
-  const films = await resolveFilms(rows, () => year);
+  // resolver cada título contra TMDB, verificando la dirección
+  const { films, errors } = await resolveFilms(rows, () => year);
 
   return {
     festival: key,
@@ -509,6 +624,7 @@ async function buildEdition(key, f, year) {
     fetchedAt: Date.now(),
     films,
     unresolved: films.filter((x) => !x.tmdb_id).length,
+    resolveErrors: errors,
   };
 }
 
@@ -531,10 +647,57 @@ export async function festivalEdition(key, year, { refresh = false } = {}) {
   let base = refresh ? null : cacheRead(cacheKey, y < nowYear ? 180 * DAY : DAY);
   if (!base) {
     base = await buildEdition(key, f, y);
-    cacheWrite(cacheKey, base);
+    // un resultado con fallos de red (429 de TMDB en plena ráfaga) NO se
+    // cachea: la siguiente visita lo reintenta y el hueco se cura solo
+    if (!base.resolveErrors) cacheWrite(cacheKey, base);
   }
 
   return { ...base, films: await decorateLive(base.films) };
+}
+
+/**
+ * La vigía: ¿alguno de los festivales ya tiene publicada la sección de su
+ * edición en curso (o la del año que viene, para los de enero)? La primera vez
+ * que aparece se apunta como novedad — con deep-link a la edición, donde ya
+ * esperan los botones de «seguir a todos» y «mandar a Radarr». El INSERT OR
+ * IGNORE sobre (type, ref) evita repetir el aviso cada noche.
+ */
+export async function watchFestivalEditions() {
+  const nowYear = new Date().getFullYear();
+  const ins = db.prepare(
+    `INSERT OR IGNORE INTO app_events (type, ref, title, body, url, created_at)
+     VALUES ('festival_edition', ?, ?, ?, ?, ?)`
+  );
+  const vistos = new Set(
+    db.prepare(`SELECT ref FROM app_events WHERE type = 'festival_edition'`).all().map((r) => r.ref)
+  );
+  let checked = 0;
+  let found = 0;
+  for (const [key, f] of Object.entries(REGISTRY)) {
+    if (f.onlyWinners) continue;
+    for (const y of [nowYear, nowYear + 1]) {
+      if (y < f.sinceYear) continue;
+      const ref = `${key}:${y}`;
+      if (vistos.has(ref)) continue;
+      checked++;
+      try {
+        const ed = await festivalEdition(key, y);
+        if (ed.films.length) {
+          ins.run(
+            ref,
+            `🎪 ${f.name} ${y}: sección oficial publicada`,
+            `${ed.films.length} películas en «${ed.section}». Desde Festivales puedes seguir a toda su dirección o mandarlas a Radarr.`,
+            `/festivales?f=${key}&y=${y}`,
+            Date.now()
+          );
+          found++;
+        }
+      } catch {
+        // aún sin programa (o Wikipedia caída): se reintenta en el siguiente pase
+      }
+    }
+  }
+  return { checked, found };
 }
 
 // Lo vivo (la tienes, vista, notas) se calcula al leer, nunca se cachea.
@@ -558,7 +721,7 @@ async function decorateLive(films) {
 export async function festivalWinners(key, { refresh = false } = {}) {
   const f = REGISTRY[key];
   if (!f) throw new Error('Festival desconocido');
-  if (!f.awardPage) {
+  if (!f.awardPage && !f.staticList) {
     throw new Error(
       `El palmarés de ${f.name} aún no tiene artículo utilizable en Wikipedia` +
         (key === 'busan' ? ' (el premio nació en 2025: mira la edición del 2025)' : '') +
@@ -569,7 +732,16 @@ export async function festivalWinners(key, { refresh = false } = {}) {
   let base = refresh ? null : cacheRead(cacheKey, 30 * DAY);
   if (!base) {
     let rows;
-    if (f.awardParse === 'sundanceList') {
+    let source = f.awardPage ? `https://en.wikipedia.org/wiki/${f.awardPage.replace(/ /g, '_')}` : null;
+    let note = null;
+    if (f.staticList) {
+      // dataset fijo empaquetado con la app (Sight & Sound se renueva en 2032)
+      rows = f.staticList.map((r) => ({
+        year: r.year, title: r.title, original_title: r.title, director: r.director, country: null, rank: r.rank,
+      }));
+      source = 'https://www.bfi.org.uk/sight-and-sound/greatest-films-all-time';
+      note = `La lista extendida de la encuesta de la crítica (${rows.length} películas, empates incluidos), ordenada por puesto. Se renueva cada década: la próxima, en 2032.`;
+    } else if (f.awardParse === 'sundanceList') {
       // la lista de Sundance va por años con viñetas: página entera de una vez
       const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
       rows = parseSundanceWinners(parsed.text).filter((r) => r.year >= f.sinceYear);
@@ -577,22 +749,32 @@ export async function festivalWinners(key, { refresh = false } = {}) {
       const meta = await wikiParse({ page: f.awardPage, prop: 'sections' });
       const sec = (meta.sections || []).find((s) => f.awardSection.test(stripTags(s.line)));
       if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
-      // la sección «Winners» incluye sus subsecciones por década, cada una con su tabla
+      // la sección «Winners» suele incluir sus subsecciones por década…
       const parsed = await wikiParse({ page: f.awardPage, section: String(sec.index), prop: 'text' });
       rows = parseWinnersTables(parsed.text);
+      if (!rows.length) {
+        // …pero en algunos artículos (Goya, BAFTA) las décadas son secciones
+        // HERMANAS y la de «Winners» llega vacía: página entera, y que el
+        // parser descarte las tablas que no son palmarés
+        const full = await wikiParse({ page: f.awardPage, prop: 'text' });
+        rows = parseWinnersTables(full.text);
+      }
     }
     if (!rows.length) throw new Error(`El artículo «${f.awardPage}» no tiene una lista de ganadoras reconocible.`);
+    const { films, errors } = await resolveFilms(rows, (r) => r.year);
     base = {
       festival: key,
       name: f.name,
       award: f.award,
-      source: `https://en.wikipedia.org/wiki/${f.awardPage.replace(/ /g, '_')}`,
+      note,
+      source,
       fetchedAt: Date.now(),
-      films: await resolveFilms(rows, (r) => r.year),
-      unresolved: 0,
+      films,
+      unresolved: films.filter((x) => !x.tmdb_id).length,
+      resolveErrors: errors,
     };
-    base.unresolved = base.films.filter((x) => !x.tmdb_id).length;
-    cacheWrite(cacheKey, base);
+    // con fallos de red no se cachea: se reintenta en la siguiente visita
+    if (!base.resolveErrors) cacheWrite(cacheKey, base);
   }
   return { ...base, films: await decorateLive(base.films) };
 }

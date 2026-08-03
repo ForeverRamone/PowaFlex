@@ -1,5 +1,5 @@
 import { db, getSetting, setSetting } from './db.js';
-import { setBuildProgress, clearBuildProgress } from './tmdb.js';
+import { setBuildProgress, clearBuildProgress, enrichReleasePhases } from './tmdb.js';
 
 function radarrConfig() {
   const url = (getSetting('radarr_url') || '').replace(/\/+$/, '');
@@ -133,6 +133,43 @@ export async function radarrWanted() {
 export async function radarrCutoffUnmet() {
   const items = await fetchWantedPages('cutoff');
   return items.sort((a, b) => String(a.added || '9999').localeCompare(String(b.added || '9999')));
+}
+
+/**
+ * Vigía de estrenos digitales: de las pedidas sin archivo, ¿cuáles acaban de
+ * pasar a digital? Cada una se apunta como novedad UNA vez (UNIQUE type+ref) y
+ * se reordena su búsqueda en Radarr — solo si el estreno digital es reciente
+ * (60 días): relanzar de golpe todo lo que lleva años en digital y aun así no
+ * aparece sería maltratar a los indexers para nada.
+ */
+export async function checkDigitalReleases({ maxFetch = 500 } = {}) {
+  const hoy = new Date().toLocaleDateString('en-CA');
+  const items = await radarrWanted();
+  await enrichReleasePhases(items, { maxFetch });
+  const ins = db.prepare(
+    `INSERT OR IGNORE INTO app_events (type, ref, title, body, url, created_at)
+     VALUES ('digital', ?, ?, ?, ?, ?)`
+  );
+  let nuevas = 0;
+  for (const it of items) {
+    const d = it.phases?.digital;
+    if (!d || d > hoy) continue;
+    if (Date.now() - Date.parse(d) > 60 * 24 * 3600 * 1000) continue;
+    const r = ins.run(
+      String(it.tmdb_id),
+      `💿 «${it.title}» ya está en digital`,
+      `Estreno digital el ${d}: Radarr vuelve a buscarla.`,
+      '/calidad',
+      Date.now()
+    );
+    if (r.changes) {
+      nuevas++;
+      try {
+        await radarrSearchAgain(it.tmdb_id);
+      } catch {}
+    }
+  }
+  return { wanted: items.length, nuevas };
 }
 
 /** Reordena a Radarr buscar una película concreta ya monitorizada. */

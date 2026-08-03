@@ -169,7 +169,9 @@ export default function About() {
           <p>
             La foto general: cuántas películas tienes, cuántas horas de cine suman, cuánto disco ocupan, y
             gráficas por década y por género, además del ritmo al que crece la biblioteca y los
-            directores/as y actores/actrices con más presencia.
+            directores/as y actores/actrices con más presencia. Arriba, lo vivo: las <b>novedades</b> que
+            detecta el pase nocturno (una edición de festival recién publicada, una pedida que ya está en
+            digital) y las <b>capturas</b> de la semana.
           </p>
         </Block>
         <Block icon="🎞️" title="Biblioteca" to="/biblioteca">
@@ -210,9 +212,11 @@ export default function About() {
           <p>
             Las secciones oficiales de los grandes festivales —los seis de la vía directa al Óscar internacional
             (Cannes, Venecia, Berlinale, Sundance, Toronto y Busan) más San Sebastián y sus Horizontes Latinos—,
-            edición a edición, y el palmarés histórico de cada premio. Todo casado con tu Plex: manda a Radarr lo
-            que falte y sigue a sus directores/as —de una en una o la sección entera— para que sus estrenos
-            entren en el calendario.
+            edición a edición, el palmarés histórico de cada premio, los grandes premios anuales (Goya, César,
+            BAFTA, Cine Europeo y el Óscar internacional) y el canon <b>Sight &amp; Sound 2022</b> de la
+            crítica al completo. Todo casado con tu Plex: manda a Radarr lo que falte y sigue a sus directores/as
+            —de una en una o la sección entera— para que sus estrenos entren en el calendario. El pase nocturno
+            vigila las ediciones nuevas y te lo cuenta en el Dashboard en cuanto un festival publica su selección.
           </p>
         </Block>
         <Block icon="🧭" title="Descubrir huecos" to="/descubrir">
@@ -240,7 +244,8 @@ export default function About() {
           <p>
             El contador de lo que llevas visto (Plex + Letterboxd) y lo visto contra lo pendiente: por década, por
             género, los directores/as de los que más te queda por ver, joyas y discrepancias frente a tu nota de
-            Letterboxd, las mejor valoradas que aún no has visto y tu historial reciente.
+            Letterboxd, las mejor valoradas que aún no has visto, los «must-see» de Metacritic pendientes y tu
+            historial reciente.
           </p>
         </Block>
         <Block icon="💾" title="Calidad y disco" to="/calidad">
@@ -248,6 +253,13 @@ export default function About() {
             La salud técnica de la colección: distribución de resoluciones, códecs y HDR, las películas bien
             valoradas que siguen por debajo de 1080p (candidatas a upgrade), duplicados, los archivos más pesados
             y cuánto disco consume cada década.
+          </p>
+        </Block>
+        <Block icon="🩺" title="Salud de los datos" to="/salud">
+          <p>
+            Auditorías locales de la base de datos: películas sin ficha de TMDB, identidades repetidas,
+            entradas de Letterboxd sin casar, peticiones zombis de Radarr y personas cuyo emparejado no se
+            pudo demostrar — cada hallazgo con su remedio al lado.
           </p>
         </Block>
         <Block icon="🟠" title="Letterboxd" to="/letterboxd">
@@ -261,7 +273,8 @@ export default function About() {
           <p>
             Las conexiones (Plex, TMDB, Radarr y MDBList) con guías paso a paso para conseguir cada credencial, el aspecto de la app, qué notas quieres ver, el
             perfil de calidad y carpeta que usará Radarr, el tamaño del radar del calendario, el control de
-            sincronización manual y la copia de seguridad: descarga de la base de datos entera y
+            sincronización manual, el histórico de los últimos 30 días del pase nocturno (paso a paso, con
+            duraciones y errores) y la copia de seguridad: descarga de la base de datos entera y
             exportación/importación de la configuración para reinstalar sin empezar de cero.
           </p>
         </Block>

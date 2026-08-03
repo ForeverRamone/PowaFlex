@@ -13,6 +13,7 @@ import {
   filmographyProfile,
   getCalendarCached,
   enrichPeopleLife,
+  enrichReleasePhases,
   tmdbPoster,
   searchMovieId,
   tmdbMovieDetail,
@@ -70,7 +71,8 @@ import {
 } from './letterboxd.js';
 import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
 import { festivalsIndex, festivalEdition, festivalWinners } from './festivals.js';
-import { runFullRefresh, refreshStatus } from './refresh.js';
+import { dataHealth } from './datahealth.js';
+import { runFullRefresh, refreshStatus, refreshHistory, nightlyHealth } from './refresh.js';
 import { availability, isUpgradeable } from './justwatch.js';
 import { scanSagas, sagaScanStatus, sagaScanState, sagaList, sagaComplete, enrichSagaStats, sagaStatsStatus } from './saga.js';
 import * as q from './queries.js';
@@ -232,6 +234,8 @@ app.get('/api/setup-state', async () => {
     movies,
     newlyAdded: Number(s.last_sync_added || 0),
     lastSyncAt: Number(s.last_sync_at || 0) || null,
+    // para el aviso de la barra lateral: última pasada con errores o caducada
+    nightly: nightlyHealth(),
   };
 });
 
@@ -668,6 +672,9 @@ app.get('/api/media/:tmdbId', async (req, reply) => {
 app.get('/api/build-progress', async () => currentProgress());
 
 // "Actualizar todo": one button for the whole routine (same code as the nightly)
+// histórico de pasadas (30 días): duración y estado por paso
+app.get('/api/refresh-history', async () => refreshHistory());
+
 app.get('/api/refresh-all', async () => ({
   ...refreshStatus,
   lastRun: Number(getSetting('full_refresh_last_run') || 0) || null,
@@ -1136,10 +1143,23 @@ app.get('/api/radarr/ids', async () => radarrOwnedIds());
 app.get('/api/radarr/captures', async (req) =>
   radarrCaptures(Math.min(Number(req.query.days) || 30, 365), Math.min(Number(req.query.limit) || 60, 200)));
 
+// auditorías locales de calidad del dato (huérfanos, homónimos, zombis…)
+app.get('/api/datahealth', async () => dataHealth());
+
+// novedades detectadas por el pase nocturno (ediciones de festivales, digitales…)
+app.get('/api/events', async (req) =>
+  db
+    .prepare('SELECT * FROM app_events WHERE created_at >= ? ORDER BY created_at DESC LIMIT ?')
+    .all(Date.now() - Math.min(Number(req.query.days) || 14, 90) * 24 * 3600 * 1000, Math.min(Number(req.query.limit) || 30, 100)));
+
 // lo que Radarr aún debe: pedidas sin archivo y con archivo bajo el corte
 app.get('/api/radarr/wanted', async (req, reply) => {
   try {
-    return { items: await radarrWanted() };
+    const items = await radarrWanted();
+    // fase de estreno (salas/digital) para leer POR QUÉ no aparece cada una;
+    // lo no cacheado se limita aquí y lo remata el pase nocturno
+    if (getSetting('tmdb_key')) await enrichReleasePhases(items, { maxFetch: 40 });
+    return { items };
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };

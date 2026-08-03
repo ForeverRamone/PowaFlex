@@ -2,7 +2,7 @@
 
 # 🎬 PowaFlex
 
-> **Alpha 0.9.6** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
+> **Alpha 0.9.7** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
 > de filmografías, calendario de estrenos venideros conectado a TMDB y envío directo a Radarr.
 
 PowaFlex es tu centro de mando cinéfilo. Vive junto a tu servidor Plex (en Docker), lee tu
@@ -21,13 +21,14 @@ cuentas ni telemetría.
 | 🎞️ **Biblioteca** | Toda la colección en parrilla de pósters con código de color (🟢 en Plex · ★ vista) y filtros estilo Letterboxd: género, país, década, visto/sin ver, largo/corto (<40 min), resolución, HDR/Dolby Vision, notas mínimas de IMDb/RT/Letterboxd… y ordenaciones por cualquiera de esas notas (incluido aleatorio). La nota que sale en cada póster es configurable (IMDb, Letterboxd o la combinada de MDBList). |
 | 🎭 **Directores/as y actores/actrices** | Ranking por presencia, con filtros por género, vivo/fallecido, continente y país. Cada ficha cruza la filmografía de TMDB con lo que tienes: % de completismo (solo largometrajes, con filtros para cortos, documentales, TV y dirección coral), lo que falta (botón **+ Radarr**) y proyectos anunciados. Quien dirige **y** actúa tiene dos barras (director/a y actor/actriz). |
 | 🗓️ **Cine venidero** | Calendario mensual de estrenos y proyectos anunciados de tus directores/as y actores/actrices top y favoritos, con envío a Radarr en un clic. |
-| 🎪 **Festivales** | Las secciones oficiales de los grandes festivales —los seis de la vía Óscar internacional (Cannes, Venecia, Berlinale, Sundance, Toronto, Busan) más **San Sebastián y sus Horizontes Latinos**—, edición a edición, con el **palmarés histórico** de cada premio. Manda a Radarr lo que falte y sigue a sus directores/as, de una en una o la sección entera. |
+| 🎪 **Festivales** | Las secciones oficiales de los grandes festivales —los seis de la vía Óscar internacional (Cannes, Venecia, Berlinale, Sundance, Toronto, Busan) más **San Sebastián y sus Horizontes Latinos**—, edición a edición, con el **palmarés histórico** de cada premio, los grandes premios anuales (**Goya, César, BAFTA, Cine Europeo y Óscar internacional**) y el canon **Sight & Sound 2022** completo. Manda a Radarr lo que falte, sigue a sus directores/as (de una en una o la sección entera) y deja que el pase nocturno **vigile las ediciones nuevas** y te avise en el Dashboard. |
 | ⭐ **Favoritos** | Ranking paginado por nº de títulos (con filtro de fallecidos y actualización de estado vital), paquetes temáticos de directores/as (españoles, premiados en festivales, emergentes, taquilleros, en boga) con **«añadir todos»**, pegar una lista de nombres separados por comas o líneas, y añadir a cualquiera tecleando. Cada persona puede seguirse como director/a, como actor/actriz **o por las dos facetas a la vez**. Alimentan el calendario y el auto-Radarr. |
 | 🧭 **Descubrir huecos** | Lo que te falta de tus favoritos y de tus filmografías top, más los canon de directores/as de **They Shoot Pictures** (Top 250 de siempre y Top 100 del siglo XXI) para detectar ausencias en tu servidor. Con buscador de personas y actualización bajo demanda. |
 | 🏆 **Listas y retos** | Listas de MDBList y **retos de Letterboxd** con anillos concéntricos de «lo que tengo» vs «lo que he visto», ocultar los que no te interesen y envío en bloque a Radarr. |
 | 📚 **Sagas** | Detecta franquicias desde la colección real de TMDB de cada película: qué partes te faltan o están por estrenar, con envío a Radarr. |
-| 👁️ **Visionado** | Contador de lo que llevas visto (Plex + Letterboxd, con lo que aún no cuadra con tu biblioteca), visto vs. pendiente por década y género, directores/as con obra pendiente, joyas y discrepancias frente a tu nota de Letterboxd, y mejor valoradas sin ver. |
-| 💾 **Calidad y disco** | Resoluciones, códecs, HDR, candidatas a upgrade (buenas películas por debajo de 1080p) con comprobación en **JustWatch** de si existe versión de más calidad, duplicados, archivos más pesados y la **deuda de Radarr**: qué pediste que sigue sin aparecer y qué llegó por debajo del corte de tu perfil, con re-búsqueda en un clic. |
+| 👁️ **Visionado** | Contador de lo que llevas visto (Plex + Letterboxd, con lo que aún no cuadra con tu biblioteca), visto vs. pendiente por década y género, directores/as con obra pendiente, joyas y discrepancias frente a tu nota de Letterboxd, mejor valoradas sin ver y los «must-see» de Metacritic pendientes. |
+| 💾 **Calidad y disco** | Resoluciones, códecs, HDR, candidatas a upgrade (buenas películas por debajo de 1080p) con comprobación en **JustWatch** de si existe versión de más calidad, duplicados, archivos más pesados y la **deuda de Radarr**: qué pediste que sigue sin aparecer (con su fase de estreno: en cines, ya en digital, sin fecha) y qué llegó por debajo del corte de tu perfil, con re-búsqueda en un clic. |
+| 🩺 **Salud de los datos** | Auditorías locales: películas sin ficha TMDB, identidades repetidas, Letterboxd sin casar, peticiones zombis y emparejados de personas sin demostrar — cada hallazgo con su remedio. |
 | 🟠 **Letterboxd** | Importa el **.zip completo** del export (diario, notas, vistas, watchlist y listas) o el **feed RSS** de tu usuario, y lo cruza con Plex. |
 
 Además: **buscador global** (Ctrl/⌘ + K), ficha de película en cualquier póster de la app, notas de
@@ -35,8 +36,10 @@ IMDb, Rotten Tomatoes, Metacritic y Letterboxd (vía MDBList) enlazadas a cada w
 de credenciales (`POWAFLEX_SECRET`) y **auto-Radarr diario** de los estrenos de tus directores
 favoritos vivos.
 
-La sincronización con Plex es **incremental** y se repite sola cada noche (03:00). Los datos de
-TMDB se cachean para no abusar de su API.
+La sincronización con Plex es **incremental** y se repite sola cada noche (03:00), con histórico
+persistente de cada pasada, tope de tiempo por paso y aviso en la barra lateral si algo falló. Los
+datos de TMDB se cachean para no abusar de su API, y las filmografías solo se re-piden cuando el
+propio feed de cambios de TMDB dice que cambiaron.
 
 ## 📋 Requisitos
 

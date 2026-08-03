@@ -20,7 +20,9 @@ export const CACHE_VERSIONS = {
   discover_absent: 5,
   // v2: el emparejado con TMDB se verifica contra el director/a (antes un
   // título genérico enganchaba otra película del mismo año)
-  festival: 2,
+  // v3: nombres insensibles al orden (Imamura Shōhei), fichas sin equipo aún
+  // aceptadas por título clavado, y los 429 ya no se cachean como «sin ficha»
+  festival: 3,
 };
 
 /** Prefijo con versión de una caché: `calendar:v7`, `discover_gaps:v7`… */

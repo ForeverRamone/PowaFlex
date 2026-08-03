@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, Empty, StatusLegend, PageHeader, useRadarrIds,
@@ -11,10 +12,16 @@ import { toast } from '../toast.js';
  * pasar por el comité nacional. Datos de Wikipedia, casados contra TMDB.
  */
 export default function Festivals() {
+  // deep-link desde Novedades: /festivales?f=venecia&y=2027 abre esa edición
+  const [params] = useSearchParams();
   const [index, setIndex] = useState(null);
-  const [fest, setFest] = useState(() => localStorage.getItem('festival_key') || 'cannes');
-  const [year, setYear] = useState(() => Number(localStorage.getItem('festival_year')) || new Date().getFullYear());
-  const [view, setView] = useState(() => localStorage.getItem('festival_view') || 'seleccion'); // seleccion | palmares
+  const [fest, setFest] = useState(() => params.get('f') || localStorage.getItem('festival_key') || 'cannes');
+  const [year, setYear] = useState(
+    () => Number(params.get('y')) || Number(localStorage.getItem('festival_year')) || new Date().getFullYear()
+  );
+  const [view, setView] = useState(() =>
+    params.get('f') ? 'seleccion' : localStorage.getItem('festival_view') || 'seleccion'
+  ); // seleccion | palmares
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -51,6 +58,11 @@ export default function Festivals() {
   }, [fest, year, view]);
 
   const info = index?.festivals?.find((f) => f.key === fest);
+  // las entradas de solo-palmarés (Sight & Sound) no tienen ediciones por año
+  const soloPalmares = !!info?.onlyWinners;
+  useEffect(() => {
+    if (soloPalmares && view !== 'palmares') setView('palmares');
+  }, [soloPalmares, view]);
   const films = data?.films || [];
   const missingIds = films.filter((f) => f.tmdb_id && !f.owned && !radarrIds.has(f.tmdb_id)).map((f) => f.tmdb_id);
 
@@ -95,11 +107,25 @@ export default function Festivals() {
       />
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
-        {(index?.festivals || []).map((f) => (
-          <button key={f.key} onClick={() => setFest(f.key)} className={fest === f.key ? 'btn-gold' : 'btn-ghost'} title={`Premio que clasifica: ${f.award}`}>
-            {f.name}
-          </button>
-        ))}
+        {[
+          ['festival', 'Festivales'],
+          ['premio', 'Premios'],
+          ['canon', 'Cánones'],
+        ].map(([g, label]) => {
+          const del = (index?.festivals || []).filter((f) => f.group === g);
+          if (!del.length) return null;
+          return (
+            <div key={g} className="flex gap-2 items-center flex-wrap">
+              <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{label}:</span>
+              {del.map((f) => (
+                <button key={f.key} onClick={() => setFest(f.key)} className={fest === f.key ? 'btn-gold' : 'btn-ghost'} title={f.award}>
+                  {f.name}
+                </button>
+              ))}
+              <span className="w-2" />
+            </div>
+          );
+        })}
         {view === 'seleccion' && (
           <div className="flex items-center gap-1 ml-auto">
             <button className="btn-ghost !py-1" onClick={() => setYear((y) => y - 1)} title="Edición anterior">←</button>
@@ -117,17 +143,20 @@ export default function Festivals() {
       </div>
 
       <div className="flex items-center gap-3 flex-wrap mb-4">
-        <div className="flex gap-2">
-          <button onClick={() => setView('seleccion')} className={`${view === 'seleccion' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
-            Sección oficial por año
-          </button>
-          <button onClick={() => setView('palmares')} className={`${view === 'palmares' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
-            🏆 Palmarés histórico
-          </button>
-        </div>
+        {!soloPalmares && (
+          <div className="flex gap-2">
+            <button onClick={() => setView('seleccion')} className={`${view === 'seleccion' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
+              Sección oficial por año
+            </button>
+            <button onClick={() => setView('palmares')} className={`${view === 'palmares' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
+              🏆 Palmarés histórico
+            </button>
+          </div>
+        )}
         {info && (
           <span className="text-xs text-zinc-500">
-            Premio que clasifica: <b className="text-zinc-300">{info.award}</b>
+            {soloPalmares ? 'Canon: ' : 'Premio que clasifica: '}
+            <b className="text-zinc-300">{info.award}</b>
             {view === 'seleccion' && info.sinceYear > 1990 && ` · esta sección existe desde ${info.sinceYear}`}
           </span>
         )}
@@ -146,6 +175,11 @@ export default function Festivals() {
               · {data.section || `todas las ganadoras (${data.award})`} · {films.length} películas
               {data.unresolved > 0 && (
                 <span className="text-zinc-500"> · {data.unresolved} sin casar con TMDB</span>
+              )}
+              {data.resolveErrors > 0 && (
+                <span className="text-orange-300" title="TMDB cortó el grifo a mitad de comprobación; este resultado no se guarda en caché">
+                  {' '}· {data.resolveErrors} sin comprobar por fallos de red — recarga en un rato
+                </span>
               )}
             </span>
             <a href={data.source} target="_blank" rel="noreferrer" className="text-[11px] text-zinc-500 hover:text-gold-400 underline">
@@ -179,7 +213,7 @@ export default function Festivals() {
                 <div key={f.tmdb_id || `${f.title}-${i}`}>
                   {f.tmdb_id ? (
                     <TmdbCard item={f}>
-                      {f.mdb?.score != null && (
+                      {f.mdb?.score > 0 && (
                         <div className="text-[11px] text-gold-400/90 tabular">
                           Σ {f.mdb.score}
                           {f.mdb.imdb != null ? ` · IMDb ${Number(f.mdb.imdb).toFixed(1)}` : ''}
@@ -194,16 +228,23 @@ export default function Festivals() {
                       {f.title}
                     </div>
                   )}
-                  {f.director && (
-                    <button
-                      onClick={() => followDirector(f.director)}
-                      disabled={dirBusy === f.director || followedDirs.has(f.director)}
-                      className="mt-1 text-[11px] text-zinc-400 hover:text-gold-400 text-left leading-tight cursor-pointer disabled:cursor-default"
-                      title={followedDirs.has(f.director) ? 'Ya en favoritos' : `Seguir a ${f.director} como director/a`}
-                    >
-                      {followedDirs.has(f.director) ? '⭐' : dirBusy === f.director ? '…' : '☆'} {f.director}
-                    </button>
-                  )}
+                  <div className="flex items-baseline gap-1.5">
+                    {f.rank && (
+                      <span className="text-[11px] text-gold-400 font-semibold tabular shrink-0" title={f.tied ? `Puesto ${f.rank} (empate)` : `Puesto ${f.rank}`}>
+                        #{f.rank}
+                      </span>
+                    )}
+                    {f.director && (
+                      <button
+                        onClick={() => followDirector(f.director)}
+                        disabled={dirBusy === f.director || followedDirs.has(f.director)}
+                        className="mt-1 text-[11px] text-zinc-400 hover:text-gold-400 text-left leading-tight cursor-pointer disabled:cursor-default"
+                        title={followedDirs.has(f.director) ? 'Ya en favoritos' : `Seguir a ${f.director} como director/a`}
+                      >
+                        {followedDirs.has(f.director) ? '⭐' : dirBusy === f.director ? '…' : '☆'} {f.director}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

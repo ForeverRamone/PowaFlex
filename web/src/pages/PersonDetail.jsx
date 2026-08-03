@@ -322,7 +322,7 @@ export default function PersonDetail() {
                 ) : null
               }
             >
-              {item.mdb?.score != null && (
+              {item.mdb?.score > 0 && (
                 <div className="text-[11px] text-gold-400/90 tabular">
                   Σ {item.mdb.score}
                   {item.mdb.imdb != null ? ` · IMDb ${Number(item.mdb.imdb).toFixed(1)}` : ''}
