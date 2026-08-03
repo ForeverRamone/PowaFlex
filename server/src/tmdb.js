@@ -1,4 +1,4 @@
-import { db, getSetting, cacheRead, cacheWrite } from './db.js';
+import { db, getSetting, setSetting, cacheRead, cacheWrite } from './db.js';
 import { watchedIndex, isWatched, normTitle } from './letterboxd.js';
 import { needsLatin, readableTitle } from './titles.js';
 import { cachePrefix } from './cache-versions.js';

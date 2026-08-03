@@ -1,5 +1,15 @@
 # Changelog
 
+## Alpha 0.9.8 (0.9.8-alpha) — 2026-08-03
+
+- **Arreglado el paso «Detectar filmografías cambiadas en TMDB»**, que en la 0.9.7 moría con
+  «setSetting is not defined»: al módulo le faltaba un import. No saltó en las pruebas porque la
+  clave TMDB del entorno de pruebas hacía fallar el paso antes de llegar a esa línea. Sin este
+  paso, las filmografías de tus favoritos tardaban hasta 7 días en refrescarse en vez de detectar
+  los cambios a diario. De paso, un barrido por toda la aplicación confirmó que no había más
+  imports olvidados de esta clase.
+
+
 ## Alpha 0.9.7 (0.9.7-alpha) — 2026-08-03
 
 - **Novedades en el Dashboard.** El pase nocturno ahora deja rastro de lo que detecta, y el
