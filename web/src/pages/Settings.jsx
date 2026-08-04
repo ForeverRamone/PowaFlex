@@ -147,8 +147,10 @@ export default function Settings() {
 
       {/* ACTUALIZAR TODO */}
       <section className="card-raised p-5 mb-6 border-l-4 !border-l-yellow-500 !bg-yellow-500/8">
+        {/* basis-64: sin una base mínima, el flex-1 se estrujaba junto al botón
+            y en móvil la descripción quedaba en una columna de una palabra */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-64">
             <h2 className="font-semibold text-zinc-100">Actualizar todo</h2>
             <p className="text-xs text-zinc-500 mt-1 max-w-2xl">
               Una sola rutina con todo lo que PowaFlex necesita, en orden: biblioteca de Plex, emparejado de

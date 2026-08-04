@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   REGISTRY, parseSelectionTable, parseSundanceWinners, parseWinnersTables, stripTags, directorsMatch, cleanTableTitle,
+  parseCahiersTables, splitDirectors,
 } from '../src/festivals.js';
 import { SIGHT_AND_SOUND_2022 } from '../src/data/sight-and-sound-2022.js';
 
@@ -207,6 +208,61 @@ test('parseWinnersTables: keepAll marca la ganadora entre las nominadas', () => 
     ['The Red Virgin', false],
   ]);
   assert.ok(todas.every((r) => r.year === 2024));
+});
+
+// El artículo de Cahiers: una tabla por década, años como filas-cabecera,
+// rowspan en empates y países, colspan cuando el título original coincide, y
+// al final la lista «de la década» («2010s (2010–2019)») que NO es un año.
+const TABLA_CAHIERS = `
+<table class="wikitable">
+<tr><th>#</th><th>English Title</th><th>Original Title</th><th>Director(s)</th><th>Production Country</th></tr>
+<tr><th colspan="5">2010<sup>[1]</sup></th></tr>
+<tr><th>1.</th><td><i>Uncle Boonmee</i></td><td>ลุงบุญมี</td><td>Apichatpong Weerasethakul</td><td rowspan="2">Thailand</td></tr>
+<tr><th>2.</th><td colspan="2"><i>The Social Network</i></td><td>David Fincher</td></tr>
+<tr><th colspan="5">2011<sup>[2]</sup></th></tr>
+<tr><th>1.</th><td><i>We Have a Pope</i></td><td><i>Habemus Papam</i></td><td>Nanni Moretti</td><td>Italy</td></tr>
+<tr><th rowspan="2">2.</th><td colspan="2"><i>The Tree of Life</i></td><td>Terrence Malick</td><td>United States</td></tr>
+<tr><td><i>Outside Satan</i></td><td><i>Hors Satan</i></td><td>Bruno Dumont</td><td>France</td></tr>
+<tr><th colspan="5">No list for 2012</th></tr>
+<tr><th colspan="5">2010s (2010–2019)</th></tr>
+<tr><th>1.</th><td colspan="2"><i>Twin Peaks: The Return</i></td><td>David Lynch</td><td>United States</td></tr>
+</table>`;
+
+test('parseCahiersTables: años, empates por rowspan, colspan de título y país arrastrado', () => {
+  const rows = parseCahiersTables(TABLA_CAHIERS);
+  assert.deepEqual(
+    rows.map((r) => [r.year, r.rank, r.tied, r.title, r.original_title, r.director, r.country]),
+    [
+      [2010, 1, false, 'Uncle Boonmee', 'ลุงบุญมี', 'Apichatpong Weerasethakul', 'Thailand'],
+      // sin celda de título original (colspan) y con el país heredado por rowspan
+      [2010, 2, false, 'The Social Network', 'The Social Network', 'David Fincher', 'Thailand'],
+      [2011, 1, false, 'We Have a Pope', 'Habemus Papam', 'Nanni Moretti', 'Italy'],
+      // empate: el rowspan del puesto abraza dos películas
+      [2011, 2, true, 'The Tree of Life', 'The Tree of Life', 'Terrence Malick', 'United States'],
+      [2011, 2, true, 'Outside Satan', 'Hors Satan', 'Bruno Dumont', 'France'],
+      // la lista «de la década» y el hueco de 2012 no cuelan como años
+    ]
+  );
+});
+
+test('la entrada de Cahiers del REGISTRY va por año con etiqueta propia', () => {
+  assert.equal(REGISTRY.cahiers.group, 'canon');
+  assert.ok(REGISTRY.cahiers.awardNominees);
+  assert.equal(REGISTRY.cahiers.awardParse, 'cahiers');
+  assert.equal(REGISTRY.cahiers.sinceYear, 1951);
+  assert.equal(REGISTRY.cahiers.editionLabel, 'Top 10 por año');
+});
+
+// una celda con varios nombres se parte en personas seguibles por separado;
+// con apellido compartido, el nombre suelto lo hereda del último completo
+test('splitDirectors parte celdas multi-nombre y completa apellidos compartidos', () => {
+  assert.deepEqual(splitDirectors('Javier Calvo and Javier Ambrossi'), ['Javier Calvo', 'Javier Ambrossi']);
+  assert.deepEqual(splitDirectors('Joel and Ethan Coen'), ['Joel Coen', 'Ethan Coen']);
+  assert.deepEqual(splitDirectors('Jean-Marie Straub, Danièle Huillet'), ['Jean-Marie Straub', 'Danièle Huillet']);
+  assert.deepEqual(splitDirectors('Anton Balekdjian, Léo Couture and Mattéo Eustachon'),
+    ['Anton Balekdjian', 'Léo Couture', 'Mattéo Eustachon']);
+  assert.deepEqual(splitDirectors('Hirokazu Kore-eda'), ['Hirokazu Kore-eda']);
+  assert.deepEqual(splitDirectors(null), []);
 });
 
 test('stripTags limpia notas, estilos y entidades', () => {

@@ -194,9 +194,10 @@ function Shell() {
           rel="noreferrer"
           title={`PowaFlex ${version.version} — ver novedades en GitHub`}
           /* sobre el papel de «Cartelera» un texto suelto en zinc-600 no se
-             leía: va sellado en su propia tarjeta, como el resto de la app */
+             leía: va sellado en su propia tarjeta, como el resto de la app.
+             En móvil se oculta: flotando sobre una columna tapaba contenido. */
           className="card-raised fixed bottom-2 right-3 z-40 px-2 py-1 text-[11px] leading-none
-                     text-zinc-400 hover:text-gold-400 transition-colors"
+                     text-zinc-400 hover:text-gold-400 transition-colors hidden md:block"
         >
           {version.label}
         </a>

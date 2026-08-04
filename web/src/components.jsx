@@ -194,7 +194,7 @@ export function Toaster() {
       {items.map((t) => (
         <div
           key={t.id}
-          className={`card-raised px-4 py-2 text-sm ${
+          className={`card-raised px-4 py-2 text-sm max-w-[calc(100vw-2rem)] ${
             t.type === 'error' ? 'text-red-400' : t.type === 'success' ? 'text-emerald-400' : 'text-zinc-200'
           }`}
         >

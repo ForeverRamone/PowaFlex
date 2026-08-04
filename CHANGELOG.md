@@ -1,5 +1,25 @@
 # Changelog
 
+## Alpha 0.9.12 (0.9.12-alpha) — 2026-08-05
+
+- **El top 10 anual de Cahiers du Cinéma**, año por año, en Festivales → Cánones: la lista
+  ordenada de cada año (1951–hoy, empates marcados) y un palmarés histórico con la número 1 de
+  cada año (66 películas). Sale de Wikipedia con un parser propio que entiende sus tablas por
+  década; los años sin lista (1952–53, 1969–1980, 2003) lo explican en vez de dar error.
+- **Una estrella de seguir por cada director/a**: cuando la celda trae varios nombres («Javier
+  Calvo and Javier Ambrossi», «Joel and Ethan Coen»), cada persona tiene su propia ☆ y se sigue
+  su perfil individual — antes la cadena entera no resolvía a nadie. El «seguir a todos» de cada
+  edición también cuenta personas, apellidos compartidos incluidos.
+- **Cuadros de habituales de festival** en Favoritos → Añadir directores/as: los directores/as
+  con más películas en la competición de Cannes 🌴, Venecia 🦁 y Berlín 🐻 en la última década,
+  con su presencia («4 en competición (2018–2026)») y botón de seguir, individual o en bloque.
+  El recuento sale de Wikipedia sin gastar cuota de TMDB y se cachea una semana.
+- **Repaso del móvil, página a página**: la descripción de «Actualizar todo» ya no se estruja en
+  una columna de una palabra, las pestañas de Favoritos y los conmutadores de Festivales envuelven
+  como botones enteros en vez de partirse en tres líneas, los buscadores de Biblioteca y Personas
+  ocupan todo el ancho, las tarjetas de upgrade de Calidad no se comprimen, y la placa de versión
+  flotante se oculta en pantallas pequeñas (tapaba contenido en todas las páginas).
+
 ## Alpha 0.9.11 (0.9.11-alpha) — 2026-08-03
 
 - **La página pasa a llamarse «Festivales y premios»**, con los premios ganando su segunda vista:

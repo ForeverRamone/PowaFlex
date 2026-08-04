@@ -6,6 +6,23 @@ import {
 } from '../components.jsx';
 import { toast } from '../toast.js';
 
+// La celda de dirección de Wikipedia puede traer varios nombres («Javier Calvo
+// and Javier Ambrossi»): se parte aquí para pintar UNA estrella por persona —
+// seguirlos juntos como una sola cadena no resolvía a nadie. Con apellido
+// compartido («Joel and Ethan Coen»), al nombre suelto se le pega el apellido
+// del último. Espejo de splitDirectors del servidor.
+export function splitDirectors(s) {
+  const parts = String(s || '')
+    .split(/,|;|&| and | y /i)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const last = parts[parts.length - 1] || '';
+  const apellido = last.includes(' ') ? last.slice(last.indexOf(' ') + 1) : '';
+  return parts
+    .map((p) => (p !== last && !p.includes(' ') && apellido ? `${p} ${apellido}` : p))
+    .filter((x) => x.replace(/[^\p{L}\p{N}]/gu, '').length >= 4);
+}
+
 /**
  * Secciones oficiales de los seis festivales de la «vía festival» al Óscar
  * internacional: ganar su premio gordo clasifica una película no inglesa sin
@@ -95,8 +112,7 @@ export default function Festivals() {
     toast(`✓ ${res.added} añadidas a Radarr${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''}`);
   };
 
-  // el nombre viene de la tabla de Wikipedia («A, B» si son varios): by-names
-  // ya sabe partirlo y resolver cada uno contra TMDB como director/a
+  // cada estrella sigue a UNA persona: el nombre llega ya partido de la celda
   const followDirector = async (name) => {
     setDirBusy(name);
     const r = await api('/tracked/by-names', { method: 'POST', body: { names: name, role: 'director' } });
@@ -107,8 +123,9 @@ export default function Festivals() {
   };
 
   // para las ediciones venideras: en cuanto se anuncie la sección oficial,
-  // seguir de un golpe a toda su dirección y que entren en el calendario
-  const pendingDirs = [...new Set(films.map((f) => f.director).filter((d) => d && !followedDirs.has(d)))];
+  // seguir de un golpe a toda su dirección (ya por personas) y que entren en
+  // el calendario
+  const pendingDirs = [...new Set(films.flatMap((f) => splitDirectors(f.director)).filter((d) => !followedDirs.has(d)))];
   const followAll = async () => {
     setFollowAllBusy(true);
     const r = await api('/tracked/by-names', { method: 'POST', body: { names: pendingDirs.join('\n'), role: 'director' } });
@@ -204,9 +221,9 @@ export default function Festivals() {
 
       <div className="flex items-center gap-3 flex-wrap mb-4">
         {!soloPalmares && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button onClick={() => setView('seleccion')} className={`${view === 'seleccion' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
-              {info?.awardNominees ? 'Nominadas por año' : 'Sección oficial por año'}
+              {info?.editionLabel || (info?.awardNominees ? 'Nominadas por año' : 'Sección oficial por año')}
             </button>
             <button onClick={() => setView('palmares')} className={`${view === 'palmares' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
               🏆 Palmarés histórico
@@ -215,7 +232,7 @@ export default function Festivals() {
         )}
         {info && (
           <span className="text-xs text-zinc-500">
-            {soloPalmares ? 'Canon: ' : 'Premio que clasifica: '}
+            {soloPalmares || info.group === 'canon' ? 'Canon: ' : 'Premio que clasifica: '}
             <b className="text-zinc-300">{info.award}</b>
             {view === 'seleccion' && info.sinceYear > 1990 && ` · esta sección existe desde ${info.sinceYear}`}
           </span>
@@ -309,14 +326,21 @@ export default function Festivals() {
                       </span>
                     )}
                     {f.director && (
-                      <button
-                        onClick={() => followDirector(f.director)}
-                        disabled={dirBusy === f.director || followedDirs.has(f.director)}
-                        className="mt-1 text-[11px] text-zinc-400 hover:text-gold-400 text-left leading-tight cursor-pointer disabled:cursor-default"
-                        title={followedDirs.has(f.director) ? 'Ya en favoritos' : `Seguir a ${f.director} como director/a`}
-                      >
-                        {followedDirs.has(f.director) ? '⭐' : dirBusy === f.director ? '…' : '☆'} {f.director}
-                      </button>
+                      /* una estrella POR persona: una película con dos
+                         directores tiene dos perfiles que seguir por separado */
+                      <div className="flex flex-col items-start">
+                        {splitDirectors(f.director).map((d) => (
+                          <button
+                            key={d}
+                            onClick={() => followDirector(d)}
+                            disabled={dirBusy === d || followedDirs.has(d)}
+                            className="mt-1 text-[11px] text-zinc-400 hover:text-gold-400 text-left leading-tight cursor-pointer disabled:cursor-default"
+                            title={followedDirs.has(d) ? 'Ya en favoritos' : `Seguir a ${d} como director/a`}
+                          >
+                            {followedDirs.has(d) ? '⭐' : dirBusy === d ? '…' : '☆'} {d}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>

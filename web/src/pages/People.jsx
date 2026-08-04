@@ -69,7 +69,7 @@ export default function People() {
           </button>
         ))}
         <input
-          className="input !w-56 ml-2"
+          className="input !w-56 ml-2 max-sm:!w-full max-sm:ml-0"
           placeholder="Buscar nombre…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

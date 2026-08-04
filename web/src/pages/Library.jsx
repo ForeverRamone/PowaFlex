@@ -114,8 +114,8 @@ export default function Library() {
       <PageHeader eyebrow="Colección" title="Biblioteca" />
 
       <div className="flex flex-wrap gap-2 items-center mb-3">
-        <form onSubmit={(e) => { e.preventDefault(); set('search', search); }}>
-          <input className="input !w-52" placeholder="Buscar título…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <form className="max-sm:w-full" onSubmit={(e) => { e.preventDefault(); set('search', search); }}>
+          <input className="input !w-52 max-sm:!w-full" placeholder="Buscar título…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </form>
         <Select value={q.sort || ''} onChange={(v) => set('sort', v)} placeholder="Orden: añadida" options={SORT_OPTIONS} />
         <button className={`btn-ghost ${showFilters ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setShowFilters((s) => !s)}>

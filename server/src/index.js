@@ -71,7 +71,7 @@ import {
   letterboxdSummary,
 } from './letterboxd.js';
 import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
-import { festivalsIndex, festivalEdition, festivalWinners, festivalOverrideKey } from './festivals.js';
+import { festivalsIndex, festivalEdition, festivalWinners, festivalOverrideKey, festivalDirectorPacks } from './festivals.js';
 import { dataHealth } from './datahealth.js';
 import { runFullRefresh, refreshStatus, refreshHistory, nightlyHealth } from './refresh.js';
 import { availability, isUpgradeable } from './justwatch.js';
@@ -471,6 +471,19 @@ app.get('/api/people/filter-options', async () => q.peopleFilterOptions());
 app.get('/api/people/suggestions', async (req, reply) => {
   try {
     return await suggestedPeople();
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// cuadros de «habituales de festival»: los directores/as con más películas en
+// la competición de Cannes, Venecia y Berlín en la última década, listos para
+// seguirse desde Favoritos → Añadir. La primera construcción baja ~30 tablas
+// de Wikipedia y se cachea 7 días; después es instantáneo.
+app.get('/api/people/festival-packs', async (req, reply) => {
+  try {
+    return await festivalDirectorPacks({ refresh: req.query.refresh === '1' });
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };

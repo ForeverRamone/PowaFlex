@@ -15,7 +15,7 @@
  */
 import { db, cacheRead, cacheWrite } from './db.js';
 import { cachePrefix } from './cache-versions.js';
-import { searchMovieCandidates, movieDirectors, movieSummary } from './tmdb.js';
+import { searchMovieCandidates, movieDirectors, movieSummary, findPersonInfo, latinizeNames } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { watchedIndex, isWatched } from './letterboxd.js';
 import { SIGHT_AND_SOUND_2022 } from './data/sight-and-sound-2022.js';
@@ -123,6 +123,20 @@ export const REGISTRY = {
     onlyWinners: true,
     staticList: SIGHT_AND_SOUND_2022,
   },
+  // El otro canon de la crítica: el top 10 que Cahiers du Cinéma publica cada
+  // año desde 1951 (con el paréntesis de 1969-1980, cuando la revista dejó de
+  // votar listas). Va por año como los premios, pero lo que se enseña es la
+  // lista ordenada, no unas nominadas: por eso lleva `editionLabel` propio.
+  cahiers: {
+    name: 'Cahiers du Cinéma',
+    award: 'Top 10 anual de la crítica de Cahiers du Cinéma',
+    group: 'canon',
+    awardNominees: true,
+    editionLabel: 'Top 10 por año',
+    sinceYear: 1951,
+    awardPage: "Cahiers du Cinéma's Annual Top 10 Lists",
+    awardParse: 'cahiers',
+  },
   // --- premios anuales, del artículo-lista de cada premio. Sus tablas llevan
   // la ganadora sombreada entre las nominadas: el palmarés es el sombreado, y
   // la vista por año (`awardNominees`) enseña TODAS las candidatas del año con
@@ -210,6 +224,7 @@ export function festivalsIndex() {
       sinceYear: f.sinceYear ?? null,
       onlyWinners: !!f.onlyWinners,
       awardNominees: !!f.awardNominees,
+      editionLabel: f.editionLabel || null,
     })),
   };
 }
@@ -464,6 +479,102 @@ export function parseSundanceWinners(html) {
   return out.sort((a, b) => b.year - a.year);
 }
 
+/**
+ * Top 10 anual de Cahiers: el artículo lleva UNA wikitable por década con
+ * filas-cabecera de año («2010») intercaladas, el puesto en <th> («1.», con
+ * rowspan en los empates), la celda de título con colspan cuando el original
+ * coincide con el inglés, y el país con rowspan abrazando varias filas. Nada de
+ * eso lo aguanta el parser posicional de los premios, así que aquí la tabla se
+ * expande a una rejilla resolviendo rowspan/colspan y LUEGO se leen las
+ * columnas por cabecera. Devuelve {year, rank, tied, title, original_title,
+ * director, country}, en el orden del artículo.
+ */
+export function parseCahiersTables(html) {
+  const out = [];
+  const tables = String(html || '').match(/<table[^>]*wikitable[\s\S]*?<\/table>/gi) || [];
+  for (const t of tables) {
+    const rows = t.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+    if (rows.length < 2) continue;
+    const headers = (rows[0].match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || []).map((c) => stripTags(c).toLowerCase());
+    const idxRank = headers.findIndex((h) => h === '#' || /^no\.?$/.test(h));
+    const idxTitle = headers.findIndex((h) => /english title|^film\b|^title/.test(h));
+    const idxOrig = headers.findIndex((h) => /original title/.test(h));
+    const idxDir = headers.findIndex((h) => /director/.test(h));
+    const idxCountry = headers.findIndex((h) => /countr/.test(h));
+    if (idxRank === -1 || idxDir === -1 || idxTitle === -1) continue;
+    const nCols = headers.length;
+
+    // arrastre de rowspans: pending[col] = {text, left} mientras la celda siga viva
+    const pending = new Array(nCols).fill(null);
+    let year = null;
+    for (const row of rows.slice(1)) {
+      const cells = row.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || [];
+      if (!cells.length) continue;
+      // Fila-cabecera que abarca la tabla: un año («2010[1]») abre lista; todo
+      // lo demás la CIERRA (year = null). Sin eso, la lista «de la década»
+      // («2010s (2010–2019)») y los huecos («No list for 2003») colgaban sus
+      // filas del último año visto. El (?!s) descarta el propio «2010s».
+      const primerSpan = Number((cells[0].match(/colspan="?(\d+)/i) || [])[1] || 1);
+      if (cells.length === 1 && primerSpan >= nCols - 1) {
+        const y = stripTags(cells[0]).match(/^((?:19|20)\d{2})(?!s)/);
+        year = y ? Number(y[1]) : null;
+        continue;
+      }
+      const fila = new Array(nCols).fill(null);
+      let ci = 0;
+      for (let col = 0; col < nCols; col++) {
+        if (pending[col]) {
+          fila[col] = pending[col].text;
+          if (--pending[col].left <= 0) pending[col] = null;
+          continue;
+        }
+        const cell = cells[ci++];
+        if (!cell) continue;
+        const text = stripTags(cell);
+        const cspan = Number((cell.match(/colspan="?(\d+)/i) || [])[1] || 1);
+        const rspan = Number((cell.match(/rowspan="?(\d+)/i) || [])[1] || 1);
+        for (let k = 0; k < cspan && col + k < nCols; k++) {
+          fila[col + k] = text;
+          if (rspan > 1) pending[col + k] = { text, left: rspan - 1 };
+        }
+        col += cspan - 1;
+      }
+      if (!year) continue;
+      const rank = Number((String(fila[idxRank] || '').match(/^(\d+)/) || [])[1]) || null;
+      const title = cleanTableTitle(fila[idxTitle]);
+      const director = fila[idxDir] || null;
+      if (!rank || !title || !director) continue;
+      const orig = idxOrig >= 0 && fila[idxOrig] && fila[idxOrig] !== fila[idxTitle] ? cleanTableTitle(fila[idxOrig]) : title;
+      out.push({ year, rank, title, original_title: orig, director, country: idxCountry >= 0 ? fila[idxCountry] : null });
+    }
+  }
+  // empates: dos filas del mismo año compartiendo puesto por rowspan
+  const porPuesto = new Map();
+  for (const r of out) porPuesto.set(`${r.year}:${r.rank}`, (porPuesto.get(`${r.year}:${r.rank}`) || 0) + 1);
+  for (const r of out) r.tied = porPuesto.get(`${r.year}:${r.rank}`) > 1;
+  return out;
+}
+
+/**
+ * Una celda de dirección puede traer varios nombres («Joel and Ethan Coen»,
+ * «A, B & C»): esta es LA forma canónica de partirla, compartida con el
+ * front (que pinta una estrella de seguir por persona). El filtro de longitud
+ * tira restos de puntuación, no nombres reales.
+ */
+export function splitDirectors(s) {
+  const parts = String(s || '')
+    .split(/,|;|&| and | y /i)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  // apellido compartido: en «Joel and Ethan Coen» el primer trozo queda en
+  // «Joel» a secas; se le pega el apellido del último nombre completo
+  const last = parts[parts.length - 1] || '';
+  const apellido = last.includes(' ') ? last.slice(last.indexOf(' ') + 1) : '';
+  return parts
+    .map((p) => (p !== last && !p.includes(' ') && apellido ? `${p} ${apellido}` : p))
+    .filter((x) => normName(x).length >= 4);
+}
+
 // nombres comparables entre Wikipedia y TMDB: sin acentos, sin guiones ni
 // espacios («Hirokazu Kore-eda» y «Hirokazu Koreeda» son la misma persona)
 const normName = (s) =>
@@ -687,10 +798,14 @@ async function resolveFilms(rows, yearOf) {
 
 // --- edición de un festival ----------------------------------------------------
 
-async function buildEdition(key, f, year) {
-  // los premios sí tienen «edición por año»: sus nominadas
-  if (f.awardNominees) return buildAwardYear(key, f, year);
-  if (f.onlyWinners) throw new Error(`${f.name} no tiene ediciones por año: mira su palmarés.`);
+/**
+ * Solo la parte de Wikipedia de una edición: la tabla de la sección oficial ya
+ * parseada, SIN casar nada contra TMDB. La usan buildEdition (que después
+ * resuelve las fichas) y el agregado de directores habituales (al que le
+ * bastan los nombres tal cual vienen de la tabla).
+ */
+async function fetchSelectionRows(key, f, year) {
+  if (f.onlyWinners || f.awardNominees) throw new Error(`${f.name} no tiene sección oficial por año.`);
   const special = SPECIAL_EDITIONS[`${key}:${year}`];
   if (special?.unavailable) throw new Error(special.unavailable);
   const sectionRe = special?.section || f.section;
@@ -737,6 +852,14 @@ async function buildEdition(key, f, year) {
   if (!rows.length) {
     throw new Error(`Las secciones de competición de «${page}» no tienen una tabla de películas reconocible.`);
   }
+  return { rows, section: stripTags(sec.line), note: special?.note || null, page };
+}
+
+async function buildEdition(key, f, year) {
+  // los premios sí tienen «edición por año»: sus nominadas
+  if (f.awardNominees) return buildAwardYear(key, f, year);
+  if (f.onlyWinners) throw new Error(`${f.name} no tiene ediciones por año: mira su palmarés.`);
+  const { rows, section, note, page } = await fetchSelectionRows(key, f, year);
 
   // resolver cada título contra TMDB, verificando la dirección
   const { films, errors } = await resolveFilms(rows, () => year);
@@ -746,8 +869,8 @@ async function buildEdition(key, f, year) {
     name: f.name,
     award: f.award,
     year,
-    section: stripTags(sec.line),
-    note: special?.note || null,
+    section,
+    note,
     source: `https://en.wikipedia.org/wiki/${page.replace(/ /g, '_')}`,
     fetchedAt: Date.now(),
     films,
@@ -860,20 +983,34 @@ async function getAwardRows(f, { keepAll = false } = {}) {
   return rows;
 }
 
+/** El artículo de Cahiers entero, parseado con su parser propio. */
+async function getCahiersRows(f) {
+  const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
+  const rows = parseCahiersTables(parsed.text);
+  if (!rows.length) throw new Error(`El artículo «${f.awardPage}» no tiene listas anuales reconocibles.`);
+  return rows;
+}
+
 /**
  * La «edición» de un premio: todas las NOMINADAS de ese año, con la ganadora
  * marcada (🏆). Sale del mismo artículo-lista que el palmarés, sin el filtro
- * de sombreadas.
+ * de sombreadas. Cahiers pasa por aquí también: su «edición» es el top 10
+ * ordenado del año, con el puesto en vez de la bandera de ganadora.
  */
 async function buildAwardYear(key, f, year) {
   const rows = f.staticAward
     ? f.staticAward.filter((r) => r.year === year)
-    : (await getAwardRows(f, { keepAll: true })).filter((r) => r.year === year);
+    : f.awardParse === 'cahiers'
+      ? (await getCahiersRows(f)).filter((r) => r.year === year)
+      : (await getAwardRows(f, { keepAll: true })).filter((r) => r.year === year);
   if (!rows.length) {
+    if (f.awardParse === 'cahiers' && year >= 1969 && year <= 1980) {
+      throw new Error(`Cahiers no publicó top 10 entre 1969 y 1980: no hay lista de ${year}.`);
+    }
     throw new Error(
       year >= new Date().getFullYear()
-        ? `Wikipedia aún no lista las nominadas de ${f.name} ${year}.`
-        : `Wikipedia no tiene nominadas de ${f.name} en ${year}.`
+        ? `Wikipedia aún no lista ${f.awardParse === 'cahiers' ? 'el top 10' : 'las nominadas'} de ${f.name} ${year}.`
+        : `Wikipedia no tiene ${f.awardParse === 'cahiers' ? 'top 10' : 'nominadas'} de ${f.name} en ${year}.`
     );
   }
   const { films, errors } = await resolveFilms(rows, () => year);
@@ -882,7 +1019,7 @@ async function buildAwardYear(key, f, year) {
     name: f.name,
     award: f.award,
     year,
-    section: 'Nominadas',
+    section: f.awardParse === 'cahiers' ? 'Top 10 del año' : 'Nominadas',
     note: null,
     source: f.staticAward
       ? 'https://www.wikidata.org/wiki/Q102427'
@@ -927,6 +1064,14 @@ export async function festivalWinners(key, { refresh = false } = {}) {
       }));
       source = 'https://www.bfi.org.uk/sight-and-sound/greatest-films-all-time';
       note = `La lista extendida de la encuesta de la crítica (${rows.length} películas, empates incluidos), ordenada por puesto. Se renueva cada década: la próxima, en 2032.`;
+    } else if (f.awardParse === 'cahiers') {
+      // el «palmarés» de Cahiers: la número 1 de cada año, reciente primero
+      // como el resto de palmareses
+      rows = (await getCahiersRows(f))
+        .filter((r) => r.rank === 1)
+        .map(({ rank, tied, ...r }) => r)
+        .sort((a, b) => b.year - a.year);
+      note = 'La número 1 de cada año para la crítica de Cahiers; en «Top 10 por año» está la lista completa de cada año.';
     } else if (f.awardParse === 'sundanceList') {
       // la lista de Sundance va por años con viñetas: página entera de una vez
       const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
@@ -951,4 +1096,152 @@ export async function festivalWinners(key, { refresh = false } = {}) {
     if (!base.resolveErrors) cacheWrite(cacheKey, base);
   }
   return { ...base, films: await decorateLive(base.films) };
+}
+
+// --- directores habituales de la última década ---------------------------------
+
+// Los tres grandes con competición estable y peso real de autor: para sugerir
+// «a quién seguir», Cannes, Venecia y Berlín son el radar.
+const DECADE_FESTIVALS = ['cannes', 'venecia', 'berlinale'];
+
+/**
+ * Filas de una edición SIN tocar TMDB: si la edición completa ya está en caché
+ * se aprovechan sus películas (llevan director), y si no se trae solo la tabla
+ * de Wikipedia y se guarda cruda 180 días. El agregado de una década no puede
+ * permitirse resolver ~600 fichas contra TMDB solo para contar nombres.
+ */
+async function editionRowsLight(key, f, year) {
+  const full = cacheRead(`${cachePrefix('festival')}:${key}:${year}`, 180 * DAY);
+  if (full?.films?.length) return full.films;
+  const rawKey = `${cachePrefix('festival')}:raw:${key}:${year}`;
+  const hit = cacheRead(rawKey, 180 * DAY);
+  if (hit?.rows) return hit.rows;
+  const { rows } = await fetchSelectionRows(key, f, year);
+  cacheWrite(rawKey, { rows });
+  return rows;
+}
+
+/**
+ * Los directores/as con más películas en la competición de Cannes, Venecia y
+ * Berlín en las últimas `years` ediciones publicadas. Cuenta películas (no
+ * ediciones), separa las celdas con varios nombres y devuelve, por festival,
+ * los repetidores (2+) ordenados por presencia. Cacheado 7 días.
+ */
+export async function festivalTopDirectors({ years = 10, top = 12, refresh = false } = {}) {
+  const cacheKey = `${cachePrefix('festival')}:topdirs:${years}`;
+  if (!refresh) {
+    const hit = cacheRead(cacheKey, 7 * DAY);
+    if (hit) return hit;
+  }
+  const nowYear = new Date().getFullYear();
+  const festivals = [];
+  for (const key of DECADE_FESTIVALS) {
+    const f = REGISTRY[key];
+    const porDirector = new Map();
+    const editions = [];
+    // desde el año en curso hacia atrás hasta juntar `years` ediciones con
+    // programa publicado (la del año corriente puede no existir aún)
+    for (let y = nowYear; y > nowYear - years - 2 && editions.length < years; y--) {
+      let rows;
+      try {
+        rows = await editionRowsLight(key, f, y);
+      } catch {
+        continue; // sin programa (aún) o edición no celebrada: no cuenta
+      }
+      if (!rows?.length) continue;
+      editions.push(y);
+      for (const r of rows) {
+        for (const name of splitDirectors(r.director)) {
+          const k = normName(name);
+          if (!k) continue;
+          const d = porDirector.get(k) || { name, count: 0, years: new Set(), films: [] };
+          d.count++;
+          d.years.add(y);
+          if (d.films.length < 6 && r.title) d.films.push(r.title);
+          porDirector.set(k, d);
+        }
+      }
+    }
+    editions.sort();
+    festivals.push({
+      festival: key,
+      name: f.name,
+      award: f.award,
+      editions,
+      directors: [...porDirector.values()]
+        .filter((d) => d.count >= 2)
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+        .slice(0, top)
+        .map((d) => ({ name: d.name, count: d.count, years: [...d.years].sort(), films: d.films })),
+    });
+  }
+  const res = { generatedAt: Date.now(), years, festivals };
+  cacheWrite(cacheKey, res);
+  return res;
+}
+
+const FESTIVAL_PACK_META = {
+  cannes: { emoji: '🌴', accent: 'gold' },
+  venecia: { emoji: '🦁', accent: 'sky' },
+  berlinale: { emoji: '🐻', accent: 'orange' },
+};
+
+/**
+ * Los habituales de cada festival como «packs» de Favoritos → Añadir: mismos
+ * campos que los packs curados de suggestedPeople, con la presencia en
+ * competición como texto de apoyo. Los nombres resueltos contra TMDB se
+ * cachean 7 días; la bandera `tracked` se calcula SIEMPRE al servir, porque
+ * congelada en la caché marcaba como seguidos a quienes ya no lo estaban.
+ */
+export async function festivalDirectorPacks({ refresh = false } = {}) {
+  const cacheKey = `${cachePrefix('festival')}:topdirs-packs`;
+  let base = refresh ? null : cacheRead(cacheKey, 7 * DAY);
+  if (!base) {
+    const agg = await festivalTopDirectors({ refresh });
+    const packs = [];
+    for (const fest of agg.festivals) {
+      const people = [];
+      for (const d of fest.directors) {
+        try {
+          const info = await findPersonInfo(d.name, 'Directing');
+          if (!info?.id) continue;
+          const rango = d.years[0] === d.years[d.years.length - 1] ? `${d.years[0]}` : `${d.years[0]}–${d.years[d.years.length - 1]}`;
+          people.push({
+            tmdb_id: info.id,
+            name: info.name || d.name,
+            profile_path: info.profile_path || null,
+            knownFor: [`${d.count} en competición (${rango})`, d.films[d.films.length - 1]].filter(Boolean),
+          });
+        } catch {
+          // sin ficha en TMDB: fuera del pack, no hay a quién seguir
+        }
+      }
+      if (!people.length) continue;
+      const meta = FESTIVAL_PACK_META[fest.festival] || {};
+      const rango = fest.editions.length ? `${fest.editions[0]}–${fest.editions[fest.editions.length - 1]}` : 'última década';
+      packs.push({
+        key: `habituales-${fest.festival}`,
+        title: `Habituales de ${fest.name}`,
+        emoji: meta.emoji || '🎪',
+        accent: meta.accent || 'gold',
+        description: `Con más películas en la competición de ${fest.name} en la última década (${rango}).`,
+        people,
+      });
+    }
+    await latinizeNames(packs.flatMap((p) => p.people));
+    base = { generatedAt: Date.now(), packs };
+    if (packs.length) cacheWrite(cacheKey, base);
+  }
+  const trackedTmdb = new Set(
+    db.prepare(`SELECT p.tmdb_id FROM tracked_people t JOIN people p ON p.id = t.person_id
+                WHERE p.tmdb_id IS NOT NULL AND t.role = 'director'`)
+      .all().map((r) => r.tmdb_id)
+  );
+  return {
+    ...base,
+    packs: base.packs.map((p) => ({
+      ...p,
+      people: p.people.map((x) => ({ ...x, tracked: trackedTmdb.has(x.tmdb_id) })),
+    })),
+  };
 }

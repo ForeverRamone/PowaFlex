@@ -292,9 +292,13 @@ export default function Favorites() {
       else setLoadError(r?.error || 'No se han podido cargar tus favoritos');
     });
 
+  // los «habituales de festival» llegan por su propio endpoint: la primera
+  // construcción baja ~30 tablas de Wikipedia y no debe frenar al resto
+  const [festPacks, setFestPacks] = useState(null);
   useEffect(() => {
     loadTracked();
     api('/people/suggestions').then((s) => !s.error && setSuggest(s));
+    api('/people/festival-packs').then((r) => Array.isArray(r?.packs) && setFestPacks(r.packs));
   }, []);
 
   // scoped to the active facet: followed as director must still be addable as actor
@@ -515,7 +519,9 @@ export default function Favorites() {
         <span className="text-xs text-zinc-600 ml-2">Cada faceta se gestiona por separado</span>
       </div>
 
-      <div className="flex gap-2 mb-6">
+      {/* flex-wrap: en móvil los dos botones no caben y, sin él, se estrujaban
+          en bloques de tres líneas en vez de pasar cada uno a su fila */}
+      <div className="flex gap-2 mb-6 flex-wrap">
         <button onClick={() => setTab('mine')} className={`${tab === 'mine' ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
           <Star size={15} strokeWidth={1.75} /> Mis {roleLabel(role).toLowerCase()} ({counts[role]})
         </button>
@@ -652,10 +658,10 @@ export default function Favorites() {
               <button className="btn-ghost !py-1 text-xs inline-flex items-center gap-1.5" onClick={updateLife} disabled={updatingLife}>
                 {updatingLife ? 'Actualizando…' : <><RotateCw size={12} strokeWidth={2} /> Actualizar vivos/muertos</>}
               </button>
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="text-xs text-zinc-400">Añadir los</span>
+              <div className="flex items-center gap-2 ml-auto flex-wrap">
+                <span className="text-xs text-zinc-400 whitespace-nowrap">Añadir los</span>
                 <input type="number" min="1" max="1000" className="input !w-20 text-center !py-1" value={topN} onChange={(e) => setTopN(e.target.value)} />
-                <span className="text-xs text-zinc-400">primeros</span>
+                <span className="text-xs text-zinc-400 whitespace-nowrap">primeros</span>
                 <button className="btn-gold !py-1 text-xs inline-flex items-center gap-1.5" onClick={bulkAdd}><Star size={12} strokeWidth={2} /> Revisar y añadir</button>
               </div>
               {lifeMsg && <span className="text-[11px] text-zinc-400 w-full">{lifeMsg}</span>}
@@ -791,9 +797,10 @@ export default function Favorites() {
 
           <CanonPacks role={role} onDone={loadTracked} />
 
-          {suggest?.packs && (
+          {(festPacks?.length > 0 || suggest?.packs) && (
             <div className="mb-8 space-y-5">
-              {suggest.packs.map((pack) => {
+              {/* primero los habituales de Cannes/Venecia/Berlín, luego los curados */}
+              {[...(festPacks || []), ...(suggest?.packs || [])].map((pack) => {
                 const pending = pack.people.filter((p) => !p.tracked && !trackedTmdb.has(p.tmdb_id)).length;
                 const accent = ACCENTS[pack.accent] || ACCENTS.gold;
                 return (

@@ -256,7 +256,7 @@ export default function Quality() {
                   <MovieCard movie={m} onClick={() => setSelected(m.rating_key)} />
                   <div className="text-[11px] text-orange-400 mt-1">{(m.resolution || 'SD').toUpperCase()} · {fmtBytes(m.size_bytes)}</div>
                   {m.tmdb_id && (
-                    <div className="mt-auto pt-1.5 flex items-center justify-between gap-1">
+                    <div className="mt-auto pt-1.5 flex items-center justify-between gap-1 flex-wrap">
                       <JustWatchCheck tmdbId={m.tmdb_id} result={jw.results[m.tmdb_id]} />
                       <RadarrButton tmdbId={m.tmdb_id} small alreadyInRadarr={radarrIds.has(m.tmdb_id)} onAdded={addRadarrId} />
                     </div>
