@@ -3,10 +3,13 @@
 Guía para DSM 7.2+ con **Container Manager** (en DSM 6.x / 7.0–7.1 la app se llama «Docker»;
 los pasos son casi idénticos).
 
-## 1. Preparar la carpeta
+## 1. Preparar las carpetas
 
 1. Abre **File Station** y crea la carpeta `docker/powaflex` (si no existe `docker`, créala).
-   Ahí vivirán la base de datos y la caché de imágenes de PowaFlex.
+2. **Dentro de `docker/powaflex`, crea una subcarpeta llamada `data`.** Es la que monta el
+   `docker-compose.yml` de abajo y ahí vivirán la base de datos y la caché de imágenes de
+   PowaFlex; si no existe antes de arrancar el proyecto, el contenedor puede fallar o crearla
+   con permisos equivocados.
 
 ## 2. Crear el proyecto
 

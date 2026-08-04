@@ -51,7 +51,8 @@ Docker). Las novedades de cada versión están en
 ## Problemas comunes
 
 - **Puerto ocupado** → cambia el Host Port (p. ej. `3861`) dejando el Container Port en `3860`.
-- **Permisos en appdata** → PowaFlex corre como root dentro del contenedor y escribe SQLite en
-  `/data`; con el appdata estándar de UNRAID no hay que tocar nada.
+- **Permisos en appdata** → PowaFlex ajusta solo los permisos de `/data` al arrancar y después
+  baja privilegios (respeta `PUID`/`PGID` si los defines, o el dueño actual de la carpeta, como
+  el `nobody:users` de UNRAID); con el appdata estándar no hay que tocar nada.
 - **¿Backup?** → incluye `/mnt/user/appdata/powaflex` en tu backup de appdata (plugin
   «Appdata Backup»); es todo lo que PowaFlex necesita para restaurarse.
