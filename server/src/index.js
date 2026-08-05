@@ -49,6 +49,7 @@ import {
   radarrSearchAgain,
 } from './radarr.js';
 import { libraryGaps, favoritesGaps, absentGreats, listCanons, saveCanon, deleteCanon, canonNames } from './discover.js';
+import { releases } from './releases.js';
 import {
   mdbTest,
   syncRatings,
@@ -1353,6 +1354,20 @@ app.patch('/api/tracked/:personId/role', async (req, reply) => {
   })();
   invalidateFavoritesCaches();
   return { ok: true, role };
+});
+
+// estrenos por región: cines ES/US y plataformas ES, con Σ de MDBList
+app.get('/api/releases', async (req, reply) => {
+  try {
+    return await releases({
+      kind: req.query.kind,
+      window: req.query.window,
+      refresh: req.query.refresh === '1',
+    });
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
 });
 
 // remove every deceased person from favorites in one go ("vivos y muertos")

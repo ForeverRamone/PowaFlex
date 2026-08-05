@@ -2,7 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy,
-  Eye, Wrench, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award,
+  Eye, Wrench, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award, Ticket,
 } from 'lucide-react';
 import { Spinner, Toaster, GlobalSearch, ErrorBoundary } from './components.jsx';
 import { api, applyTheme } from './api.js';
@@ -22,6 +22,7 @@ const Discover = lazy(() => import('./pages/Discover.jsx'));
 const Favorites = lazy(() => import('./pages/Favorites.jsx'));
 const Lists = lazy(() => import('./pages/Lists.jsx'));
 const Festivals = lazy(() => import('./pages/Festivals.jsx'));
+const Estrenos = lazy(() => import('./pages/Estrenos.jsx'));
 const About = lazy(() => import('./pages/About.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
@@ -44,6 +45,7 @@ const NAV_GROUPS = [
       { to: '/descubrir', label: 'Descubrir huecos', Icon: Compass },
       { to: '/calendario', label: 'Cine venidero', Icon: CalendarDays },
       { to: '/festivales', label: 'Festivales y premios', Icon: Award },
+      { to: '/estrenos', label: 'Estrenos', Icon: Ticket },
       { to: '/listas', label: 'Listas y retos', Icon: Trophy },
     ],
   },
@@ -213,6 +215,7 @@ function Shell() {
           <Route path="/favoritos" element={<Favorites />} />
           <Route path="/listas" element={<Lists />} />
           <Route path="/festivales" element={<Festivals />} />
+          <Route path="/estrenos" element={<Estrenos />} />
           <Route path="/taller" element={<Taller />} />
           <Route path="/acerca" element={<About />} />
           <Route path="/ajustes" element={<Settings />} />

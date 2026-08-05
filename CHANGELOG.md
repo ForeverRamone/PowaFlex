@@ -21,6 +21,15 @@ marcadores viejos siguen funcionando: `/calidad`, `/salud`, `/colecciones`, `/di
   Ajustes; «tus notas vs. la comunidad» se muda a Visionado; y la watchlist se muda a Listas y
   retos — donde por fin gana botón de Radarr en lo que te falta (era la única lista de faltantes
   sin él).
+- **Estrenos** (sección nueva en La caza, bajo Festivales): qué acaba de llegar y qué viene a los
+  **cines de España**, a los **cines de EE UU** y a las **plataformas españolas**. La lista sale
+  del discover de TMDB por región y tipo de estreno (la fuente consistente de fechas por país); la
+  pestaña de plataformas usa la fecha de estreno digital y enseña **dónde verla** con los watch
+  providers de TMDB (datos de JustWatch licenciados), con filtro por plataforma concreta. Solo
+  cine largometraje: fuera series, cortos, telefilmes y vídeos. Ventana de 7/30/90 días más los
+  próximos 60, y todos los filtros de la casa: **listón Σ de MDBList** (lo aún sin nota no se
+  oculta), tipos, Me faltan / Las tengo, orden por Σ/popularidad/fecha/votos, descarte ✕
+  compartido con Descubrir, y Radarr suelto o en bloque sobre lo visible.
 - **⌘K busca de todo**: además de películas y personas, ahora sagas, listas seguidas, festivales y
   premios, y saltar a cualquier sección — con navegación por teclado (↑/↓/Enter) y búsqueda
   insensible a acentos.

@@ -237,6 +237,15 @@ export default function About() {
             reversible, listón de nota y filtros de ruido.
           </p>
         </Block>
+        <Block icon="🎟️" title="Estrenos" to="/estrenos">
+          <p>
+            Qué acaba de llegar y qué viene: a los <b>cines de España</b>, a los <b>cines de EE UU</b> y a las{' '}
+            <b>plataformas españolas</b> (fecha de estreno digital de TMDB, con chips de dónde verla: Netflix,
+            Filmin, Movistar…). Solo cine largometraje, con ventana de 7/30/90 días más lo próximo, y los filtros
+            de la casa: listón Σ de MDBList para separar el estreno que importa del relleno, Me faltan / Las
+            tengo, tipos, plataforma concreta, y envío a Radarr suelto o en bloque.
+          </p>
+        </Block>
         <Block icon="🏆" title="Listas y retos" to="/listas">
           <p>
             Tu <b>watchlist de Letterboxd</b> (con Radarr en lo que te falta), tus retos importados de Letterboxd

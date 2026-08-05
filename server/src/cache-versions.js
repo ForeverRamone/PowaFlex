@@ -31,6 +31,8 @@ export const CACHE_VERSIONS = {
   // v6: títulos con «(ex-æquo)» y título original inline limpiados, y premios
   // con vista de nominadas por año
   festival: 6,
+  // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
+  releases: 1,
 };
 
 /** Prefijo con versión de una caché: `calendar:v7`, `discover_gaps:v7`… */
