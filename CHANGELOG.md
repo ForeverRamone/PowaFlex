@@ -1,11 +1,17 @@
 # Changelog
 
-## Beta 0.10 (0.10.0-beta) — 2026-08-06
+## Beta 1.00 (1.0.0-beta) — 2026-08-06
 
-**La gran reorganización.** Mismas funciones, la mitad de menú: la app pasa de 16 secciones a 12
-(5 + 5 + 2), agrupando lo que compartía dominio y llevando los filtros a donde faltaban. Los
-marcadores viejos siguen funcionando: `/calidad`, `/salud`, `/colecciones`, `/directores` y
-`/letterboxd` redirigen a su nuevo hogar.
+**La gran reorganización.** Mismas funciones, la mitad de menú: la app se agrupa en 13 secciones
+(5 + 6 + 2), juntando lo que compartía dominio, estrenando la sección Estrenos y llevando los
+filtros a donde faltaban. Los marcadores viejos siguen funcionando: `/calidad`, `/salud`,
+`/colecciones`, `/directores` y `/letterboxd` redirigen a su nuevo hogar.
+
+- **Filtros demográficos en «Directores/as top» y «Actores/actrices top»** (Descubrir huecos):
+  los mismos selectores que la página Personas —género, vivos/fallecidos, continente y país de
+  nacimiento— acotan el ranking de los más presentes en tu biblioteca, aplicados en el servidor
+  («Ver más» recorre el ranking ya filtrado). Sirven para cazar huecos de «mis directores top
+  españoles», «mujeres directoras» o «cineastas asiáticos» sin salir de la pestaña.
 
 - **Taller** (nuevo): Calidad y disco + Salud de los datos, juntas bajo un techo con pestañas.
   Compartían dominio (Radarr, duplicados, ficheros) y hasta bloques duplicados.
@@ -46,17 +52,7 @@ marcadores viejos siguen funcionando: `/calidad`, `/salud`, `/colecciones`, `/di
   código muerto retirado del Dashboard.
 - About reescrito a la nueva taxonomía, con la ruta de primeros pasos actualizada.
 
-## Alpha 0.9.17 (0.9.17-alpha) — 2026-08-05
-
-- **Filtros demográficos en «Directores/as top» y «Actores/actrices top»** (Descubrir huecos):
-  los mismos selectores que la página Personas —género, vivos/fallecidos, continente y país de
-  nacimiento— ahora acotan el ranking de los más presentes en tu biblioteca. Sirven para cazar
-  huecos de «mis directores top españoles», «mujeres directoras» o «cineastas asiáticos» sin
-  salir de la pestaña. El filtro se aplica en el servidor, así que «Ver más» recorre el ranking
-  ya filtrado (hasta los 500 primeros), y la selección se recuerda entre visitas. El botón
-  «Limpiar filtros» de la caja de vista también los restablece. Si un filtro deja la lista
-  vacía, la página lo dice y recuerda que los datos demográficos se amplían desde Ajustes →
-  «Actualizar estado vital» (vienen del lugar de nacimiento de TMDB, que a veces falta).
+## Alpha 0.9.16 (0.9.16-alpha) — 2026-08-05
 
 - **«Personas con emparejado sin demostrar» ya no alarma de más.** Ese número juntaba dos cosas
   muy distintas: las que se comprobaron y no se pudo demostrar quiénes son (ahí sí puede haber un
