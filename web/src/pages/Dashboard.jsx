@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line,
 } from 'recharts';
@@ -63,7 +63,6 @@ function RecentStrip({ items, onSelect, kind }) {
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const ch = useChartTheme();
   const [ov, setOv] = useState(null);
   const [charts, setCharts] = useState(null);
@@ -73,11 +72,6 @@ export default function Dashboard() {
   const [directors, setDirectors] = useState([]);
   const [actors, setActors] = useState([]);
   const [selected, setSelected] = useState(null);
-
-  const openResolution = (name) => {
-    if (!name || name === 'desconocida') return navigate('/biblioteca');
-    navigate(`/biblioteca?resolution=${encodeURIComponent(name)}`);
-  };
 
   useEffect(() => {
     api('/stats/overview').then(setOv);
@@ -139,7 +133,7 @@ export default function Dashboard() {
       {captures?.length > 0 && (
         <Section
           title={`🎬 Capturadas esta semana (${captures.length})`}
-          action={<Link to="/calidad" className="text-xs text-gold-400 hover:underline">Pendientes →</Link>}
+          action={<Link to="/taller?tab=calidad" className="text-xs text-gold-400 hover:underline">Pendientes →</Link>}
         >
           <div className="card divide-y divide-ink-800 max-h-72 overflow-y-auto">
             {captures.map((c) => (

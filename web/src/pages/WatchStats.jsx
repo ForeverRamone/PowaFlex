@@ -28,6 +28,12 @@ export default function WatchStats() {
   const [data, setData] = useState(null);
   const [ins, setIns] = useState(null);
   const [selected, setSelected] = useState(null);
+  // tus notas vs. la comunidad venía de la antigua página Letterboxd; aquí es
+  // donde se compara lo visto, así que es su sitio natural
+  const [lbCompare, setLbCompare] = useState(null);
+  useEffect(() => {
+    api('/letterboxd/summary').then((s) => setLbCompare(Array.isArray(s?.ratingCompare) ? s.ratingCompare : []));
+  }, []);
   const [resolving, setResolving] = useState(false);
   const [resolveMsg, setResolveMsg] = useState('');
 
@@ -155,7 +161,7 @@ export default function WatchStats() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
             {data.directorsPending.map((d) => (
-              <Link key={d.id} to={`/biblioteca?personId=${d.id}&personRole=director&watched=no`} className="card p-3 hover:border-gold-400 transition-colors">
+              <Link key={d.id} to={`/biblioteca?personId=${d.id}&personRole=director&watched=no&personName=${encodeURIComponent(d.name)}`} className="card p-3 hover:border-gold-400 transition-colors">
                 <div className="text-sm font-medium text-zinc-200">{d.name}</div>
                 <div className="text-xs text-zinc-500 mt-1">
                   {d.watched} vistas de {d.total} · <span className="text-gold-400">{d.total - d.watched} pendientes</span>
@@ -180,7 +186,7 @@ export default function WatchStats() {
               {data.directorsMostWatched.map((d, i) => (
                 <Link
                   key={d.id}
-                  to={`/biblioteca?personId=${d.id}&personRole=director&watched=yes`}
+                  to={`/biblioteca?personId=${d.id}&personRole=director&watched=yes&personName=${encodeURIComponent(d.name)}`}
                   className="card p-3 flex items-baseline gap-2 hover:border-gold-400 transition-colors"
                 >
                   <span className="text-[11px] text-zinc-600 tabular w-5 shrink-0">{i + 1}</span>
@@ -242,6 +248,36 @@ export default function WatchStats() {
             onSelect={setSelected}
           />
         </>
+      )}
+
+      {lbCompare?.length > 0 && (
+        <Section title="Tus notas de Letterboxd vs. la comunidad">
+          <div className="card p-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-zinc-500 text-left border-b border-ink-700">
+                  <th className="py-2">Título</th><th>Año</th>
+                  <th className="text-right">Tu nota /10</th>
+                  <th className="text-right">Comunidad LB /10</th>
+                  <th className="text-right">Σ MDBList</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lbCompare.slice(0, 200).map((m) => (
+                  <tr key={m.rating_key} className="border-b border-ink-800">
+                    <td className="py-1.5 text-zinc-200">
+                      <button className="hover:text-gold-400 text-left" onClick={() => setSelected(m.rating_key)}>{m.title}</button>
+                    </td>
+                    <td className="text-zinc-500">{m.year}</td>
+                    <td className="text-right text-gold-400">{m.lb?.toFixed(1)}</td>
+                    <td className="text-right text-orange-300">{m.community != null ? m.community.toFixed(1) : '—'}</td>
+                    <td className="text-right text-zinc-400">{m.mdb_score ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
       )}
 
       <Section title="Vistas recientemente">

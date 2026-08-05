@@ -4,6 +4,7 @@ import { api, tmdbImg, fmtDate } from '../api.js';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, StatusLegend,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge, MatchCorrector,
+  Select, MinScoreBar, passesScore,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
@@ -28,10 +29,6 @@ const SORTS = {
   letterboxd: { label: 'Nota Letterboxd', fn: (a, b) => (b.mdb?.letterboxd ?? -1) - (a.mdb?.letterboxd ?? -1) },
   votos: { label: 'Más votadas', fn: (a, b) => (b.votes || 0) - (a.votes || 0) },
 };
-
-// Igual que en Descubrir: el listón solo esconde lo que tiene nota por debajo;
-// lo que no tiene nota se queda a la vista.
-const passesScore = (i, minScore) => !minScore || i.mdb?.score == null || i.mdb.score >= minScore;
 
 export default function PersonDetail() {
   const { id } = useParams();
@@ -233,7 +230,7 @@ export default function PersonDetail() {
                 ? `★ Siguiendo como ${active === 'actor' ? 'actor/actriz' : 'director/a'}`
                 : `☆ Seguir como ${active === 'actor' ? 'actor/actriz' : 'director/a'}`}
             </button>
-            <Link to={`/biblioteca?personId=${person.id}&personRole=${active}`} className="btn-ghost">
+            <Link to={`/biblioteca?personId=${person.id}&personRole=${active}&personName=${encodeURIComponent(person.name)}`} className="btn-ghost">
               Ver en tu biblioteca
             </Link>
             {botonCorregir}
@@ -320,23 +317,10 @@ export default function PersonDetail() {
       <div className="flex items-center gap-x-4 gap-y-2 flex-wrap mb-4 text-sm">
         <label className="flex items-center gap-2 text-xs text-zinc-500">
           Ordenar:
-          <select className="input !w-auto !py-1 text-xs" value={sort} onChange={(e) => setSortPref(e.target.value)}>
-            {Object.entries(SORTS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}
-          </select>
+          <Select className="!py-1 text-xs" value={sort} onChange={setSortPref}
+            options={Object.entries(SORTS).map(([k, s]) => [k, s.label])} />
         </label>
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-zinc-500">Nota mínima Σ:</span>
-          {[0, 40, 50, 60, 70].map((v) => (
-            <button
-              key={v}
-              onClick={() => setMinScorePref(v)}
-              className={`btn-ghost !py-1 text-xs ${minScore === v ? '!border-gold-400 text-gold-400' : ''}`}
-            >
-              {v === 0 ? 'Todas' : `Σ ≥ ${v}`}
-            </button>
-          ))}
-          <span className="text-xs text-zinc-600">(las sin nota no se ocultan)</span>
-        </div>
+        <MinScoreBar minScore={minScore} setMinScore={setMinScorePref} />
         {hayFiltros && (
           <button className="btn-ghost !py-1 text-xs" onClick={limpiarFiltros}>✕ Limpiar filtros</button>
         )}

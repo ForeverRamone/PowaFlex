@@ -34,14 +34,14 @@ const FIRST_STEPS = [
   },
   {
     title: 'Trae tu Letterboxd y las notas',
-    to: '/letterboxd',
+    to: '/ajustes',
     optional: true,
-    body: 'Importa el zip de tu export para que PowaFlex sepa qué has visto aunque no lo reprodujeras en Plex, y pon tu RSS para que se mantenga solo. Con la clave de MDBList (también en Ajustes) cada película gana las notas de IMDb, Rotten Tomatoes, Metacritic y Letterboxd.',
+    body: 'En Ajustes, importa el zip de tu export para que PowaFlex sepa qué has visto aunque no lo reprodujeras en Plex, y pon tu RSS para que se mantenga solo. Con la clave de MDBList (también en Ajustes) cada película gana las notas de IMDb, Rotten Tomatoes, Metacritic y Letterboxd.',
   },
   {
     title: 'Mira dónde estás',
     to: '/',
-    body: 'El Dashboard te da la foto general y Calidad y disco la salud técnica. En Visionado ves cuánto llevas visto y qué grandes películas tuyas siguen esperando. Aquí todavía no hay nada que decidir: es tomar medida de la colección.',
+    body: 'El Dashboard te da la foto general y el Taller la salud técnica. En Visionado ves cuánto llevas visto y qué grandes películas tuyas siguen esperando. Aquí todavía no hay nada que decidir: es tomar medida de la colección.',
   },
   {
     title: 'Marca a tu gente',
@@ -164,6 +164,10 @@ export default function About() {
       </div>
 
       <h2 className="text-lg font-semibold text-zinc-100 mb-3">Las secciones, una a una</h2>
+      <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
+        Y desde cualquier sitio, <b className="text-zinc-300">Ctrl/⌘ + K</b> abre la búsqueda global: películas,
+        personas, sagas, listas, festivales y saltar a cualquier sección, con las flechas y Enter.
+      </p>
       <div className="grid md:grid-cols-2 gap-4 mb-6">
         <Block icon="📊" title="Dashboard" to="/">
           <p>
@@ -184,12 +188,13 @@ export default function About() {
         </Block>
         <Block icon="🎭" title="Directores/as y actores/actrices" to="/personas">
           <p>
-            Ranking de directores/as, actores/actrices y guionistas por presencia en tu biblioteca. La ficha de
-            cada persona cruza su filmografía completa de TMDB con lo que tienes: porcentaje de completismo (solo
-            largometrajes, con filtros para cortos, documentales, TV y dirección coral), lo que te falta (con
-            botón directo a Radarr), sus proyectos anunciados y las notas de cada título, con orden por
-            calificación, año o votos y listón de nota mínima. Quien dirige y actúa tiene una pestaña por faceta,
-            y con «☆ Seguir» fijas esa faceta en el calendario.
+            Dos pestañas. <b>Tu biblioteca</b>: el ranking de directores/as, actores/actrices y guionistas por
+            presencia en tu Plex, con filtros demográficos (género, vivos/fallecidos, continente, país), la ★
+            para seguir a cualquiera y el alta en bloque de «los N primeros» con previsualización.{' '}
+            <b>Directores en activo</b>: el catálogo de 680 nombres de Wikidata con su importancia, obra y
+            premios, para descubrir a quién seguir. La ficha de cada persona cruza su filmografía completa de
+            TMDB con lo que tienes: completismo, lo que te falta (con botón a Radarr), proyectos anunciados y
+            notas, con orden y listón de nota mínima. Quien dirige y actúa tiene una pestaña por faceta.
           </p>
         </Block>
         <Block icon="🗓️" title="Cine venidero" to="/calendario">
@@ -202,10 +207,11 @@ export default function About() {
         <Block icon="⭐" title="Favoritos" to="/favoritos">
           <p>
             Tu lista de directores/as y actores/actrices de cabecera, la que alimenta el calendario. Cada persona
-            puede seguirse por una faceta o por las dos (un Eastwood cuenta en directores Y en actores). Incluye un
-            ranking paginado por número de títulos (con filtro de fallecidos y actualización de estado vital),
-            paquetes temáticos con «añadir todos», pegar una lista de nombres, y quitar o añadir individualmente.
-            Lo que quites con la ✕ no vuelve por los añadidos masivos (solo a mano).
+            puede seguirse por una faceta o por las dos (un Eastwood cuenta en directores Y en actores). Incluye
+            paquetes temáticos y de festival con «añadir todos», volcar cánones enteros, pegar una lista de
+            nombres, exportar la tuya, y el modo podar para limpiar en bloque. Lo que quites con la ✕ no vuelve
+            por los añadidos masivos (solo a mano). Para seguir gente desde el ranking de tu biblioteca, la ★
+            vive en Directores y actores.
           </p>
         </Block>
         <Block icon="🎪" title="Festivales" to="/festivales">
@@ -222,59 +228,45 @@ export default function About() {
         </Block>
         <Block icon="🧭" title="Descubrir huecos" to="/descubrir">
           <p>
-            El modo completista: agrega lo que te falta de las filmografías de tus directores/as y actores/actrices
-            top, y además comprueba el canon de los 250 grandes directores/as de <i>They Shoot Pictures, Don't
-            They?</i> para detectar los que no tienen ni una sola película en tu servidor, con sus obras esenciales
-            listas para añadir.
+            El modo completista, en cinco pestañas: lo que te falta de <b>tus favoritos</b>; los{' '}
+            <b>directores/as y actores/actrices top</b> de tu biblioteca (con filtros demográficos: «mis
+            directoras españolas top»); los <b>grandes ausentes</b> del canon —They Shoot Pictures, IMDb 501, el
+            «en boga» de TMDB o cualquier lista que pegues— sin una sola película en tu servidor; y tus{' '}
+            <b>sagas</b> a medias, detectadas con la colección real de TMDB. Todo con envío a Radarr, descarte
+            reversible, listón de nota y filtros de ruido.
           </p>
         </Block>
         <Block icon="🏆" title="Listas y retos" to="/listas">
           <p>
-            Sigue listas de MDBList (1001 películas, palmarés de premios, tops de la comunidad) y conviértelas en
-            retos de completismo: % conseguido, lo que falta y envío en bloque a Radarr. Con MDBList además toda
-            la app gana notas de IMDb, Rotten Tomatoes, Metacritic y Letterboxd.
-          </p>
-        </Block>
-        <Block icon="📚" title="Sagas" to="/colecciones">
-          <p>
-            Detecta tus franquicias cruzando cada película con su colección real de TMDB (no con etiquetas de
-            Plex) y te dice, saga a saga, qué partes te faltan o están por estrenar, con envío a Radarr.
+            Tu <b>watchlist de Letterboxd</b> (con Radarr en lo que te falta), tus retos importados de Letterboxd
+            con anillos de «tengo» vs «visto», y las listas de MDBList (1001 películas, palmarés de premios, tops
+            de la comunidad) convertidas en retos de completismo: % conseguido, lo que falta y envío en bloque a
+            Radarr.
           </p>
         </Block>
         <Block icon="👁️" title="Visionado" to="/visionado">
           <p>
             El contador de lo que llevas visto (Plex + Letterboxd) y lo visto contra lo pendiente: por década, por
             género, los directores/as de los que más te queda por ver, joyas y discrepancias frente a tu nota de
-            Letterboxd, las mejor valoradas que aún no has visto, los «must-see» de Metacritic pendientes y tu
-            historial reciente.
+            Letterboxd, las mejor valoradas que aún no has visto, los «must-see» de Metacritic pendientes, la
+            tabla de tus notas contra la comunidad y tu historial reciente.
           </p>
         </Block>
-        <Block icon="💾" title="Calidad y disco" to="/calidad">
+        <Block icon="🔧" title="Taller" to="/taller">
           <p>
-            La salud técnica de la colección: distribución de resoluciones, códecs y HDR, las películas bien
-            valoradas que siguen por debajo de 1080p (candidatas a upgrade), duplicados, los archivos más pesados
-            y cuánto disco consume cada década.
-          </p>
-        </Block>
-        <Block icon="🩺" title="Salud de los datos" to="/salud">
-          <p>
-            Auditorías locales de la base de datos: películas sin ficha de TMDB, identidades repetidas,
-            entradas de Letterboxd sin casar, peticiones zombis de Radarr y personas cuyo emparejado no se
-            pudo demostrar — cada hallazgo con su remedio al lado.
-          </p>
-        </Block>
-        <Block icon="🟠" title="Letterboxd" to="/letterboxd">
-          <p>
-            Importa tu export de Letterboxd (diario, notas, watchlist, vistas) y lo cruza con Plex: qué parte de
-            tu watchlist ya tienes en casa, cuál te falta, y cómo casan tus notas de Letterboxd con las de la
-            comunidad y la nota combinada de MDBList.
+            El mantenimiento, en dos pestañas. <b>Calidad y disco</b>: resoluciones, códecs y HDR, candidatas a
+            upgrade, duplicados, la deuda de Radarr (pedidas que no llegan, por debajo del corte) y los archivos
+            más pesados. <b>Salud de los datos</b>: auditorías locales —películas sin ficha TMDB, identidades
+            repetidas, entradas de Letterboxd sin casar, peticiones zombis y emparejados sin demostrar— cada una
+            con su remedio al lado.
           </p>
         </Block>
         <Block icon="⚙️" title="Ajustes" to="/ajustes">
           <p>
-            Las conexiones (Plex, TMDB, Radarr y MDBList) con guías paso a paso para conseguir cada credencial, el aspecto de la app, qué notas quieres ver, el
-            perfil de calidad y carpeta que usará Radarr, el tamaño del radar del calendario, el control de
-            sincronización manual, el histórico de los últimos 30 días del pase nocturno (paso a paso, con
+            Las conexiones (Plex, TMDB, Radarr, MDBList y Letterboxd —el zip del export y el RSS se importan
+            aquí—) con guías paso a paso para conseguir cada credencial, el aspecto de la app, qué notas quieres
+            ver, el perfil de calidad y carpeta que usará Radarr, el tamaño del radar del calendario, el control
+            de sincronización manual, el histórico de los últimos 30 días del pase nocturno (paso a paso, con
             duraciones y errores) y la copia de seguridad: descarga de la base de datos entera y
             exportación/importación de la configuración para reinstalar sin empezar de cero.
           </p>

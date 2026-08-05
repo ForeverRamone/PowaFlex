@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Star, Clapperboard, Drama, Search, Scissors, RotateCw, X } from 'lucide-react';
-import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature, ErrorBox } from '../components.jsx';
+import { Star, Clapperboard, Drama, Search, Scissors, X } from 'lucide-react';
+import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature, ErrorBox, Select } from '../components.jsx';
 import { toast } from '../toast.js';
 
 // The whole page is scoped to ONE role at a time: a director you follow is
@@ -246,18 +246,6 @@ export default function Favorites() {
   const setRole = (r) => { setRoleState(r); localStorage.setItem('fav_role', r); };
   const [tab, setTab] = useState('mine'); // mine | discover
   const [health, setHealth] = useState({ gaps: false, calendar: false });
-  const [rankItems, setRankItems] = useState(null);
-  const [rankMore, setRankMore] = useState(false);
-  const [hideDead, setHideDeadState] = useState(() => localStorage.getItem('fav_hide_dead') === '1');
-  const setHideDead = (fn) => setHideDeadState((prev) => {
-    const next = typeof fn === 'function' ? fn(prev) : fn;
-    localStorage.setItem('fav_hide_dead', next ? '1' : '0');
-    return next;
-  });
-  const [lifeMsg, setLifeMsg] = useState('');
-  const [updatingLife, setUpdatingLife] = useState(false);
-  const [topN, setTopN] = useState(10);
-  const [flash, setFlash] = useState('');
   const [suggest, setSuggest] = useState(null);
   const [pq, setPq] = useState('');
   const [presults, setPresults] = useState(null);
@@ -269,7 +257,7 @@ export default function Favorites() {
   const [favSearch, setFavSearch] = useState('');
   const [favSort, setFavSortState] = useState(() => localStorage.getItem('fav_sort') || 'titulos');
   const setFavSort = (v) => { setFavSortState(v); localStorage.setItem('fav_sort', v); };
-  const limpiarFiltros = () => { setFavSearch(''); setFavSort('titulos'); setHideDead(false); };
+  const limpiarFiltros = () => { setFavSearch(''); setFavSort('titulos'); };
   // un nombre por línea, listo para pegarlo en «añadir por nombres» de otra
   // instalación de PowaFlex — todo en el navegador, sin servidor
   const exportarTxt = () => {
@@ -282,10 +270,9 @@ export default function Favorites() {
     URL.revokeObjectURL(a.href);
     toast(`⬇ ${roleFavs.length} nombres exportados`);
   };
-  const hayFiltros = () => favSearch.trim() || favSort !== 'titulos' || hideDead;
+  const hayFiltros = () => favSearch.trim() || favSort !== 'titulos';
   const [pruneMode, setPruneMode] = useState(false);
   const [selected, setSelected] = useState(new Set());
-  const [preview, setPreview] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
   const [loadError, setLoadError] = useState(null);
@@ -356,75 +343,7 @@ export default function Favorites() {
     setPresults(Array.isArray(r) ? r : []);
   };
 
-  const RANK_PAGE = 100;
-  const loadRanking = (reset = true) => {
-    const offset = reset ? 0 : rankItems?.length || 0;
-    if (reset) setRankItems(null);
-    api(`/people?role=${role}&limit=${RANK_PAGE}&offset=${offset}&hideDead=${hideDead ? '1' : '0'}`).then((r) => {
-      const arr = Array.isArray(r) ? r : [];
-      setRankItems((prev) => (reset ? arr : [...(prev || []), ...arr]));
-      setRankMore(arr.length === RANK_PAGE);
-    });
-  };
-  useEffect(() => { loadRanking(true); }, [role, hideDead]);
   useEffect(() => { setSelected(new Set()); setPruneMode(false); }, [role]);
-
-  const updateLife = async () => {
-    setUpdatingLife(true);
-    setLifeMsg('Consultando fechas de nacimiento/fallecimiento en TMDB…');
-    const r = await api('/people/life-sync', { method: 'POST' });
-    setUpdatingLife(false);
-    setLifeMsg(r.error ? `✗ ${r.error}` : `✓ ${r.done} actualizadas · ${r.deceased} fallecidos/as`);
-    loadRanking(true);
-    loadTracked();
-  };
-
-  // the old blind top-N add was the factory of favorite noise: preview first
-  const bulkAdd = async () => {
-    const res = await api('/tracked/bulk', { method: 'POST', body: { role, top: Number(topN), preview: true } });
-    if (res.error) { toast(`⚠️ ${res.error}`, 'error'); return; }
-    const candidates = res.candidates || [];
-    if (!candidates.length) {
-      setFlash('Nadie nuevo que añadir con ese criterio');
-      setTimeout(() => setFlash(''), 4000);
-      return;
-    }
-    setPreview({ candidates, checked: new Set(candidates.map((c) => c.id)) });
-  };
-  const togglePreview = (id) =>
-    setPreview((p) => {
-      const checked = new Set(p.checked);
-      checked.has(id) ? checked.delete(id) : checked.add(id);
-      return { ...p, checked };
-    });
-  const confirmBulkAdd = async () => {
-    const ids = preview.candidates.filter((c) => preview.checked.has(c.id)).map((c) => c.id);
-    setPreview(null);
-    if (!ids.length) return;
-    const res = await api('/tracked/bulk', { method: 'POST', body: { personIds: ids, role } });
-    if (res.ok) { toast(`⭐ ${res.added} añadidos a ${roleLabel(role).toLowerCase()}`, 'success'); loadTracked(); }
-    else toast(`⚠️ ${res.error || 'error'}`, 'error');
-  };
-
-  // the star reflects THIS facet only: adding here never touches the other
-  // facet, so someone can be in directors AND actors at once (#Eastwood)
-  const toggle = async (id, name) => {
-    const followedHere = (tracked || []).some((t) => t.id === id && (t.role || 'director') === role);
-    if (followedHere) {
-      setTracked((prev) => prev.filter((t) => !(t.id === id && (t.role || 'director') === role)));
-      await api(`/tracked/${id}?role=${role}`, { method: 'DELETE' });
-      toast(`${name || 'Quitado'} fuera de ${roleLabel(role).toLowerCase()}`);
-    } else {
-      const r = await api(`/tracked/${id}`, { method: 'POST', body: { role } });
-      const extra = r.directorAlso
-        ? ' · y a directores/as: dirige 4+ películas'
-        : r.actorAlso
-          ? ' · y a actores/actrices: tiene 8+ interpretadas'
-          : '';
-      toast(`⭐ ${name || 'Añadido'} a ${roleLabel(role).toLowerCase()}${extra}`, 'success');
-    }
-    loadTracked();
-  };
   // la ✕ de una tarjeta quita SOLO la faceta de la lista que estás viendo
   const removeFav = async (p) => {
     setTracked((prev) => prev.filter((t) => !(t.id === p.id && (t.role || 'director') === role)));
@@ -576,11 +495,8 @@ export default function Favorites() {
                   value={favSearch}
                   onChange={(e) => setFavSearch(e.target.value)}
                 />
-                <select className="input !w-auto !py-1.5 text-xs" value={favSort} onChange={(e) => setFavSort(e.target.value)}>
-                  {Object.entries(FAV_SORTS).map(([k, s]) => (
-                    <option key={k} value={k}>{s.label}</option>
-                  ))}
-                </select>
+                <Select className="!py-1.5 text-xs" value={favSort} onChange={setFavSort}
+                  options={Object.entries(FAV_SORTS).map(([k, s]) => [k, s.label])} />
                 <button
                   onClick={() => { setPruneMode((v) => !v); setSelected(new Set()); }}
                   className={`btn-ghost !py-1.5 text-xs inline-flex items-center gap-1.5 ${pruneMode ? '!border-gold-400 text-gold-400' : ''}`}
@@ -654,101 +570,17 @@ export default function Favorites() {
             </>
           )}
 
-          {/* ranking of the library, scoped to this role, to add more */}
-          <Section title={`Ranking de ${roleLabel(role).toLowerCase()} por títulos en tu Plex`}>
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <button
-                onClick={() => setHideDead((v) => !v)}
-                className={`btn-ghost !py-1 text-xs ${hideDead ? '!border-gold-400 text-gold-400' : ''}`}
-              >
-                {hideDead ? '✓ Ocultando fallecidos/as' : '† Ocultar fallecidos/as'}
-              </button>
-              <button className="btn-ghost !py-1 text-xs inline-flex items-center gap-1.5" onClick={updateLife} disabled={updatingLife}>
-                {updatingLife ? 'Actualizando…' : <><RotateCw size={12} strokeWidth={2} /> Actualizar vivos/muertos</>}
-              </button>
-              <div className="flex items-center gap-2 ml-auto flex-wrap">
-                <span className="text-xs text-zinc-400 whitespace-nowrap">Añadir los</span>
-                <input type="number" min="1" max="1000" className="input !w-20 text-center !py-1" value={topN} onChange={(e) => setTopN(e.target.value)} />
-                <span className="text-xs text-zinc-400 whitespace-nowrap">primeros</span>
-                <button className="btn-gold !py-1 text-xs inline-flex items-center gap-1.5" onClick={bulkAdd}><Star size={12} strokeWidth={2} /> Revisar y añadir</button>
-              </div>
-              {lifeMsg && <span className="text-[11px] text-zinc-400 w-full">{lifeMsg}</span>}
-              {flash && <span className="text-emerald-400 text-xs w-full">{flash}</span>}
-            </div>
-
-            {preview && (
-              <div className="card p-4 mb-3">
-                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                  <h3 className="font-semibold text-zinc-100 text-sm">
-                    Vas a seguir a {preview.checked.size} de {preview.candidates.length} como {role === 'director' ? 'director/a' : 'actor/actriz'}
-                  </h3>
-                  <div className="flex gap-2">
-                    <button className="btn-gold !py-1 text-xs inline-flex items-center gap-1.5" onClick={confirmBulkAdd} disabled={!preview.checked.size}>
-<Star size={12} strokeWidth={2} /> Confirmar ({preview.checked.size})
-                    </button>
-                    <button className="btn-ghost !py-1 text-xs" onClick={() => setPreview(null)}>Cancelar</button>
-                  </div>
-                </div>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 max-h-72 overflow-y-auto">
-                  {preview.candidates.map((c) => (
-                    <label key={c.id} className="flex items-center gap-2 text-sm text-zinc-300 py-0.5 cursor-pointer min-w-0">
-                      <input type="checkbox" checked={preview.checked.has(c.id)} onChange={() => togglePreview(c.id)} />
-                      <span className="truncate">{c.name}</span>
-                      <DeathBadge deathday={c.deathday} />
-                      <span className="text-[11px] text-zinc-500 shrink-0 ml-auto">{c.n} títulos</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {!rankItems ? (
-              <Spinner />
-            ) : (
-              <div className="card divide-y divide-ink-800 max-h-[60vh] overflow-y-auto">
-                {rankItems.map((p, i) => {
-                  const here = tracked.some((t) => t.id === p.id && (t.role || 'director') === role);
-                  const other = tracked.find((t) => t.id === p.id && (t.role || 'director') !== role);
-                  const elsewhere = !here && !!other;
-                  return (
-                    <div key={p.id} className="flex items-center gap-3 px-4 py-2">
-                      <span className="text-zinc-600 text-sm w-8 text-right shrink-0">{i + 1}.</span>
-                      <Link to={`/personas/${p.id}?role=${role}`} className="text-sm text-zinc-200 hover:text-gold-400 truncate flex-1 flex items-center gap-1.5 min-w-0">
-                        <span className="truncate">{p.name}</span>
-                        <DeathBadge deathday={p.deathday} />
-                        {elsewhere && (
-                          <span className="text-[11px] text-zinc-500 shrink-0" title={`Le sigues como ${other.role === 'director' ? 'director/a' : 'actor/actriz'}`}>
-                            {other.role === 'director' ? <Clapperboard size={11} /> : <Drama size={11} />}
-                          </span>
-                        )}
-                      </Link>
-                      <span className="text-xs text-zinc-500 shrink-0">{p.n} títulos</span>
-                      <button
-                        onClick={() => toggle(p.id, p.name)}
-                        title={
-                          here
-                            ? `Quitar de ${roleLabel(role).toLowerCase()}`
-                            : elsewhere
-                              ? `Le sigues como ${other.role === 'director' ? 'director/a' : 'actor/actriz'}: seguirle TAMBIÉN como ${role === 'director' ? 'director/a' : 'actor/actriz'}`
-                              : `Seguir como ${role === 'director' ? 'director/a' : 'actor/actriz'}`
-                        }
-                        className={`text-lg cursor-pointer transition-colors shrink-0 ${
-                          here ? 'text-gold-400' : elsewhere ? 'text-gold-400/30 hover:text-gold-400' : 'text-zinc-600 hover:text-gold-400'
-                        }`}
-                      >
-                        ★
-                      </button>
-                    </div>
-                  );
-                })}
-                {rankMore && (
-                  <button className="w-full py-2 text-xs text-zinc-400 hover:text-gold-400 cursor-pointer" onClick={() => loadRanking(false)}>
-                    Ver más
-                  </button>
-                )}
-              </div>
-            )}
-          </Section>
+          {/* el ranking por títulos vivía duplicado aquí y en Personas; ahora
+              Personas tiene la ★ y el alta top-N, y aquí queda el puente */}
+          <div className="card p-4 flex items-center justify-between flex-wrap gap-2 text-sm">
+            <span className="text-zinc-400">
+              ¿Buscas el ranking de {roleLabel(role).toLowerCase()} por títulos en tu Plex? Vive en Personas, con la ★
+              para seguir y el alta de «los N primeros».
+            </span>
+            <Link to={`/personas?role=${role}`} className="btn-ghost !py-1.5 text-xs shrink-0 inline-flex items-center gap-1.5">
+              <Star size={13} strokeWidth={2} /> Ir a Personas
+            </Link>
+          </div>
         </>
       )}
 
@@ -810,7 +642,7 @@ export default function Favorites() {
               verdad: un filtro y un orden en vez de una lista congelada. */}
           {role === 'director' && (
             <Link
-              to="/directores"
+              to="/personas?tab=catalogo"
               className="card p-4 mb-6 flex items-center gap-4 hover:border-gold-400 transition-colors"
             >
               <div className="text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-gold-400/15">🎬</div>

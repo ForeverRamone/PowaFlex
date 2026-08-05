@@ -53,7 +53,7 @@ function SagaDetail({ id, radarrIds, addRadarrId }) {
   );
 }
 
-export default function Sagas() {
+export default function Sagas({ embedded = false }) {
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(null);
   const [scan, setScan] = useState(null);
@@ -113,7 +113,7 @@ export default function Sagas() {
 
   return (
     <div>
-      <PageHeader eyebrow="Colección" title="Sagas" />
+      {!embedded && <PageHeader eyebrow="Colección" title="Sagas" />}
       <p className="text-sm text-zinc-500 mb-5 max-w-3xl">
         Franquicias detectadas cruzando cada película de tu biblioteca con su colección real de TMDB (no con las
         etiquetas manuales de Plex). Abre cualquiera para ver qué partes te faltan y mandarlas a Radarr.

@@ -673,7 +673,7 @@ export function letterboxdSummary() {
 
   const watchlistMissing = db
     .prepare(
-      `SELECT title, year, uri FROM lb_entries WHERE list = 'watchlist' AND movie_id IS NULL ORDER BY year DESC`
+      `SELECT title, year, uri, tmdb_id FROM lb_entries WHERE list = 'watchlist' AND movie_id IS NULL ORDER BY year DESC`
     )
     .all();
   const watchlistOwned = db

@@ -7,7 +7,7 @@ import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 import { useChartTheme } from '../charts.js';
 
-export default function Quality() {
+export default function Quality({ embedded = false }) {
   const pollRef = useRef(null);
   useEffect(() => () => clearInterval(pollRef.current), []);
   const ch = useChartTheme();
@@ -134,7 +134,7 @@ export default function Quality() {
 
   return (
     <div>
-      <PageHeader eyebrow="Colección" title="Calidad y disco" />
+      {!embedded && <PageHeader eyebrow="Colección" title="Calidad y disco" />}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {[

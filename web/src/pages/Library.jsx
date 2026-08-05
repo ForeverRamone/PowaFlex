@@ -94,9 +94,23 @@ export default function Library() {
   const FILTER_LABELS = {
     genres: 'Género', countries: 'País', decade: 'Década', watched: 'Visionado', length: 'Metraje',
     resolution: 'Resolución', hdr: 'HDR', imdbMin: 'IMDb', rtMin: 'RT', lbMin: 'LB', personId: 'Persona',
+    collection: 'Colección', yearMin: 'Desde', yearMax: 'Hasta',
   };
   const VALUE_LABELS = { yes: 'Vistas', no: 'Sin ver', feature: 'Largometraje', short: 'Corto', hdr: 'HDR/DV', dv: 'Dolby Vision', sdr: 'SDR' };
   const activeKeys = Object.keys(q).filter((k) => FILTER_LABELS[k] && q[k]);
+  // el deep-link de una ficha trae personId (+personRole); el nombre viaja en
+  // personName solo para que el chip no enseñe un id numérico crudo
+  const chipLabel = (k) =>
+    k === 'personId'
+      ? `Persona: ${q.personName || `#${q.personId}`}${q.personRole ? ` (${q.personRole === 'director' ? 'dirige' : 'actúa'})` : ''}`
+      : `${FILTER_LABELS[k]}: ${VALUE_LABELS[q[k]] || q[k]}`;
+  const clearChip = (k) => {
+    if (k !== 'personId') return set(k, '');
+    const next = new URLSearchParams(params);
+    for (const extra of ['personId', 'personRole', 'personName']) next.delete(extra);
+    next.delete('offset');
+    setParams(next, { replace: true });
+  };
 
   return (
     <div>
@@ -126,8 +140,8 @@ export default function Library() {
             </button>
           )}
           {activeKeys.map((k) => (
-            <button key={k} className="text-xs bg-ink-800 border border-ink-600 rounded-full px-2.5 py-1 text-zinc-300 hover:border-red-400" onClick={() => set(k, '')}>
-              {FILTER_LABELS[k]}: {VALUE_LABELS[q[k]] || q[k]} ✕
+            <button key={k} className="text-xs bg-ink-800 border border-ink-600 rounded-full px-2.5 py-1 text-zinc-300 hover:border-red-400" onClick={() => clearChip(k)}>
+              {chipLabel(k)} ✕
             </button>
           ))}
         </div>
@@ -157,6 +171,24 @@ export default function Library() {
               con umbrales 3.5/4/4.3 este filtro no descartaba prácticamente nada */}
           <Select value={q.lbMin || ''} onChange={(v) => set('lbMin', v)} placeholder="Letterboxd mín."
             options={[['7', 'LB 7+'], ['8', 'LB 8+'], ['8.6', 'LB 8.6+']]} />
+          {/* las colecciones de Plex llevaban desde siempre en /api/filters sin
+              que ninguna página las enseñara */}
+          {filters.collections?.length > 0 && (
+            <Select value={q.collection || ''} onChange={(v) => set('collection', v)} placeholder="Colección de Plex"
+              options={filters.collections.map((c) => [c.name, `${c.name} (${c.n})`])} />
+          )}
+          <span className="flex items-center gap-1 text-xs text-zinc-500">
+            Años
+            <input
+              type="number" className="input !w-20 !py-1.5 text-center" placeholder="desde"
+              value={q.yearMin || ''} onChange={(e) => set('yearMin', e.target.value)}
+            />
+            –
+            <input
+              type="number" className="input !w-20 !py-1.5 text-center" placeholder="hasta"
+              value={q.yearMax || ''} onChange={(e) => set('yearMax', e.target.value)}
+            />
+          </span>
         </div>
       )}
 

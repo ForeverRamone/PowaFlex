@@ -1,29 +1,27 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy, Layers,
-  Eye, HardDrive, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award, HeartPulse, Clapperboard,
+  LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy,
+  Eye, Wrench, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award,
 } from 'lucide-react';
-import { Spinner, Toaster, GlobalSearch, LetterboxdLogo, ErrorBoundary } from './components.jsx';
+import { Spinner, Toaster, GlobalSearch, ErrorBoundary } from './components.jsx';
 import { api, applyTheme } from './api.js';
 import { ScrollMemory } from './scroll.js';
 
-// lazy per route so heavy pages (and recharts) don't weigh down the first paint
+// lazy per route so heavy pages (and recharts) don't weigh down the first paint.
+// Sagas, Quality, Salud y Directors ya no son rutas: viven como pestañas dentro
+// de Descubrir, Taller y Personas, que las cargan perezosas por su cuenta.
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Library = lazy(() => import('./pages/Library.jsx'));
 const People = lazy(() => import('./pages/People.jsx'));
 const PersonDetail = lazy(() => import('./pages/PersonDetail.jsx'));
 const Calendar = lazy(() => import('./pages/Calendar.jsx'));
-const Sagas = lazy(() => import('./pages/Sagas.jsx'));
-const Letterboxd = lazy(() => import('./pages/Letterboxd.jsx'));
-const Quality = lazy(() => import('./pages/Quality.jsx'));
+const Taller = lazy(() => import('./pages/Taller.jsx'));
 const WatchStats = lazy(() => import('./pages/WatchStats.jsx'));
 const Discover = lazy(() => import('./pages/Discover.jsx'));
 const Favorites = lazy(() => import('./pages/Favorites.jsx'));
 const Lists = lazy(() => import('./pages/Lists.jsx'));
 const Festivals = lazy(() => import('./pages/Festivals.jsx'));
-const Directors = lazy(() => import('./pages/Directors.jsx'));
-const Salud = lazy(() => import('./pages/Salud.jsx'));
 const About = lazy(() => import('./pages/About.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
@@ -35,17 +33,14 @@ const NAV_GROUPS = [
       { to: '/', label: 'Dashboard', Icon: LayoutDashboard },
       { to: '/biblioteca', label: 'Biblioteca', Icon: Film },
       { to: '/personas', label: 'Directores y actores', Icon: Users },
-      { to: '/colecciones', label: 'Sagas', Icon: Layers },
       { to: '/visionado', label: 'Visionado', Icon: Eye },
-      { to: '/calidad', label: 'Calidad y disco', Icon: HardDrive },
-      { to: '/salud', label: 'Salud de los datos', Icon: HeartPulse },
+      { to: '/taller', label: 'Taller', Icon: Wrench },
     ],
   },
   {
     label: 'La caza',
     items: [
       { to: '/favoritos', label: 'Favoritos', Icon: Star },
-      { to: '/directores', label: 'Directores en activo', Icon: Clapperboard },
       { to: '/descubrir', label: 'Descubrir huecos', Icon: Compass },
       { to: '/calendario', label: 'Cine venidero', Icon: CalendarDays },
       { to: '/festivales', label: 'Festivales y premios', Icon: Award },
@@ -55,8 +50,6 @@ const NAV_GROUPS = [
   {
     label: 'Cuenta',
     items: [
-      // the logo is a wide 3-dot mark: give it a size that reads at nav scale
-      { to: '/letterboxd', label: 'Letterboxd', Icon: () => <LetterboxdLogo size={7} className="shrink-0" /> },
       { to: '/ajustes', label: 'Ajustes', Icon: SettingsIcon },
       { to: '/acerca', label: '¿Qué es PowaFlex?', Icon: HelpCircle },
     ],
@@ -215,18 +208,21 @@ function Shell() {
           <Route path="/personas" element={<People />} />
           <Route path="/personas/:id" element={<PersonDetail />} />
           <Route path="/calendario" element={<Calendar />} />
-          <Route path="/colecciones" element={<Sagas />} />
           <Route path="/visionado" element={<WatchStats />} />
           <Route path="/descubrir" element={<Discover />} />
           <Route path="/favoritos" element={<Favorites />} />
           <Route path="/listas" element={<Lists />} />
           <Route path="/festivales" element={<Festivals />} />
-          <Route path="/directores" element={<Directors />} />
-          <Route path="/salud" element={<Salud />} />
+          <Route path="/taller" element={<Taller />} />
           <Route path="/acerca" element={<About />} />
-          <Route path="/calidad" element={<Quality />} />
-          <Route path="/letterboxd" element={<Letterboxd />} />
           <Route path="/ajustes" element={<Settings />} />
+          {/* rutas de antes de la reorganización: los marcadores viejos siguen
+              llegando a su contenido, ahora pestañas de otras páginas */}
+          <Route path="/colecciones" element={<Navigate to="/descubrir?tab=sagas" replace />} />
+          <Route path="/calidad" element={<Navigate to="/taller?tab=calidad" replace />} />
+          <Route path="/salud" element={<Navigate to="/taller?tab=datos" replace />} />
+          <Route path="/directores" element={<Navigate to="/personas?tab=catalogo" replace />} />
+          <Route path="/letterboxd" element={<Navigate to="/ajustes" replace />} />
         </Routes>
         </ErrorBoundary>
         </Suspense>

@@ -84,13 +84,40 @@ function WatchedStar({ watched }) {
   );
 }
 
-// Global command palette: search movies + people, jump anywhere (#8).
-// Opens with Ctrl/Cmd+K or a window 'powaflex-search' event.
+// Secciones de la app, para saltar a cualquiera desde la paleta. Incluye las
+// que ahora son pestañas de otra página (Sagas, Calidad, Salud, catálogo).
+const PALETTE_SECTIONS = [
+  ['Dashboard', '/'],
+  ['Biblioteca', '/biblioteca'],
+  ['Directores y actores', '/personas'],
+  ['Directores en activo (catálogo)', '/personas?tab=catalogo'],
+  ['Visionado', '/visionado'],
+  ['Taller', '/taller'],
+  ['Calidad y disco', '/taller?tab=calidad'],
+  ['Salud de los datos', '/taller?tab=datos'],
+  ['Favoritos', '/favoritos'],
+  ['Descubrir huecos', '/descubrir'],
+  ['Sagas', '/descubrir?tab=sagas'],
+  ['Cine venidero', '/calendario'],
+  ['Festivales y premios', '/festivales'],
+  ['Listas y retos', '/listas'],
+  ['Letterboxd (importar)', '/ajustes'],
+  ['Ajustes', '/ajustes'],
+  ['¿Qué es PowaFlex?', '/acerca'],
+];
+
+// acentos fuera y a minúsculas, para que «oscar» encuentre «Óscar»
+const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+// Global command palette: movies + people + sagas + lists + festivals +
+// sections, keyboard-first (#8). Opens with Ctrl/Cmd+K or 'powaflex-search'.
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [res, setRes] = useState(null);
   const [sel, setSel] = useState(null);
+  const [fests, setFests] = useState(null); // índice real de /festivales, una vez
+  const [active, setActive] = useState(0);
   const navigate = useNavigate();
   useEffect(() => {
     const onKey = (e) => {
@@ -103,6 +130,9 @@ export function GlobalSearch() {
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('powaflex-search', onEvt); };
   }, []);
   useEffect(() => {
+    if (open && !fests) api('/festivals').then((r) => setFests(Array.isArray(r?.festivals) ? r.festivals : []));
+  }, [open, fests]);
+  useEffect(() => {
     if (!q.trim()) { setRes(null); return; }
     const t = setTimeout(() => api(`/search?q=${encodeURIComponent(q.trim())}`).then((r) => !r.error && setRes(r)), 200);
     return () => clearTimeout(t);
@@ -110,7 +140,53 @@ export function GlobalSearch() {
   // el hook va SIEMPRE (no se pueden llamar a medias) y no hace nada si está cerrado
   const dialogo = useFocusTrap(() => setOpen(false), open);
   const go = (path) => { setOpen(false); setQ(''); navigate(path); };
+
+  // una sola lista plana con grupos: por ella se mueve el teclado (↑/↓/Enter)
+  const term = fold(q.trim());
+  const flat = [];
+  const grupo = (label, items) => { if (items.length) flat.push({ header: label }, ...items); };
+  if (term) {
+    grupo('Personas', (res?.people || []).map((p) => ({
+      key: `p${p.id}`, kind: 'person', p,
+      run: () => go(`/personas/${p.id}?role=${p.role}`),
+    })));
+    grupo('Películas', (res?.movies || []).map((m) => ({
+      key: `m${m.rating_key}`, kind: 'movie', m,
+      run: () => setSel(m.rating_key),
+    })));
+    grupo('Sagas', (res?.sagas || []).map((s) => ({
+      key: `s${s.id}`, kind: 'plain', label: s.name, sub: `${s.n} en tu Plex`,
+      run: () => go('/descubrir?tab=sagas'),
+    })));
+    grupo('Listas y retos', (res?.lists || []).map((l) => ({
+      key: `l${l.kind}${l.id}`, kind: 'plain', label: l.name, sub: l.kind === 'lb' ? 'Letterboxd' : 'MDBList',
+      run: () => go('/listas'),
+    })));
+    grupo('Festivales y premios', (fests || [])
+      .filter((f) => fold(f.name).includes(term) || fold(f.award).includes(term))
+      .slice(0, 5)
+      .map((f) => ({
+        key: `f${f.key}`, kind: 'plain', label: f.name, sub: f.award || 'Festivales',
+        run: () => go(`/festivales?f=${encodeURIComponent(f.key)}`),
+      })));
+    grupo('Secciones', PALETTE_SECTIONS
+      .filter(([label]) => fold(label).includes(term))
+      .slice(0, 5)
+      .map(([label, path]) => ({ key: `sec${path}${label}`, kind: 'plain', label, sub: 'Ir a', run: () => go(path) })));
+  }
+  const rows = flat.filter((f) => !f.header);
+  const clamp = (i) => (rows.length ? (i + rows.length) % rows.length : 0);
+  const onInputKey = (e) => {
+    // 'Down'/'Up' son los nombres antiguos de tecla (IE/Edge y algunos WebView)
+    if (e.key === 'ArrowDown' || e.key === 'Down') { e.preventDefault(); setActive((i) => clamp(i + 1)); }
+    else if (e.key === 'ArrowUp' || e.key === 'Up') { e.preventDefault(); setActive((i) => clamp(i - 1)); }
+    else if (e.key === 'Enter' && rows[active]) { e.preventDefault(); rows[active].run(); }
+  };
+  // al cambiar los resultados, la selección vuelve arriba
+  useEffect(() => { setActive(0); }, [q, res]);
+
   if (!open) return null;
+  let rowIdx = -1;
   return (
     <div
       className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-start justify-center p-4 pt-24"
@@ -120,56 +196,80 @@ export function GlobalSearch() {
         ref={dialogo}
         role="dialog"
         aria-modal="true"
-        aria-label="Buscar en tu biblioteca"
+        aria-label="Buscar en PowaFlex"
         className="card-float w-full max-w-xl p-3"
         onClick={(e) => e.stopPropagation()}
       >
-        <input autoFocus className="input" placeholder="Buscar película o persona…" value={q} onChange={(e) => setQ(e.target.value)} />
-        {res && (
+        <input
+          autoFocus
+          className="input"
+          placeholder="Película, persona, saga, lista, festival o sección…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={onInputKey}
+        />
+        {term && (
           <div className="mt-2 max-h-[60vh] overflow-y-auto">
-            {res.people?.length > 0 && (
-              <div className="text-[11px] uppercase tracking-widest text-zinc-600 px-2 mt-1 mb-1">Personas</div>
-            )}
-            {res.people?.map((p) => (
-              <button
-                key={`p${p.id}`}
-                className="w-full text-left px-2 py-1.5 rounded hover:bg-ink-800 text-sm text-zinc-200 flex items-center gap-2.5"
-                onClick={() => go(`/personas/${p.id}?role=${p.role}`)}
-              >
-                {p.thumb ? (
-                  <img src={`/img/person/${p.id}`} alt="" loading="lazy" className="w-7 h-7 rounded-full object-cover bg-ink-800 shrink-0" />
-                ) : (
-                  <span className="w-7 h-7 rounded-full bg-ink-800 text-zinc-500 text-[11px] flex items-center justify-center shrink-0">
-                    {p.name.slice(0, 1)}
-                  </span>
-                )}
-                <span className="truncate">{p.name}</span>
-                <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{p.total} títulos</span>
-              </button>
-            ))}
-            {res.movies?.length > 0 && (
-              <div className="text-[11px] uppercase tracking-widest text-zinc-600 px-2 mt-3 mb-1">Películas</div>
-            )}
-            {res.movies?.map((m) => (
-              <button
-                key={`m${m.rating_key}`}
-                className="w-full text-left px-2 py-1.5 rounded hover:bg-ink-800 text-sm text-zinc-200 flex items-center gap-2.5"
-                onClick={() => setSel(m.rating_key)}
-              >
-                <img
-                  src={`/img/${m.rating_key}/poster`}
-                  alt=""
-                  loading="lazy"
-                  className="w-7 h-10 rounded-sm object-cover bg-ink-800 ring-art shrink-0"
-                />
-                <span className="truncate">{m.title}</span>
-                <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{m.year ?? '¿?'}</span>
-              </button>
-            ))}
-            {!res.people?.length && !res.movies?.length && <div className="text-sm text-zinc-500 px-2 py-3">Nada encontrado.</div>}
+            {flat.map((f) => {
+              if (f.header) {
+                return (
+                  <div key={`h${f.header}`} className="text-[11px] uppercase tracking-widest text-zinc-600 px-2 mt-3 first:mt-1 mb-1">
+                    {f.header}
+                  </div>
+                );
+              }
+              rowIdx++;
+              const isActive = rowIdx === active;
+              const cls = `w-full text-left px-2 py-1.5 rounded text-sm text-zinc-200 flex items-center gap-2.5 ${
+                isActive ? 'bg-ink-800' : 'hover:bg-ink-800'
+              }`;
+              if (f.kind === 'person') {
+                const p = f.p;
+                return (
+                  <button key={f.key} className={cls} onClick={f.run}>
+                    {p.thumb ? (
+                      <img src={`/img/person/${p.id}`} alt="" loading="lazy" className="w-7 h-7 rounded-full object-cover bg-ink-800 shrink-0" />
+                    ) : (
+                      <span className="w-7 h-7 rounded-full bg-ink-800 text-zinc-500 text-[11px] flex items-center justify-center shrink-0">
+                        {p.name.slice(0, 1)}
+                      </span>
+                    )}
+                    <span className="truncate">{p.name}</span>
+                    <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{p.total} títulos</span>
+                  </button>
+                );
+              }
+              if (f.kind === 'movie') {
+                const m = f.m;
+                return (
+                  <button key={f.key} className={cls} onClick={f.run}>
+                    <img
+                      src={`/img/${m.rating_key}/poster`}
+                      alt=""
+                      loading="lazy"
+                      className="w-7 h-10 rounded-sm object-cover bg-ink-800 ring-art shrink-0"
+                    />
+                    <span className="truncate">{m.title}</span>
+                    <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{m.year ?? '¿?'}</span>
+                  </button>
+                );
+              }
+              return (
+                <button key={f.key} className={cls} onClick={f.run}>
+                  <span className="truncate">{f.label}</span>
+                  {f.sub && <span className="text-zinc-500 text-xs ml-auto shrink-0">{f.sub}</span>}
+                </button>
+              );
+            })}
+            {rows.length === 0 && <div className="text-sm text-zinc-500 px-2 py-3">Nada encontrado.</div>}
           </div>
         )}
-        {!res && <div className="text-xs text-zinc-500 px-2 py-3">Escribe para buscar en tu biblioteca. Atajo: Ctrl/⌘ + K.</div>}
+        {!term && (
+          <div className="text-xs text-zinc-500 px-2 py-3">
+            Escribe para buscar películas, personas, sagas, listas, festivales o saltar a una sección. ↑↓ para moverte,
+            Enter para abrir. Atajo: Ctrl/⌘ + K.
+          </div>
+        )}
       </div>
       {sel && <MovieModal id={sel} onClose={() => { setSel(null); setOpen(false); }} />}
     </div>
@@ -546,7 +646,13 @@ export function JustWatchCheck({ tmdbId, result = null }) {
   );
 }
 
-export function PersonCard({ person, role }) {
+/**
+ * `follow` (opcional) pinta la estrella de seguir dentro de la tarjeta:
+ * { state: 'here' | 'elsewhere' | 'no', title, onToggle }. El clic en la
+ * estrella NO navega (preventDefault): la tarjeta entera sigue siendo el
+ * enlace a la ficha.
+ */
+export function PersonCard({ person, role, follow = null }) {
   const [imgError, setImgError] = useState(false);
   return (
     <Link
@@ -566,7 +672,7 @@ export function PersonCard({ person, role }) {
           <span className="text-lg">🎭</span>
         )}
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-zinc-200 truncate flex items-center gap-1.5">
           <span className="truncate">{person.name}</span>
           <DeathBadge deathday={person.deathday} />
@@ -576,6 +682,21 @@ export function PersonCard({ person, role }) {
           {person.watched != null && <span> · {person.watched} vistas</span>}
         </div>
       </div>
+      {follow && (
+        <button
+          onClick={(e) => { e.preventDefault(); follow.onToggle(person); }}
+          title={follow.title}
+          className={`text-lg cursor-pointer transition-colors shrink-0 ${
+            follow.state === 'here'
+              ? 'text-gold-400'
+              : follow.state === 'elsewhere'
+                ? 'text-gold-400/30 hover:text-gold-400'
+                : 'text-zinc-600 hover:text-gold-400'
+          }`}
+        >
+          ★
+        </button>
+      )}
     </Link>
   );
 }
@@ -615,6 +736,31 @@ export function Empty({ children }) {
 }
 
 /**
+ * Listón de nota mínima Σ. Vivía copiado carácter a carácter en Descubrir y en
+ * la ficha de persona (y con él su regla de oro): el listón solo esconde lo que
+ * tiene nota por debajo; lo que no tiene nota se queda a la vista.
+ */
+export const passesScore = (i, minScore) => !minScore || i.mdb?.score == null || i.mdb.score >= minScore;
+
+export function MinScoreBar({ minScore, setMinScore }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap text-sm">
+      <span className="text-xs text-zinc-500">Nota mínima Σ:</span>
+      {[0, 40, 50, 60, 70].map((v) => (
+        <button
+          key={v}
+          onClick={() => setMinScore(v)}
+          className={`btn-ghost !py-1 text-xs ${minScore === v ? '!border-gold-400 text-gold-400' : ''}`}
+        >
+          {v === 0 ? 'Todas' : `Σ ≥ ${v}`}
+        </button>
+      ))}
+      <span className="text-xs text-zinc-600">(las sin nota no se ocultan)</span>
+    </div>
+  );
+}
+
+/**
  * El corrector manual de emparejado con TMDB, para lo que ninguna regla va a
  * acertar: dos personas con el mismo nombre, alguien con la obra repartida en
  * dos fichas, o una película que Plex identificó con el guid de otra.
@@ -630,6 +776,9 @@ export function MatchCorrector({
   initialQuery = '',
   year = null,
   role = null,
+  // Festivales busca candidatos con su propio endpoint (acotado al año de la
+  // edición); el resto usa las rutas por defecto según `kind`
+  searchPath = null,
   onPick,
   onClear = null,
   clearLabel = 'Quitar corrección / volver al automático',
@@ -645,9 +794,11 @@ export function MatchCorrector({
   const buscar = async () => {
     if (!q.trim()) return;
     setBuscando(true);
-    const ruta = esPersona
-      ? `/people/search-tmdb?q=${encodeURIComponent(q.trim())}${role ? `&role=${role}` : ''}`
-      : `/movies/match-candidates?q=${encodeURIComponent(q.trim())}&year=${year || ''}`;
+    const ruta = searchPath
+      ? searchPath(q.trim())
+      : esPersona
+        ? `/people/search-tmdb?q=${encodeURIComponent(q.trim())}${role ? `&role=${role}` : ''}`
+        : `/movies/match-candidates?q=${encodeURIComponent(q.trim())}&year=${year || ''}`;
     const r = await api(ruta);
     setBuscando(false);
     // las personas llegan como lista pelada; las películas, envueltas

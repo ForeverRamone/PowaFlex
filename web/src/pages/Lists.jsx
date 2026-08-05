@@ -213,6 +213,70 @@ function ChallengeCard({ l, mode, open, setOpen, load }) {
   );
 }
 
+/**
+ * Tu watchlist de Letterboxd es el reto más personal de todos; vivía en la
+ * antigua página Letterboxd sin botón de Radarr (la única lista de faltantes
+ * de la app sin él). Ahora vive aquí, y las que el emparejado ya resolvió a
+ * TMDB se pueden pedir a Radarr directamente.
+ */
+function LbWatchlist() {
+  const [summary, setSummary] = useState(null);
+  const [radarrIds, addRadarrId] = useRadarrIds();
+  useEffect(() => {
+    api('/letterboxd/summary').then((s) => !s?.error && setSummary(s));
+  }, []);
+  const missing = summary?.watchlistMissing || [];
+  const owned = summary?.watchlistOwned || [];
+  if (!summary || (!missing.length && !owned.length)) return null;
+
+  return (
+    <div className="card p-4 mb-6">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <h2 className="font-semibold text-zinc-100">
+          Watchlist de Letterboxd <span className="text-zinc-500 text-xs font-normal">· te faltan {missing.length} en Plex</span>
+        </h2>
+      </div>
+      {missing.length === 0 ? (
+        <Empty>Tu watchlist entera está en Plex. 🏆</Empty>
+      ) : (
+        <div className="max-h-96 overflow-y-auto">
+          {missing.map((m, i) => (
+            <div key={i} className="flex items-center justify-between py-1 border-b border-ink-800 text-sm gap-2">
+              <span className="text-zinc-200 min-w-0 truncate">
+                {m.title} <span className="text-zinc-500">({m.year ?? '¿?'})</span>
+              </span>
+              <span className="flex items-center gap-2 shrink-0">
+                {m.tmdb_id && (
+                  <RadarrButton tmdbId={m.tmdb_id} small alreadyInRadarr={radarrIds.has(m.tmdb_id)} onAdded={addRadarrId} />
+                )}
+                {m.uri && (
+                  <a href={m.uri} target="_blank" rel="noreferrer" className="text-gold-400 text-xs hover:underline">
+                    Letterboxd ↗
+                  </a>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {owned.length > 0 && (
+        <details className="mt-3">
+          <summary className="text-sm text-zinc-400 cursor-pointer hover:text-zinc-200">
+            Ver las {owned.length} de tu watchlist que ya tienes
+          </summary>
+          <div className="max-h-64 overflow-y-auto mt-2">
+            {owned.map((m, i) => (
+              <div key={i} className="py-1 border-b border-ink-800 text-sm text-zinc-300">
+                ✓ {m.title} <span className="text-zinc-500">({m.year})</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
 function LetterboxdChallenges() {
   const [lists, setLists] = useState(null);
   const [url, setUrl] = useState('');
@@ -450,7 +514,10 @@ export default function Lists() {
       </div>
 
       {tab === 'letterboxd' ? (
-        <LetterboxdChallenges />
+        <>
+          <LbWatchlist />
+          <LetterboxdChallenges />
+        </>
       ) : (
       <>
       <p className="text-sm text-zinc-500 mb-5 max-w-3xl">

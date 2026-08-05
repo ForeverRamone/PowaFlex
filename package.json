@@ -1,6 +1,6 @@
 {
   "name": "powaflex",
-  "version": "0.9.17-alpha",
+  "version": "0.10.0-beta",
   "private": true,
   "workspaces": [
     "server",

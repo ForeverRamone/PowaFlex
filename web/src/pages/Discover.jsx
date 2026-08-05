@@ -1,18 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid, X } from 'lucide-react';
+import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid, X, Layers } from 'lucide-react';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
-  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, PageHeader, Signature, Select } from '../components.jsx';
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, PageHeader, Signature, Select,
+  MinScoreBar, passesScore } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
+
+// las sagas se cazan aquí desde que /colecciones dejó de ser página propia
+const Sagas = lazy(() => import('./Sagas.jsx'));
 
 const TABS = [
   ['favorites', 'Tus favoritos', Star],
   ['director', 'Directores/as top', Clapperboard],
   ['actor', 'Actores/actrices top', Drama],
   ['absent', 'Grandes ausentes', Landmark],
+  ['sagas', 'Sagas', Layers],
 ];
 
 // send a visible batch to Radarr in one go
@@ -21,7 +26,6 @@ async function sendBulk(ids, addRadarrId) {
   if (summary) toast(summary, error ? 'error' : undefined);
 }
 
-const passesScore = (f, minScore) => !minScore || f.mdb?.score == null || f.mdb.score >= minScore;
 const visibleMissing = (p, show, minScore, dismissed) =>
   (p.missing || []).filter(
     (f) => !dismissed.has(f.tmdb_id) && matchesTypeFilters(f, show) && passesScore(f, minScore)
@@ -113,24 +117,6 @@ function typeCounts(people) {
     coral: all.filter((f) => f.isCoral).length,
     cameos: all.filter((f) => f.isCameo).length,
   };
-}
-
-function MinScoreBar({ minScore, setMinScore }) {
-  return (
-    <div className="flex items-center gap-2 flex-wrap text-sm">
-      <span className="text-xs text-zinc-500">Nota mínima Σ:</span>
-      {[0, 40, 50, 60, 70].map((v) => (
-        <button
-          key={v}
-          onClick={() => setMinScore(v)}
-          className={`btn-ghost !py-1 text-xs ${minScore === v ? '!border-gold-400 text-gold-400' : ''}`}
-        >
-          {v === 0 ? 'Todas' : `Σ ≥ ${v}`}
-        </button>
-      ))}
-      <span className="text-xs text-zinc-600">(las sin nota no se ocultan)</span>
-    </div>
-  );
 }
 
 const PERSON_SORTS = {
@@ -279,13 +265,11 @@ function GapsView({
               </button>
               <span className="text-xs text-zinc-500 ml-2">Ordenar:</span>
               {view === 'person' ? (
-                <select className="input !w-auto !py-1 text-xs" value={personSort} onChange={(e) => setPersonSortPref(e.target.value)}>
-                  {Object.entries(PERSON_SORTS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}
-                </select>
+                <Select className="!py-1 text-xs" value={personSort} onChange={setPersonSortPref}
+                  options={Object.entries(PERSON_SORTS).map(([k, s]) => [k, s.label])} />
               ) : (
-                <select className="input !w-auto !py-1 text-xs" value={filmSort} onChange={(e) => setFilmSortPref(e.target.value)}>
-                  {Object.entries(FILM_SORTS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}
-                </select>
+                <Select className="!py-1 text-xs" value={filmSort} onChange={setFilmSortPref}
+                  options={Object.entries(FILM_SORTS).map(([k, s]) => [k, s.label])} />
               )}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -599,8 +583,14 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
 
 const DEMO_VACIO = { gender: '', life: '', continent: '', country: '' };
 
+const TAB_KEYS = new Set(TABS.map(([t]) => t));
+
 export default function Discover() {
-  const [tab, setTab] = useState('favorites');
+  // la pestaña vive en la URL: se puede enlazar («/descubrir?tab=sagas») y
+  // /colecciones redirige aquí sin romper marcadores viejos
+  const [params, setParams] = useSearchParams();
+  const tab = TAB_KEYS.has(params.get('tab')) ? params.get('tab') : 'favorites';
+  const setTab = (t) => setParams(t === 'favorites' ? {} : { tab: t });
   const [favRole, setFavRole] = useState(() => localStorage.getItem('gaps_fav_role') || 'director');
   const [radarrIds, addRadarrId] = useRadarrIds();
   const [show, toggle, resetTypes] = useTypeFilters();
@@ -672,8 +662,8 @@ export default function Discover() {
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
         Lo que le falta a tu colección. <b>Tus favoritos</b> son los que tú eliges en{' '}
         <Link to="/favoritos" className="text-gold-400 hover:underline">Favoritos</Link>, cada uno en la faceta por la
-        que le sigues; los <b>top</b> son los más presentes en tu biblioteca; y <b>grandes ausentes</b> son nombres del
-        canon que aún no tienes. ¿Buscas a alguien concreto? Usa ⌘K o{' '}
+        que le sigues; los <b>top</b> son los más presentes en tu biblioteca; <b>grandes ausentes</b> son nombres del
+        canon que aún no tienes; y <b>sagas</b> son tus franquicias a medias. ¿Buscas a alguien concreto? Usa ⌘K o{' '}
         <Link to="/personas" className="text-gold-400 hover:underline">Personas</Link>.
       </p>
 
@@ -723,7 +713,11 @@ export default function Discover() {
         </div>
       )}
 
-      {tab === 'absent' ? (
+      {tab === 'sagas' ? (
+        <Suspense fallback={<Spinner />}>
+          <Sagas embedded />
+        </Suspense>
+      ) : tab === 'absent' ? (
         <AbsentView radarrIds={radarrIds} addRadarrId={addRadarrId} dismissed={dismissed} onDismiss={onDismiss} />
       ) : tab === 'favorites' ? (
         <GapsView

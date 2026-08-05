@@ -1,0 +1,48 @@
+import { lazy, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { HardDrive, HeartPulse } from 'lucide-react';
+import { Spinner, PageHeader } from '../components.jsx';
+
+// las dos mitades siguen siendo páginas completas; el Taller solo las agrupa
+const Quality = lazy(() => import('./Quality.jsx'));
+const Salud = lazy(() => import('./Salud.jsx'));
+
+const TABS = [
+  ['calidad', 'Calidad y disco', HardDrive],
+  ['datos', 'Salud de los datos', HeartPulse],
+];
+
+/**
+ * Calidad y Salud compartían dominio (Radarr, duplicados, ficheros) y hasta
+ * bloques duplicados; ahora viven juntas bajo un techo con pestañas. La
+ * pestaña va en la URL para que /calidad y /salud puedan redirigir aquí sin
+ * romper enlaces viejos.
+ */
+export default function Taller() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') === 'datos' ? 'datos' : 'calidad';
+
+  return (
+    <div>
+      <PageHeader
+        eyebrow="Tu colección"
+        title="Taller"
+        subtitle="El mantenimiento de la colección: calidad de los archivos, disco, deuda de Radarr y auditorías de los datos."
+      />
+      <div className="flex gap-2 mb-5 flex-wrap">
+        {TABS.map(([t, label, Icon]) => (
+          <button
+            key={t}
+            onClick={() => setParams({ tab: t })}
+            className={`${tab === t ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}
+          >
+            <Icon size={15} strokeWidth={1.75} /> {label}
+          </button>
+        ))}
+      </div>
+      <Suspense fallback={<Spinner />}>
+        {tab === 'datos' ? <Salud embedded /> : <Quality embedded />}
+      </Suspense>
+    </div>
+  );
+}

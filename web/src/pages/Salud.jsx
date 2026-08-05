@@ -22,7 +22,7 @@ const Lista = ({ children }) => (
   <div className="card divide-y divide-ink-800 max-h-80 overflow-y-auto text-sm">{children}</div>
 );
 
-export default function Salud() {
+export default function Salud({ embedded = false }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [resolviendo, setResolviendo] = useState(false);
@@ -74,11 +74,13 @@ export default function Salud() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Tu colección"
-        title="Salud de los datos"
-        subtitle="Auditorías locales de la base de datos: huérfanos, homónimos y peticiones zombis, cada uno con su remedio al lado."
-      />
+      {!embedded && (
+        <PageHeader
+          eyebrow="Tu colección"
+          title="Salud de los datos"
+          subtitle="Auditorías locales de la base de datos: huérfanos, homónimos y peticiones zombis, cada uno con su remedio al lado."
+        />
+      )}
 
       <Auditoria
         title="Películas sin ficha de TMDB"
@@ -122,7 +124,7 @@ export default function Salud() {
           <button className="btn-gold !py-1 text-xs" disabled={resolviendo} onClick={resolverLb}>
             {resolviendo ? 'Resolviendo…' : '🔎 Intentar resolverlas contra TMDB'}
           </button>
-          <Link to="/letterboxd" className="btn-ghost !py-1 text-xs">Ir a Letterboxd</Link>
+          <Link to="/ajustes" className="btn-ghost !py-1 text-xs">Ir a Ajustes → Letterboxd</Link>
         </div>
         <Lista>
           {data.lbSinEmparejar.sample.map((m, i) => (
@@ -141,7 +143,7 @@ export default function Salud() {
         hint="Monitorizadas desde hace más de medio año sin archivo. En «Calidad y disco» tienen su fase de estreno y la re-búsqueda; las que no existan en digital quizá merezcan salir de Radarr."
       >
         <div className="mb-2">
-          <Link to="/calidad" className="btn-ghost !py-1 text-xs">Verlas en Calidad y disco →</Link>
+          <Link to="/taller?tab=calidad" className="btn-ghost !py-1 text-xs">Verlas en Calidad y disco →</Link>
         </div>
         <Lista>
           {data.radarrZombis.sample.map((m) => (

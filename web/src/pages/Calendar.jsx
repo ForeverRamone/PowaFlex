@@ -5,7 +5,7 @@ import { api, tmdbImg, fmtDate } from '../api.js';
 import { Plus, RotateCw } from 'lucide-react';
 import {
   ErrorBox, RadarrButton, Empty, useRadarrIds, MediaModal, BuildProgress,
-  useTypeFilters, matchesTypeFilters, TypeFilterBar,
+  useTypeFilters, matchesTypeFilters, TypeFilterBar, Select,
 } from '../components.jsx';
 
 function monthLabel(ym) {
@@ -188,13 +188,8 @@ export default function Calendar() {
 
       <div className="card p-3 mb-6 flex flex-wrap items-center gap-2 text-sm">
         <span className="text-zinc-400">Monitorizar en bloque lo visible de los próximos</span>
-        <select className="input !w-auto !py-1" value={horizon} onChange={(e) => setHorizon(e.target.value)}>
-          <option value="3">3 meses</option>
-          <option value="6">6 meses</option>
-          <option value="12">12 meses</option>
-          <option value="24">2 años</option>
-          <option value="all">todo (incl. sin fecha)</option>
-        </select>
+        <Select className="!py-1" value={horizon} onChange={setHorizon}
+          options={[['3', '3 meses'], ['6', '6 meses'], ['12', '12 meses'], ['24', '2 años'], ['all', 'todo (incl. sin fecha)']]} />
         <button className="btn-gold !py-1.5 inline-flex items-center gap-2" onClick={bulkAdd} disabled={bulk.running || eligible.length === 0}>
           {bulk.running ? 'Añadiendo…' : <><Plus size={14} strokeWidth={2.5} /> Añadir {eligible.length} a Radarr</>}
         </button>

@@ -324,7 +324,20 @@ export function globalSearch(term) {
     byPerson.set(r.id, cur);
   }
   const people = [...byPerson.values()].sort((a, b) => b.total - a.total).slice(0, 8);
-  return { movies, people };
+  // sagas y listas seguidas también se encuentran desde ⌘K: antes solo salían
+  // películas y personas y había que recordar en qué página vivía cada cosa
+  const sagas = db
+    .prepare(
+      `SELECT collection_id id, collection_name name, COUNT(*) n FROM movie_saga
+       WHERE collection_name LIKE ? AND collection_id IS NOT NULL
+       GROUP BY collection_id ORDER BY n DESC LIMIT 5`
+    )
+    .all(like);
+  const lists = [
+    ...db.prepare(`SELECT id, name, 'lb' AS kind FROM lb_lists WHERE name LIKE ? LIMIT 4`).all(like),
+    ...db.prepare(`SELECT id, name, 'mdb' AS kind FROM mdb_lists WHERE name LIKE ? LIMIT 4`).all(like),
+  ].slice(0, 5);
+  return { movies, people, sagas, lists };
 }
 
 export function filterOptions() {

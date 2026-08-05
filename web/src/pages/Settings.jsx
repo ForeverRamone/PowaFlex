@@ -1,7 +1,171 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, UI_THEMES, applyTheme, currentTheme } from '../api.js';
-import { Spinner, ProgressBar, PageHeader } from '../components.jsx';
+import { Spinner, ProgressBar, PageHeader, Dropzone, StatCard, LetterboxdLogo } from '../components.jsx';
 import { toast } from '../toast.js';
+
+/**
+ * El importador de Letterboxd vivía en su propia página del menú; como es
+ * configuración de una fuente de datos (igual que Plex o Radarr), ahora vive
+ * aquí. Lo analítico se mudó: notas vs. comunidad a Visionado y la watchlist a
+ * Listas y retos.
+ */
+function LetterboxdSection() {
+  const [summary, setSummary] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [rssUser, setRssUser] = useState('');
+  const [rssBusy, setRssBusy] = useState(false);
+  const [rssResult, setRssResult] = useState(null);
+
+  const load = () => api('/letterboxd/summary').then((s) => { setSummary(s); if (s.rssUser != null) setRssUser(s.rssUser || ''); });
+  useEffect(() => { load(); }, []);
+
+  // try/finally everywhere: a network error used to leave the spinner spinning
+  // and the dropzone blocked until a reload
+  const upload = async (files) => {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      for (const f of files) fd.append('files', f);
+      const res = await fetch('/api/letterboxd/import', { method: 'POST', body: fd });
+      setResult(await res.json());
+    } catch (err) {
+      setResult({ error: `No se pudo subir: ${err.message || err}` });
+    } finally {
+      setUploading(false);
+      load();
+    }
+  };
+
+  const syncRss = async (user = rssUser.trim()) => {
+    setRssBusy(true);
+    setRssResult(null);
+    try {
+      const res = await api('/letterboxd/rss', { method: 'POST', body: { user, save: true } });
+      setRssResult(res);
+    } catch (err) {
+      setRssResult({ error: String(err.message || err) });
+    } finally {
+      setRssBusy(false);
+      load();
+    }
+  };
+
+  // clearing the user is what stops the nightly pull; the endpoint saves the
+  // empty value and then complains there's nothing to sync, which is expected
+  const stopRss = async () => {
+    setRssBusy(true);
+    setRssUser('');
+    try {
+      await api('/letterboxd/rss', { method: 'POST', body: { user: '', save: true } });
+      setRssResult({ stopped: true });
+    } finally {
+      setRssBusy(false);
+      load();
+    }
+  };
+
+  const counts = summary?.counts || {};
+  const hasData = Object.keys(counts).length > 0;
+
+  return (
+    <section className="card p-5 mb-5">
+      <h2 className="font-semibold text-zinc-100 flex items-center gap-2">
+        <LetterboxdLogo size={7} className="shrink-0" /> Letterboxd
+        <span className="text-zinc-500 text-xs font-normal">(opcional: tus vistas, notas y watchlist)</span>
+      </h2>
+      <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-3xl">
+        Exporta tus datos en letterboxd.com → Settings → Data → Export y sube aquí <b>el .zip completo</b> tal cual
+        (sin descomprimir): PowaFlex extrae diario, notas, vistas, watchlist y tus listas. También acepta CSV sueltos
+        y el formato Letterboxd de WebTools-NG. Tus notas vs. la comunidad se ven en <b>Visionado</b>; la watchlist,
+        en <b>Listas y retos</b>.
+      </p>
+      {summary?.error ? (
+        <p className="text-sm text-red-400">{summary.error}</p>
+      ) : !summary ? (
+        <Spinner />
+      ) : (
+        <>
+          <Dropzone
+            accept=".csv,.zip"
+            busy={uploading}
+            onFiles={upload}
+            label="Arrastra aquí el .zip de Letterboxd (o CSV sueltos), o haz clic para elegir"
+            hint="Acepta el export completo sin descomprimir · también CSV en formato WebTools-NG"
+          />
+          {hasData && (
+            <div className="mt-3">
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={async () => { await api('/letterboxd', { method: 'DELETE' }); setResult(null); load(); }}
+              >
+                Vaciar datos importados
+              </button>
+            </div>
+          )}
+          {result?.results && (
+            <div className="text-xs text-zinc-400 space-y-0.5 mt-3">
+              {result.results.map((r, i) => (
+                <div key={i}>
+                  {r.file}: {r.error ? `⚠️ ${r.error}` : `${r.imported} importadas (${r.matched} emparejadas con tu biblioteca) como «${r.list}»`}
+                </div>
+              ))}
+              {result.lists?.length > 0 && (
+                <div className="text-gold-400">
+                  + {result.lists.length} listas importadas como retos (míralas en «Listas y retos»).
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4">
+            <h3 className="font-semibold text-zinc-100 text-sm mb-1">Feed RSS de tu perfil</h3>
+            <p className="text-xs text-zinc-500 mb-3 max-w-3xl">
+              Guarda tu usuario de Letterboxd y PowaFlex irá recogiendo tus últimas películas vistas automáticamente
+              (cada noche, y cuando pulses aquí). Aparecerán en el Dashboard y se emparejan con tu biblioteca.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-zinc-500 text-sm">letterboxd.com/</span>
+              <input
+                className="input !w-48"
+                placeholder="tu-usuario"
+                value={rssUser}
+                onChange={(e) => setRssUser(e.target.value)}
+              />
+              <button className="btn-gold" disabled={rssBusy || !rssUser.trim()} onClick={() => syncRss()}>
+                {rssBusy ? 'Sincronizando…' : 'Guardar y sincronizar'}
+              </button>
+              {summary.rssUser && (
+                <button className="btn-ghost" disabled={rssBusy} onClick={stopRss} title="Deja de recoger tus vistas cada noche">
+                  Dejar de sincronizar
+                </button>
+              )}
+              {rssResult && (
+                <span className={`text-xs ${rssResult.error ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {rssResult.stopped
+                    ? '✓ Sincronización detenida'
+                    : rssResult.error
+                      ? `⚠️ ${rssResult.error}`
+                      : `✓ ${rssResult.imported} nuevas (${rssResult.matched} en tu biblioteca) de ${rssResult.seen} del feed`}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {hasData && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              {Object.entries(counts).map(([list, c]) => (
+                <StatCard key={list} label={`${list}`} value={c.total} sub={`${c.matched} emparejadas con Plex`} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
 
 function Guide({ title, children }) {
   const [open, setOpen] = useState(false);
@@ -548,6 +712,8 @@ export default function Settings() {
           <p>3. La cuenta gratuita da 1.000 peticiones/día; las Supporter, bastantes más. PowaFlex respeta el límite y reparte el trabajo.</p>
         </Guide>
       </section>
+
+      <LetterboxdSection />
 
       {/* LOOK */}
       <section className="card p-5 mb-5">

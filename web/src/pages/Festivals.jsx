@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { api, tmdbImg } from '../api.js';
+import { api } from '../api.js';
 import {
-  Spinner, ErrorBox, TmdbCard, RadarrButton, Empty, StatusLegend, PageHeader, useRadarrIds, useFocusTrap,
+  Spinner, ErrorBox, TmdbCard, RadarrButton, Empty, StatusLegend, PageHeader, useRadarrIds,
+  MatchCorrector, MinScoreBar, passesScore,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
@@ -57,11 +58,14 @@ export default function Festivals() {
   const [dirBusy, setDirBusy] = useState(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [followAllBusy, setFollowAllBusy] = useState(false);
-  // corrector manual de emparejado: película en edición + buscador
+  // corrector manual de emparejado: película en edición (el diálogo es el
+  // MatchCorrector compartido, que aquí busca con el endpoint de festivales)
   const [editar, setEditar] = useState(null);
-  const [busca, setBusca] = useState('');
-  const [candidatos, setCandidatos] = useState(null);
-  const [buscando, setBuscando] = useState(false);
+  // filtros de contenido, como en Descubrir: nota mínima Σ y posesión
+  const [minScore, setMinScoreState] = useState(() => Number(localStorage.getItem('festival_min_score') || 0));
+  const setMinScore = (v) => { setMinScoreState(v); localStorage.setItem('festival_min_score', String(v)); };
+  const [own, setOwnState] = useState(() => localStorage.getItem('festival_own') || '');
+  const setOwn = (v) => { setOwnState(v); localStorage.setItem('festival_own', v); };
 
   useEffect(() => {
     api('/festivals').then((r) => !r.error && setIndex(r));
@@ -118,7 +122,13 @@ export default function Festivals() {
     else if (year > añoMax) setYear(añoMax);
   }, [fest, info, soloPalmares, year, añoMin, añoMax]);
   const films = data?.films || [];
-  const missingIds = films.filter((f) => f.tmdb_id && !f.owned && !radarrIds.has(f.tmdb_id)).map((f) => f.tmdb_id);
+  // lo que se enseña es lo que cuentan los botones masivos: mismo criterio que
+  // en Descubrir («las N visibles»). Las sin ficha TMDB no se filtran por nota.
+  const shown = films.filter(
+    (f) => (!f.tmdb_id || passesScore(f, minScore)) && (own === '' || (own === 'missing' ? !f.owned : !!f.owned))
+  );
+  const hidden = films.length - shown.length;
+  const missingIds = shown.filter((f) => f.tmdb_id && !f.owned && !radarrIds.has(f.tmdb_id)).map((f) => f.tmdb_id);
 
   const bulkAdd = async () => {
     setBulkBusy(true);
@@ -140,7 +150,7 @@ export default function Festivals() {
   // para las ediciones venideras: en cuanto se anuncie la sección oficial,
   // seguir de un golpe a toda su dirección (ya por personas) y que entren en
   // el calendario
-  const pendingDirs = [...new Set(films.flatMap((f) => splitDirectors(f.director)).filter((d) => !followedDirs.has(d)))];
+  const pendingDirs = [...new Set(shown.flatMap((f) => splitDirectors(f.director)).filter((d) => !followedDirs.has(d)))];
   const followAll = async () => {
     setFollowAllBusy(true);
     const r = await api('/tracked/by-names', { method: 'POST', body: { names: pendingDirs.join('\n'), role: 'director' } });
@@ -150,19 +160,6 @@ export default function Festivals() {
     toast(`⭐ ${r.added} directores/as añadidos a favoritos${r.notFound?.length ? ` · ${r.notFound.length} sin resolver` : ''}`, 'success');
   };
 
-  const abrirCorrector = (f) => {
-    setEditar(f);
-    setBusca(f.title || '');
-    setCandidatos(null);
-  };
-  const buscarCandidatos = async () => {
-    if (!busca.trim()) return;
-    setBuscando(true);
-    const keyYear = view === 'palmares' ? editar.year : data?.year;
-    const r = await api(`/festivals/match-candidates?q=${encodeURIComponent(busca.trim())}&year=${keyYear || ''}`);
-    setBuscando(false);
-    setCandidatos(r.error ? [] : r.candidates || []);
-  };
   const fijarMatch = async (tmdbId) => {
     const keyYear = view === 'palmares' ? editar.year : data?.year;
     const r = await api('/festivals/match', {
@@ -295,13 +292,34 @@ export default function Festivals() {
           {data.note && (
             <p className="text-xs text-sky-300 mb-3 max-w-3xl">ℹ️ {data.note}</p>
           )}
+
+          <div className="flex items-center gap-3 flex-wrap mb-2">
+            <div className="flex items-center gap-2 flex-wrap text-sm">
+              {[['', 'Todas'], ['missing', 'Me faltan'], ['owned', 'Las tengo']].map(([v, label]) => (
+                <button
+                  key={v}
+                  onClick={() => setOwn(v)}
+                  className={`btn-ghost !py-1 text-xs ${own === v ? '!border-gold-400 text-gold-400' : ''}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <MinScoreBar minScore={minScore} setMinScore={setMinScore} />
+            {(own || minScore > 0) && (
+              <button className="btn-ghost !py-1 text-xs" onClick={() => { setOwn(''); setMinScore(0); }}>
+                ✕ Limpiar filtros
+              </button>
+            )}
+            {hidden > 0 && <span className="text-xs text-zinc-500">{hidden} ocultas por tus filtros</span>}
+          </div>
           <StatusLegend className="mb-4" />
 
-          {films.length === 0 ? (
-            <Empty>Sin películas en esta edición.</Empty>
+          {shown.length === 0 ? (
+            <Empty>{films.length === 0 ? 'Sin películas en esta edición.' : 'Nada que enseñar con estos filtros.'}</Empty>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {films.map((f, i) => (
+              {shown.map((f, i) => (
                 <div key={f.tmdb_id || `${f.title}-${i}`}>
                   {f.tmdb_id ? (
                     <TmdbCard
@@ -329,7 +347,7 @@ export default function Festivals() {
                   )}
                   <div className="flex items-baseline gap-1.5">
                     <button
-                      onClick={() => abrirCorrector(f)}
+                      onClick={() => setEditar(f)}
                       title="Corregir el emparejado con TMDB a mano"
                       className="text-[11px] text-zinc-600 hover:text-gold-400 shrink-0 cursor-pointer"
                     >
@@ -365,79 +383,21 @@ export default function Festivals() {
         </>
       )}
 
-      {editar && <Corrector
-        editar={editar}
-        onClose={() => setEditar(null)}
-        busca={busca} setBusca={setBusca}
-        buscando={buscando} candidatos={candidatos}
-        buscarCandidatos={buscarCandidatos} fijarMatch={fijarMatch}
-      />}
-    </div>
-  );
-}
-
-/** El corrector manual de emparejado. Aparte para que pueda usar el mismo
- *  atrapa-foco que los demás diálogos de la app: sin él, con Tab te ibas
- *  paseando por la página de detrás con el modal abierto. */
-function Corrector({ editar, onClose, busca, setBusca, buscando, candidatos, buscarCandidatos, fijarMatch }) {
-  const dialogo = useFocusTrap(onClose);
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
-      <div ref={dialogo} role="dialog" aria-modal="true" aria-label={`Corregir emparejado de ${editar.title}`}
-        className="card-raised p-4 w-full max-w-lg mt-16" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <h3 className="font-semibold text-zinc-100 text-sm">
-                Corregir emparejado · «{editar.title}»{editar.director ? ` — ${editar.director}` : ''}
-              </h3>
-              <button className="text-zinc-500 hover:text-zinc-200" onClick={onClose} aria-label="Cerrar">✕</button>
-            </div>
-            <p className="text-[11px] text-zinc-500 mb-3">
-              Busca en TMDB y elige la ficha correcta. La corrección se recuerda y manda sobre el
-              emparejado automático.
-            </p>
-            <form
-              className="flex gap-2 mb-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                buscarCandidatos();
-              }}
-            >
-              <input className="input flex-1" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Título a buscar en TMDB…" />
-              <button type="submit" className="btn-gold" disabled={buscando}>
-                {buscando ? '…' : 'Buscar'}
-              </button>
-            </form>
-            {candidatos && candidatos.length === 0 && <Empty>Nada en TMDB con ese título.</Empty>}
-            {candidatos?.length > 0 && (
-              <div className="divide-y divide-ink-800 max-h-80 overflow-y-auto">
-                {candidatos.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => fijarMatch(c.id)}
-                    className="w-full flex items-center gap-3 py-2 text-left hover:bg-ink-800 px-2 cursor-pointer"
-                  >
-                    {c.poster_path ? (
-                      <img src={tmdbImg(c.poster_path, 'w92')} alt="" className="w-10 rounded border border-ink-700 shrink-0" />
-                    ) : (
-                      <span className="w-10 h-14 shrink-0 border border-ink-700 rounded flex items-center justify-center text-[9px] text-zinc-500">sin cartel</span>
-                    )}
-                    <span className="min-w-0">
-                      <span className="block text-sm text-zinc-200 truncate">{c.title}</span>
-                      <span className="block text-[11px] text-zinc-500 truncate">
-                        {c.date ? c.date.slice(0, 4) : 'sin fecha'}
-                        {c.original_title && c.original_title !== c.title ? ` · ${c.original_title}` : ''}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {editar.tmdb_id && (
-              <button className="btn-ghost !py-1 text-xs mt-3" onClick={() => fijarMatch(null)}>
-                Quitar corrección / volver al automático
-              </button>
-            )}
-      </div>
+      {editar && (
+        /* el diálogo compartido de toda la app; los candidatos se buscan con el
+           endpoint de festivales, acotado al año de la edición que miras */
+        <MatchCorrector
+          kind="movie"
+          title={`${editar.title}${editar.director ? ` — ${editar.director}` : ''}`}
+          initialQuery={editar.title || ''}
+          searchPath={(term) =>
+            `/festivals/match-candidates?q=${encodeURIComponent(term)}&year=${(view === 'palmares' ? editar.year : data?.year) || ''}`}
+          subtitle="Busca en TMDB y elige la ficha correcta. La corrección se recuerda y manda sobre el emparejado automático."
+          onPick={fijarMatch}
+          onClear={editar.tmdb_id ? () => fijarMatch(null) : null}
+          onClose={() => setEditar(null)}
+        />
+      )}
     </div>
   );
 }

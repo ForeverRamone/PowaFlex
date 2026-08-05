@@ -1,5 +1,40 @@
 # Changelog
 
+## Beta 0.10 (0.10.0-beta) — 2026-08-06
+
+**La gran reorganización.** Mismas funciones, la mitad de menú: la app pasa de 16 secciones a 12
+(5 + 5 + 2), agrupando lo que compartía dominio y llevando los filtros a donde faltaban. Los
+marcadores viejos siguen funcionando: `/calidad`, `/salud`, `/colecciones`, `/directores` y
+`/letterboxd` redirigen a su nuevo hogar.
+
+- **Taller** (nuevo): Calidad y disco + Salud de los datos, juntas bajo un techo con pestañas.
+  Compartían dominio (Radarr, duplicados, ficheros) y hasta bloques duplicados.
+- **Directores y actores** absorbe el catálogo de **Directores en activo** como segunda pestaña, y
+  gana la ★ de seguir en cada tarjeta y el alta en bloque de «los N primeros» con
+  previsualización (que vivían en el ranking de Favoritos, ahora retirado por duplicado — allí
+  queda un puente).
+- **Descubrir huecos** absorbe **Sagas** como quinta pestaña, y sus pestañas van ahora en la URL
+  (se puede enlazar `/descubrir?tab=sagas`).
+- **La página Letterboxd se disuelve**: el importador (zip + RSS) es configuración y se muda a
+  Ajustes; «tus notas vs. la comunidad» se muda a Visionado; y la watchlist se muda a Listas y
+  retos — donde por fin gana botón de Radarr en lo que te falta (era la única lista de faltantes
+  sin él).
+- **⌘K busca de todo**: además de películas y personas, ahora sagas, listas seguidas, festivales y
+  premios, y saltar a cualquier sección — con navegación por teclado (↑/↓/Enter) y búsqueda
+  insensible a acentos.
+- **Biblioteca**: filtro por **colección de Plex** (el servidor lo sabía desde siempre y ninguna
+  página lo enseñaba), **rango de años** (desde/hasta), y el chip del filtro de persona ya dice
+  «Persona: Agnès Varda (dirige)» en vez de un id numérico crudo (y al quitarlo limpia también el
+  rol).
+- **Festivales**: filtros de contenido nuevos —Todas / Me faltan / Las tengo y el listón de nota
+  mínima Σ— y los botones masivos («mandar a Radarr», «seguir a sus directores») cuentan solo lo
+  visible, como en Descubrir. El corrector de emparejado ✎ ahora es el diálogo compartido de toda
+  la app (busca solo al abrirse, con el año de la edición).
+- **Homogeneización**: el listón «Nota mínima Σ» y el desplegable de filtros son ahora componentes
+  únicos compartidos (vivían copiados en Descubrir, la ficha de persona y varios selects crudos);
+  código muerto retirado del Dashboard.
+- About reescrito a la nueva taxonomía, con la ruta de primeros pasos actualizada.
+
 ## Alpha 0.9.17 (0.9.17-alpha) — 2026-08-05
 
 - **Filtros demográficos en «Directores/as top» y «Actores/actrices top»** (Descubrir huecos):

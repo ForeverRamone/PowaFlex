@@ -107,7 +107,7 @@ function Ficha({ d, foto, onFollow, busy }) {
   );
 }
 
-export default function Directors() {
+export default function Directors({ embedded = false }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -246,11 +246,19 @@ export default function Directors() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="La caza"
-        title="Directores en activo"
-        subtitle="680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Filtra por región, país o género, ordena por lo que te interese y ve marcando con la estrella a quién quieres seguir."
-      />
+      {!embedded && (
+        <PageHeader
+          eyebrow="La caza"
+          title="Directores en activo"
+          subtitle="680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Filtra por región, país o género, ordena por lo que te interese y ve marcando con la estrella a quién quieres seguir."
+        />
+      )}
+      {embedded && (
+        <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
+          680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han
+          ganado. Este catálogo no sale de tu biblioteca — sirve para descubrir a quién seguir con la estrella.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2 items-center mb-3">
         <input
