@@ -1,13 +1,9 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Star, Users, Clapperboard } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { Spinner, PersonCard, Empty, PageHeader, Select, DeathBadge } from '../components.jsx';
 import { toast } from '../toast.js';
-
-// el catálogo de Wikidata es la otra pestaña de esta página; perezoso para no
-// cargar sus 680 filas si solo vienes a ver tu biblioteca
-const Directors = lazy(() => import('./Directors.jsx'));
 
 const ROLES = [
   ['director', 'Directores/as'],
@@ -19,9 +15,6 @@ const roleLabel = (r) => (r === 'director' ? 'directores/as' : 'actores/actrices
 
 export default function People() {
   const [params, setParams] = useSearchParams();
-  // dos pestañas: tu biblioteca (por defecto) y el catálogo de Wikidata, que
-  // antes era la página /directores
-  const tab = params.get('tab') === 'catalogo' ? 'catalogo' : 'biblioteca';
   const role = params.get('role') || 'director';
   const [search, setSearch] = useState(params.get('search') || '');
   const [people, setPeople] = useState(null);
@@ -115,36 +108,9 @@ export default function People() {
 
   const setFilter = (k) => (v) => setF((prev) => ({ ...prev, [k]: v }));
 
-  if (tab === 'catalogo') {
-    return (
-      <div>
-        <PageHeader eyebrow="Tu gente" title="Directores/as y actores/actrices" />
-        <div className="flex flex-wrap gap-2 mb-4 items-center">
-          <button onClick={() => setParams({})} className="btn-ghost inline-flex items-center gap-2">
-            <Users size={15} strokeWidth={1.75} /> Tu biblioteca
-          </button>
-          <button className="btn-gold inline-flex items-center gap-2">
-            <Clapperboard size={15} strokeWidth={1.75} /> Directores en activo
-          </button>
-        </div>
-        <Suspense fallback={<Spinner />}>
-          <Directors embedded />
-        </Suspense>
-      </div>
-    );
-  }
-
   return (
     <div>
       <PageHeader eyebrow="Tu gente" title="Directores/as y actores/actrices" />
-      <div className="flex flex-wrap gap-2 mb-4 items-center">
-        <button className="btn-gold inline-flex items-center gap-2">
-          <Users size={15} strokeWidth={1.75} /> Tu biblioteca
-        </button>
-        <button onClick={() => setParams({ tab: 'catalogo' })} className="btn-ghost inline-flex items-center gap-2">
-          <Clapperboard size={15} strokeWidth={1.75} /> Directores en activo
-        </button>
-      </div>
       <div className="flex flex-wrap gap-2 mb-3 items-center">
         {ROLES.map(([r, label]) => (
           <button

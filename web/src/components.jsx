@@ -90,7 +90,7 @@ const PALETTE_SECTIONS = [
   ['Dashboard', '/'],
   ['Biblioteca', '/biblioteca'],
   ['Directores y actores', '/personas'],
-  ['Directores en activo (catálogo)', '/personas?tab=catalogo'],
+  ['Directores en activo (catálogo)', '/favoritos?add=activos'],
   ['Visionado', '/visionado'],
   ['Taller', '/taller'],
   ['Calidad y disco', '/taller?tab=calidad'],

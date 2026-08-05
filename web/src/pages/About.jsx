@@ -188,13 +188,12 @@ export default function About() {
         </Block>
         <Block icon="🎭" title="Directores/as y actores/actrices" to="/personas">
           <p>
-            Dos pestañas. <b>Tu biblioteca</b>: el ranking de directores/as, actores/actrices y guionistas por
-            presencia en tu Plex, con filtros demográficos (género, vivos/fallecidos, continente, país), la ★
-            para seguir a cualquiera y el alta en bloque de «los N primeros» con previsualización.{' '}
-            <b>Directores en activo</b>: el catálogo de 680 nombres de Wikidata con su importancia, obra y
-            premios, para descubrir a quién seguir. La ficha de cada persona cruza su filmografía completa de
-            TMDB con lo que tienes: completismo, lo que te falta (con botón a Radarr), proyectos anunciados y
-            notas, con orden y listón de nota mínima. Quien dirige y actúa tiene una pestaña por faceta.
+            El ranking de directores/as, actores/actrices y guionistas por presencia en tu Plex, con filtros
+            demográficos (género, vivos/fallecidos, continente, país), la ★ para seguir a cualquiera y el alta
+            en bloque de «los N primeros» con previsualización. La ficha de cada persona cruza su filmografía
+            completa de TMDB con lo que tienes: completismo, lo que te falta (con botón a Radarr), proyectos
+            anunciados y notas, con orden y listón de nota mínima. Quien dirige y actúa tiene una pestaña por
+            faceta.
           </p>
         </Block>
         <Block icon="🗓️" title="Cine venidero" to="/calendario">
@@ -207,11 +206,13 @@ export default function About() {
         <Block icon="⭐" title="Favoritos" to="/favoritos">
           <p>
             Tu lista de directores/as y actores/actrices de cabecera, la que alimenta el calendario. Cada persona
-            puede seguirse por una faceta o por las dos (un Eastwood cuenta en directores Y en actores). Incluye
-            paquetes temáticos y de festival con «añadir todos», volcar cánones enteros, pegar una lista de
-            nombres, exportar la tuya, y el modo podar para limpiar en bloque. Lo que quites con la ✕ no vuelve
-            por los añadidos masivos (solo a mano). Para seguir gente desde el ranking de tu biblioteca, la ★
-            vive en Directores y actores.
+            puede seguirse por una faceta o por las dos (un Eastwood cuenta en directores Y en actores). En
+            «Añadir» está el <b>catálogo de 680 directores en activo</b> de Wikidata —importancia, obra y
+            premios, con filtros por región, país y género— para captar favoritos con la ☆, además de los
+            paquetes temáticos y de festival con «añadir todos», volcar cánones enteros y pegar una lista de
+            nombres; también exportar la tuya y el modo podar para limpiar en bloque. Lo que quites con la ✕ no
+            vuelve por los añadidos masivos (solo a mano). Para seguir gente desde el ranking de tu biblioteca,
+            la ★ vive en Directores y actores.
           </p>
         </Block>
         <Block icon="🎪" title="Festivales" to="/festivales">

@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, lazy, Suspense } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Search, Scissors, X } from 'lucide-react';
 import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature, ErrorBox, Select } from '../components.jsx';
 import { toast } from '../toast.js';
+
+// el catálogo de 680 directores de Wikidata vive aquí, en «Añadir»: es una
+// herramienta de captación de favoritos, no un listado de tu biblioteca.
+// Perezoso para no cargar sus filas si no se despliega.
+const Directors = lazy(() => import('./Directors.jsx'));
 
 // The whole page is scoped to ONE role at a time: a director you follow is
 // never counted, sorted or shown together with their acting work.
@@ -245,6 +250,18 @@ export default function Favorites() {
   const [role, setRoleState] = useState(() => localStorage.getItem('fav_role') || 'director'); // scopes the entire page
   const setRole = (r) => { setRoleState(r); localStorage.setItem('fav_role', r); };
   const [tab, setTab] = useState('mine'); // mine | discover
+  // el catálogo de directores en activo, plegado por defecto para no alargar
+  // la pestaña; /directores (ruta vieja) llega aquí con ?add=activos y lo abre
+  const [params] = useSearchParams();
+  const [catalogoAbierto, setCatalogoAbierto] = useState(() => params.get('add') === 'activos');
+  useEffect(() => {
+    if (params.get('add') === 'activos') {
+      setRoleState('director');
+      localStorage.setItem('fav_role', 'director');
+      setTab('discover');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [health, setHealth] = useState({ gaps: false, calendar: false });
   const [suggest, setSuggest] = useState(null);
   const [pq, setPq] = useState('');
@@ -639,23 +656,34 @@ export default function Favorites() {
               —«españoles», «premiados en festivales», «emergentes»,
               «taquilleros»— de veinte nombres fijos cada uno. Las cuatro ideas
               siguen ahí, pero ahora salen de un catálogo de 680 con datos de
-              verdad: un filtro y un orden en vez de una lista congelada. */}
+              verdad: un filtro y un orden en vez de una lista congelada. El
+              catálogo entero vive AQUÍ (plegado): añadir directores en activo
+              a favoritos es exactamente para lo que sirve. */}
           {role === 'director' && (
-            <Link
-              to="/personas?tab=catalogo"
-              className="card p-4 mb-6 flex items-center gap-4 hover:border-gold-400 transition-colors"
-            >
-              <div className="text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-gold-400/15">🎬</div>
-              <div className="min-w-0 flex-1">
-                <h2 className="font-semibold text-zinc-100">Directores en activo · el catálogo</h2>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y ordena
-                  por importancia, premios, número de largometrajes o taquilla: españoles, premiados, emergentes o
-                  taquilleros salen de aquí con dos clics.
-                </p>
-              </div>
-              <span className="text-gold-400 shrink-0 text-sm">Explorar →</span>
-            </Link>
+            <div className="card p-4 mb-6">
+              <button
+                onClick={() => setCatalogoAbierto((v) => !v)}
+                className="w-full flex items-center gap-4 text-left cursor-pointer"
+              >
+                <div className="text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-gold-400/15">🎬</div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="font-semibold text-zinc-100">Añadir directores en activo · el catálogo</h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y
+                    ordena por importancia, premios, número de largometrajes o taquilla: españoles, premiados,
+                    emergentes o taquilleros salen de aquí con dos clics, con la ☆ para seguirlos.
+                  </p>
+                </div>
+                <span className="text-gold-400 shrink-0 text-sm">{catalogoAbierto ? 'Plegar ▴' : 'Explorar ▾'}</span>
+              </button>
+              {catalogoAbierto && (
+                <div className="mt-4 border-t border-ink-700 pt-4">
+                  <Suspense fallback={<Spinner />}>
+                    <Directors embedded />
+                  </Suspense>
+                </div>
+              )}
+            </div>
           )}
 
           <CanonPacks role={role} onDone={loadTracked} />

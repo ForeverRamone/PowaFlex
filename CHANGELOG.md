@@ -9,10 +9,12 @@ marcadores viejos siguen funcionando: `/calidad`, `/salud`, `/colecciones`, `/di
 
 - **Taller** (nuevo): Calidad y disco + Salud de los datos, juntas bajo un techo con pestañas.
   Compartían dominio (Radarr, duplicados, ficheros) y hasta bloques duplicados.
-- **Directores y actores** absorbe el catálogo de **Directores en activo** como segunda pestaña, y
-  gana la ★ de seguir en cada tarjeta y el alta en bloque de «los N primeros» con
-  previsualización (que vivían en el ranking de Favoritos, ahora retirado por duplicado — allí
-  queda un puente).
+- **Directores y actores** gana la ★ de seguir en cada tarjeta y el alta en bloque de «los N
+  primeros» con previsualización (que vivían en el ranking de Favoritos, ahora retirado por
+  duplicado — allí queda un puente).
+- El catálogo de **Directores en activo** se muda a **Favoritos → Añadir**, desplegable bajo
+  «Añadir directores en activo»: es una herramienta de captación de favoritos, no un listado de
+  tu biblioteca.
 - **Descubrir huecos** absorbe **Sagas** como quinta pestaña, y sus pestañas van ahora en la URL
   (se puede enlazar `/descubrir?tab=sagas`).
 - **La página Letterboxd se disuelve**: el importador (zip + RSS) es configuración y se muda a

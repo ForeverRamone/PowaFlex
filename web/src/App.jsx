@@ -221,7 +221,7 @@ function Shell() {
           <Route path="/colecciones" element={<Navigate to="/descubrir?tab=sagas" replace />} />
           <Route path="/calidad" element={<Navigate to="/taller?tab=calidad" replace />} />
           <Route path="/salud" element={<Navigate to="/taller?tab=datos" replace />} />
-          <Route path="/directores" element={<Navigate to="/personas?tab=catalogo" replace />} />
+          <Route path="/directores" element={<Navigate to="/favoritos?add=activos" replace />} />
           <Route path="/letterboxd" element={<Navigate to="/ajustes" replace />} />
         </Routes>
         </ErrorBoundary>
