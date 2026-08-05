@@ -74,6 +74,7 @@ import {
 } from './letterboxd.js';
 import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
 import { festivalsIndex, festivalEdition, festivalWinners, festivalOverrideKey, festivalDirectorPacks } from './festivals.js';
+import { DIRECTORS_2026 } from './data/directors-2026.js';
 import { dataHealth } from './datahealth.js';
 import { runFullRefresh, refreshStatus, refreshHistory, nightlyHealth } from './refresh.js';
 import { availability, isUpgradeable } from './justwatch.js';
@@ -172,9 +173,18 @@ app.addHook('onRequest', async (req, reply) => {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return;
   const origen = req.headers.origin;
   if (!origen) return;
+  // Detrás de un proxy inverso (nginx, Traefik, el de Synology) el Host que
+  // llega aquí es el del contenedor, no el que escribió el usuario en la barra
+  // del navegador: sin mirar X-Forwarded-Host, ese montaje se quedaría sin
+  // poder sincronizar ni guardar nada.
+  const anfitriones = new Set(
+    [req.headers['x-forwarded-host'], req.headers.host]
+      .filter(Boolean)
+      .flatMap((h) => String(h).split(',').map((x) => x.trim().toLowerCase()))
+  );
   let ajeno = true;
   try {
-    ajeno = new URL(origen).host !== req.headers.host;
+    ajeno = !anfitriones.has(new URL(origen).host.toLowerCase());
   } catch {
     ajeno = true;
   }
@@ -509,6 +519,95 @@ app.get('/api/movies/:id', async (req, reply) => {
   return m;
 });
 
+/**
+ * Corrector manual de emparejado.
+ *
+ * Por muy afinadas que estén las reglas, siempre queda el caso que no van a
+ * acertar: dos personas con el mismo nombre, alguien con la obra repartida en
+ * dos fichas de TMDB, o una película que Plex identificó con el guid de otra.
+ * Aquí tú tienes la última palabra, y lo que digas se marca con `tmdb_locked`
+ * para que ningún automatismo lo revise: ni la re-verificación semanal de
+ * personas ni la sincronización nocturna de Plex.
+ */
+function invalidarDeLaPersona(tmdbId) {
+  // su filmografía cacheada era la de la ficha ANTERIOR
+  if (tmdbId) {
+    db.prepare('DELETE FROM tmdb_cache WHERE key LIKE ? OR key LIKE ?')
+      .run(`person_credits:${tmdbId}:%`, `person:${tmdbId}:%`);
+  }
+  // y las páginas que se construyen a partir de ella
+  db.prepare(
+    `DELETE FROM tmdb_cache WHERE key LIKE 'calendar:%' OR key LIKE 'discover_favorites:%'
+       OR key LIKE 'discover_gaps:%' OR key LIKE 'discover_absent:%'`
+  ).run();
+}
+
+app.post('/api/people/:id/match', async (req, reply) => {
+  const personId = Number(req.params.id);
+  const persona = db.prepare('SELECT id, name, tmdb_id FROM people WHERE id = ?').get(personId);
+  if (!persona) {
+    reply.code(404);
+    return { error: 'Esa persona no está en tu biblioteca' };
+  }
+  const tmdbId = req.body?.tmdbId == null ? null : Number(req.body.tmdbId);
+  if (tmdbId !== null && !Number.isSafeInteger(tmdbId)) {
+    reply.code(400);
+    return { error: 'El id de TMDB no es válido' };
+  }
+
+  invalidarDeLaPersona(persona.tmdb_id);
+  if (tmdbId) {
+    db.prepare('UPDATE people SET tmdb_id = ?, tmdb_verified = 1, tmdb_locked = 1, tmdb_checked_at = ? WHERE id = ?')
+      .run(tmdbId, Date.now(), personId);
+    invalidarDeLaPersona(tmdbId);
+  } else {
+    // quitar la corrección: se olvida lo fijado y vuelve el automatismo, que
+    // reintentará en la próxima construcción (tmdb_checked_at a null)
+    db.prepare('UPDATE people SET tmdb_locked = 0, tmdb_verified = 0, tmdb_checked_at = NULL WHERE id = ?')
+      .run(personId);
+  }
+  return { ok: true, name: persona.name, tmdbId };
+});
+
+app.get('/api/movies/match-candidates', async (req, reply) => {
+  try {
+    const term = String(req.query.q || '').trim();
+    if (!term) return { candidates: [] };
+    const year = Number(req.query.year) || null;
+    return { candidates: (await searchMovieCandidates(term, year)).slice(0, 8) };
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.post('/api/movies/:id/match', async (req, reply) => {
+  const ratingKey = Number(req.params.id);
+  const peli = db.prepare('SELECT rating_key, title FROM movies WHERE rating_key = ?').get(ratingKey);
+  if (!peli) {
+    reply.code(404);
+    return { error: 'Esa película no está en tu biblioteca' };
+  }
+  const tmdbId = req.body?.tmdbId == null ? null : Number(req.body.tmdbId);
+  if (tmdbId !== null && !Number.isSafeInteger(tmdbId)) {
+    reply.code(400);
+    return { error: 'El id de TMDB no es válido' };
+  }
+
+  if (tmdbId) {
+    db.prepare('UPDATE movies SET tmdb_id = ?, tmdb_locked = 1 WHERE rating_key = ?').run(tmdbId, ratingKey);
+  } else {
+    // sin bloqueo, la próxima sincronización vuelve a poner el guid de Plex
+    db.prepare('UPDATE movies SET tmdb_locked = 0 WHERE rating_key = ?').run(ratingKey);
+  }
+  // el completismo, los huecos y las notas se calculan a partir del id
+  db.prepare(
+    `DELETE FROM tmdb_cache WHERE key LIKE 'discover_gaps:%' OR key LIKE 'discover_favorites:%'
+       OR key LIKE 'discover_absent:%'`
+  ).run();
+  return { ok: true, title: peli.title, tmdbId };
+});
+
 app.get('/api/filters', async () => q.filterOptions());
 
 app.get('/api/search', async (req) => {
@@ -554,6 +653,71 @@ app.get('/api/people/festival-packs', async (req, reply) => {
     reply.code(502);
     return { error: String(err.message || err) };
   }
+});
+
+/**
+ * El catálogo de directores en activo (Wikidata, agosto de 2026).
+ *
+ * Se sirve entero y en crudo —son 680 filas, nada para un JSON— y filtrar y
+ * ordenar lo hace el navegador: así los controles responden al instante en vez
+ * de pedir una página por cada clic. Lo único que se calcula aquí es a quién
+ * sigues ya, comparando por nombre normalizado (que es como se resuelven
+ * contra TMDB cuando los añades).
+ */
+app.get('/api/directors/catalog', async () => {
+  const norm = (s) =>
+    String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+  const seguidos = new Set(
+    db
+      .prepare(
+        `SELECT p.name FROM tracked_people t JOIN people p ON p.id = t.person_id WHERE t.role = 'director'`
+      )
+      .all()
+      .map((r) => norm(r.name))
+  );
+  // los que quitaste con la ✕ no deberían reaparecer como sugerencia
+  const vetados = new Set(
+    db
+      .prepare(`SELECT p.name FROM unfollowed_people u JOIN people p ON p.id = u.person_id`)
+      .all()
+      .map((r) => norm(r.name))
+  );
+  return {
+    generatedAt: '2026-08-05',
+    source: 'Wikidata (query.wikidata.org)',
+    directors: DIRECTORS_2026.map((d) => ({
+      ...d,
+      tracked: seguidos.has(norm(d.name)),
+      unfollowed: vetados.has(norm(d.name)),
+    })),
+  };
+});
+
+/**
+ * Las fotos de TMDB del catálogo, a demanda y solo de lo que estás mirando.
+ *
+ * El catálogo viene de Wikidata y no trae ids de TMDB: resolver los 680 al
+ * abrir la página serían 680 búsquedas para pintar una lista. Aquí se resuelve
+ * únicamente el puñado que hay en pantalla, y como findPersonInfo cachea 30
+ * días, cada nombre se busca UNA vez y las siguientes visitas son instantáneas.
+ * Quien no aparezca en TMDB se devuelve igualmente, con la foto a null, para
+ * que el cliente no vuelva a preguntar por él.
+ */
+app.post('/api/directors/photos', async (req, reply) => {
+  const nombres = [...new Set((req.body?.names || []).filter((n) => typeof n === 'string' && n.trim()))].slice(0, 150);
+  if (!nombres.length) return { photos: {} };
+  // sin clave de TMDB no hay fotos, pero la página funciona igual
+  if (!getSetting('tmdb_key')) return { photos: {}, unavailable: true };
+  const photos = {};
+  await mapPool(nombres, 6, async (nombre) => {
+    try {
+      const info = await findPersonInfo(nombre, 'Directing');
+      photos[nombre] = { tmdbId: info?.id || null, profilePath: info?.profile_path || null };
+    } catch {
+      photos[nombre] = { tmdbId: null, profilePath: null };
+    }
+  });
+  return { photos };
 });
 
 app.get('/api/people/search-tmdb', async (req, reply) => {

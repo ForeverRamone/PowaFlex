@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, StatusLegend,
-  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge,
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge, MatchCorrector,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
@@ -47,6 +47,7 @@ export default function PersonDetail() {
   const [show, toggle, resetTypes] = useTypeFilters();
   const [localShow, setLocalShow] = useState({}); // anulaciones SOLO de esta ficha (documentalistas)
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [corrigiendo, setCorrigiendo] = useState(false);
   const [sort, setSort] = useState(() => localStorage.getItem('person_film_sort') || 'reciente');
   const [minScore, setMinScore] = useState(() => Number(localStorage.getItem('person_min_score') || 0));
   const setSortPref = (v) => { setSort(v); localStorage.setItem('person_film_sort', v); };
@@ -61,18 +62,22 @@ export default function PersonDetail() {
   };
   const hayFiltros = view !== 'all' || sort !== 'reciente' || minScore > 0;
 
-  useEffect(() => {
+  const cargarFilmografia = () => {
     setData(null);
     setError(null);
     setRole(null);
     setLocalShow({});
-    api(`/people/${id}/filmography?role=${wantRole}`).then((d) => {
+    return api(`/people/${id}/filmography?role=${wantRole}`).then((d) => {
       if (d.error) setError(d.error);
       else {
         setData(d);
         setRole(d.roles?.[wantRole] ? wantRole : d.primary);
       }
     });
+  };
+
+  useEffect(() => {
+    cargarFilmografia();
     api('/tracked').then(
       (list) =>
         Array.isArray(list) &&
@@ -101,6 +106,40 @@ export default function PersonDetail() {
     if (!siguiendo && r?.actorAlso) toast('⭐ Añadido también a actores/actrices: tiene 8+ interpretadas en tu biblioteca');
   };
 
+  // El corrector manual: para homónimos y para quien tiene la obra repartida en
+  // dos fichas de TMDB. Se pinta en las dos ramas —con ficha y sin ella—
+  // porque el caso típico («10 dirigidas y ningún dato») cae justo en medio.
+  const nombre = data?.person?.name || '';
+  const fijarPersona = async (tmdbId) => {
+    const r = await api(`/people/${id}/match`, { method: 'POST', body: { tmdbId } });
+    if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    setCorrigiendo(false);
+    toast(tmdbId ? `✓ ${nombre} emparejado a mano` : '✓ Corrección quitada');
+    cargarFilmografia();
+  };
+  const corrector = corrigiendo && (
+    <MatchCorrector
+      kind="person"
+      role={wantRole === 'actor' ? 'actor' : 'director'}
+      title={nombre}
+      initialQuery={nombre}
+      subtitle="Elige su ficha de TMDB. Se recuerda para siempre y ningún automatismo vuelve a revisarla: úsalo cuando haya dos personas con el mismo nombre o cuando su obra esté repartida en dos fichas."
+      onPick={fijarPersona}
+      onClear={data?.person?.tmdb_locked ? () => fijarPersona(null) : null}
+      clearLabel="Quitar la corrección y volver al emparejado automático"
+      onClose={() => setCorrigiendo(false)}
+    />
+  );
+  const botonCorregir = (
+    <button
+      onClick={() => setCorrigiendo(true)}
+      className="text-xs text-zinc-500 hover:text-gold-400 cursor-pointer"
+      title="Corregir a mano su ficha de TMDB"
+    >
+      ✎ {data?.person?.tmdb_locked ? 'emparejado a mano' : 'corregir emparejado'}
+    </button>
+  );
+
   if (error) return <ErrorBox error={`No se pudo cargar la filmografía: ${error}. ¿Está configurada la API key de TMDB en Ajustes?`} />;
   if (!data) return <Spinner label="Consultando TMDB…" />;
   if (!data.matched)
@@ -108,6 +147,8 @@ export default function PersonDetail() {
       <div>
         <h1 className="text-2xl font-bold mb-2">{data.person?.name}</h1>
         <Empty>No se encontró esta persona en TMDB.</Empty>
+        <div className="text-center">{botonCorregir}</div>
+        {corrector}
       </div>
     );
 
@@ -119,6 +160,8 @@ export default function PersonDetail() {
       <div>
         <h1 className="text-2xl font-bold mb-2">{person?.name}</h1>
         <Empty>No hay filmografía que mostrar.</Empty>
+        <div className="text-center">{botonCorregir}</div>
+        {corrector}
       </div>
     );
   const { stats, items } = roles[active];
@@ -193,6 +236,7 @@ export default function PersonDetail() {
             <Link to={`/biblioteca?personId=${person.id}&personRole=${active}`} className="btn-ghost">
               Ver en tu biblioteca
             </Link>
+            {botonCorregir}
           </div>
           {person.birthday && (
             <div className="text-sm text-zinc-500 mt-1">
@@ -329,6 +373,7 @@ export default function PersonDetail() {
           ))}
         </div>
       )}
+      {corrector}
     </div>
   );
 }

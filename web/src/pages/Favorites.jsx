@@ -101,9 +101,17 @@ function FavoriteCard({ p, role, alsoOther, selectable, selected, onSelect, onRe
           </div>
         ) : p.tmdbBlank ? (
           // tienes películas suyas pero TMDB no le devuelve filmografía: casi
-          // siempre es un homónimo mal emparejado, no una carrera vacía
-          <div className="text-[11px] text-orange-300 mt-2" title="Se reintentará el emparejado en la próxima actualización">
-            Sin ficha de TMDB fiable · no se puede calcular su completismo
+          // siempre es un homónimo mal emparejado, no una carrera vacía. Y eso
+          // no lo va a arreglar ningún reintento: hay que elegir la ficha buena.
+          <div className="text-[11px] text-orange-300 mt-2">
+            Sin ficha de TMDB fiable · no se puede calcular su completismo ·{' '}
+            <Link
+              to={`/personas/${p.id}?role=${role}`}
+              className="text-gold-400 hover:underline"
+              title="Abre su ficha para elegir a mano la persona correcta en TMDB"
+            >
+              ✎ corregir
+            </Link>
           </div>
         ) : (
           <div className="text-[11px] text-zinc-600 mt-2">
@@ -794,6 +802,29 @@ export default function Favorites() {
               )
             )}
           </div>
+
+          {/* La puerta grande. Aquí había cuatro paquetes escritos a mano
+              —«españoles», «premiados en festivales», «emergentes»,
+              «taquilleros»— de veinte nombres fijos cada uno. Las cuatro ideas
+              siguen ahí, pero ahora salen de un catálogo de 680 con datos de
+              verdad: un filtro y un orden en vez de una lista congelada. */}
+          {role === 'director' && (
+            <Link
+              to="/directores"
+              className="card p-4 mb-6 flex items-center gap-4 hover:border-gold-400 transition-colors"
+            >
+              <div className="text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-gold-400/15">🎬</div>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-semibold text-zinc-100">Directores en activo · el catálogo</h2>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y ordena
+                  por importancia, premios, número de largometrajes o taquilla: españoles, premiados, emergentes o
+                  taquilleros salen de aquí con dos clics.
+                </p>
+              </div>
+              <span className="text-gold-400 shrink-0 text-sm">Explorar →</span>
+            </Link>
+          )}
 
           <CanonPacks role={role} onDone={loadTracked} />
 

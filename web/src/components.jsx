@@ -591,12 +591,18 @@ export function ProgressBar({ pct }) {
   );
 }
 
-/** Desplegable de filtro con su opción vacía como marcador de posición. Estaba
- *  duplicado carácter a carácter en Biblioteca y en Personas. */
-export function Select({ value, onChange, options, placeholder, className = '' }) {
+/**
+ * Desplegable de filtro. Estaba duplicado carácter a carácter en Biblioteca y
+ * en Personas.
+ *
+ * SIN `placeholder` no se pinta la opción vacía: eso vale para un filtro («sin
+ * filtrar» es un estado real) pero no para elegir un orden, donde siempre hay
+ * uno puesto — ahí la opción vacía salía como un duplicado del primer orden.
+ */
+export function Select({ value, onChange, options, placeholder = null, className = '' }) {
   return (
     <select className={`input !w-auto ${className}`} value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{placeholder}</option>
+      {placeholder != null && <option value="">{placeholder}</option>}
       {options.map(([v, l]) => (
         <option key={v} value={v}>{l}</option>
       ))}
@@ -606,6 +612,133 @@ export function Select({ value, onChange, options, placeholder, className = '' }
 
 export function Empty({ children }) {
   return <div className="text-zinc-500 text-sm py-8 text-center">{children}</div>;
+}
+
+/**
+ * El corrector manual de emparejado con TMDB, para lo que ninguna regla va a
+ * acertar: dos personas con el mismo nombre, alguien con la obra repartida en
+ * dos fichas, o una película que Plex identificó con el guid de otra.
+ *
+ * Sirve para personas y para películas —cambia lo que se busca y cómo se pinta
+ * cada candidato, no el diálogo— y lo usan la ficha de persona, la tarjeta de
+ * Favoritos, la ficha de película y Festivales.
+ */
+export function MatchCorrector({
+  kind = 'movie',
+  title,
+  subtitle,
+  initialQuery = '',
+  year = null,
+  role = null,
+  onPick,
+  onClear = null,
+  clearLabel = 'Quitar corrección / volver al automático',
+  onClose,
+}) {
+  const esPersona = kind === 'person';
+  const [q, setQ] = useState(initialQuery);
+  const [cands, setCands] = useState(null);
+  const [buscando, setBuscando] = useState(false);
+  const [fijando, setFijando] = useState(false);
+  const dialogo = useFocusTrap(onClose);
+
+  const buscar = async () => {
+    if (!q.trim()) return;
+    setBuscando(true);
+    const ruta = esPersona
+      ? `/people/search-tmdb?q=${encodeURIComponent(q.trim())}${role ? `&role=${role}` : ''}`
+      : `/movies/match-candidates?q=${encodeURIComponent(q.trim())}&year=${year || ''}`;
+    const r = await api(ruta);
+    setBuscando(false);
+    // las personas llegan como lista pelada; las películas, envueltas
+    setCands(r.error ? [] : (Array.isArray(r) ? r : r.candidates) || []);
+  };
+  // la primera búsqueda se lanza sola con el nombre que ya conocemos: en la
+  // inmensa mayoría de los casos la ficha buena sale ahí mismo
+  useEffect(() => { if (initialQuery.trim()) buscar(); }, []);
+
+  const elegir = async (id) => {
+    setFijando(true);
+    await onPick(id);
+    setFijando(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div
+        ref={dialogo}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Corregir emparejado de ${title}`}
+        className="card-raised p-4 w-full max-w-lg mt-16"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <h3 className="font-semibold text-zinc-100 text-sm">Corregir emparejado · «{title}»</h3>
+          <button className="text-zinc-500 hover:text-zinc-200 shrink-0" onClick={onClose} aria-label="Cerrar">✕</button>
+        </div>
+        <p className="text-[11px] text-zinc-500 mb-3">
+          {subtitle || (esPersona
+            ? 'Busca en TMDB y elige la ficha correcta. Se recuerda para siempre y ningún automatismo la revisa.'
+            : 'Busca en TMDB y elige la ficha correcta. Se recuerda y sobrevive a las sincronizaciones de Plex.')}
+        </p>
+
+        <form className="flex gap-2 mb-3" onSubmit={(e) => { e.preventDefault(); buscar(); }}>
+          <input
+            className="input flex-1"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={esPersona ? 'Nombre a buscar en TMDB…' : 'Título a buscar en TMDB…'}
+          />
+          <button type="submit" className="btn-gold" disabled={buscando}>{buscando ? '…' : 'Buscar'}</button>
+        </form>
+
+        {cands && cands.length === 0 && <Empty>Nada en TMDB con esa búsqueda.</Empty>}
+        {cands?.length > 0 && (
+          <div className="divide-y divide-ink-800 max-h-80 overflow-y-auto">
+            {cands.map((c) => {
+              const id = esPersona ? c.tmdb_id : c.id;
+              const img = esPersona ? c.profile_path : c.poster_path;
+              const pie = esPersona
+                ? [c.dept === 'Directing' ? 'Dirección' : c.dept === 'Acting' ? 'Interpretación' : c.dept, (c.knownFor || []).join(', ')]
+                    .filter(Boolean).join(' · ')
+                : [c.date ? c.date.slice(0, 4) : 'sin fecha',
+                   c.original_title && c.original_title !== c.title ? c.original_title : null]
+                    .filter(Boolean).join(' · ');
+              return (
+                <button
+                  key={id}
+                  disabled={fijando}
+                  onClick={() => elegir(id)}
+                  className="w-full flex items-center gap-3 py-2 text-left hover:bg-ink-800 px-2 cursor-pointer disabled:opacity-50"
+                >
+                  {img ? (
+                    <img
+                      src={tmdbImg(img, 'w92')}
+                      alt=""
+                      className={`w-10 shrink-0 border border-ink-700 ${esPersona ? 'h-14 object-cover rounded-full' : 'rounded'}`}
+                    />
+                  ) : (
+                    <span className="w-10 h-14 shrink-0 border border-ink-700 rounded flex items-center justify-center text-[9px] text-zinc-500">
+                      {esPersona ? 'sin foto' : 'sin cartel'}
+                    </span>
+                  )}
+                  <span className="min-w-0">
+                    <span className="block text-sm text-zinc-200 truncate">{esPersona ? c.name : c.title}</span>
+                    <span className="block text-[11px] text-zinc-500 truncate">{pie || `TMDB ${id}`}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {onClear && (
+          <button className="btn-ghost !py-1 text-xs mt-3" disabled={fijando} onClick={onClear}>{clearLabel}</button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Poster-grid skeleton for loading states.
@@ -806,6 +939,7 @@ function toViewModel({ ratingKey, movie, media }) {
       ratings: movie.ratings,
       tmdb_id: movie.tmdb_id,
       imdb_id: movie.imdb_id,
+      tmdbLocked: !!movie.tmdb_locked,
       owned: {
         rating_key: ratingKey, resolution: movie.resolution, hdr: movie.hdr, video_codec: movie.video_codec,
         user_rating: movie.user_rating, view_count: movie.view_count, file_path: movie.file_path,
@@ -837,15 +971,27 @@ function toViewModel({ ratingKey, movie, media }) {
 export function Ficha({ ratingKey, tmdbId, onClose }) {
   const [vm, setVm] = useState(null);
   const [err, setErr] = useState(null);
+  const [corrigiendo, setCorrigiendo] = useState(false);
   const dialogo = useFocusTrap(onClose);
-  useEffect(() => {
+  const cargar = () => {
     setVm(null); setErr(null);
     if (ratingKey) {
       api(`/movies/${ratingKey}`).then((d) => (d.error ? setErr(d.error) : setVm(toViewModel({ ratingKey, movie: d }))));
     } else {
       api(`/media/${tmdbId}`).then((d) => (d.error ? setErr(d.error) : setVm(toViewModel({ media: d }))));
     }
-  }, [ratingKey, tmdbId]);
+  };
+  useEffect(cargar, [ratingKey, tmdbId]);
+
+  // corregir a mano a qué ficha de TMDB apunta ESTA película de tu biblioteca:
+  // de ahí salen las notas, el reparto y el completismo de su gente
+  const fijarPelicula = async (nuevoId) => {
+    const r = await api(`/movies/${ratingKey}/match`, { method: 'POST', body: { tmdbId: nuevoId } });
+    if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    setCorrigiendo(false);
+    toast(nuevoId ? '✓ Emparejado corregido' : '✓ Corrección quitada');
+    cargar();
+  };
 
   const owned = vm?.owned;
   const PersonLinks = ({ people, role, cls }) => (
@@ -933,11 +1079,37 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
                   vm.tmdb_id && <RadarrButton tmdbId={vm.tmdb_id} alreadyInRadarr={vm.inRadarr} />
                 )}
               </div>
+              {/* solo para lo que está en tu biblioteca: una ficha de TMDB
+                  suelta no tiene emparejado que corregir */}
+              {ratingKey && (
+                <div className="mt-3">
+                  <button
+                    onClick={() => setCorrigiendo(true)}
+                    className="text-[11px] text-zinc-500 hover:text-gold-400 cursor-pointer"
+                    title="Elegir a mano su ficha de TMDB"
+                  >
+                    ✎ {vm.tmdbLocked ? 'emparejado a mano' : 'corregir emparejado con TMDB'}
+                  </button>
+                </div>
+              )}
               {owned?.file_path && <div className="mt-2 text-[11px] text-zinc-600 break-all">{owned.file_path}</div>}
             </div>
           </>
         )}
       </div>
+      {corrigiendo && vm && (
+        <MatchCorrector
+          kind="movie"
+          title={vm.title}
+          initialQuery={vm.originalTitle || vm.title}
+          year={vm.year}
+          subtitle="Elige su ficha de TMDB. De ahí salen las notas, el reparto y el completismo de su gente. La corrección se recuerda y sobrevive a las sincronizaciones de Plex."
+          onPick={fijarPelicula}
+          onClear={vm.tmdbLocked ? () => fijarPelicula(null) : null}
+          clearLabel="Quitar la corrección y volver a lo que diga Plex"
+          onClose={() => setCorrigiendo(false)}
+        />
+      )}
     </div>
   );
 }

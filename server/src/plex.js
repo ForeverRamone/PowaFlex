@@ -82,7 +82,10 @@ ON CONFLICT(rating_key) DO UPDATE SET
   audience_rating = excluded.audience_rating, critic_rating = excluded.critic_rating,
   duration_ms = excluded.duration_ms, content_rating = excluded.content_rating,
   studio = excluded.studio, tagline = excluded.tagline, summary = excluded.summary,
-  tmdb_id = excluded.tmdb_id, imdb_id = excluded.imdb_id, thumb = excluded.thumb, art = excluded.art,
+  -- el emparejado que fijaste a mano sobrevive a la sincronización: si no,
+  -- cada pasada volvía a poner el guid de Plex y tu corrección duraba horas
+  tmdb_id = CASE WHEN movies.tmdb_locked = 1 THEN movies.tmdb_id ELSE excluded.tmdb_id END,
+  imdb_id = excluded.imdb_id, thumb = excluded.thumb, art = excluded.art,
   resolution = excluded.resolution, video_codec = excluded.video_codec,
   audio_codec = excluded.audio_codec, audio_channels = excluded.audio_channels,
   container = excluded.container, size_bytes = excluded.size_bytes, bitrate = excluded.bitrate,

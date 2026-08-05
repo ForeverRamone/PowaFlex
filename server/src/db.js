@@ -311,6 +311,15 @@ ensureColumn('people', 'tmdb_verified', 'tmdb_verified INTEGER');
 // cuándo se intentó verificar por última vez, para no repetir a diario un
 // emparejado que ya falló (ver resolvePerson)
 ensureColumn('people', 'tmdb_checked_at', 'tmdb_checked_at INTEGER');
+// 1 cuando lo has elegido TÚ a mano. Manda sobre cualquier automatismo: ni
+// resolvePerson lo revisa ni una sincronización lo pisa. Es la última palabra
+// para los casos que ninguna regla va a acertar (homónimos, gente con la
+// filmografía repartida en dos fichas de TMDB).
+ensureColumn('people', 'tmdb_locked', 'tmdb_locked INTEGER');
+// lo mismo para una película de la biblioteca: el emparejado que fijaste tú.
+// Aquí hace más falta todavía, porque cada sincronización de Plex reescribe
+// movies.tmdb_id con el guid que traiga Plex.
+ensureColumn('movies', 'tmdb_locked', 'tmdb_locked INTEGER');
 
 function dropPeopleNameUnique() {
   const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'people'").get()?.sql || '';

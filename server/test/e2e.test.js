@@ -253,6 +253,25 @@ test('las peticiones que mutan desde otro origen se rechazan; la propia app pasa
   assert.equal(lectura.status, 200, 'los GET no llevan cortafuegos de origen');
 });
 
+// Detrás de un proxy inverso el Host que llega es el del contenedor, no el que
+// el usuario escribió: mirando solo Host, ese montaje se quedaba sin poder
+// sincronizar ni guardar nada. El mismo caso se da con el proxy de desarrollo
+// de Vite, y ahí se detectó.
+test('un proxy inverso que anuncia X-Forwarded-Host no queda bloqueado', async () => {
+  const conProxy = await fetch(`${base}/api/sagas/scan`, {
+    method: 'POST',
+    headers: { Origin: 'https://powaflex.midominio.com', 'X-Forwarded-Host': 'powaflex.midominio.com' },
+  });
+  assert.notEqual(conProxy.status, 403, 'el origen que anuncia el proxy es legítimo');
+
+  // pero un origen que NO es el que anuncia el proxy sigue fuera
+  const impostor = await fetch(`${base}/api/sagas/scan`, {
+    method: 'POST',
+    headers: { Origin: 'https://web-cualquiera.example', 'X-Forwarded-Host': 'powaflex.midominio.com' },
+  });
+  assert.equal(impostor.status, 403);
+});
+
 test('el proxy de imágenes normaliza el id y rechaza lo que no es un entero', async () => {
   for (const malo of ['1e3', '-1', '99999999999999999999999', 'abc']) {
     assert.equal((await fetch(`${base}/img/${malo}/poster`)).status, 400, `${malo} no es un id`);

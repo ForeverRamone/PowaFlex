@@ -1,5 +1,34 @@
 # Changelog
 
+## Alpha 0.9.14 (0.9.14-alpha) — 2026-08-05
+
+- **Directores en activo: una página nueva con 680 nombres.** Directores y directoras con obra
+  reciente, sacados de Wikidata, con su país, su edad, cuántos largometrajes llevan, en qué años
+  ha ido su carrera y qué han ganado. Filtra por región, país, sexo/género y actividad —el
+  desplegable de país se acota solo a la región elegida y lleva el recuento— y ordena por
+  importancia, prestigio, impacto, número de largometrajes, taquilla, edad, debut más reciente o
+  alfabéticamente. La estrella de cada ficha lo manda a tus favoritos, y hay un botón para añadir
+  de golpe todos los que deje el filtro.
+  - Un conmutador **«solo los que no sigo»** para no repasar a quien ya tienes.
+  - Cada ficha lleva la **foto de TMDB**, que se busca solo de lo que estás viendo (y se recuerda
+    treinta días): abrir la página no cuesta ni una llamada de más.
+  - La **importancia** es 60 % prestigio y 40 % impacto, y la página lo explica donde se lee, con
+    sus limitaciones: es una convención operativa, no un juicio de valor.
+- **Los cuatro paquetes de directores escritos a mano** («españoles», «premiados en festivales»,
+  «emergentes», «taquilleros») **desaparecen**: eran veinte nombres fijos cada uno y las cuatro
+  ideas salen ahora del catálogo con un filtro y un orden, sobre datos de verdad. Siguen «en boga»
+  (que cambia día a día), los habituales de Cannes/Venecia/Berlín y los cánones.
+- **Corrector manual de emparejado para personas y películas.** Cuando PowaFlex confunde a alguien
+  con su homónimo —o Plex identifica una película con la ficha de otra— ahora lo arreglas tú: un
+  ✎ en la ficha de persona, en el aviso de Favoritos y en la ficha de cualquier película de tu
+  biblioteca. Lo que elijas se recuerda y **ningún automatismo vuelve a tocarlo**: ni la
+  re-verificación semanal de personas ni la sincronización nocturna de Plex, que hasta ahora
+  reescribía el emparejado de cada película en cada pasada.
+- **Arreglo importante para quien use un proxy inverso** (nginx, Traefik, el de Synology): el
+  cortafuegos anti-CSRF de la 0.9.13 comparaba con el nombre del contenedor y no con el que
+  escribes en el navegador, así que detrás de un proxy no se podía sincronizar ni guardar nada.
+  Ahora se respeta `X-Forwarded-Host`. Lo mismo rompía el entorno de desarrollo.
+
 ## Alpha 0.9.13 (0.9.13-alpha) — 2026-08-05
 
 Versión de mantenimiento salida de una auditoría a fondo (seguridad, uso de APIs y limpieza).

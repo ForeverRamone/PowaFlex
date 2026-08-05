@@ -295,6 +295,8 @@ const libraryFilmsOf = (personId) =>
 export async function resolvePerson(personId) {
   const person = db.prepare('SELECT * FROM people WHERE id = ?').get(personId);
   if (!person) return null;
+  // lo elegiste tú a mano: no se revisa nunca (ver POST /api/people/:id/match)
+  if (person.tmdb_locked) return person;
   if (person.tmdb_id && person.tmdb_verified) return person;
   // se reintenta, pero no todos los días: una semana entre intentos
   if (person.tmdb_id && person.tmdb_checked_at && Date.now() - person.tmdb_checked_at < 7 * DAY) return person;
@@ -1121,51 +1123,14 @@ export async function getCalendarCached({ refresh = false } = {}) {
 
 // Curated "packs" of directors to follow, each surfaced with an "add all"
 // button in Favoritos → Descubrir (#9).
-const DIRECTOR_PACKS = [
-  {
-    key: 'spanish', emoji: '🇪🇸', accent: 'red',
-    title: 'Directores españoles',
-    description: 'Nombres imprescindibles y actuales del cine español.',
-    names: [
-      'Pedro Almodóvar', 'Alejandro Amenábar', 'J. A. Bayona', 'Isabel Coixet', 'Icíar Bollaín',
-      'Rodrigo Sorogoyen', 'Álex de la Iglesia', 'Fernando León de Aranoa', 'Carla Simón', 'Jonás Trueba',
-      'Paco Plaza', 'Albert Serra', 'Carlos Vermut', 'Alauda Ruiz de Azúa', 'Pilar Palomero',
-      'Víctor Erice', 'David Trueba', 'Cesc Gay', 'Fernando Trueba', 'Oliver Laxe',
-    ],
-  },
-  {
-    key: 'awarded', emoji: '🏆', accent: 'gold',
-    title: 'Premiados en grandes festivales',
-    description: 'Palmas, Leones y Osos recientes de Cannes, Venecia y Berlín, más ganadores del Óscar.',
-    names: [
-      'Bong Joon-ho', 'Hirokazu Kore-eda', 'Ruben Östlund', 'Justine Triet', 'Jonathan Glazer',
-      'Sean Baker', 'Christopher Nolan', 'Jacques Audiard', 'Yorgos Lanthimos', 'Lucrecia Martel',
-      'Cristian Mungiu', 'Michel Franco', 'Alice Rohrwacher', 'Aki Kaurismäki', 'Asghar Farhadi',
-      'Radu Jude', 'Pawel Pawlikowski', 'Kleber Mendonça Filho',
-    ],
-  },
-  {
-    key: 'emerging', emoji: '🌱', accent: 'emerald',
-    title: 'Directores emergentes',
-    description: 'Voces nuevas que están definiendo el cine de la última década.',
-    names: [
-      'Charlotte Wells', 'Celine Song', 'Julia Ducournau', 'Rose Glass', 'Robert Eggers',
-      'Ari Aster', 'Chloé Zhao', 'Emerald Fennell', 'Kogonada', 'Alice Diop',
-      'Coralie Fargeat', 'Jane Schoenbrun', 'RaMell Ross', 'Cooper Raiff', 'Zach Cregger',
-    ],
-  },
-  {
-    key: 'boxoffice', emoji: '💥', accent: 'sky',
-    title: 'Directores taquilleros',
-    description: 'Los que llenan salas y mueven la taquilla mundial.',
-    names: [
-      'James Cameron', 'Christopher Nolan', 'Denis Villeneuve', 'Greta Gerwig', 'Jordan Peele',
-      'Ryan Coogler', 'Matt Reeves', 'Taika Waititi', 'James Wan', 'Peter Jackson',
-      'Steven Spielberg', 'Ridley Scott', 'Sam Mendes', 'Guy Ritchie', 'Wes Anderson',
-      'Damien Chazelle',
-    ],
-  },
-];
+// Los cuatro paquetes escritos a mano que había aquí («directores españoles»,
+// «premiados en festivales», «emergentes» y «taquilleros») los sustituye el
+// catálogo de Directores en activo: 680 nombres de Wikidata con región, país,
+// género, obra y premios, donde esas cuatro ideas son un filtro y un orden en
+// vez de veinte nombres congelados. Lo que sigue vivo aquí es lo que el
+// catálogo NO puede dar: «en boga», que cambia día a día según TMDB.
+const DIRECTOR_PACKS = [];
+
 
 /** Curated director packs + directors "en boga" from TMDB, each with a tracked flag. */
 export async function suggestedPeople() {
