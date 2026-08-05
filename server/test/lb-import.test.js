@@ -71,3 +71,57 @@ test('rematch enlaza por tmdb_id, acepta entradas sin año y limpia las borradas
   );
   assert.ok(res.cleared >= 1);
 });
+
+/**
+ * El CSV «formato Letterboxd» que exporta WebTools-NG (el que usa Ramón para
+ * sacar de Plex lo que no está en el export oficial) trae la nota en `rating10`
+ * —de 0 a 10— en vez del `Rating` de 0 a 5 de Letterboxd. Media app espera la
+ * escala de estrellas, así que si esa división por dos se cae, todas las notas
+ * importadas por esta vía salen al doble y contaminan joyas, discrepancias y el
+ * ranking de Visionado. No tenía prueba.
+ */
+test('el CSV de WebTools trae rating10 (0-10) y se guarda en estrellas (0-5)', () => {
+  const csv = [
+    'Name,Year,rating10,tmdbID',
+    'Amanece que no es poco,1989,9,54123',
+    'Sin nota,1990,,54124',
+  ].join('\n');
+  importLetterboxdCsv(Buffer.from(csv), { filename: 'webtools-export.csv' });
+
+  const fila = db.prepare("SELECT rating FROM lb_entries WHERE title = 'Amanece que no es poco'").get();
+  assert.equal(fila.rating, 4.5, 'un 9 sobre 10 son 4,5 estrellas');
+
+  const vacia = db.prepare("SELECT rating FROM lb_entries WHERE title = 'Sin nota'").get();
+  assert.equal(vacia.rating, null, 'sin nota se queda sin nota, no en cero');
+});
+
+test('la columna Rating de Letterboxd (0-5) se guarda tal cual', () => {
+  const csv = ['Name,Year,Rating', 'El espíritu de la colmena,1973,4.5'].join('\n');
+  importLetterboxdCsv(Buffer.from(csv), { filename: 'ratings.csv' });
+  const fila = db.prepare("SELECT rating FROM lb_entries WHERE title = 'El espíritu de la colmena'").get();
+  assert.equal(fila.rating, 4.5, 'la escala de estrellas no se toca');
+});
+
+test('un CSV con rating10 se detecta como lista de notas', () => {
+  const r = importLetterboxdCsv(Buffer.from('Name,Year,rating10\nOtra,2001,7'), { filename: 'sin-pistas.csv' });
+  assert.equal(r.list, 'ratings');
+});
+
+/**
+ * La caché negativa de MDBList (una fila vacía para lo que MDBList no conoce,
+ * para no volver a pedirlo eternamente) no puede colarse en la cobertura que
+ * enseña Salud: si contara, diría «423 de 423 con notas» teniendo cero.
+ */
+test('las filas vacías de la caché negativa no cuentan como «con notas»', async () => {
+  const { ratingsCoverage } = await import('../src/mdblist.js');
+  db.prepare('DELETE FROM movies').run();
+  db.prepare('DELETE FROM mdb_ratings').run();
+  db.prepare("INSERT INTO movies (rating_key, title, tmdb_id) VALUES (1, 'Con notas', 111), (2, 'Sin notas', 222)").run();
+  // una con nota de verdad y otra que MDBList no conoce
+  db.prepare('INSERT INTO mdb_ratings (tmdb_id, score, fetched_at) VALUES (111, 78, ?)').run(Date.now());
+  db.prepare('INSERT INTO mdb_ratings (tmdb_id, fetched_at) VALUES (222, ?)').run(Date.now());
+
+  const c = ratingsCoverage();
+  assert.equal(c.total, 2);
+  assert.equal(c.withRatings, 1, 'solo la que de verdad tiene nota');
+});

@@ -1,8 +1,9 @@
 import { db, cacheRead, cacheWrite, getSetting } from './db.js';
+import { today } from './dates.js';
 import {
   personCredits, findPersonInfo, resolvePerson, enrichRuntimes, setBuildProgress, clearBuildProgress,
   buildRoleItems, roleStats, classifyGenres, latinizeTitles, featureRule, tmdbGet, latinizeNames,
-  isCameoCredit, esParcialCaducado,
+  isCameoCredit, esParcialCaducado, personPopularPage,
 } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { matchMovie, watchedIndex, isWatched } from './letterboxd.js';
@@ -152,7 +153,7 @@ async function tmdbPopularDirectors(limit = 100) {
   const out = [];
   const seen = new Set();
   for (const page of [1, 2, 3, 4, 5]) {
-    const data = await tmdbGet('/person/popular', { page }, { cacheKey: `person_popular:${page}:es-ES`, cacheMs: 24 * HOUR });
+    const data = await personPopularPage(page);
     for (const p of data.results || []) {
       if (p.known_for_department !== 'Directing' || seen.has(p.id)) continue;
       seen.add(p.id);
@@ -199,11 +200,6 @@ export async function canonNames(canon) {
   return null; // no existe: quien llama decide
 }
 
-/** ¿Existe este canon? Evita responder con otro distinto sin decirlo. */
-export function canonExists(canon) {
-  return !!(CANONS[canon] || canon === TMDB_POPULAR || db.prepare('SELECT 1 FROM custom_canons WHERE key = ?').get(canon));
-}
-
 /** Guarda una lista pegada como canon propio. Devuelve su clave. */
 export function saveCanon({ label, names, source = null }) {
   const parsed = [
@@ -242,10 +238,6 @@ export function deleteCanon(key) {
 
 const libraryTmdbIds = () =>
   new Set(db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((r) => r.tmdb_id));
-
-function today() {
-  return new Date().toLocaleDateString('en-CA');
-}
 
 /**
  * For the library's top people of a role, aggregate their missing (released,

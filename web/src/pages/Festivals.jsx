@@ -1,17 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import {
-  Spinner, ErrorBox, TmdbCard, RadarrButton, Empty, StatusLegend, PageHeader, useRadarrIds,
+  Spinner, ErrorBox, TmdbCard, RadarrButton, Empty, StatusLegend, PageHeader, useRadarrIds, useFocusTrap,
 } from '../components.jsx';
 import { toast } from '../toast.js';
+import { addBulkToRadarr } from '../radarr.js';
 
 // La celda de dirección de Wikipedia puede traer varios nombres («Javier Calvo
 // and Javier Ambrossi»): se parte aquí para pintar UNA estrella por persona —
 // seguirlos juntos como una sola cadena no resolvía a nadie. Con apellido
 // compartido («Joel and Ethan Coen»), al nombre suelto se le pega el apellido
-// del último. Espejo de splitDirectors del servidor.
+// del último.
+//
+// Copia EXACTA de splitDirectors de server/src/festivals.js, filtro incluido:
+// el servidor no puede importar de web/ ni al revés, así que la única defensa
+// es que sean idénticas. Y tienen que serlo, porque quien decide si un nombre
+// se sigue de verdad es el servidor: cuando el filtro del cliente era más
+// permisivo, se pintaba una estrella para nombres que el servidor iba a
+// descartar y el clic no hacía nada.
 export function splitDirectors(s) {
+  const normName = (x) =>
+    String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
   const parts = String(s || '')
     .split(/,|;|&| and | y /i)
     .map((x) => x.trim())
@@ -20,7 +30,7 @@ export function splitDirectors(s) {
   const apellido = last.includes(' ') ? last.slice(last.indexOf(' ') + 1) : '';
   return parts
     .map((p) => (p !== last && !p.includes(' ') && apellido ? `${p} ${apellido}` : p))
-    .filter((x) => x.replace(/[^\p{L}\p{N}]/gu, '').length >= 4);
+    .filter((x) => normName(x).length >= 4);
 }
 
 /**
@@ -61,7 +71,13 @@ export default function Festivals() {
     );
   }, []);
 
+  // Pulsar ← o → varias veces seguidas lanza varias peticiones a la vez, y sin
+  // este testigo ganaba la última en LLEGAR, no la última pedida: como una
+  // edición sin cachear tarda mucho más que una cacheada, la parrilla podía
+  // acabar enseñando un año distinto del que marca el desplegable.
+  const peticion = useRef(0);
   const load = (k = fest, y = year, v = view, refresh = false) => {
+    const mia = ++peticion.current;
     setLoading(true);
     setError(null);
     setData(null);
@@ -70,6 +86,7 @@ export default function Festivals() {
     const soloP = index?.festivals?.find((f) => f.key === k)?.onlyWinners;
     const path = soloP || v === 'palmares' ? `/festivals/${k}/palmares` : `/festivals/${k}/${y}`;
     api(`${path}${refresh ? '?refresh=1' : ''}`).then((r) => {
+      if (mia !== peticion.current) return; // llegó tarde: ya se pidió otra cosa
       setLoading(false);
       if (r.error) setError(r.error);
       else setData(r);
@@ -105,11 +122,9 @@ export default function Festivals() {
 
   const bulkAdd = async () => {
     setBulkBusy(true);
-    const res = await api('/radarr/add-bulk', { method: 'POST', body: { tmdbIds: missingIds.slice(0, 300) } });
+    const { error, summary } = await addBulkToRadarr(missingIds, { onAdded: addRadarrId });
     setBulkBusy(false);
-    if (res.error) { toast(`⚠️ ${res.error}`, 'error'); return; }
-    for (const r of res.results || []) if (r.ok || r.alreadyExists) addRadarrId(r.tmdbId);
-    toast(`✓ ${res.added} añadidas a Radarr${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''}`);
+    if (summary) toast(summary, error ? 'error' : undefined);
   };
 
   // cada estrella sigue a UNA persona: el nombre llega ya partido de la celda
@@ -350,14 +365,31 @@ export default function Festivals() {
         </>
       )}
 
-      {editar && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto" onClick={() => setEditar(null)}>
-          <div className="card-raised p-4 w-full max-w-lg mt-16" onClick={(e) => e.stopPropagation()}>
+      {editar && <Corrector
+        editar={editar}
+        onClose={() => setEditar(null)}
+        busca={busca} setBusca={setBusca}
+        buscando={buscando} candidatos={candidatos}
+        buscarCandidatos={buscarCandidatos} fijarMatch={fijarMatch}
+      />}
+    </div>
+  );
+}
+
+/** El corrector manual de emparejado. Aparte para que pueda usar el mismo
+ *  atrapa-foco que los demás diálogos de la app: sin él, con Tab te ibas
+ *  paseando por la página de detrás con el modal abierto. */
+function Corrector({ editar, onClose, busca, setBusca, buscando, candidatos, buscarCandidatos, fijarMatch }) {
+  const dialogo = useFocusTrap(onClose);
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div ref={dialogo} role="dialog" aria-modal="true" aria-label={`Corregir emparejado de ${editar.title}`}
+        className="card-raised p-4 w-full max-w-lg mt-16" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-2 mb-1">
               <h3 className="font-semibold text-zinc-100 text-sm">
                 Corregir emparejado · «{editar.title}»{editar.director ? ` — ${editar.director}` : ''}
               </h3>
-              <button className="text-zinc-500 hover:text-zinc-200" onClick={() => setEditar(null)}>✕</button>
+              <button className="text-zinc-500 hover:text-zinc-200" onClick={onClose} aria-label="Cerrar">✕</button>
             </div>
             <p className="text-[11px] text-zinc-500 mb-3">
               Busca en TMDB y elige la ficha correcta. La corrección se recuerda y manda sobre el
@@ -405,9 +437,7 @@ export default function Festivals() {
                 Quitar corrección / volver al automático
               </button>
             )}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

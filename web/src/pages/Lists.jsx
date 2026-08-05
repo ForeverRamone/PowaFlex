@@ -4,6 +4,7 @@ import {
   Spinner, ErrorBox, Empty, ProgressBar, MovieModal, MediaModal, PageHeader, RadarrButton, useRadarrIds,
 } from '../components.jsx';
 import { toast } from '../toast.js';
+import { addBulkToRadarr } from '../radarr.js';
 import { useChartTheme } from '../charts.js';
 
 // --- Letterboxd completista rings -------------------------------------------
@@ -338,16 +339,9 @@ function ListDetail({ listId, onChanged }) {
 
   const bulkAdd = async () => {
     setBulk({ running: true, summary: null });
-    const res = await api('/radarr/add-bulk', {
-      method: 'POST',
-      body: { tmdbIds: missing.slice(0, 300).map((i) => i.tmdb_id) },
-    });
-    setBulk({
-      running: false,
-      summary: res.error
-        ? `⚠️ ${res.error}`
-        : `✓ ${res.added} añadidas${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''}`,
-    });
+    // sin «a Radarr» detrás: aquí el contexto ya es la lista y su botón
+    const { summary } = await addBulkToRadarr(missing.map((i) => i.tmdb_id), { onAdded: addRadarrId, target: '' });
+    setBulk({ running: false, summary });
   };
 
   return (

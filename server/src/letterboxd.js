@@ -1,4 +1,5 @@
 import { parse } from 'csv-parse/sync';
+import { mapPool } from './pool.js';
 import { unzipSync, strFromU8 } from 'fflate';
 import { db } from './db.js';
 
@@ -208,7 +209,7 @@ const isOfficialSlug = (slug) => OFFICIAL_HINTS.some((h) => slug.includes(h));
 // se expandía a 765 MB en memoria y tumbaba el contenedor: `unzipSync` saca TODAS
 // las entradas antes de que nadie mire si son .csv. El export real de Letterboxd
 // de una filmoteca grande no llega a 30 MB.
-const MAX_UNZIPPED = 200 * 1024 * 1024;
+const MAX_UNZIPPED = 64 * 1024 * 1024;
 const MAX_ENTRIES = 500;
 
 export function importLetterboxdZip(buffer) {
@@ -404,8 +405,13 @@ export async function importLetterboxdListUrl(url) {
   const seen = new Set();
   let nombre = decodeURIComponent(listSlug).replace(/-/g, ' ');
   for (let page = 1; page <= 20; page++) {
+    // Una lista de 2.000 títulos son 20 páginas seguidas: pedirlas sin respirar
+    // es la forma más rápida de que Letterboxd nos corte. Un cuarto de segundo
+    // entre páginas no se nota al importar y es buena vecindad; el User-Agent
+    // dice quién llama y a dónde escribir si molesta.
+    if (page > 1) await new Promise((r) => setTimeout(r, 250));
     const res = await fetch(`https://letterboxd.com/${user}/list/${listSlug}/page/${page}/`, {
-      headers: { 'User-Agent': 'PowaFlex' },
+      headers: { 'User-Agent': 'PowaFlex/0.9 (self-hosted; https://github.com/ForeverRamone/PowaFlex)' },
       signal: AbortSignal.timeout(20000),
     });
     if (!res.ok) { if (page === 1) throw new Error(`Letterboxd ${res.status}`); break; }
@@ -497,17 +503,10 @@ export async function listMissingTmdbIds(listId) {
     .prepare('SELECT title, year, tmdb_id, movie_id FROM lb_list_items WHERE list_id = ? AND movie_id IS NULL')
     .all(listId);
   const ids = [];
-  let i = 0;
-  async function worker() {
-    for (;;) {
-      const idx = i++;
-      if (idx >= items.length) return;
-      const it = items[idx];
-      const id = it.tmdb_id || (await searchMovieId(it.title, it.year));
-      if (id) ids.push(id);
-    }
-  }
-  await Promise.all(Array.from({ length: 6 }, worker));
+  await mapPool(items, 6, async (it) => {
+    const id = it.tmdb_id || (await searchMovieId(it.title, it.year));
+    if (id) ids.push(id);
+  });
   return [...new Set(ids)];
 }
 
@@ -579,19 +578,12 @@ export async function resolveUnmatchedLb() {
     `UPDATE lb_entries SET tmdb_id = ? WHERE tmdb_id IS NULL AND title = ? AND (year IS ? OR year = ?)`
   );
   let resolved = 0;
-  let i = 0;
-  async function worker() {
-    for (;;) {
-      const idx = i++;
-      if (idx >= groups.length) return;
-      const g = groups[idx];
-      try {
-        const id = await searchMovieId(g.title, g.year);
-        if (id) { setTmdb.run(id, g.title, g.year, g.year); resolved++; }
-      } catch {}
-    }
-  }
-  await Promise.all(Array.from({ length: 6 }, worker));
+  await mapPool(groups, 6, async (g) => {
+    try {
+      const id = await searchMovieId(g.title, g.year);
+      if (id) { setTmdb.run(id, g.title, g.year, g.year); resolved++; }
+    } catch {}
+  });
 
   // also resolve challenge-list items (e.g. AFI/IMDb lists) the same way, so films
   // you own under a localised title (Sunset Boulevard ↔ El crepúsculo…) count (#G)

@@ -1,4 +1,6 @@
 import Fastify from 'fastify';
+import { today } from './dates.js';
+import { mapPool } from './pool.js';
 import fastifyStatic from '@fastify/static';
 import multipart from '@fastify/multipart';
 import path from 'node:path';
@@ -6,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { db, DATA_DIR, getAllSettings, setSetting, getSetting } from './db.js';
+import { db, DATA_DIR, getAllSettings, setSetting, getSetting, SECRET_SETTING_KEYS } from './db.js';
 import { plexTest, plexConfig, runSync, syncStatus, movieSections } from './plex.js';
 import {
   tmdbTest,
@@ -146,11 +148,46 @@ app.get('/api/version', async () => ({
   repo: 'https://github.com/ForeverRamone/PowaFlex',
 }));
 
-await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024, files: 8 } });
+// El export completo de Letterboxd de una cinefilia larga no pasa de unos
+// pocos MB; 40 MB × 4 sobra de calle y evita que una subida se coma la RAM del
+// NAS (cada parte se materializa entera en memoria con toBuffer()).
+await app.register(multipart, { limits: { fileSize: 40 * 1024 * 1024, files: 4 } });
+
+/**
+ * Cortafuegos contra peticiones lanzadas desde OTRA web.
+ *
+ * Un formulario ajeno puede mandar multipart/form-data sin que el navegador
+ * pida permiso antes (es «simple request»: no hay preflight que lo pare), y de
+ * paso reenvía las credenciales Basic que ya tenga guardadas para este origen.
+ * Como el parser de multipart deja el cuerpo vacío en vez de fallar, cualquier
+ * POST que no necesite cuerpo —sincronizar, actualizar todo, lanzar el
+ * auto-Radarr— se podía disparar desde una pestaña cualquiera. Antes esto solo
+ * cubría la importación de Letterboxd; ahora vale para todo lo que muta.
+ *
+ * La app se sirve del mismo origen que la API, así que su Origin siempre casa
+ * con el Host y nada cambia de cara al usuario. Sin cabecera Origin (curl, la
+ * app de escritorio) se deja pasar: ahí no hay navegador que engañar.
+ */
+app.addHook('onRequest', async (req, reply) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return;
+  const origen = req.headers.origin;
+  if (!origen) return;
+  let ajeno = true;
+  try {
+    ajeno = new URL(origen).host !== req.headers.host;
+  } catch {
+    ajeno = true;
+  }
+  if (ajeno) {
+    reply.code(403);
+    return reply.send({ error: 'Petición desde otro sitio web' });
+  }
+});
 
 // --- settings ----------------------------------------------------------------
 
-const SECRET_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key', 'mdblist_key']);
+// la lista vive en db.js, que es quien cifra: una sola fuente de verdad
+const SECRET_KEYS = SECRET_SETTING_KEYS;
 
 // Solo estas claves se pueden escribir desde fuera. El destino de todas las
 // peticiones salientes (Plex, Radarr) sale de aquí, así que dejar la puerta
@@ -183,19 +220,42 @@ app.get('/api/settings', async () => {
   const all = getAllSettings();
   const out = {};
   for (const [k, v] of Object.entries(all)) {
-    out[k] = SECRET_KEYS.has(k) && v ? `••••${v.slice(-4)}` : v;
+    // los últimos 4 caracteres son del VALOR, no del criptograma: con
+    // POWAFLEX_SECRET el crudo es «enc:v1:…» y el rabito no decía nada
+    out[k] = SECRET_KEYS.has(k) && v ? `••••${String(getSetting(k) ?? '').slice(-4)}` : v;
   }
   for (const k of SECRET_KEYS) out[`${k}_set`] = !!all[k];
   return out;
 });
 
-app.put('/api/settings', async (req) => {
+// Las URL de Plex y Radarr deciden a dónde salen las peticiones (con el token
+// pegado), y su respuesta se devuelve al navegador. Una URL con query,
+// fragmento o userinfo no es de un servidor de verdad: el «#» final, además,
+// descarta todo lo que la app le pega detrás, así que la petición acabaría
+// yendo a la ruta exacta que quisiera quien escribiera el ajuste. Ninguna URL
+// legítima de Plex o Radarr lleva nada de eso.
+const URL_SETTINGS = new Set(['plex_url', 'radarr_url']);
+function urlDeServicioValida(v) {
+  if (!v) return true; // vaciar el ajuste es legítimo
+  try {
+    const u = new URL(v);
+    return ['http:', 'https:'].includes(u.protocol) && !u.search && !u.hash && !u.username && !u.password;
+  } catch {
+    return false;
+  }
+}
+
+app.put('/api/settings', async (req, reply) => {
   const body = req.body || {};
   const ignoradas = [];
   let invalidar = false;
   for (const [k, v] of Object.entries(body)) {
     if (typeof v !== 'string' && v !== null) continue;
     if (!WRITABLE_SETTINGS.has(k)) { ignoradas.push(k); continue; }
+    if (URL_SETTINGS.has(k) && !urlDeServicioValida(v)) {
+      reply.code(400);
+      return { error: `La dirección de ${k === 'plex_url' ? 'Plex' : 'Radarr'} debe ser una URL http(s) sin parámetros ni «#» (por ejemplo http://192.168.1.50:32400)` };
+    }
     if (SECRET_KEYS.has(k) && typeof v === 'string' && v.startsWith('••••')) continue; // masked, unchanged
     if (CACHE_BUSTING_SETTINGS.has(k) && String(getSetting(k) ?? '') !== String(v ?? '')) invalidar = true;
     setSetting(k, v);
@@ -320,9 +380,15 @@ app.get('/api/backup/database', async (req, reply) => {
 // los secretos): es una copia para reinstalar, no una pantalla. Solo las claves
 // que se pueden escribir, nada de contadores ni estado interno.
 app.get('/api/backup/settings', async (req, reply) => {
-  const all = getAllSettings();
   const settings = {};
-  for (const k of WRITABLE_SETTINGS) if (all[k] != null) settings[k] = all[k];
+  // getSetting (no getAllSettings) porque este descifra: con POWAFLEX_SECRET
+  // activo, el crudo son blobs «enc:v1:…» cifrados con ESTE secreto, y
+  // restaurarlos en otra instalación dejaba credenciales inservibles sin decir
+  // nada.
+  for (const k of WRITABLE_SETTINGS) {
+    const v = getSetting(k);
+    if (v != null) settings[k] = v;
+  }
   const fecha = new Date().toISOString().slice(0, 10);
   reply.header('Content-Disposition', `attachment; filename="powaflex-ajustes-${fecha}.json"`);
   reply.type('application/json');
@@ -784,25 +850,18 @@ app.post('/api/justwatch/batch', async (req, reply) => {
     const results = {};
     let done = 0;
     setBuildProgress('justwatch', 'Consultando JustWatch', 0, ids.length);
-    let i = 0;
-    async function worker() {
-      for (;;) {
-        const idx = i++;
-        if (idx >= ids.length) return;
-        const tmdbId = ids[idx];
-        const m = owned.get(tmdbId);
-        try {
-          const title = m?.original_title || m?.title;
-          if (!title) throw new Error('sin título en la biblioteca');
-          const av = await availability(title, m.year || null);
-          results[tmdbId] = { ...av, ownedResolution: m.resolution || null, upgradeable: isUpgradeable(m.resolution, av.maxQuality) };
-        } catch (err) {
-          results[tmdbId] = { maxQuality: null, providers: [], error: String(err.message || err) };
-        }
-        setBuildProgress('justwatch', 'Consultando JustWatch', ++done, ids.length);
+    await mapPool(ids, 3, async (tmdbId) => {
+      const m = owned.get(tmdbId);
+      try {
+        const title = m?.original_title || m?.title;
+        if (!title) throw new Error('sin título en la biblioteca');
+        const av = await availability(title, m.year || null);
+        results[tmdbId] = { ...av, ownedResolution: m.resolution || null, upgradeable: isUpgradeable(m.resolution, av.maxQuality) };
+      } catch (err) {
+        results[tmdbId] = { maxQuality: null, providers: [], error: String(err.message || err) };
       }
-    }
-    await Promise.all(Array.from({ length: 3 }, worker));
+      setBuildProgress('justwatch', 'Consultando JustWatch', ++done, ids.length);
+    });
     clearBuildProgress('justwatch');
     const upgradeable = Object.values(results).filter((r) => r.upgradeable).length;
     return { checked: ids.length, upgradeable, results };
@@ -929,7 +988,7 @@ app.get('/api/tracked/health', async () => {
   }
   const upcomingBy = new Map();
   try {
-    const now = new Date().toLocaleDateString('en-CA'); // local, como el resto de la app
+    const now = today(); // local, como el resto de la app
     for (const ev of (JSON.parse(calRow?.json || '{}').events || [])) {
       if (ev.date && ev.date < now) continue; // future or still-undated (announced)
       // OJO: `followedDirectors`/`followedActors` NO existen aquí — buildCalendar
@@ -1350,24 +1409,7 @@ app.get('/api/quality/upgrades', async (req) =>
 );
 app.get('/api/quality/duplicates', async () => q.duplicates());
 
-// Los formularios con fichero son de los pocos que un navegador manda a otro
-// sitio sin pedir permiso antes, así que una web cualquiera podría hacerte
-// importar un zip. Los demás endpoints se salvan porque solo aceptan JSON.
-function origenAjeno(req) {
-  const origen = req.headers.origin;
-  if (!origen) return false; // curl, la propia app: no hay navegador de por medio
-  try {
-    return new URL(origen).host !== req.headers.host;
-  } catch {
-    return true;
-  }
-}
-
 app.post('/api/letterboxd/import', async (req, reply) => {
-  if (origenAjeno(req)) {
-    reply.code(403);
-    return { error: 'Petición desde otro sitio web' };
-  }
   const results = [];
   let lists = [];
   for await (const part of req.files()) {
@@ -1495,19 +1537,36 @@ app.delete('/api/letterboxd', async () => {
 app.get('/api/letterboxd/summary', async () => letterboxdSummary());
 // --- plex image proxy (with tiny disk cache) ----------------------------------------------
 
+/**
+ * La respuesta de Plex se guarda en disco y se sirve como image/jpeg: si el
+ * destino resultara no ser Plex, estaríamos cacheando y devolviendo lo que
+ * fuera. Un vistazo al content-type corta eso sin coste.
+ */
+function esImagen(res) {
+  return (res.headers.get('content-type') || '').toLowerCase().startsWith('image/');
+}
+
 app.get('/img/:key/:kind', async (req, reply) => {
   const { key, kind } = req.params;
   if (!/^\d+$/.test(key) || !['poster', 'art'].includes(kind)) {
     reply.code(400);
     return { error: 'bad request' };
   }
-  const cacheFile = path.join(DATA_DIR, 'img', `${key}-${kind}.jpg`);
+  // el id normalizado, no el crudo: «123», «0123» y «00123» son la misma
+  // película para la consulta (Number) y tenían tres ficheros de caché
+  // distintos, cada uno con su transcode a Plex
+  const id = Number(key);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    reply.code(400);
+    return { error: 'bad request' };
+  }
+  const cacheFile = path.join(DATA_DIR, 'img', `${id}-${kind}.jpg`);
   if (fs.existsSync(cacheFile)) {
     reply.header('Cache-Control', 'public, max-age=604800');
     reply.type('image/jpeg');
     return fs.createReadStream(cacheFile);
   }
-  const movie = db.prepare('SELECT thumb, art FROM movies WHERE rating_key = ?').get(Number(key));
+  const movie = db.prepare('SELECT thumb, art FROM movies WHERE rating_key = ?').get(id);
   const rel = kind === 'poster' ? movie?.thumb : movie?.art;
   if (!rel) {
     reply.code(404);
@@ -1519,7 +1578,7 @@ app.get('/img/:key/:kind', async (req, reply) => {
   const target = `${url}/photo/:/transcode?width=${width}&height=${height}&minSize=1&upscale=1&url=${encodeURIComponent(rel)}&X-Plex-Token=${token}`;
   try {
     const res = await fetch(target, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) throw new Error(String(res.status));
+    if (!res.ok || !esImagen(res)) throw new Error(String(res.status));
     const buf = Buffer.from(await res.arrayBuffer());
     fs.writeFile(cacheFile, buf, () => {});
     reply.header('Cache-Control', 'public, max-age=604800');
@@ -1533,12 +1592,17 @@ app.get('/img/:key/:kind', async (req, reply) => {
 
 // person thumb proxy (plex tag thumbs are absolute plex paths)
 app.get('/img/person/:id', async (req, reply) => {
-  const person = db.prepare('SELECT thumb FROM people WHERE id = ?').get(Number(req.params.id));
+  const personId = Number(req.params.id);
+  if (!Number.isSafeInteger(personId) || personId <= 0) {
+    reply.code(400);
+    return { error: 'bad request' };
+  }
+  const person = db.prepare('SELECT thumb FROM people WHERE id = ?').get(personId);
   if (!person?.thumb) {
     reply.code(404);
     return { error: 'sin imagen' };
   }
-  const cacheFile = path.join(DATA_DIR, 'img', `p${req.params.id}.jpg`);
+  const cacheFile = path.join(DATA_DIR, 'img', `p${personId}.jpg`);
   if (fs.existsSync(cacheFile)) {
     reply.header('Cache-Control', 'public, max-age=604800');
     reply.type('image/jpeg');
@@ -1551,7 +1615,7 @@ app.get('/img/person/:id', async (req, reply) => {
       target = `${url}/photo/:/transcode?width=200&height=200&minSize=1&url=${encodeURIComponent(person.thumb)}&X-Plex-Token=${token}`;
     }
     const res = await fetch(target, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) throw new Error(String(res.status));
+    if (!res.ok || !esImagen(res)) throw new Error(String(res.status));
     const buf = Buffer.from(await res.arrayBuffer());
     fs.writeFile(cacheFile, buf, () => {});
     reply.header('Cache-Control', 'public, max-age=604800');
@@ -1582,7 +1646,9 @@ setInterval(() => {
   const now = new Date();
   const h = now.getHours();
   const m = now.getMinutes();
-  const todayStr = now.toISOString().slice(0, 10);
+  // el MISMO «hoy» que el resto de la app (local, no UTC): antes convivían dos
+  // ideas de qué día es dentro del mismo proceso
+  const todayStr = today();
   // guard so a restart inside the 03:00 window doesn't re-trigger the whole run
   if (
     h === 3 && m < 5 &&
@@ -1594,13 +1660,11 @@ setInterval(() => {
     // its own failure instead of the whole chain dying silently
     runFullRefresh({ trigger: 'nightly' })
       .then((r) => {
+        // el histórico de verdad lo escribe runFullRefresh en refresh_runs, que
+        // es lo que leen Ajustes y el aviso de la barra lateral: aquí basta con
+        // dejar los fallos en el log del servidor
         const failed = (r.steps || []).filter((s) => s.state === 'error');
         for (const s of failed) app.log.error({ step: s.key, detail: s.detail }, 'nightly');
-        setSetting('nightly_last_result', JSON.stringify({
-          at: Date.now(),
-          ok: (r.steps || []).filter((s) => s.state === 'done').length,
-          failed: failed.map((s) => ({ key: s.key, detail: s.detail })),
-        }));
       })
       .catch((err) => app.log.error({ err }, 'nightly'));
   }

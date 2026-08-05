@@ -1,4 +1,6 @@
 import { db, getSetting, setSetting, cacheRead, cacheWrite } from './db.js';
+import { today } from './dates.js';
+import { mapPool } from './pool.js';
 import { watchedIndex, isWatched, normTitle } from './letterboxd.js';
 import { needsLatin, readableTitle } from './titles.js';
 import { cachePrefix } from './cache-versions.js';
@@ -189,6 +191,16 @@ export async function personDetails(tmdbPersonId) {
   );
 }
 
+/**
+ * Una página del ranking «en boga» de TMDB. La piden dos sitios (los paquetes
+ * de Favoritos y el canon «en boga» de Descubrir) y cada uno la cacheaba por su
+ * cuenta —uno con el idioma incrustado a mano— así que la misma página se
+ * descargaba dos veces y caducaba en momentos distintos.
+ */
+export async function personPopularPage(page) {
+  return tmdbGet('/person/popular', { page }, { cacheKey: `person_popular:${page}:${lang()}`, cacheMs: DAY });
+}
+
 // Rough country -> continent map for the people filters (film-producing nations).
 const CONTINENTS = {
   'United States': 'Norteamérica', USA: 'Norteamérica', Canada: 'Norteamérica', Mexico: 'Norteamérica',
@@ -345,14 +357,40 @@ export async function resolvePerson(personId) {
   return person;
 }
 
+// --- ficha de película: UNA puerta para todos los caminos ---------------------
+
+/**
+ * La ficha de una película, con o sin créditos.
+ *
+ * Vivía en dos cachés independientes: `movie_cr:` (con append_to_response=
+ * credits) y `movie:` (sin). Como la primera es un superset ESTRICTO de la
+ * segunda —trae runtime, genres, poster_path, release_date y títulos—, los
+ * caminos que no necesitan créditos estaban pidiendo a TMDB una ficha que otro
+ * camino acababa de guardar entera. Pasaba en cadena: en un palmarés,
+ * movieDirectors bajaba `movie_cr:` del candidato ganador y acto seguido
+ * movieSummary volvía a pedir LA MISMA película bajo `movie:`, una llamada de
+ * más por película emparejada, en la misma ráfaga que ya provocaba 429.
+ *
+ * Ahora quien no necesita créditos mira primero si el superset está en casa.
+ * Al revés no vale: `movie:` no lleva créditos y devolverlo rompería a quien
+ * los pide.
+ */
+const MOVIE_TTL = 7 * DAY;
+
+export async function movieDetail(tmdbId, { withCredits = false, cacheMs = MOVIE_TTL } = {}) {
+  const conCreditos = `movie_cr:${tmdbId}:${lang()}`;
+  if (withCredits) {
+    return tmdbGet(`/movie/${tmdbId}`, { append_to_response: 'credits' }, { cacheKey: conCreditos, cacheMs });
+  }
+  const superset = cacheRead(conCreditos, cacheMs);
+  if (superset) return superset;
+  return tmdbGet(`/movie/${tmdbId}`, {}, { cacheKey: `movie:${tmdbId}:${lang()}`, cacheMs });
+}
+
 // --- filmography / completeness ---------------------------------------------
 
 const libraryTmdbIds = () =>
   new Set(db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((r) => r.tmdb_id));
-
-function today() {
-  return new Date().toLocaleDateString('en-CA');
-}
 
 /**
  * Enrich TMDB items (with .tmdb_id) with runtime and short/doc/TV flags, using
@@ -361,39 +399,22 @@ function today() {
  * are cheap. Mutates items in place.
  */
 export async function enrichRuntimes(items, { concurrency = 6, withCredits = false } = {}) {
-  let i = 0;
-  async function worker() {
-    for (;;) {
-      const idx = i++;
-      if (idx >= items.length) return;
-      const it = items[idx];
-      try {
-        // With credits we can also count co-directors → "dirección coral" (#7).
-        const det = withCredits
-          ? await tmdbGet(
-              `/movie/${it.tmdb_id}`,
-              { append_to_response: 'credits' },
-              { cacheKey: `movie_cr:${it.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
-            )
-          : await tmdbGet(
-              `/movie/${it.tmdb_id}`,
-              {},
-              { cacheKey: `movie:${it.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
-            );
-        it.runtime = det.runtime || null;
-        if (det.genres?.length) classifyGenres(it, det.genres.map((x) => x.id));
-        if (withCredits) {
-          const dirs = new Set((det.credits?.crew || []).filter((c) => c.job === 'Director').map((c) => c.id));
-          it.directorCount = dirs.size || 1;
-          it.isCoral = dirs.size >= 3;
-        }
-      } catch {
-        it.runtime = it.runtime ?? null;
+  await mapPool(items, concurrency, async (it) => {
+    try {
+      // With credits we can also count co-directors → "dirección coral" (#7).
+      const det = await movieDetail(it.tmdb_id, { withCredits });
+      it.runtime = det.runtime || null;
+      if (det.genres?.length) classifyGenres(it, det.genres.map((x) => x.id));
+      if (withCredits) {
+        const dirs = new Set((det.credits?.crew || []).filter((c) => c.job === 'Director').map((c) => c.id));
+        it.directorCount = dirs.size || 1;
+        it.isCoral = dirs.size >= 3;
       }
-      it.isShort = !!it.runtime && it.runtime < 40;
+    } catch {
+      it.runtime = it.runtime ?? null;
     }
-  }
-  await Promise.all(Array.from({ length: concurrency }, worker));
+    it.isShort = !!it.runtime && it.runtime < 40;
+  });
   // punto único por el que pasan filmografías, huecos y favoritos: si TMDB no
   // tenía traducción y devolvió el título original en otro alfabeto, aquí se
   // cambia por el internacional
@@ -523,18 +544,14 @@ export async function enrichReleasePhases(items, { maxFetch = 60, concurrency = 
 
 /** Directores/as de una película, con la misma caché movie_cr que enrichRuntimes. */
 export async function movieDirectors(tmdbId) {
-  const det = await tmdbGet(
-    `/movie/${tmdbId}`,
-    { append_to_response: 'credits' },
-    { cacheKey: `movie_cr:${tmdbId}:${lang()}`, cacheMs: 7 * DAY }
-  );
+  const det = await movieDetail(tmdbId, { withCredits: true });
   return (det.credits?.crew || []).filter((c) => c.job === 'Director').map((c) => c.name);
 }
 
 /** Ficha mínima de una película (cartel, fecha, títulos), con la misma caché
  *  de 7 días que usa enrichRuntimes para no pedir dos veces lo mismo. */
 export async function movieSummary(tmdbId) {
-  const det = await tmdbGet(`/movie/${tmdbId}`, {}, { cacheKey: `movie:${tmdbId}:${lang()}`, cacheMs: 7 * DAY });
+  const det = await movieDetail(tmdbId);
   return {
     tmdb_id: tmdbId,
     title: det.title || det.original_title || null,
@@ -574,20 +591,13 @@ export async function backfillMovieTmdbIds() {
     .all();
   const upd = db.prepare('UPDATE movies SET tmdb_id = ? WHERE rating_key = ?');
   let resolved = 0;
-  let i = 0;
-  async function worker() {
-    for (;;) {
-      const idx = i++;
-      if (idx >= rows.length) return;
-      const m = rows[idx];
-      const id =
-        (await findByImdbId(m.imdb_id)) ||
-        (m.original_title ? await searchMovieId(m.original_title, m.year) : null) ||
-        (await searchMovieId(m.title, m.year));
-      if (id) { upd.run(id, m.rating_key); resolved++; }
-    }
-  }
-  await Promise.all(Array.from({ length: 6 }, worker));
+  await mapPool(rows, 6, async (m) => {
+    const id =
+      (await findByImdbId(m.imdb_id)) ||
+      (m.original_title ? await searchMovieId(m.original_title, m.year) : null) ||
+      (await searchMovieId(m.title, m.year));
+    if (id) { upd.run(id, m.rating_key); resolved++; }
+  });
   return { pending: rows.length, resolved };
 }
 
@@ -601,25 +611,18 @@ export async function backfillEnglishTitles({ budget = 3000 } = {}) {
   // '' when TMDB has no English title, so the row is not retried forever
   const upd = db.prepare('UPDATE movies SET english_title = ? WHERE rating_key = ?');
   let done = 0;
-  let i = 0;
-  async function worker() {
-    for (;;) {
-      const idx = i++;
-      if (idx >= rows.length) return;
-      const m = rows[idx];
-      try {
-        const data = await tmdbGet(
-          `/movie/${m.tmdb_id}`,
-          { language: 'en-US' },
-          { cacheKey: `movie_en:${m.tmdb_id}`, cacheMs: 30 * DAY }
-        );
-        upd.run(data.title || '', m.rating_key);
-        done++;
-        setBuildProgress('english_titles', 'Completando títulos en inglés…', done, rows.length);
-      } catch {}
-    }
-  }
-  await Promise.all(Array.from({ length: 6 }, worker));
+  await mapPool(rows, 6, async (m) => {
+    try {
+      const data = await tmdbGet(
+        `/movie/${m.tmdb_id}`,
+        { language: 'en-US' },
+        { cacheKey: `movie_en:${m.tmdb_id}`, cacheMs: 30 * DAY }
+      );
+      upd.run(data.title || '', m.rating_key);
+      done++;
+      setBuildProgress('english_titles', 'Completando títulos en inglés…', done, rows.length);
+    } catch {}
+  });
   clearBuildProgress('english_titles');
   return { done, remaining: pending - done };
 }
@@ -643,22 +646,15 @@ export async function normalizeLibraryTitles({ concurrency = 6 } = {}) {
 
   const upd = db.prepare('UPDATE movies SET title = ?, english_title = ? WHERE rating_key = ?');
   let renamed = 0;
-  let i = 0;
-  async function worker() {
-    for (;;) {
-      const idx = i++;
-      if (idx >= pending.length) return;
-      const row = pending[idx];
-      // el backfill de títulos en inglés ya puede tenerlo; si no, se pide
-      let en = row.english_title || null;
-      if (!en && row.tmdb_id) en = await englishTitle(row.tmdb_id);
-      if (!en || needsLatin(en)) continue;
-      upd.run(en, en, row.rating_key);
-      renamed++;
-      setBuildProgress('titles:movies', 'Normalizando títulos…', renamed, pending.length);
-    }
-  }
-  await Promise.all(Array.from({ length: concurrency }, worker));
+  await mapPool(pending, concurrency, async (row) => {
+    // el backfill de títulos en inglés ya puede tenerlo; si no, se pide
+    let en = row.english_title || null;
+    if (!en && row.tmdb_id) en = await englishTitle(row.tmdb_id);
+    if (!en || needsLatin(en)) return;
+    upd.run(en, en, row.rating_key);
+    renamed++;
+    setBuildProgress('titles:movies', 'Normalizando títulos…', renamed, pending.length);
+  });
   clearBuildProgress('titles:movies');
   return { checked: pending.length, renamed };
 }
@@ -686,20 +682,13 @@ export async function englishTitle(tmdbId) {
 export async function latinizeTitles(items, { concurrency = 6 } = {}) {
   const pending = items.filter((i) => i?.tmdb_id && needsLatin(i.title));
   if (!pending.length) return items;
-  let i = 0;
-  async function worker() {
-    for (;;) {
-      const idx = i++;
-      if (idx >= pending.length) return;
-      const it = pending[idx];
-      const en = await englishTitle(it.tmdb_id);
-      if (en) {
-        it.original_title = it.original_title || it.title;
-        it.title = readableTitle(it.title, en);
-      }
+  await mapPool(pending, concurrency, async (it) => {
+    const en = await englishTitle(it.tmdb_id);
+    if (en) {
+      it.original_title = it.original_title || it.title;
+      it.title = readableTitle(it.title, en);
     }
-  }
-  await Promise.all(Array.from({ length: concurrency }, worker));
+  });
   return items;
 }
 
@@ -726,16 +715,9 @@ export async function latinPersonName(tmdbId, name) {
 export async function latinizeNames(entries, { concurrency = 6 } = {}) {
   const pending = entries.filter((e) => e && needsLatin(e.name) && (e.tmdb_id || e.tmdbId));
   if (!pending.length) return entries;
-  let i = 0;
-  async function worker() {
-    for (;;) {
-      const idx = i++;
-      if (idx >= pending.length) return;
-      const e = pending[idx];
-      e.name = await latinPersonName(e.tmdb_id || e.tmdbId, e.name);
-    }
-  }
-  await Promise.all(Array.from({ length: concurrency }, worker));
+  await mapPool(pending, concurrency, async (e) => {
+    e.name = await latinPersonName(e.tmdb_id || e.tmdbId, e.name);
+  });
   return entries;
 }
 
@@ -753,31 +735,20 @@ export async function normalizePeopleNames({ concurrency = 6 } = {}) {
 
   const upd = db.prepare('UPDATE people SET name = ? WHERE id = ?');
   let renamed = 0;
-  let i = 0;
-  async function worker() {
-    for (;;) {
-      const idx = i++;
-      if (idx >= pending.length) return;
-      const row = pending[idx];
-      const latin = await latinPersonName(row.tmdb_id, row.name);
-      if (latin === row.name) continue;
-      upd.run(latin, row.id);
-      renamed++;
-      setBuildProgress('titles:people', 'Normalizando nombres…', renamed, pending.length);
-    }
-  }
-  await Promise.all(Array.from({ length: concurrency }, worker));
+  await mapPool(pending, concurrency, async (row) => {
+    const latin = await latinPersonName(row.tmdb_id, row.name);
+    if (latin === row.name) return;
+    upd.run(latin, row.id);
+    renamed++;
+    setBuildProgress('titles:people', 'Normalizando nombres…', renamed, pending.length);
+  });
   clearBuildProgress('titles:people');
   return { checked: pending.length, renamed };
 }
 
 /** Full TMDB movie detail with credits (cached). */
 export async function tmdbMovieDetail(tmdbId) {
-  const det = await tmdbGet(
-    `/movie/${tmdbId}`,
-    { append_to_response: 'credits' },
-    { cacheKey: `movie_cr:${tmdbId}:${lang()}`, cacheMs: 7 * DAY }
-  );
+  const det = await movieDetail(tmdbId, { withCredits: true });
   if (!needsLatin(det.title)) return det;
   // la ficha sigue enseñando el original debajo: solo cambia el titular
   return { ...det, title: readableTitle(det.title, await englishTitle(tmdbId)) };
@@ -787,7 +758,10 @@ export async function tmdbMovieDetail(tmdbId) {
 export async function tmdbPoster(tmdbId) {
   if (!tmdbId) return null;
   try {
-    const det = await tmdbGet(`/movie/${tmdbId}`, {}, { cacheKey: `movie:${tmdbId}:${lang()}`, cacheMs: 30 * DAY });
+    // 30 días: un cartel no cambia, y esto solo alimenta miniaturas. Antes ese
+    // TTL más largo se escribía sobre la MISMA clave que usa movieSummary con 7
+    // días, así que cuál mandaba dependía de quién llegara primero.
+    const det = await movieDetail(tmdbId, { cacheMs: 30 * DAY });
     return det.poster_path || null;
   } catch {
     return null;
@@ -1074,11 +1048,7 @@ export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays 
       const ev = out[i];
       let directors = [];
       try {
-        const det = await tmdbGet(
-          `/movie/${ev.tmdb_id}`,
-          { append_to_response: 'credits' },
-          { cacheKey: `movie_cr:${ev.tmdb_id}:${lang()}`, cacheMs: 7 * DAY }
-        );
+        const det = await movieDetail(ev.tmdb_id, { withCredits: true });
         ev.runtime = det.runtime || null;
         if (det.genres?.length) ev.genre_ids = det.genres.map((g) => g.id);
         directors = (det.credits?.crew || []).filter((c) => c.job === 'Director');
@@ -1216,7 +1186,7 @@ export async function suggestedPeople() {
   // popular people, filtered to directors ("en boga" según TMDB/IMDb)
   const popularRaw = [];
   for (const page of [1, 2, 3, 4]) {
-    const data = await tmdbGet('/person/popular', { page }, { cacheKey: `person_popular:${page}:${lang()}`, cacheMs: DAY });
+    const data = await personPopularPage(page);
     for (const p of data.results || []) if (p.known_for_department === 'Directing') popularRaw.push(p);
   }
   const seen = new Set();

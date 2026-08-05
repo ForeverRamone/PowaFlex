@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { addBulkToRadarr } from '../radarr.js';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
 import { Plus, RotateCw } from 'lucide-react';
@@ -149,16 +150,9 @@ export default function Calendar() {
 
   const bulkAdd = async () => {
     setBulk({ running: true, summary: null });
-    const res = await api('/radarr/add-bulk', { method: 'POST', body: { tmdbIds: eligible.map((e) => e.tmdb_id) } });
-    if (res.error) {
-      setBulk({ running: false, summary: `⚠️ ${res.error}` });
-      return;
-    }
-    for (const r of res.results || []) if (r.ok || r.alreadyExists) addRadarrId(r.tmdbId);
-    setBulk({
-      running: false,
-      summary: `✓ ${res.added} añadidas a Radarr${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''}`,
-    });
+    // el resumen se enseña aquí al lado, no en un toast
+    const { summary } = await addBulkToRadarr(eligible.map((e) => e.tmdb_id), { onAdded: addRadarrId });
+    setBulk({ running: false, summary });
   };
 
   const byMonth = new Map();

@@ -6,6 +6,7 @@ import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, PageHeader, Signature } from '../components.jsx';
 import { toast } from '../toast.js';
+import { addBulkToRadarr } from '../radarr.js';
 
 const TABS = [
   ['favorites', 'Tus favoritos', Star],
@@ -16,16 +17,8 @@ const TABS = [
 
 // send a visible batch to Radarr in one go
 async function sendBulk(ids, addRadarrId) {
-  if (!ids.length) return;
-  const res = await api('/radarr/add-bulk', { method: 'POST', body: { tmdbIds: ids.slice(0, 300) } });
-  if (res.error) {
-    toast(`⚠️ ${res.error}`, 'error');
-    return;
-  }
-  for (const r of res.results || []) if (r.ok || r.alreadyExists) addRadarrId(r.tmdbId);
-  toast(
-    `✓ ${res.added} añadidas a Radarr${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''}`
-  );
+  const { error, summary } = await addBulkToRadarr(ids, { onAdded: addRadarrId });
+  if (summary) toast(summary, error ? 'error' : undefined);
 }
 
 const passesScore = (f, minScore) => !minScore || f.mdb?.score == null || f.mdb.score >= minScore;

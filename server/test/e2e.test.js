@@ -221,3 +221,45 @@ test('con contraseña puesta, nada pasa sin ella (salvo /api/version)', async ()
     fs.rmSync(dir2, { recursive: true, force: true });
   }
 });
+
+/**
+ * Un formulario en otra web puede mandar multipart/form-data a este servidor sin
+ * que el navegador pida permiso antes (no hay preflight que lo pare) y con las
+ * credenciales Basic ya guardadas. Como el parser de multipart deja el cuerpo
+ * vacío en vez de fallar, TODO POST que no necesite cuerpo se podía disparar
+ * desde una pestaña cualquiera: sincronizar, actualizar todo, lanzar Radarr.
+ */
+test('las peticiones que mutan desde otro origen se rechazan; la propia app pasa', async () => {
+  const post = (ruta, headers) =>
+    fetch(`${base}${ruta}`, { method: 'POST', headers }).then((r) => r.status);
+
+  for (const ruta of ['/api/sync', '/api/refresh-all', '/api/radarr/auto/run', '/api/letterboxd/import']) {
+    assert.equal(
+      await post(ruta, { Origin: 'http://web-cualquiera.example' }),
+      403,
+      `${ruta} debe rechazar el origen ajeno`
+    );
+  }
+
+  // la app se sirve del mismo origen que la API: su Origin siempre casa
+  const propio = await post('/api/sagas/scan', { Origin: base });
+  assert.notEqual(propio, 403, 'el mismo origen no puede quedar bloqueado');
+
+  // sin cabecera Origin no hay navegador al que engañar (curl, scripts)
+  assert.notEqual(await post('/api/sagas/scan', {}), 403, 'sin Origin tampoco se bloquea');
+
+  // y leer nunca se bloquea: el proxy de imágenes y la SPA se sirven a cualquiera
+  const lectura = await fetch(`${base}/api/version`, { headers: { Origin: 'http://web-cualquiera.example' } });
+  assert.equal(lectura.status, 200, 'los GET no llevan cortafuegos de origen');
+});
+
+test('el proxy de imágenes normaliza el id y rechaza lo que no es un entero', async () => {
+  for (const malo of ['1e3', '-1', '99999999999999999999999', 'abc']) {
+    assert.equal((await fetch(`${base}/img/${malo}/poster`)).status, 400, `${malo} no es un id`);
+  }
+  // 404 (no hay película) en vez de 400: el id es válido, con ceros o sin ellos
+  for (const bueno of ['7', '007']) {
+    assert.equal((await fetch(`${base}/img/${bueno}/poster`)).status, 404, `${bueno} es un id válido`);
+  }
+  assert.equal((await fetch(`${base}/img/person/0`)).status, 400);
+});

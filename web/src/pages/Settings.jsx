@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, UI_THEMES, applyTheme, currentTheme } from '../api.js';
 import { Spinner, ProgressBar, PageHeader } from '../components.jsx';
 import { toast } from '../toast.js';
@@ -25,6 +25,9 @@ function TestBadge({ result }) {
 }
 
 export default function Settings() {
+  // el sondeo de MDBList vive aquí para poder cortarlo al salir de la página
+  const mdbPoll = useRef(null);
+  useEffect(() => () => clearInterval(mdbPoll.current), []);
   const [s, setS] = useState(null);
   const [tests, setTests] = useState({});
   const [saved, setSaved] = useState(false);
@@ -53,12 +56,14 @@ export default function Settings() {
     api('/refresh-all').then((r) => !r.error && setRefresh(r));
   }, []);
 
-  // poll sync status while running
+  // poll sync status while running. Durante «Actualizar todo» NO: ese bucle ya
+  // pregunta por /sync/status cada 1,5 s, y con los dos vivos se preguntaba dos
+  // veces por lo mismo al mismo ritmo.
   useEffect(() => {
-    if (!sync?.running) return;
+    if (!sync?.running || refresh?.running) return;
     const t = setInterval(() => api('/sync/status').then(setSync), 1500);
     return () => clearInterval(t);
-  }, [sync?.running]);
+  }, [sync?.running, refresh?.running]);
 
   // poll the full-refresh routine while it runs (it drives the Plex sync too)
   useEffect(() => {
@@ -514,10 +519,14 @@ export default function Settings() {
             onClick={async () => {
               await save();
               await api('/mdblist/sync', { method: 'POST' });
-              const poll = setInterval(async () => {
+              // el intervalo se guarda en la ref para que el efecto de limpieza
+              // lo mate al salir de Ajustes: antes seguía preguntando cada dos
+              // segundos hasta recargar la página
+              clearInterval(mdbPoll.current);
+              mdbPoll.current = setInterval(async () => {
                 const st = await api('/mdblist/status');
                 setMdbStatus(st);
-                if (!st.running) clearInterval(poll);
+                if (!st.running) clearInterval(mdbPoll.current);
               }, 2000);
             }}
           >

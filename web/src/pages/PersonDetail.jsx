@@ -6,6 +6,7 @@ import {
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge,
 } from '../components.jsx';
 import { toast } from '../toast.js';
+import { addBulkToRadarr } from '../radarr.js';
 
 const VIEWS = [
   ['all', 'Todas'],
@@ -161,16 +162,9 @@ export default function PersonDetail() {
   ).length;
   const bulkAddMissing = async () => {
     setBulkBusy(true);
-    const res = await api('/radarr/add-bulk', { method: 'POST', body: { tmdbIds: missingPendingIds.slice(0, 300) } });
+    const { error, summary } = await addBulkToRadarr(missingPendingIds, { onAdded: addRadarrId });
     setBulkBusy(false);
-    if (res.error) {
-      toast(`⚠️ ${res.error}`, 'error');
-      return;
-    }
-    for (const r of res.results || []) if (r.ok || r.alreadyExists) addRadarrId(r.tmdbId);
-    toast(
-      `✓ ${res.added} añadidas a Radarr${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''}`
-    );
+    if (summary) toast(summary, error ? 'error' : undefined);
   };
 
   return (

@@ -1,4 +1,5 @@
 import { db, getSetting, setSetting } from './db.js';
+import { today } from './dates.js';
 import { UNWATCHED } from './queries.js';
 
 const BASE = process.env.MDBLIST_BASE || 'https://api.mdblist.com';
@@ -52,12 +53,12 @@ function dailyBudget() {
 }
 
 function usage() {
-  const today = new Date().toLocaleDateString('en-CA'); // el día cambia a tu medianoche
+  const hoy = today(); // el día cambia a tu medianoche
   try {
     const u = JSON.parse(getSetting('mdblist_usage') || '{}');
-    if (u.date === today) return u;
+    if (u.date === hoy) return u;
   } catch {}
-  return { date: today, count: 0 };
+  return { date: hoy, count: 0 };
 }
 
 function addUsage(n) {
@@ -118,6 +119,7 @@ export async function fetchRatingsBatch(tmdbIds) {
   apiKey(); // no key = no request leaves: must not spend budget either
   let items = null;
   let used = 0;
+  let parsed = [];
   try {
     try {
       used = 1;
@@ -145,13 +147,30 @@ export async function fetchRatingsBatch(tmdbIds) {
     // delante el resto, pero las que YA se descargaron están pagadas del
     // presupuesto del día y tirarlas obligaba a volver a pedirlas mañana.
     if (items?.length) {
-      const parsed = items.map(parseItem).filter(Boolean);
+      parsed = items.map(parseItem).filter(Boolean); // una sola pasada: el return lo reutiliza
       db.transaction(() => {
         for (const p of parsed) upsertRating.run(p);
+        // MDBList no conoce todas las películas (las raras y las antiguas se le
+        // escapan), y de las que no conoce no quedaba ni rastro: como «lo que
+        // falta» se calcula mirando qué ids NO están en la tabla, esos volvían
+        // a pedirse en CADA visita, para siempre. Un canon viejo como Sight &
+        // Sound se comía 50 peticiones del presupuesto diario cada vez que lo
+        // abrías. Dejando una fila vacía con la fecha, el id deja de pedirse; y
+        // como el barrido semanal reintenta lo más viejo, si MDBList la añade
+        // algún día se acaba recogiendo igual.
+        const vinieron = new Set(parsed.map((p) => p.tmdb_id));
+        for (const id of tmdbIds) {
+          if (vinieron.has(id)) continue;
+          upsertRating.run({
+            tmdb_id: id, imdb: null, imdb_votes: null, rt_critic: null, rt_audience: null,
+            metacritic: null, letterboxd: null, lb_votes: null, trakt: null, score: null,
+            json: null, fetched_at: Date.now(),
+          });
+        }
       })();
     }
   }
-  return items.map(parseItem).filter(Boolean);
+  return parsed;
 }
 
 export const mdbSyncStatus = {
@@ -205,9 +224,15 @@ export async function syncRatings() {
 
 export function ratingsCoverage() {
   const total = db.prepare('SELECT COUNT(DISTINCT tmdb_id) n FROM movies WHERE tmdb_id IS NOT NULL').get().n;
+  // «Tiene al menos una nota» distingue una ficha de verdad de la fila vacía
+  // que se deja cuando MDBList no conoce la película; sin esto, la cobertura
+  // que enseña Salud contaría como «con notas» justo las que no las tienen.
+  // Se mira nota a nota y no el JSON crudo, que en bases antiguas puede venir
+  // vacío aun teniendo notas.
   const withRatings = db
     .prepare(
-      `SELECT COUNT(DISTINCT m.tmdb_id) n FROM movies m JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id`
+      `SELECT COUNT(DISTINCT m.tmdb_id) n FROM movies m JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
+       WHERE COALESCE(r.score, r.imdb, r.rt_critic, r.rt_audience, r.metacritic, r.letterboxd, r.trakt) IS NOT NULL`
     )
     .get().n;
   return { total, withRatings, remainingBudget: remainingBudget(), usedToday: usage().count };

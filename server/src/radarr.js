@@ -1,4 +1,5 @@
 import { db, getSetting, setSetting } from './db.js';
+import { today } from './dates.js';
 import { setBuildProgress, clearBuildProgress, enrichReleasePhases } from './tmdb.js';
 
 function radarrConfig() {
@@ -143,18 +144,33 @@ export async function radarrCutoffUnmet() {
  * aparece sería maltratar a los indexers para nada.
  */
 export async function checkDigitalReleases({ maxFetch = 500 } = {}) {
-  const hoy = new Date().toLocaleDateString('en-CA');
+  const hoy = today();
   const items = await radarrWanted();
   await enrichReleasePhases(items, { maxFetch });
   const ins = db.prepare(
     `INSERT OR IGNORE INTO app_events (type, ref, title, body, url, created_at)
      VALUES ('digital', ?, ?, ?, ?, ?)`
   );
+  const yaAvisada = new Map(
+    db.prepare(`SELECT ref FROM app_events WHERE type = 'digital'`).all().map((r) => [r.ref, true])
+  );
   let nuevas = 0;
   for (const it of items) {
     const d = it.phases?.digital;
     if (!d || d > hoy) continue;
     if (Date.now() - Date.parse(d) > 60 * 24 * 3600 * 1000) continue;
+    // Ya avisada en una pasada anterior: ni evento ni búsqueda. Esta
+    // comprobación es la que evita machacar los indexers cada noche, y va
+    // primero para poder ordenar la búsqueda ANTES de dar la película por
+    // avisada: apuntando el evento primero, si la orden a Radarr fallaba
+    // (caído, o sin esa película), el INSERT OR IGNORE ya había consumido el
+    // único intento y esa película se quedaba sin buscar para siempre.
+    if (yaAvisada.get(String(it.tmdb_id))) continue;
+    try {
+      await radarrSearchAgain(it.tmdb_id);
+    } catch {
+      continue; // se reintenta en la siguiente pasada
+    }
     const r = ins.run(
       String(it.tmdb_id),
       `💿 «${it.title}» ya está en digital`,
@@ -162,12 +178,7 @@ export async function checkDigitalReleases({ maxFetch = 500 } = {}) {
       '/calidad',
       Date.now()
     );
-    if (r.changes) {
-      nuevas++;
-      try {
-        await radarrSearchAgain(it.tmdb_id);
-      } catch {}
-    }
+    if (r.changes) nuevas++;
   }
   return { wanted: items.length, nuevas };
 }

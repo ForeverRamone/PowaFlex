@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   REGISTRY, parseSelectionTable, parseSundanceWinners, parseWinnersTables, stripTags, directorsMatch, cleanTableTitle,
-  parseCahiersTables, splitDirectors,
+  parseCahiersTables, splitDirectors, elegirCandidato,
 } from '../src/festivals.js';
 import { SIGHT_AND_SOUND_2022 } from '../src/data/sight-and-sound-2022.js';
 
@@ -268,4 +268,101 @@ test('splitDirectors parte celdas multi-nombre y completa apellidos compartidos'
 test('stripTags limpia notas, estilos y entidades', () => {
   assert.equal(stripTags('<i><a href="#">Título</a></i><sup>[2]</sup>'), 'Título');
   assert.equal(stripTags('A&amp;B &quot;C&quot;'), 'A&B "C"');
+});
+
+// --- la decisión del emparejado, sin salir a internet -------------------------
+// Cuatro rondas de fallos de producción vivían aquí (las versiones v2…v6 de la
+// caché) y ninguna tenía prueba porque hacía falta red. Con elegirCandidato
+// separada del código de red, cada regresión conocida queda fijada.
+
+const dirsFijos = (mapa) => async (id) => (id in mapa ? mapa[id] : []);
+const SIN_LIB = new Set();
+
+test('un título genérico no engancha a otra película: manda el director', async () => {
+  const row = { title: 'Bunker', director: 'Florian Zeller' };
+  const cands = [
+    { id: 1, title: 'Bunker', original_title: 'Bunker', date: '2026-03-01' },
+    { id: 2, title: 'Bunker', original_title: 'Bunker', date: '2026-08-01' },
+  ];
+  const { tmdbId } = await elegirCandidato(row, 2026, cands, SIN_LIB, dirsFijos({
+    1: ['Otra Persona'], 2: ['Florian Zeller'],
+  }));
+  assert.equal(tmdbId, 2);
+});
+
+test('sin ningún director que case, mejor sin ficha que con la equivocada', async () => {
+  const row = { title: 'Bunker', director: 'Florian Zeller' };
+  const cands = [{ id: 1, title: 'Bunker', original_title: 'Bunker', date: '2026-03-01' }];
+  const { tmdbId } = await elegirCandidato(row, 2026, cands, SIN_LIB, dirsFijos({ 1: ['Otra Persona'] }));
+  assert.equal(tmdbId, null);
+});
+
+// «@ In the Mood for Love» (making-of, 2001) normaliza al mismo título que el
+// largometraje (2000) y lo dirige el mismo Wong Kar Wai: solo el año los separa
+test('a igualdad de director gana el título clavado y el año exacto', async () => {
+  const row = { title: 'In the Mood for Love', director: 'Wong Kar Wai' };
+  const cands = [
+    { id: 10, title: '@ In the Mood for Love', original_title: '@ In the Mood for Love', date: '2001-01-01' },
+    { id: 11, title: 'In the Mood for Love', original_title: 'Fa yeung nin wa', date: '2000-09-29' },
+  ];
+  const { tmdbId } = await elegirCandidato(row, 2000, cands, SIN_LIB, dirsFijos({
+    10: ['Wong Kar-wai'], 11: ['Wong Kar-wai'],
+  }));
+  assert.equal(tmdbId, 11);
+});
+
+// Fanny y Alexander existe como película y como serie de TV, ambas de Bergman
+test('entre dos verificados legítimos, gana el que ya tienes en Plex', async () => {
+  const row = { title: 'Fanny and Alexander', director: 'Ingmar Bergman' };
+  const cands = [
+    { id: 20, title: 'Fanny and Alexander', original_title: 'Fanny och Alexander', date: '1982-12-17' },
+    { id: 21, title: 'Fanny and Alexander', original_title: 'Fanny och Alexander', date: '1982-12-17' },
+  ];
+  const { tmdbId } = await elegirCandidato(row, 1982, cands, new Set([21]), dirsFijos({
+    20: ['Ingmar Bergman'], 21: ['Ingmar Bergman'],
+  }));
+  assert.equal(tmdbId, 21);
+});
+
+// una «Undercover» ajena y sin créditos se colaba por delante de la de Arantxa
+// Echevarría solo por el orden en que TMDB devolvía la búsqueda
+test('las fichas sin equipo son el último recurso, nunca antes que una verificada', async () => {
+  const row = { title: 'Undercover', director: 'Arantxa Echevarría' };
+  const cands = [
+    { id: 30, title: 'Undercover', original_title: 'Undercover', date: '2024-01-01' },   // sin créditos
+    { id: 31, title: 'Undercover', original_title: 'La infiltrada', date: '2024-09-01' },
+  ];
+  const { tmdbId } = await elegirCandidato(row, 2024, cands, SIN_LIB, dirsFijos({
+    30: [], 31: ['Arantxa Echevarría'],
+  }));
+  assert.equal(tmdbId, 31);
+});
+
+test('sin nadie que lo demuestre, una ficha sin equipo vale si el título es clavado', async () => {
+  const row = { title: 'Sheep in the Box', director: 'Hirokazu Kore-eda' };
+  const cands = [{ id: 40, title: 'Sheep in the Box', original_title: 'Sheep in the Box', date: null }];
+  const { tmdbId } = await elegirCandidato(row, 2026, cands, SIN_LIB, dirsFijos({ 40: [] }));
+  assert.equal(tmdbId, 40);
+});
+
+// un 429 a mitad de comprobación dejaba ganar al siguiente de la fila, y encima
+// se cacheaba como bueno
+test('un fallo de red aborta la resolución: nadie gana por incomparecencia', async () => {
+  const row = { title: 'Alguna', director: 'Quien Sea' };
+  const cands = [
+    { id: 50, title: 'Alguna', original_title: 'Alguna', date: '2020-01-01' },
+    { id: 51, title: 'Alguna', original_title: 'Alguna', date: '2020-06-01' },
+  ];
+  const { tmdbId, fallosRed } = await elegirCandidato(row, 2020, cands, SIN_LIB, async (id) =>
+    (id === 50 ? null : ['Quien Sea'])
+  );
+  assert.equal(tmdbId, null, 'no puede elegir al segundo cuando el primero se cayó');
+  assert.equal(fallosRed, true, 'y hay que marcarlo para no cachear la página');
+});
+
+test('un año roto no deja fuera a todos los candidatos con fecha', async () => {
+  const row = { title: 'Algo', director: 'Alguien' };
+  const cands = [{ id: 60, title: 'Algo', original_title: 'Algo', date: '1999-01-01' }];
+  const { tmdbId } = await elegirCandidato(row, NaN, cands, SIN_LIB, dirsFijos({ 60: ['Alguien'] }));
+  assert.equal(tmdbId, 60);
 });

@@ -1,9 +1,10 @@
 import { db, getSetting } from './db.js';
-import { tmdbGet, collectionDetails, latinizeTitles } from './tmdb.js';
+import { today } from './dates.js';
+import { mapPool } from './pool.js';
+import { tmdbGet, collectionDetails, latinizeTitles, movieDetail } from './tmdb.js';
 
 const DAY = 24 * 3600 * 1000;
 const lang = () => getSetting('language') || 'es-ES';
-const today = () => new Date().toLocaleDateString('en-CA');
 
 export const sagaScanStatus = {
   running: false,
@@ -40,28 +41,17 @@ export async function scanSagas({ budget = 800, force = false } = {}) {
        VALUES (?, ?, ?, ?, ?)`
     );
 
-    let i = 0;
-    async function worker() {
-      for (;;) {
-        const idx = i++;
-        if (idx >= work.length) return;
-        const m = work[idx];
-        try {
-          const det = await tmdbGet(
-            `/movie/${m.tmdb_id}`,
-            {},
-            { cacheKey: `movie:${m.tmdb_id}:${lang()}`, cacheMs: 30 * DAY }
-          );
-          const coll = det.belongs_to_collection || null;
-          ins.run(m.rating_key, m.tmdb_id, coll?.id || null, coll?.name || null, Date.now());
-          sagaScanStatus.scanned++;
-        } catch {
-          // leave unscanned; a later run will retry
-        }
-        sagaScanStatus.done++;
+    await mapPool(work, 6, async (m) => {
+      try {
+        const det = await movieDetail(m.tmdb_id, { cacheMs: 30 * DAY });
+        const coll = det.belongs_to_collection || null;
+        ins.run(m.rating_key, m.tmdb_id, coll?.id || null, coll?.name || null, Date.now());
+        sagaScanStatus.scanned++;
+      } catch {
+        // leave unscanned; a later run will retry
       }
-    }
-    await Promise.all(Array.from({ length: 6 }, worker));
+      sagaScanStatus.done++;
+    });
   } catch (err) {
     sagaScanStatus.error = String(err.message || err);
   } finally {
@@ -138,33 +128,26 @@ export async function enrichSagaStats({ force = false } = {}) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
     const now = today();
-    let i = 0;
-    async function worker() {
-      for (;;) {
-        const idx = i++;
-        if (idx >= collections.length) return;
-        const cid = collections[idx];
-        try {
-          const det = await collectionDetails(cid);
-          const parts = (det.parts || []).filter((p) => !p.video);
-          const released = parts.filter((p) => p.release_date && p.release_date <= now);
-          const owned = released.filter((p) => inLib.has(p.id));
-          const missing = released.filter((p) => !inLib.has(p.id));
-          // los títulos de la saga se guardan ya legibles: esta lista se enseña
-          // tal cual y no vuelve a pasar por TMDB
-          await latinizeTitles(missing.map((p) => ({ tmdb_id: p.id, title: p.title, ref: p })))
-            .then((fixed) => fixed.forEach((f) => { f.ref.title = f.title; }));
-          ins.run(
-            cid, released.length, owned.length, missing.length,
-            parts.filter((p) => !p.release_date || p.release_date > now).length,
-            JSON.stringify(missing.map((p) => ({ title: p.title, year: p.release_date ? Number(p.release_date.slice(0, 4)) : null })).slice(0, 30)),
-            Date.now()
-          );
-        } catch {}
-        sagaStatsStatus.done++;
-      }
-    }
-    await Promise.all(Array.from({ length: 5 }, worker));
+    await mapPool(collections, 5, async (cid) => {
+      try {
+        const det = await collectionDetails(cid);
+        const parts = (det.parts || []).filter((p) => !p.video);
+        const released = parts.filter((p) => p.release_date && p.release_date <= now);
+        const owned = released.filter((p) => inLib.has(p.id));
+        const missing = released.filter((p) => !inLib.has(p.id));
+        // los títulos de la saga se guardan ya legibles: esta lista se enseña
+        // tal cual y no vuelve a pasar por TMDB
+        await latinizeTitles(missing.map((p) => ({ tmdb_id: p.id, title: p.title, ref: p })))
+          .then((fixed) => fixed.forEach((f) => { f.ref.title = f.title; }));
+        ins.run(
+          cid, released.length, owned.length, missing.length,
+          parts.filter((p) => !p.release_date || p.release_date > now).length,
+          JSON.stringify(missing.map((p) => ({ title: p.title, year: p.release_date ? Number(p.release_date.slice(0, 4)) : null })).slice(0, 30)),
+          Date.now()
+        );
+      } catch {}
+      sagaStatsStatus.done++;
+    });
   } finally {
     sagaStatsStatus.running = false;
     sagaStatsStatus.finishedAt = Date.now();

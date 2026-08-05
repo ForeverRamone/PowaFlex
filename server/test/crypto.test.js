@@ -38,7 +38,11 @@ test('los ajustes que no son credenciales no se cifran', () => {
   assert.equal(stored('plex_url'), 'http://192.168.1.10:32400');
 });
 
-test('sin el secreto el valor cifrado no se puede leer', () => {
+// Sin el secreto (perdido, o cambiado) la credencial es ilegible. Lo que NO
+// puede pasar es que el criptograma salga de aquí haciéndose pasar por ella:
+// acababa en la query de Plex y en las cabeceras de TMDB/Radarr, y el usuario
+// solo veía un 401 incomprensible en vez de «falta la credencial».
+test('sin el secreto la credencial cifrada se lee como ausente, no como criptograma', () => {
   const env = { ...process.env, DATA_DIR: dir };
   delete env.POWAFLEX_SECRET;
   const out = execFileSync(
@@ -47,11 +51,32 @@ test('sin el secreto el valor cifrado no se puede leer', () => {
       '--input-type=module',
       '-e',
       `const { getSetting } = await import(${JSON.stringify(dbUrl)});
-       process.stdout.write(String(getSetting('plex_token') ?? ''));`,
+       process.stdout.write(JSON.stringify({
+         token: getSetting('plex_token'),
+         url: getSetting('plex_url'),
+       }));`,
     ],
     { env, encoding: 'utf-8', cwd: path.dirname(fileURLToPath(import.meta.url)) }
   );
-  // the blob comes back as-is: opaque, but boot still works
-  assert.match(out, /^enc:v1:/);
-  assert.ok(!out.includes('xyz-token-plex'));
+  const leido = JSON.parse(out);
+  assert.equal(leido.token, null);
+  assert.ok(!String(out).includes('xyz-token-plex'));
+  // y lo que no es una credencial se sigue leyendo con normalidad: el arranque
+  // no se rompe por haber perdido el secreto
+  assert.equal(leido.url, 'http://192.168.1.10:32400');
+});
+
+test('con el secreto equivocado tampoco se cuela el criptograma', () => {
+  const env = { ...process.env, DATA_DIR: dir, POWAFLEX_SECRET: 'otro-secreto-distinto' };
+  const out = execFileSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `const { getSetting } = await import(${JSON.stringify(dbUrl)});
+       process.stdout.write(JSON.stringify(getSetting('plex_token')));`,
+    ],
+    { env, encoding: 'utf-8', cwd: path.dirname(fileURLToPath(import.meta.url)) }
+  );
+  assert.equal(JSON.parse(out), null);
 });

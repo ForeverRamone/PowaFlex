@@ -1,22 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Spinner, PersonCard, Empty, PageHeader } from '../components.jsx';
+import { Spinner, PersonCard, Empty, PageHeader, Select } from '../components.jsx';
 
 const ROLES = [
   ['director', 'Directores/as'],
   ['actor', 'Actores/actrices'],
   ['writer', 'Guionistas'],
 ];
-
-const Select = ({ value, onChange, options, placeholder }) => (
-  <select className="input !w-auto" value={value} onChange={(e) => onChange(e.target.value)}>
-    <option value="">{placeholder}</option>
-    {options.map(([v, l]) => (
-      <option key={v} value={v}>{l}</option>
-    ))}
-  </select>
-);
 
 export default function People() {
   const [params, setParams] = useSearchParams();

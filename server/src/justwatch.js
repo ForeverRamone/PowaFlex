@@ -54,14 +54,22 @@ export async function availability(title, year) {
   const cacheKey = `jw:${country()}:${title.toLowerCase()}:${year || ''}`;
   const hit = cacheRead(cacheKey, 3 * DAY);
   if (hit) return hit;
+  const falloReciente = cacheRead(`${cacheKey}:err`, 15 * 60 * 1000);
+  if (falloReciente) return falloReciente;
 
   let node;
   try {
     node = await search(title, year);
   } catch (err) {
-    // A timeout or a JustWatch hiccup is not an answer: caching it would mark
-    // the film as "sin oferta digital" for three days. Return it uncached.
-    return { maxQuality: null, providers: [], offers: 0, error: String(err.message || err) };
+    // Un timeout o un traspiés de JustWatch no es una respuesta: cachearlo tres
+    // días marcaría la película como «sin oferta digital» sin saberlo. Pero
+    // tampoco puede reintentarse a ciegas: la comprobación en bloque de Calidad
+    // lanza cientos de consultas y, con JustWatch caído, repetía las mismas
+    // cientos de llamadas fallidas en cada visita. Se cachea el FALLO aparte,
+    // con vida corta: quince minutos de tregua y a la siguiente se reintenta.
+    const fallo = { maxQuality: null, providers: [], offers: 0, error: String(err.message || err) };
+    cacheWrite(`${cacheKey}:err`, fallo);
+    return fallo;
   }
 
   const offers = node?.offers || [];

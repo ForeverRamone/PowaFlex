@@ -1,9 +1,9 @@
 import { db, getSetting, setSetting } from './db.js';
+import { today } from './dates.js';
 import { resolvePerson, personCredits, enrichRuntimes } from './tmdb.js';
 import { radarrAdd, radarrOwnedIds } from './radarr.js';
 
 const DAY = 24 * 3600 * 1000;
-const today = () => new Date().toLocaleDateString('en-CA');
 
 export const autoRadarrStatus = {
   running: false,

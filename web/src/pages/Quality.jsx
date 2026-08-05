@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { api, fmtBytes, fmtDate } from '../api.js';
 import { Spinner, Section, MovieCard, MovieModal, Empty, RadarrButton, useRadarrIds, JustWatchCheck, PageHeader, ProgressBar, ErrorBox} from '../components.jsx';
 import { toast } from '../toast.js';
+import { addBulkToRadarr } from '../radarr.js';
 import { useChartTheme } from '../charts.js';
 
 export default function Quality() {
@@ -120,13 +121,10 @@ export default function Quality() {
   const requestAllUpgrades = async () => {
     if (!pendingUpgradeIds.length) return;
     setBulkBusy(true);
-    const res = await api('/radarr/add-bulk', { method: 'POST', body: { tmdbIds: pendingUpgradeIds.slice(0, 300) } });
+    // «pedidas», no «añadidas»: aquí ya las tienes y lo que se pide es mejora
+    const { error, summary } = await addBulkToRadarr(pendingUpgradeIds, { onAdded: addRadarrId, verb: 'pedidas' });
     setBulkBusy(false);
-    if (res.error) return toast(`⚠️ ${res.error}`, 'error');
-    for (const r of res.results || []) if (r.ok || r.alreadyExists) addRadarrId(r.tmdbId);
-    toast(
-      `✓ ${res.added} pedidas a Radarr${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''}`
-    );
+    if (summary) toast(summary, error ? 'error' : undefined);
   };
 
   if (ov?.error) return <ErrorBox error={ov.error} />;

@@ -591,6 +591,19 @@ export function ProgressBar({ pct }) {
   );
 }
 
+/** Desplegable de filtro con su opción vacía como marcador de posición. Estaba
+ *  duplicado carácter a carácter en Biblioteca y en Personas. */
+export function Select({ value, onChange, options, placeholder, className = '' }) {
+  return (
+    <select className={`input !w-auto ${className}`} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{placeholder}</option>
+      {options.map(([v, l]) => (
+        <option key={v} value={v}>{l}</option>
+      ))}
+    </select>
+  );
+}
+
 export function Empty({ children }) {
   return <div className="text-zinc-500 text-sm py-8 text-center">{children}</div>;
 }
@@ -746,7 +759,7 @@ function useEsc(onClose) {
   }, [onClose]);
 }
 
-function useFocusTrap(onClose, activo = true) {
+export function useFocusTrap(onClose, activo = true) {
   const ref = useRef(null);
   useEsc(onClose);
   useEffect(() => {

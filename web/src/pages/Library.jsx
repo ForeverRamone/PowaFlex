@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { toast } from '../toast.js';
-import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid, PageHeader, ErrorBox } from '../components.jsx';
+import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid, PageHeader, ErrorBox, Select } from '../components.jsx';
 
 const SORT_OPTIONS = [
   ['added', 'Añadida (reciente)'],
@@ -19,17 +19,6 @@ const SORT_OPTIONS = [
   ['letterboxd', 'Nota Letterboxd'],
   ['random', 'Aleatorio 🎲'],
 ];
-
-function Select({ value, onChange, options, placeholder }) {
-  return (
-    <select className="input !w-auto" value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{placeholder}</option>
-      {options.map(([v, l]) => (
-        <option key={v} value={v}>{l}</option>
-      ))}
-    </select>
-  );
-}
 
 export default function Library() {
   const [params, setParams] = useSearchParams();

@@ -1,5 +1,63 @@
 # Changelog
 
+## Alpha 0.9.13 (0.9.13-alpha) — 2026-08-05
+
+Versión de mantenimiento salida de una auditoría a fondo (seguridad, uso de APIs y limpieza).
+**Nada cambia de aspecto ni de funcionamiento**: lo que cambia es que gasta menos red, se
+defiende mejor y tiene 19 pruebas nuevas donde antes no había ninguna.
+
+**Seguridad**
+
+- **Actualizado el componente que sirve la web** (`@fastify/static`), que tenía un fallo conocido
+  por el que se podían leer ficheros fuera de su sitio saltándose incluso la contraseña opcional.
+  También al día `fast-uri` y `brace-expansion`.
+- **Las peticiones que cambian algo ya no se pueden disparar desde otra web.** Un formulario en
+  una página cualquiera podía hacer que tu PowaFlex sincronizara, se actualizara entero o lanzara
+  altas en Radarr sin que tú tocaras nada.
+- **La copia de seguridad de los ajustes guarda las credenciales de verdad**, no el texto cifrado:
+  restaurarla en otra instalación dejaba tokens inservibles sin avisar.
+- **Si no se pueden descifrar las credenciales** (perdiste `POWAFLEX_SECRET` o cambió), ahora se
+  dice claramente en el arranque y los campos salen como vacíos, en vez de mandar el criptograma a
+  Plex y recibir un «401» incomprensible.
+- La dirección de Plex y la de Radarr se validan al guardarlas, y el proxy de carátulas comprueba
+  que lo que llega es una imagen.
+
+**Menos llamadas a las APIs**
+
+- **La ficha de cada película se pedía dos veces a TMDB** (una con reparto y otra sin), aunque la
+  primera ya lo traía todo. En un palmarés eran ~78 llamadas de más; con 30 directores en
+  favoritos, del orden de 700 por ciclo.
+- **El emparejado ya verificado de festivales dura ahora un año** en vez de caducar cada mes junto
+  a la página: al mes se repetía la comprobación completa de cada película en ráfaga, que es justo
+  lo que hacía que TMDB cortara el grifo.
+- **Los artículos de premios de Wikipedia se descargan una vez al día**, no en cada consulta:
+  pasear diez años de los Goya eran diez descargas del mismo texto, y la vigía nocturna repetía
+  esas descargas todas las noches para años aún sin publicar.
+- **Lo que MDBList no conoce deja de pedirse una y otra vez**: se recuerda que no lo tiene (y se
+  reintenta en el barrido semanal), así que abrir un canon antiguo ya no se come 50 peticiones de
+  tu cupo diario cada vez.
+- Si JustWatch falla, se espera un cuarto de hora antes de reintentar en vez de repetir cientos de
+  consultas fallidas; y el scraping de listas de Letterboxd respira entre páginas.
+- **Cine venidero podía no añadir NADA a Radarr** si tenías más de 300 películas pendientes: el
+  servidor rechazaba la tanda entera por pasarse del tope. Ahora manda las primeras 300, como el
+  resto de páginas.
+- Radarr: si la orden de volver a buscar una película recién salida en digital fallaba, esa
+  película se quedaba sin buscar para siempre. Ahora se reintenta a la noche siguiente.
+
+**Por dentro**
+
+- El mismo patrón de «repartir trabajo entre varios hilos» estaba copiado a mano 23 veces, el
+  bloque de «mandar a Radarr» en 6 páginas (ya con textos distintos), y el «qué día es hoy» en 7
+  módulos (el pase nocturno usaba encima otro huso). Ahora hay una sola versión de cada cosa.
+- **La decisión más delicada de la app** —cuál de los resultados de TMDB es la película de un
+  festival— se ha separado del código de red y tiene por fin pruebas: las cuatro rondas de fallos
+  que fuiste reportando (*In the Mood for Love* contra su making-of, *La infiltrada*, los cortes de
+  TMDB a media comprobación…) quedan fijadas para que no vuelvan.
+- Prueba también para el CSV de WebTools, cuya nota va de 0 a 10 y hay que dividir entre dos.
+- Cambiar de año rápido en Festivales ya no puede dejar la parrilla mostrando otra edición, el
+  corrector ✎ atrapa el foco como los demás diálogos, y Ajustes deja de preguntar dos veces por lo
+  mismo mientras actualiza.
+
 ## Alpha 0.9.12 (0.9.12-alpha) — 2026-08-05
 
 - **El top 10 anual de Cahiers du Cinéma**, año por año, en Festivales → Cánones: la lista

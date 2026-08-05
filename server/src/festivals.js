@@ -14,6 +14,7 @@
  * Festival»…) con redirects=1 de red de seguridad.
  */
 import { db, cacheRead, cacheWrite } from './db.js';
+import { mapPool } from './pool.js';
 import { cachePrefix } from './cache-versions.js';
 import { searchMovieCandidates, movieDirectors, movieSummary, findPersonInfo, latinizeNames } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
@@ -649,6 +650,78 @@ export function festivalOverrideKey(title, year, director) {
   return `${normName(title)}:${Number(year)}:${normName(director || '')}`;
 }
 
+/**
+ * LA decisión del emparejado: dados los candidatos de TMDB ya buscados, ¿cuál
+ * es esta película, si es alguna?
+ *
+ * Vive aparte del código de red a propósito. Aquí se han corregido cuatro
+ * rondas de fallos de producción (las versiones v2…v6 de la caché de
+ * festivales) y no había forma de probar ninguno sin salir a internet; con la
+ * decisión separada, cada regresión conocida tiene su test:
+ *
+ *  1. Un título genérico («Bunker», «Look Back») enganchaba otra película del
+ *     mismo año → un candidato solo vale si su dirección lo demuestra.
+ *  2. «In the Mood for Love» acababa siendo su propio making-of, del mismo
+ *     director → a igualdad, gana el título clavado y luego el año exacto.
+ *  3. «Fanny y Alexander» tiene versión de cine y de televisión, ambas de
+ *     Bergman → entre verificados, gana el que ya está en tu Plex.
+ *  4. Una «Undercover» ajena sin créditos se colaba por delante de la de
+ *     Echevarría → las fichas sin equipo son el ÚLTIMO recurso, y solo por
+ *     título clavado.
+ *  5. Un 429 a mitad de comprobación dejaba ganar al siguiente de la fila →
+ *     un fallo de red ABORTA la resolución (nadie gana por incomparecencia).
+ *
+ * `dirsDe` devuelve los directores de un candidato, o null si la red falló.
+ */
+export async function elegirCandidato(row, year, candidatos, inLib, dirsDe) {
+  // el estreno puede bailar un año respecto al festival; sin fecha aún
+  // (película recién anunciada) también vale como candidata.
+  // Si el año de la fila viniera roto, filtrar por ventana descartaría a TODOS
+  // los candidatos con fecha y solo quedaría morralla sin fecha.
+  const enVentana = Number.isFinite(year)
+    ? candidatos.filter((c) => !c.date || Math.abs(Number(c.date.slice(0, 4)) - year) <= 1)
+    : [...candidatos];
+
+  const wanted = normName(row.title);
+  const tituloClavado = (c) => normName(c.title) === wanted || normName(c.original_title) === wanted;
+  const distAño = (c) => (c.date && Number.isFinite(year) ? Math.abs(Number(c.date.slice(0, 4)) - year) : 0.5);
+  enVentana.sort(
+    (a, b) =>
+      (tituloClavado(a) ? 0 : 1) - (tituloClavado(b) ? 0 : 1) ||
+      (inLib.has(a.id) ? 0 : 1) - (inLib.has(b.id) ? 0 : 1) ||
+      distAño(a) - distAño(b)
+  );
+
+  let tmdbId = null;
+  let fallosRed = false;
+  const sinCreditos = [];
+  for (const c of enVentana) {
+    // null = fallo de red (no «sin créditos»). Se ABORTA la resolución de esta
+    // película: seguir probando dejaría ganar a un candidato peor solo porque
+    // al bueno le tocó el 429, y encima se cachearía como válido.
+    const dirs = await dirsDe(c.id);
+    if (dirs === null) {
+      fallosRed = true;
+      break;
+    }
+    if (dirs.length) {
+      if (directorsMatch(row.director, dirs)) {
+        tmdbId = c.id;
+        break;
+      }
+    } else {
+      sinCreditos.push(c);
+    }
+  }
+  // Solo si NADIE con créditos lo demostró (y sin cortes de red a medias),
+  // valen las fichas sin equipo por título clavado — las recién anunciadas.
+  if (!tmdbId && !fallosRed) {
+    const c = sinCreditos.find((x) => !row.director || tituloClavado(x));
+    if (c) tmdbId = c.id;
+  }
+  return { tmdbId, fallosRed };
+}
+
 async function resolveFilms(rows, yearOf) {
   const films = new Array(rows.length);
   let errors = 0; // fallos de RED (429 de TMDB…): quien llama no debe cachear
@@ -676,7 +749,14 @@ async function resolveFilms(rows, yearOf) {
       const matchKey = `film_match:v2:${claveBase}`;
       // corrección manual: ni búsqueda ni verificación, lo que dijo el usuario
       const override = overrides.has(claveBase) ? overrides.get(claveBase) : undefined;
-      const matchHit = override !== undefined ? { id: override } : cacheRead(matchKey, 30 * DAY);
+      // Un año de vida, MUY por encima de los 30 días de la página: «este
+      // título, de este año, de esta dirección» es la misma película para
+      // siempre. Cuando ambos TTL coincidían, al mes caducaba todo a la vez y
+      // reconstruir un palmarés repetía la verificación completa —cientos de
+      // llamadas en ráfaga—, que es justo lo que dispara los 429. Las
+      // correcciones siguen entrando por match_overrides, y si cambian las
+      // reglas del emparejado se sube la versión en cache-versions.js.
+      const matchHit = override !== undefined ? { id: override } : cacheRead(matchKey, 365 * DAY);
       if (matchHit?.id) {
         let sum = null;
         try {
@@ -718,69 +798,23 @@ async function resolveFilms(rows, yearOf) {
           if (!vistos.has(c.id)) cands.push(c);
         }
       }
-      // el estreno puede bailar un año respecto al festival; sin fecha aún
-      // (película recién anunciada) también vale como candidata
-      // si el año de la fila viniera roto, filtrar por ventana descartaría a
-      // TODOS los candidatos con fecha y solo quedaría morralla sin fecha
-      const enVentana = Number.isFinite(y)
-        ? cands.filter((c) => !c.date || Math.abs(Number(c.date.slice(0, 4)) - y) <= 1)
-        : cands;
-      // Título clavado primero y, a igualdad, el del año EXACTO: el making-of
-      // «@ In the Mood for Love» (2001, también de Wong Kar Wai) normaliza al
-      // mismo título que el largometraje (2000) y solo el año los separa.
-      const wanted = normName(r.title);
-      const tituloClavado = (c) => normName(c.title) === wanted || normName(c.original_title) === wanted;
-      const distAño = (c) => (c.date && Number.isFinite(y) ? Math.abs(Number(c.date.slice(0, 4)) - y) : 0.5);
-      enVentana.sort(
-        (a, b) =>
-          (tituloClavado(a) ? 0 : 1) - (tituloClavado(b) ? 0 : 1) ||
-          (inLib.has(a.id) ? 0 : 1) - (inLib.has(b.id) ? 0 : 1) ||
-          distAño(a) - distAño(b)
+      const { tmdbId, fallosRed } = await elegirCandidato(r, y, cands, inLib, (id) =>
+        movieDirectors(id).catch(() => null)
       );
-
-      let tmdbId = null;
-      let fallosRed = false;
-      const sinCreditos = [];
-      for (const c of enVentana) {
-        // null = fallo de red (no «sin créditos»). Se ABORTA la resolución de
-        // esta película: seguir probando dejaría ganar a un candidato peor
-        // solo porque al bueno le tocó el 429 (pasó con el canon de S&S), y
-        // encima el resultado se cachearía como válido.
-        const dirs = await movieDirectors(c.id).catch(() => null);
-        if (dirs === null) {
-          fallosRed = true;
-          break;
-        }
-        if (dirs.length) {
-          if (directorsMatch(r.director, dirs)) {
-            tmdbId = c.id;
-            break;
-          }
-        } else {
-          sinCreditos.push(c);
-        }
-      }
-      // Solo si NADIE con créditos lo demostró (y sin cortes de red a medias),
-      // valen las fichas sin equipo por título clavado — recién anunciadas.
-      // Nunca antes: una «Undercover» ajena y sin créditos se colaba por
-      // delante de la de Arantxa Echevarría solo por el orden de búsqueda.
-      if (!tmdbId && !fallosRed) {
-        const c = sinCreditos.find((c) => !r.director || tituloClavado(c));
-        if (c) tmdbId = c.id;
-      }
       // el emparejado limpio se guarda por película: los reintentos tras un
       // corte de red solo tocan lo que falló
       if (tmdbId && !fallosRed) cacheWrite(matchKey, { id: tmdbId });
 
       let sum = null;
+      let fichaCoja = false;
       if (tmdbId) {
         try {
           sum = await movieSummary(tmdbId);
         } catch {
-          fallosRed = true; // ficha coja: no cachear la página, reintentar luego
+          fichaCoja = true; // ficha coja: no cachear la página, reintentar luego
         }
       }
-      if (fallosRed) errors++;
+      if (fallosRed || fichaCoja) errors++;
       films[idx] = {
         ...r,
         tmdb_id: tmdbId,
@@ -965,30 +999,59 @@ async function decorateLive(films) {
 }
 
 /**
+ * Las filas ya parseadas de un artículo-lista, cacheadas UN DÍA.
+ *
+ * Sin esto, cada año que miras de un premio vuelve a descargar el artículo
+ * entero: pasear diez años del Goya eran diez descargas del mismo texto, y en
+ * Goya y BAFTA la sección «Winners» llega vacía y cae al respaldo de página
+ * completa, que es la llamada más pesada. Peor aún, la vigía nocturna prueba
+ * cada noche los premios del año en curso y el siguiente, y los años sin
+ * nominadas publicadas lanzan sin cachear nada: esas descargas se repetían
+ * todas las noches durante meses.
+ *
+ * Un día de vida mantiene vivo lo único que se mueve (las nominadas del año en
+ * curso, que Wikipedia va completando).
+ */
+const AWARD_ROWS_TTL = DAY;
+
+async function cachedAwardRows(f, sufijo, build) {
+  const key = `${cachePrefix('festival')}:awardrows:${sufijo}:${f.awardPage}`;
+  const hit = cacheRead(key, AWARD_ROWS_TTL);
+  if (hit?.rows) return hit.rows;
+  const rows = await build();
+  if (rows.length) cacheWrite(key, { rows });
+  return rows;
+}
+
+/**
  * Filas del artículo-lista de un premio. La sección «Winners» suele incluir
  * sus décadas como subsecciones, pero en algunos artículos (Goya, BAFTA) son
  * secciones HERMANAS y la de Winners llega vacía: respaldo de página entera,
  * y que el parser descarte las tablas que no son de películas.
  */
 async function getAwardRows(f, { keepAll = false } = {}) {
-  const meta = await wikiParse({ page: f.awardPage, prop: 'sections' });
-  const sec = (meta.sections || []).find((s) => f.awardSection.test(stripTags(s.line)));
-  if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
-  const parsed = await wikiParse({ page: f.awardPage, section: String(sec.index), prop: 'text' });
-  let rows = parseWinnersTables(parsed.text, { keepAll });
-  if (!rows.length) {
-    const full = await wikiParse({ page: f.awardPage, prop: 'text' });
-    rows = parseWinnersTables(full.text, { keepAll });
-  }
-  return rows;
+  return cachedAwardRows(f, keepAll ? 'todas' : 'ganadoras', async () => {
+    const meta = await wikiParse({ page: f.awardPage, prop: 'sections' });
+    const sec = (meta.sections || []).find((s) => f.awardSection.test(stripTags(s.line)));
+    if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
+    const parsed = await wikiParse({ page: f.awardPage, section: String(sec.index), prop: 'text' });
+    let rows = parseWinnersTables(parsed.text, { keepAll });
+    if (!rows.length) {
+      const full = await wikiParse({ page: f.awardPage, prop: 'text' });
+      rows = parseWinnersTables(full.text, { keepAll });
+    }
+    return rows;
+  });
 }
 
 /** El artículo de Cahiers entero, parseado con su parser propio. */
 async function getCahiersRows(f) {
-  const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
-  const rows = parseCahiersTables(parsed.text);
-  if (!rows.length) throw new Error(`El artículo «${f.awardPage}» no tiene listas anuales reconocibles.`);
-  return rows;
+  return cachedAwardRows(f, 'cahiers', async () => {
+    const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
+    const rows = parseCahiersTables(parsed.text);
+    if (!rows.length) throw new Error(`El artículo «${f.awardPage}» no tiene listas anuales reconocibles.`);
+    return rows;
+  });
 }
 
 /**

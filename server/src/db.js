@@ -488,7 +488,10 @@ const setStmt = db.prepare(
 // Optional encryption-at-rest for credentials. When POWAFLEX_SECRET is set,
 // these keys are stored as AES-256-GCM blobs; without it they stay plaintext
 // (backward compatible) and we warn once. Reads are transparent either way.
-const SECRET_SETTING_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key', 'mdblist_key']);
+/** Las credenciales: se cifran en disco y se tapan al servirlas. Una sola
+ *  lista, que index.js reutiliza (estaba escrita dos veces, y bastaba añadir
+ *  un servicio nuevo en una para que la otra lo dejara al descubierto). */
+export const SECRET_SETTING_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key', 'mdblist_key']);
 const secretKey = process.env.POWAFLEX_SECRET
   ? crypto.createHash('sha256').update(process.env.POWAFLEX_SECRET).digest()
   : null;
@@ -502,15 +505,34 @@ function encryptValue(v) {
   return `enc:v1:${iv.toString('base64')}:${tag.toString('base64')}:${ct.toString('base64')}`;
 }
 
+let warnedUndecryptable = false;
+
+// Un valor cifrado que no se puede abrir NO se devuelve tal cual: acabaría en
+// la query de Plex y en las cabeceras de TMDB/Radarr haciéndose pasar por la
+// credencial, y el usuario solo vería un 401 incomprensible. Devolviendo null,
+// la app dice exactamente lo que dice cuando falta una credencial y Ajustes
+// invita a volver a escribirla.
+function credencialIlegible() {
+  if (!warnedUndecryptable) {
+    warnedUndecryptable = true;
+    console.warn(
+      '[PowaFlex] Hay credenciales cifradas que no se pueden descifrar: falta POWAFLEX_SECRET o ha cambiado.\n' +
+      '           Restaura el secreto anterior, o vuelve a escribirlas en Ajustes para guardarlas con el actual.'
+    );
+  }
+  return null;
+}
+
 function decryptValue(v) {
-  if (typeof v !== 'string' || !v.startsWith('enc:v1:') || !secretKey) return v;
+  if (typeof v !== 'string' || !v.startsWith('enc:v1:')) return v;
+  if (!secretKey) return credencialIlegible();
   try {
     const [, , ivB, tagB, ctB] = v.split(':');
     const decipher = crypto.createDecipheriv('aes-256-gcm', secretKey, Buffer.from(ivB, 'base64'));
     decipher.setAuthTag(Buffer.from(tagB, 'base64'));
     return Buffer.concat([decipher.update(Buffer.from(ctB, 'base64')), decipher.final()]).toString('utf8');
   } catch {
-    return v;
+    return credencialIlegible();
   }
 }
 
