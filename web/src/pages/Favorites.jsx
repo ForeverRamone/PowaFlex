@@ -608,6 +608,40 @@ export default function Favorites() {
             faceta arriba si quieres seguir a alguien por la otra.
           </p>
 
+          {/* La puerta grande, y por eso LA PRIMERA. Aquí había cuatro
+              paquetes escritos a mano —«españoles», «premiados en festivales»,
+              «emergentes», «taquilleros»— de veinte nombres fijos cada uno.
+              Las cuatro ideas siguen ahí, pero ahora salen de un catálogo de
+              680 con datos de verdad: un filtro y un orden en vez de una lista
+              congelada. El catálogo entero vive AQUÍ (plegado): añadir
+              directores en activo a favoritos es exactamente para lo que sirve. */}
+          {role === 'director' && (
+            <div className="card p-4 mb-6">
+              <button
+                onClick={() => setCatalogoAbierto((v) => !v)}
+                className="w-full flex items-center gap-4 text-left cursor-pointer"
+              >
+                <div className="text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-gold-400/15">🎬</div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="font-semibold text-zinc-100">Añadir directores en activo · el catálogo</h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y
+                    ordena por importancia, premios, número de largometrajes o taquilla: españoles, premiados,
+                    emergentes o taquilleros salen de aquí con dos clics, con la ☆ para seguirlos.
+                  </p>
+                </div>
+                <span className="text-gold-400 shrink-0 text-sm">{catalogoAbierto ? 'Plegar ▴' : 'Explorar ▾'}</span>
+              </button>
+              {catalogoAbierto && (
+                <div className="mt-4 border-t border-ink-700 pt-4">
+                  <Suspense fallback={<Spinner />}>
+                    <Directors embedded />
+                  </Suspense>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="card p-4 mb-6">
             <h2 className="font-semibold text-zinc-100 mb-1">Añadir una lista de nombres</h2>
             <p className="text-xs text-zinc-500 mb-3 max-w-2xl">
@@ -651,40 +685,6 @@ export default function Favorites() {
               )
             )}
           </div>
-
-          {/* La puerta grande. Aquí había cuatro paquetes escritos a mano
-              —«españoles», «premiados en festivales», «emergentes»,
-              «taquilleros»— de veinte nombres fijos cada uno. Las cuatro ideas
-              siguen ahí, pero ahora salen de un catálogo de 680 con datos de
-              verdad: un filtro y un orden en vez de una lista congelada. El
-              catálogo entero vive AQUÍ (plegado): añadir directores en activo
-              a favoritos es exactamente para lo que sirve. */}
-          {role === 'director' && (
-            <div className="card p-4 mb-6">
-              <button
-                onClick={() => setCatalogoAbierto((v) => !v)}
-                className="w-full flex items-center gap-4 text-left cursor-pointer"
-              >
-                <div className="text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-gold-400/15">🎬</div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="font-semibold text-zinc-100">Añadir directores en activo · el catálogo</h2>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y
-                    ordena por importancia, premios, número de largometrajes o taquilla: españoles, premiados,
-                    emergentes o taquilleros salen de aquí con dos clics, con la ☆ para seguirlos.
-                  </p>
-                </div>
-                <span className="text-gold-400 shrink-0 text-sm">{catalogoAbierto ? 'Plegar ▴' : 'Explorar ▾'}</span>
-              </button>
-              {catalogoAbierto && (
-                <div className="mt-4 border-t border-ink-700 pt-4">
-                  <Suspense fallback={<Spinner />}>
-                    <Directors embedded />
-                  </Suspense>
-                </div>
-              )}
-            </div>
-          )}
 
           <CanonPacks role={role} onDone={loadTracked} />
 
