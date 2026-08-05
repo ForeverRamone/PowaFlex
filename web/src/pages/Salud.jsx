@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, fmtDate } from '../api.js';
-import { Spinner, Section, Empty, PageHeader, ErrorBox } from '../components.jsx';
+import { Spinner, Section, Empty, PageHeader, ErrorBox, ProgressBar } from '../components.jsx';
 import { toast } from '../toast.js';
 
 /**
@@ -26,11 +26,37 @@ export default function Salud() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [resolviendo, setResolviendo] = useState(false);
+  const [verif, setVerif] = useState(null);
 
   const cargar = () => api('/datahealth').then((r) => (r.error ? setError(r.error) : setData(r)));
   useEffect(() => {
     cargar();
+    // por si quedó una comprobación en marcha de una visita anterior
+    api('/datahealth/verify-people').then((r) => !r.error && (r.running || r.finishedAt) && setVerif(r));
   }, []);
+
+  // mientras corre se pregunta cada segundo y medio; al terminar se recarga la
+  // auditoría, que es justo lo que la comprobación acaba de cambiar
+  useEffect(() => {
+    if (!verif?.running) return undefined;
+    const t = setInterval(async () => {
+      const r = await api('/datahealth/verify-people');
+      if (r.error) return;
+      setVerif(r);
+      if (!r.running) {
+        clearInterval(t);
+        cargar();
+        toast(`✓ ${r.verified} identidades demostradas${r.failed ? ` · ${r.failed} sin demostrar` : ''}`, 'success');
+      }
+    }, 1500);
+    return () => clearInterval(t);
+  }, [verif?.running]);
+
+  const comprobarPersonas = async () => {
+    const r = await api('/datahealth/verify-people', { method: 'POST' });
+    if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    setVerif({ ...r, running: true });
+  };
 
   const resolverLb = async () => {
     setResolviendo(true);
@@ -133,12 +159,45 @@ export default function Salud() {
         title="Personas con emparejado sin demostrar"
         total={data.personasSinVerificar.total}
         ok="Todas las personas con ficha TMDB demostraron su identidad con tus propias películas."
-        hint="Su búsqueda en TMDB no encontró a nadie con al menos una de tus películas en su filmografía: puede ser un homónimo. Se reintenta solo cada semana; entrar en su ficha también fuerza el reintento."
+        hint={
+          data.personasSinVerificar.sinComprobar > 0
+            ? `Casi todas están simplemente SIN MIRAR: añadir a alguien a favoritos o volcar un canon le pone su ficha de TMDB, pero la identidad solo se comprueba cuando algo necesita su filmografía. Con el botón se comprueban todas de una vez.`
+            : 'Su búsqueda en TMDB no encontró a nadie con al menos una de tus películas en su filmografía: puede ser un homónimo. Se reintenta solo cada semana; entrar en su ficha también fuerza el reintento.'
+        }
       >
+        <p className="text-xs text-zinc-400 mb-2">
+          <b className="text-orange-300">{data.personasSinVerificar.fallidas.toLocaleString('es-ES')}</b> se comprobaron y
+          ninguna ficha de TMDB compartía película con las tuyas (ahí sí puede haber un homónimo) ·{' '}
+          <b className="text-zinc-300">{data.personasSinVerificar.sinComprobar.toLocaleString('es-ES')}</b> aún sin mirar.
+        </p>
+        <div className="flex items-center gap-3 flex-wrap mb-3">
+          <button className="btn-gold !py-1 text-xs" onClick={comprobarPersonas} disabled={verif?.running}>
+            {verif?.running ? 'Comprobando…' : '🔎 Comprobar ahora contra TMDB'}
+          </button>
+          {verif?.running && (
+            <span className="text-xs text-zinc-400 tabular">
+              {verif.done} de {verif.total} · {verif.verified} demostradas
+            </span>
+          )}
+          {!verif?.running && verif?.finishedAt && (
+            <span className="text-xs text-emerald-400">
+              ✓ {verif.verified} demostradas · {verif.failed} siguen sin poder demostrarse
+            </span>
+          )}
+          {verif?.error && <span className="text-xs text-red-400">⚠️ {verif.error}</span>}
+        </div>
+        {verif?.running && verif.total > 0 && (
+          <div className="mb-3 max-w-md"><ProgressBar pct={Math.round((verif.done / verif.total) * 100)} /></div>
+        )}
         <Lista>
           {data.personasSinVerificar.sample.map((p) => (
             <div key={p.id} className="px-3 py-1.5 flex gap-2">
               <Link to={`/personas/${p.id}`} className="text-zinc-200 hover:text-gold-400 truncate flex-1">{p.name}</Link>
+              {p.comprobado && (
+                <span className="text-[11px] text-orange-300 shrink-0" title="Se buscó y ninguna ficha compartía película con las tuyas">
+                  comprobada
+                </span>
+              )}
               <span className="text-zinc-500 shrink-0">{p.films} películas tuyas</span>
             </div>
           ))}

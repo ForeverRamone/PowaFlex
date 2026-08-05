@@ -46,20 +46,28 @@ export function dataHealth() {
     .prepare('SELECT COUNT(*) n FROM radarr_movies WHERE monitored = 1 AND has_file = 0 AND added IS NOT NULL AND added < ?')
     .get(seisM).n;
 
-  // 5 · Personas cuyo emparejado con TMDB no se pudo demostrar (homónimos
-  // probables): su ficha y sus huecos pueden ser de OTRA persona
+  // 5 · Personas con emparejado no demostrado. OJO a la diferencia, que antes
+  // se contaba junta y alarmaba de más: `tmdb_checked_at` con valor significa
+  // que SÍ se buscó y ninguna ficha de TMDB compartía película con las tuyas
+  // (ahí sí puede haber un homónimo); sin valor significa que aún no se ha
+  // mirado — es el caso de casi todos, porque añadir a alguien a favoritos, o
+  // desde un canon, le pone el id de TMDB pero no comprueba nada.
+  const CONDICION = `p.tmdb_id IS NOT NULL AND COALESCE(p.tmdb_verified, 0) = 0`;
   const personasSinVerificar = sample(
-    `SELECT p.id, p.name, COUNT(mp.movie_id) films FROM people p
+    `SELECT p.id, p.name, COUNT(mp.movie_id) films, p.tmdb_checked_at FROM people p
      JOIN movie_people mp ON mp.person_id = p.id
-     WHERE p.tmdb_id IS NOT NULL AND COALESCE(p.tmdb_verified, 0) = 0
-     GROUP BY p.id ORDER BY films DESC LIMIT 30`
-  );
-  const personasTotal = db
-    .prepare(
-      `SELECT COUNT(DISTINCT p.id) n FROM people p JOIN movie_people mp ON mp.person_id = p.id
-       WHERE p.tmdb_id IS NOT NULL AND COALESCE(p.tmdb_verified, 0) = 0`
-    )
-    .get().n;
+     WHERE ${CONDICION}
+     GROUP BY p.id ORDER BY p.tmdb_checked_at IS NULL, films DESC LIMIT 30`
+  ).map((p) => ({ ...p, comprobado: !!p.tmdb_checked_at }));
+  const cuenta = (extra) =>
+    db
+      .prepare(
+        `SELECT COUNT(DISTINCT p.id) n FROM people p JOIN movie_people mp ON mp.person_id = p.id
+         WHERE ${CONDICION} ${extra}`
+      )
+      .get().n;
+  const personasTotal = cuenta('');
+  const personasFallidas = cuenta('AND p.tmdb_checked_at IS NOT NULL');
 
   // 6 · Cobertura de notas de MDBList
   let notas = null;
@@ -73,7 +81,12 @@ export function dataHealth() {
     tmdbRepetido: { total: tmdbRepetido.length, sample: tmdbRepetido },
     lbSinEmparejar: { total: lbSinEmparejar, sample: lbMuestras },
     radarrZombis: { total: zombisTotal, sample: zombis },
-    personasSinVerificar: { total: personasTotal, sample: personasSinVerificar },
+    personasSinVerificar: {
+      total: personasTotal,
+      fallidas: personasFallidas,
+      sinComprobar: personasTotal - personasFallidas,
+      sample: personasSinVerificar,
+    },
     notas,
   };
 }

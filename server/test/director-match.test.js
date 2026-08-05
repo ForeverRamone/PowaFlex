@@ -120,3 +120,58 @@ test('todo el catálogo se puede comparar con lo que devuelva TMDB', async () =>
     assert.ok(normName(d.name).length >= 4, `${d.name} se queda en nada al normalizar`);
   }
 });
+
+/**
+ * TMDB no tiene fecha de nacimiento de muchísimos cineastas fuera del circuito
+ * anglosajón. Exigirla para dar por bueno el emparejado dejaba sin foto a gente
+ * que TMDB conoce de sobra y sin ningún homónimo que la dispute: la fecha vale
+ * para DESCARTAR a quien la contradice, no como requisito.
+ */
+test('un director sin fecha en TMDB, y sin nadie que lo dispute, se acepta', async () => {
+  sembrar('carla simon',
+    [{ id: 500, name: 'Carla Simón', known_for_department: 'Directing', popularity: 5, profile_path: '/carla.jpg' }],
+    { 500: { id: 500, birthday: null, deathday: null, profile_path: '/carla.jpg' } }
+  );
+  const r = await resolveCatalogDirector({ name: 'Carla Simon', age: 40, last: 2025 });
+  assert.equal(r.id, 500);
+  assert.equal(r.profile_path, '/carla.jpg');
+});
+
+test('pero quien SÍ tiene fecha y no cuadra sigue descartado, aunque otro no la tenga', async () => {
+  sembrar('tocayo mixto',
+    [
+      { id: 600, name: 'Tocayo Mixto', known_for_department: 'Acting', popularity: 99, profile_path: '/famoso.jpg' },
+      { id: 601, name: 'Tocayo Mixto', known_for_department: 'Directing', popularity: 1, profile_path: '/dir.jpg' },
+    ],
+    {
+      600: { id: 600, birthday: '1930-01-01', profile_path: '/famoso.jpg' },  // contradice
+      601: { id: 601, birthday: null, profile_path: '/dir.jpg' },             // no contradice
+    }
+  );
+  const r = await resolveCatalogDirector({ name: 'Tocayo Mixto', age: 50 });
+  assert.equal(r.id, 601, 'el famoso queda fuera por fecha; entra el que dirige y no contradice');
+});
+
+test('la fecha que cuadra gana a la ausencia de fecha', async () => {
+  sembrar('doble candidato',
+    [
+      { id: 700, name: 'Doble Candidato', known_for_department: 'Directing', popularity: 9, profile_path: '/a.jpg' },
+      { id: 701, name: 'Doble Candidato', known_for_department: 'Directing', popularity: 1, profile_path: '/b.jpg' },
+    ],
+    {
+      700: { id: 700, birthday: null, profile_path: '/a.jpg' },
+      701: { id: 701, birthday: '1970-05-05', profile_path: '/b.jpg' },
+    }
+  );
+  const r = await resolveCatalogDirector({ name: 'Doble Candidato', age: 56 }); // → 1970
+  assert.equal(r.id, 701, 'la prueba fuerte manda sobre la simple ausencia de contradicción');
+});
+
+test('si NADIE dirige y nadie cuadra por fecha, no se elige a nadie', async () => {
+  sembrar('solo actores',
+    [{ id: 800, name: 'Solo Actores', known_for_department: 'Acting', popularity: 50, profile_path: '/x.jpg' }],
+    { 800: { id: 800, birthday: null } }
+  );
+  const r = await resolveCatalogDirector({ name: 'Solo Actores', age: 60 });
+  assert.equal(r.id, null);
+});

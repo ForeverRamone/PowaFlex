@@ -1,5 +1,24 @@
 # Changelog
 
+## Alpha 0.9.16 (0.9.16-alpha) — 2026-08-05
+
+- **«Personas con emparejado sin demostrar» ya no alarma de más.** Ese número juntaba dos cosas
+  muy distintas: las que se comprobaron y no se pudo demostrar quiénes son (ahí sí puede haber un
+  homónimo) y las que **nadie ha mirado todavía**, que son casi todas. Añadir a alguien a
+  favoritos, o volcar un canon entero, le pone su ficha de TMDB pero no comprueba nada: la
+  identidad solo se verifica cuando algo necesita su filmografía. Por eso salían nombres tan poco
+  ambiguos como Angelina Jolie o Ian McKellen. Ahora Salud de los datos enseña las dos cifras por
+  separado y marca cuáles se comprobaron de verdad.
+- **Botón «Comprobar ahora contra TMDB»** en ese mismo panel: busca y verifica de una tacada todas
+  las que están pendientes, empezando por las que más películas tuyas tienen, con barra de
+  progreso y sin bloquear la app. Al terminar, la auditoría se recalcula sola.
+- **Menos fichas de director sin foto.** La comprobación por fecha de nacimiento que estrenó la
+  0.9.15 exigía que TMDB tuviera esa fecha, y no la tiene de muchísimos cineastas fuera del
+  circuito anglosajón: a esos los descartaba aunque no hubiera ningún homónimo que se los
+  disputara. Ahora la fecha sirve para **descartar a quien la contradice**, no como requisito, así
+  que Wang Bing, Pedro Costa o Carla Simón vuelven a salir con su cara. El homónimo famoso sigue
+  fuera, porque ese sí tiene fecha y no cuadra.
+
 ## Alpha 0.9.15 (0.9.15-alpha) — 2026-08-05
 
 Dos arreglos de identidad en el catálogo de directores, los dos reportados desde la 0.9.14.

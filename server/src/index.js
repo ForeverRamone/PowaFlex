@@ -30,6 +30,7 @@ import {
   searchPeople,
   findPersonInfo,
   resolveCatalogDirector,
+  resolvePerson,
   normalizeLibraryTitles,
   normalizePeopleNames,
   latinizeNames,
@@ -1457,6 +1458,71 @@ app.get('/api/radarr/captures', async (req) =>
 
 // auditorías locales de calidad del dato (huérfanos, homónimos, zombis…)
 app.get('/api/datahealth', async () => dataHealth());
+
+/**
+ * Comprobar contra TMDB los emparejados de persona que aún no están demostrados.
+ *
+ * La inmensa mayoría no es que hayan fallado: es que nadie los ha mirado nunca.
+ * Añadir a alguien a favoritos, o volcar un canon entero, le pone el id de TMDB
+ * pero no comprueba que sea la persona correcta; la comprobación solo ocurre
+ * cuando algo necesita su filmografía. Este botón la fuerza para todos.
+ *
+ * Va en segundo plano y con progreso porque son una búsqueda y hasta cinco
+ * filmografías por persona; el limitador global de TMDB marca el ritmo. Se
+ * empieza por quien más películas tuyas tiene, que es donde más se nota.
+ */
+export const verifyPeopleStatus = {
+  running: false, total: 0, done: 0, verified: 0, failed: 0, error: null, finishedAt: null,
+};
+
+app.post('/api/datahealth/verify-people', async (req, reply) => {
+  if (verifyPeopleStatus.running) return { started: false, ...verifyPeopleStatus };
+  if (!getSetting('tmdb_key')) {
+    reply.code(400);
+    return { error: 'Falta la API key de TMDB en Ajustes' };
+  }
+  const pendientes = db
+    .prepare(
+      `SELECT p.id FROM people p JOIN movie_people mp ON mp.person_id = p.id
+       WHERE p.tmdb_id IS NOT NULL AND COALESCE(p.tmdb_verified, 0) = 0 AND COALESCE(p.tmdb_locked, 0) = 0
+       GROUP BY p.id ORDER BY COUNT(mp.movie_id) DESC
+       LIMIT ?`
+    )
+    .all(Math.min(Number(req.body?.limit) || 1500, 5000))
+    .map((r) => r.id);
+
+  Object.assign(verifyPeopleStatus, {
+    running: true, total: pendientes.length, done: 0, verified: 0, failed: 0, error: null, finishedAt: null,
+  });
+
+  (async () => {
+    try {
+      for (const id of pendientes) {
+        setBuildProgress('verify-people', 'Comprobando emparejados con TMDB', verifyPeopleStatus.done + 1, pendientes.length);
+        try {
+          const p = await resolvePerson(id, { force: true });
+          if (p?.tmdb_verified) verifyPeopleStatus.verified++;
+          else verifyPeopleStatus.failed++;
+        } catch {
+          verifyPeopleStatus.failed++;
+        }
+        verifyPeopleStatus.done++;
+      }
+      // la ficha y los huecos de quien acaba de cambiar de identidad ya no valen
+      if (verifyPeopleStatus.verified) invalidarPaginasCalculadas();
+    } catch (err) {
+      verifyPeopleStatus.error = String(err.message || err);
+    } finally {
+      verifyPeopleStatus.running = false;
+      verifyPeopleStatus.finishedAt = Date.now();
+      clearBuildProgress('verify-people');
+    }
+  })();
+
+  return { started: true, ...verifyPeopleStatus };
+});
+
+app.get('/api/datahealth/verify-people', async () => verifyPeopleStatus);
 
 // novedades detectadas por el pase nocturno (ediciones de festivales, digitales…)
 app.get('/api/events', async (req) =>

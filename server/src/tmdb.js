@@ -182,8 +182,13 @@ export async function resolveCatalogDirector({ name, birth = null, age = null, l
   // quien dirige primero: casi siempre es el bueno y ahorra comprobaciones
   candidatos.sort((a, b) => (b.known_for_department === 'Directing') - (a.known_for_department === 'Directing'));
 
+  // Dos pasadas. La fecha solo sirve para DESCARTAR a quien la contradice, no
+  // para exigirla: TMDB no tiene fecha de nacimiento de muchísimos cineastas
+  // fuera del circuito anglosajón, y pedirla dejaba sin foto a gente que TMDB
+  // conoce de sobra y sin ningún homónimo que la dispute.
   let elegido = null;
   let fallosRed = false;
+  const sinFecha = [];
   for (const c of candidatos) {
     let det;
     try {
@@ -194,16 +199,20 @@ export async function resolveCatalogDirector({ name, birth = null, age = null, l
     }
     const nacido = det.birthday ? Number(det.birthday.slice(0, 4)) : null;
     const muerto = det.deathday ? Number(det.deathday.slice(0, 4)) : null;
+    const retrato = det.profile_path ?? c.profile_path;
     // muerto antes de su última película: no puede ser
     if (muerto && last && muerto < last) continue;
     if (esperado && nacido) {
-      if (Math.abs(nacido - esperado) <= 1) { elegido = { ...c, profile_path: det.profile_path ?? c.profile_path }; break; }
-      continue; // fecha que no cuadra: es otra persona, por popular que sea
+      // la fecha cuadra: es la prueba más fuerte que hay, se corta aquí
+      if (Math.abs(nacido - esperado) <= 1) { elegido = { ...c, profile_path: retrato }; break; }
+      continue; // la fecha lo DESMIENTE: es otra persona, por popular que sea
     }
-    // sin fecha con la que contrastar (ni en el catálogo ni en TMDB), vale el
-    // primero que dirija; si ninguno dirige, no se elige a nadie
-    if (!esperado && c.known_for_department === 'Directing') { elegido = c; break; }
+    // nadie a quien contradecir: queda como suplente para la segunda pasada
+    if (c.known_for_department === 'Directing') sinFecha.push({ ...c, profile_path: retrato });
   }
+  // nadie confirmado por fecha: vale quien dirige y no contradice nada. Sigue
+  // fuera el homónimo famoso, porque ese SÍ tiene fecha y no cuadra.
+  if (!elegido && !fallosRed && sinFecha.length) elegido = sinFecha[0];
 
   const info = elegido
     ? { id: elegido.id, name: elegido.name, profile_path: elegido.profile_path || null }
@@ -366,14 +375,15 @@ const libraryFilmsOf = (personId) =>
  * bueno (`tmdb_verified`). Si ninguno lo demuestra se guarda el mejor intento
  * sin marcarlo, para volver a probar más adelante.
  */
-export async function resolvePerson(personId) {
+export async function resolvePerson(personId, { force = false } = {}) {
   const person = db.prepare('SELECT * FROM people WHERE id = ?').get(personId);
   if (!person) return null;
   // lo elegiste tú a mano: no se revisa nunca (ver POST /api/people/:id/match)
   if (person.tmdb_locked) return person;
   if (person.tmdb_id && person.tmdb_verified) return person;
-  // se reintenta, pero no todos los días: una semana entre intentos
-  if (person.tmdb_id && person.tmdb_checked_at && Date.now() - person.tmdb_checked_at < 7 * DAY) return person;
+  // se reintenta, pero no todos los días: una semana entre intentos. `force` lo
+  // salta, para el botón de comprobar de Salud de los datos.
+  if (!force && person.tmdb_id && person.tmdb_checked_at && Date.now() - person.tmdb_checked_at < 7 * DAY) return person;
 
   const roles = db
     .prepare('SELECT DISTINCT role FROM movie_people WHERE person_id = ?')
