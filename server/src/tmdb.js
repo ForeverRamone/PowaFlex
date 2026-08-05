@@ -138,6 +138,80 @@ export async function findPersonId(name, knownForHint = null) {
   return (await findPersonInfo(name, knownForHint)).id;
 }
 
+/**
+ * Emparejar un director/a del catálogo con su ficha de TMDB, VERIFICANDO que es
+ * la persona correcta.
+ *
+ * `findPersonInfo` decide por popularidad, y con eso el homónimo famoso gana
+ * siempre: buscando «Steve McQueen» salía el actor de Bullitt (muerto en 1980)
+ * en vez del director de *12 años de esclavitud*, porque el actor es mucho más
+ * popular y el director no llegaba al umbral que le habría dado preferencia.
+ * Lo mismo pasaría con Michael Bay, Richard Brooks o cualquier otro par de
+ * tocayos.
+ *
+ * Aquí sí hay con qué comprobarlo: el catálogo trae el año de nacimiento (o la
+ * edad, que lo da). Un candidato solo vale si su fecha de nacimiento en TMDB
+ * cuadra con la del catálogo (±1 año, que los dos datos vienen de sitios
+ * distintos). Y si NADIE cuadra, se devuelve vacío: mejor una inicial que la
+ * cara de otra persona, que es la misma regla que ya rige el emparejado de
+ * películas en Festivales.
+ */
+export async function resolveCatalogDirector({ name, birth = null, age = null, last = null }) {
+  const esperado = birth || (age ? new Date().getFullYear() - age : null);
+  const clave = `dir_match:v1:${String(name).toLowerCase()}:${esperado || ''}`;
+  const hit = cacheRead(clave, 30 * DAY);
+  if (hit) return hit;
+
+  let candidatos = [];
+  try {
+    const data = await tmdbGet(
+      '/search/person',
+      { query: name },
+      { cacheKey: `person_search_all:${String(name).toLowerCase()}`, cacheMs: 30 * DAY }
+    );
+    candidatos = (data.results || []).slice(0, 6);
+  } catch {
+    return { id: null, profile_path: null }; // fallo de red: no se cachea
+  }
+  if (!candidatos.length) {
+    const vacio = { id: null, profile_path: null };
+    cacheWrite(clave, vacio);
+    return vacio;
+  }
+
+  // quien dirige primero: casi siempre es el bueno y ahorra comprobaciones
+  candidatos.sort((a, b) => (b.known_for_department === 'Directing') - (a.known_for_department === 'Directing'));
+
+  let elegido = null;
+  let fallosRed = false;
+  for (const c of candidatos) {
+    let det;
+    try {
+      det = await personDetails(c.id);
+    } catch {
+      fallosRed = true;
+      break; // como en el emparejado de películas: nadie gana por incomparecencia
+    }
+    const nacido = det.birthday ? Number(det.birthday.slice(0, 4)) : null;
+    const muerto = det.deathday ? Number(det.deathday.slice(0, 4)) : null;
+    // muerto antes de su última película: no puede ser
+    if (muerto && last && muerto < last) continue;
+    if (esperado && nacido) {
+      if (Math.abs(nacido - esperado) <= 1) { elegido = { ...c, profile_path: det.profile_path ?? c.profile_path }; break; }
+      continue; // fecha que no cuadra: es otra persona, por popular que sea
+    }
+    // sin fecha con la que contrastar (ni en el catálogo ni en TMDB), vale el
+    // primero que dirija; si ninguno dirige, no se elige a nadie
+    if (!esperado && c.known_for_department === 'Directing') { elegido = c; break; }
+  }
+
+  const info = elegido
+    ? { id: elegido.id, name: elegido.name, profile_path: elegido.profile_path || null }
+    : { id: null, profile_path: null };
+  if (!fallosRed) cacheWrite(clave, info);
+  return info;
+}
+
 // Siete días de caché en vez de uno: la partida más cara de TMDB era re-pedir
 // TODAS las filmografías de tus favoritos cada noche. syncPersonChanges (abajo)
 // invalida cada día las de quien de verdad cambió, y los 7 días son la

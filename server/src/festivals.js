@@ -16,6 +16,7 @@
 import { db, cacheRead, cacheWrite } from './db.js';
 import { mapPool } from './pool.js';
 import { cachePrefix } from './cache-versions.js';
+import { foldName, normName } from './names.js';
 import { searchMovieCandidates, movieDirectors, movieSummary, findPersonInfo, latinizeNames } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { watchedIndex, isWatched } from './letterboxd.js';
@@ -577,19 +578,15 @@ export function splitDirectors(s) {
 }
 
 // nombres comparables entre Wikipedia y TMDB: sin acentos, sin guiones ni
-// espacios («Hirokazu Kore-eda» y «Hirokazu Koreeda» son la misma persona)
-const normName = (s) =>
-  String(s || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/g, '');
+// espacios («Hirokazu Kore-eda» y «Hirokazu Koreeda» son la misma persona), y
+// con las letras que NFD no descompone plegadas a ASCII — «Paweł» y «Pawel»
+// tienen que ser el mismo señor (ver names.js)
 
 // tokens de un nombre: guiones fusionados («Kore-eda» → «koreeda»), sin
 // acentos, y fuera iniciales sueltas («Joseph L. Mankiewicz» → joseph,
 // mankiewicz)
 const nameTokens = (s) =>
-  String(s || '')
+  foldName(s) // «Paweł» → «Pawel» antes de partir: si no, el token queda en «Pawe»
     .toLowerCase()
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')

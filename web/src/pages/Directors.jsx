@@ -207,28 +207,34 @@ export default function Directors() {
 
   const seguir = async (d) => {
     setBusy(d.name);
-    const r = await api('/tracked/by-names', { method: 'POST', body: { names: d.name, role: 'director' } });
+    // por la ruta del catálogo, NO por /tracked/by-names: esa resuelve por
+    // popularidad y metería al homónimo famoso (el actor Steve McQueen en vez
+    // del director). Aquí se comprueba contra el año de nacimiento.
+    const r = await api('/directors/follow', { method: 'POST', body: { names: [d.name] } });
     setBusy(null);
     if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
-    if (!r.added) { toast(`${d.name} no se encontró en TMDB`, 'error'); return; }
+    // `added` cuenta ALTAS: cero también significa «ya estaba», y decir
+    // entonces «no se encontró en TMDB» era mentir. Quien no se resuelve viene
+    // en notFound.
+    if (r.notFound?.length) { toast(`No se ha podido identificar a ${d.name} en TMDB`, 'error'); return; }
     marcar(new Set([d.name]));
-    toast(`⭐ ${d.name} en favoritos (directores/as)`, 'success');
+    toast(r.added ? `⭐ ${d.name} en favoritos (directores/as)` : `${d.name} ya estaba en favoritos`, 'success');
   };
 
   const seguirVisibles = async () => {
     const pendientes = filtrados.filter((d) => !d.tracked).slice(0, 150);
     if (!pendientes.length) return;
     setBulkBusy(true);
-    const r = await api('/tracked/by-names', {
+    const r = await api('/directors/follow', {
       method: 'POST',
-      body: { names: pendientes.map((d) => d.name).join('\n'), role: 'director' },
+      body: { names: pendientes.map((d) => d.name) },
     });
     setBulkBusy(false);
     if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
     const noEncontrados = new Set(r.notFound || []);
     marcar(new Set(pendientes.map((d) => d.name).filter((n) => !noEncontrados.has(n))));
     toast(
-      `⭐ ${r.added} añadidos a favoritos${r.notFound?.length ? ` · ${r.notFound.length} sin ficha en TMDB` : ''}`,
+      `⭐ ${r.added} añadidos a favoritos${r.notFound?.length ? ` · ${r.notFound.length} sin identificar en TMDB` : ''}`,
       'success'
     );
   };

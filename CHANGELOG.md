@@ -1,5 +1,25 @@
 # Changelog
 
+## Alpha 0.9.15 (0.9.15-alpha) — 2026-08-05
+
+Dos arreglos de identidad en el catálogo de directores, los dos reportados desde la 0.9.14.
+
+- **Ya no se cuela el homónimo famoso.** A Steve McQueen (el director de *12 años de esclavitud*)
+  se le ponía la cara del actor de *Bullitt*, muerto en 1980 — y, peor, seguirle metía al ACTOR en
+  tus favoritos, en Cine venidero y en Descubrir huecos. La culpa era de resolver por popularidad:
+  el actor gana por goleada. Ahora, cuando se empareja un director del catálogo con su ficha de
+  TMDB, **se comprueba que el año de nacimiento cuadre** con el que trae el catálogo; quien no
+  cuadre queda descartado por popular que sea, y si nadie cuadra no se pone foto, que es mejor que
+  poner la cara de otra persona. También se descarta a quien murió antes de su última película.
+- **Los nombres con ł, ø, ı o İ vuelven a casar.** Wikidata escribe «Małgorzata Szumowska» y TMDB
+  guarda «Malgorzata Szumowska»; esas letras no son una letra con acento sino letras propias, y al
+  limpiar el nombre **desaparecían** en vez de convertirse en su equivalente. Resultado:
+  Szumowska, Paweł Pawlikowski, Mia Hansen-Løve e İlker Çatak salían como no seguidos aunque
+  estuvieran en favoritos, y al pulsar su estrella se decía que no tenían ficha en TMDB. Afectaba
+  también al emparejado de sus películas en Festivales, que se quedaban sin ficha.
+- De paso, el aviso al seguir a alguien deja de mentir: cuando ya estaba en favoritos lo dice, en
+  vez de dar a entender que no se encontró en TMDB.
+
 ## Alpha 0.9.14 (0.9.14-alpha) — 2026-08-05
 
 - **Directores en activo: una página nueva con 680 nombres.** Directores y directoras con obra

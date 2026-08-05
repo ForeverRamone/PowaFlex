@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { today } from './dates.js';
 import { mapPool } from './pool.js';
+import { normName } from './names.js';
 import fastifyStatic from '@fastify/static';
 import multipart from '@fastify/multipart';
 import path from 'node:path';
@@ -28,6 +29,7 @@ import {
   searchMovieCandidates,
   searchPeople,
   findPersonInfo,
+  resolveCatalogDirector,
   normalizeLibraryTitles,
   normalizePeopleNames,
   latinizeNames,
@@ -664,9 +666,14 @@ app.get('/api/people/festival-packs', async (req, reply) => {
  * sigues ya, comparando por nombre normalizado (que es como se resuelven
  * contra TMDB cuando los añades).
  */
+// el catálogo indexado por nombre: la resolución verificada necesita el año de
+// nacimiento (o la edad) de cada uno para comprobar que TMDB le ha dado la
+// persona correcta y no a su homónimo famoso
+const CATALOGO_POR_NOMBRE = new Map(DIRECTORS_2026.map((d) => [d.name, d]));
+const fichaDeCatalogo = (nombre) => CATALOGO_POR_NOMBRE.get(nombre) || { name: nombre };
+
 app.get('/api/directors/catalog', async () => {
-  const norm = (s) =>
-    String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+  const norm = normName; // pliega ł/ø/ı: Wikidata y TMDB los escriben distinto
   const seguidos = new Set(
     db
       .prepare(
@@ -711,13 +718,46 @@ app.post('/api/directors/photos', async (req, reply) => {
   const photos = {};
   await mapPool(nombres, 6, async (nombre) => {
     try {
-      const info = await findPersonInfo(nombre, 'Directing');
+      const info = await resolveCatalogDirector(fichaDeCatalogo(nombre));
       photos[nombre] = { tmdbId: info?.id || null, profilePath: info?.profile_path || null };
     } catch {
       photos[nombre] = { tmdbId: null, profilePath: null };
     }
   });
   return { photos };
+});
+
+/**
+ * Seguir directores del catálogo, con el emparejado VERIFICADO.
+ *
+ * No vale /tracked/by-names aquí: ese resuelve por popularidad y metería al
+ * homónimo famoso —el actor Steve McQueen en vez del director— en favoritos,
+ * en el calendario y en los huecos. Con la ficha del catálogo delante hay año
+ * de nacimiento contra el que comprobar, así que se usa.
+ */
+app.post('/api/directors/follow', async (req, reply) => {
+  const nombres = [...new Set((req.body?.names || []).filter((n) => typeof n === 'string' && n.trim()))].slice(0, 150);
+  if (!nombres.length) {
+    reply.code(400);
+    return { error: 'No hay a quién seguir' };
+  }
+  let added = 0;
+  const notFound = [];
+  for (const nombre of nombres) {
+    try {
+      const info = await resolveCatalogDirector(fichaDeCatalogo(nombre));
+      if (!info?.id) { notFound.push(nombre); continue; }
+      const antes = db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n;
+      const r = trackByTmdb({ tmdbId: info.id, name: info.name || nombre, profilePath: info.profile_path, role: 'director' });
+      // añadirlo a mano levanta el veto de la ✕, como en el resto de altas
+      if (r.personId) db.prepare('DELETE FROM unfollowed_people WHERE person_id = ?').run(r.personId);
+      if (db.prepare('SELECT COUNT(*) n FROM tracked_people').get().n > antes) added++;
+    } catch {
+      notFound.push(nombre);
+    }
+  }
+  if (added) invalidateFavoritesCaches();
+  return { ok: true, added, total: nombres.length, notFound };
 });
 
 app.get('/api/people/search-tmdb', async (req, reply) => {
