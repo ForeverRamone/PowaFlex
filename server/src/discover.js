@@ -10,6 +10,7 @@ import { matchMovie, watchedIndex, isWatched } from './letterboxd.js';
 import { TSPDT_DIRECTORS, TSPDT_21C_DIRECTORS } from './data/tspdt-directors.js';
 import { IMDB_501_DIRECTORS } from './data/imdb-501-directors.js';
 import { cachePrefix } from './cache-versions.js';
+import { demographicConds } from './queries.js';
 
 // Mark TMDB items as watched (Plex view or Letterboxd), for the status system (#3).
 function applyWatched(items) {
@@ -243,8 +244,12 @@ const libraryTmdbIds = () =>
  * For the library's top people of a role, aggregate their missing (released,
  * not-owned) films, ranked by TMDB vote count.
  */
-export async function libraryGaps({ role = 'director', people = 20, perPerson = 8, offset = 0, refresh = false } = {}) {
-  const cacheKey = `${cachePrefix('discover_gaps')}:${role}:${people}:${perPerson}:${offset}:${minVotesFor(role)}`;
+export async function libraryGaps({
+  role = 'director', people = 20, perPerson = 8, offset = 0, refresh = false,
+  gender = '', life = '', continent = '', country = '',
+} = {}) {
+  const demoKey = [gender, life, continent, country].join(',');
+  const cacheKey = `${cachePrefix('discover_gaps')}:${role}:${people}:${perPerson}:${offset}:${minVotesFor(role)}:${demoKey}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 12 * HOUR);
     if (hit && !esParcialCaducado(hit)) return hit;
@@ -253,17 +258,24 @@ export async function libraryGaps({ role = 'director', people = 20, perPerson = 
   const minVotes = minVotesFor(role);
   const dismissed = dismissedIds();
   const lbVotes = lbVotesMap();
+  // demographic filters (gender/life/continent/country) share the exact
+  // conditions with the Personas grid — see demographicConds
+  const demo = demographicConds({ gender, life, continent, country });
+  const where = ['mp.role = ?', ...demo.conds].join(' AND ');
   // paginated so "ver más" can walk the ranking down to the first 500
   const tops = db
     .prepare(
       `SELECT p.id, p.name, p.thumb, p.deathday, COUNT(*) n FROM movie_people mp
        JOIN people p ON p.id = mp.person_id
-       WHERE mp.role = ? GROUP BY p.id ORDER BY n DESC, p.name LIMIT ? OFFSET ?`
+       WHERE ${where} GROUP BY p.id ORDER BY n DESC, p.name LIMIT ? OFFSET ?`
     )
-    .all(role, people, offset);
+    .all(role, ...demo.args, people, offset);
   const totalPeople = db
-    .prepare(`SELECT COUNT(DISTINCT person_id) n FROM movie_people WHERE role = ?`)
-    .get(role).n;
+    .prepare(
+      `SELECT COUNT(DISTINCT mp.person_id) n FROM movie_people mp
+       JOIN people p ON p.id = mp.person_id WHERE ${where}`
+    )
+    .get(role, ...demo.args).n;
 
   const inLib = libraryTmdbIds();
   const now = today();

@@ -154,6 +154,21 @@ export function charts() {
   };
 }
 
+// Demographic conditions over `people p`, shared by the Personas grid and the
+// "top de tu biblioteca" ranking in Descubrir, so both filter identically.
+export function demographicConds({ gender = '', life = '', continent = '', country = '' } = {}) {
+  const conds = [];
+  const args = [];
+  if (gender === 'female') conds.push('p.gender = 1');
+  if (gender === 'male') conds.push('p.gender = 2');
+  if (gender === 'other') conds.push('p.gender = 3');
+  if (life === 'alive') conds.push('p.deathday IS NULL AND p.details_fetched_at IS NOT NULL');
+  if (life === 'dead') conds.push('p.deathday IS NOT NULL');
+  if (continent) { conds.push('p.continent = ?'); args.push(continent); }
+  if (country) { conds.push('p.country = ?'); args.push(country); }
+  return { conds, args };
+}
+
 export function topPeople({ role = 'director', limit = 30, offset = 0, search = '', gender = '', life = '', continent = '', country = '', hideDead = false } = {}) {
   const conds = ['mp.role = ?'];
   const args = [role];
@@ -163,13 +178,9 @@ export function topPeople({ role = 'director', limit = 30, offset = 0, search = 
   // hide only the known-dead, keeping people whose status we don't have yet (E)
   if (hideDead) conds.push('p.deathday IS NULL');
   if (search) { conds.push('p.name LIKE ?'); args.push(`%${search}%`); }
-  if (gender === 'female') conds.push('p.gender = 1');
-  if (gender === 'male') conds.push('p.gender = 2');
-  if (gender === 'other') conds.push('p.gender = 3');
-  if (life === 'alive') conds.push('p.deathday IS NULL AND p.details_fetched_at IS NOT NULL');
-  if (life === 'dead') conds.push('p.deathday IS NOT NULL');
-  if (continent) { conds.push('p.continent = ?'); args.push(continent); }
-  if (country) { conds.push('p.country = ?'); args.push(country); }
+  const demo = demographicConds({ gender, life, continent, country });
+  conds.push(...demo.conds);
+  args.push(...demo.args);
   args.push(limit, offset);
   return db
     .prepare(

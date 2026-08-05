@@ -1,6 +1,16 @@
 # Changelog
 
-## Alpha 0.9.16 (0.9.16-alpha) — 2026-08-05
+## Alpha 0.9.17 (0.9.17-alpha) — 2026-08-05
+
+- **Filtros demográficos en «Directores/as top» y «Actores/actrices top»** (Descubrir huecos):
+  los mismos selectores que la página Personas —género, vivos/fallecidos, continente y país de
+  nacimiento— ahora acotan el ranking de los más presentes en tu biblioteca. Sirven para cazar
+  huecos de «mis directores top españoles», «mujeres directoras» o «cineastas asiáticos» sin
+  salir de la pestaña. El filtro se aplica en el servidor, así que «Ver más» recorre el ranking
+  ya filtrado (hasta los 500 primeros), y la selección se recuerda entre visitas. El botón
+  «Limpiar filtros» de la caja de vista también los restablece. Si un filtro deja la lista
+  vacía, la página lo dice y recuerda que los datos demográficos se amplían desde Ajustes →
+  «Actualizar estado vital» (vienen del lugar de nacimiento de TMDB, que a veces falta).
 
 - **«Personas con emparejado sin demostrar» ya no alarma de más.** Ese número juntaba dos cosas
   muy distintas: las que se comprobaron y no se pudo demostrar quiénes son (ahí sí puede haber un

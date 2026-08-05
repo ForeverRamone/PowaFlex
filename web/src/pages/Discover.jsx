@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid, X } from 'lucide-react';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
-  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, PageHeader, Signature } from '../components.jsx';
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, PageHeader, Signature, Select } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 
@@ -203,11 +203,17 @@ function GapsView({
   const setPersonSortPref = (v) => { setPersonSort(v); localStorage.setItem('gaps_person_sort', v); };
   const setFilmSortPref = (v) => { setFilmSort(v); localStorage.setItem('gaps_film_sort', v); };
 
+  // cambiar un filtro relanza la carga sin esperar a la anterior: cada petición
+  // lleva su número y solo la última en salir puede pintar, para que una
+  // respuesta lenta (un cruce de filmografías sin cachear) no pise a la nueva
+  const reqId = useRef(0);
   const load = (refresh = false) => {
+    const id = ++reqId.current;
     setError(null);
     if (refresh) setRefreshing(true);
     else setData(null);
     api(`${endpoint}${refresh ? (endpoint.includes('?') ? '&' : '?') + 'refresh=1' : ''}`).then((d) => {
+      if (id !== reqId.current) return;
       setRefreshing(false);
       if (d.error) setError(d.error);
       else setData(d);
@@ -217,9 +223,11 @@ function GapsView({
 
   // walk the ranking further down (top tabs only)
   const loadMore = () => {
+    const id = ++reqId.current;
     setLoadingMore(true);
     const next = (data.offset || 0) + (data.pageSize || 20);
     api(`${endpoint}${endpoint.includes('?') ? '&' : '?'}offset=${next}`).then((d) => {
+      if (id !== reqId.current) return;
       setLoadingMore(false);
       if (d.error) return setError(d.error);
       setData({ ...d, people: [...data.people, ...d.people] });
@@ -247,7 +255,11 @@ function GapsView({
       </div>
 
       {data.people.length === 0 ? (
-        <Empty>Nada que rellenar aquí: filmografías completas.</Empty>
+        <Empty>
+          {data.totalPeople === 0
+            ? 'Nadie en tu biblioteca casa con esos filtros. Puede que falten datos demográficos: amplíalos en Ajustes → «Actualizar estado vital».'
+            : 'Nada que rellenar aquí: filmografías completas.'}
+        </Empty>
       ) : (
         <>
           <div className="card p-3 mb-4 space-y-3">
@@ -585,6 +597,8 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
   );
 }
 
+const DEMO_VACIO = { gender: '', life: '', continent: '', country: '' };
+
 export default function Discover() {
   const [tab, setTab] = useState('favorites');
   const [favRole, setFavRole] = useState(() => localStorage.getItem('gaps_fav_role') || 'director');
@@ -595,11 +609,36 @@ export default function Discover() {
     setMinScoreState(v);
     localStorage.setItem('gaps_min_score', String(v));
   };
-  // la parte del padre de «limpiar filtros»: listón de nota y filtros de tipo
-  // (la vista y los órdenes viven en GapsView, que completa la limpieza)
+  // filtros demográficos de las pestañas «top» (mismos que en Personas), para
+  // acotar el ranking a «mis directores top españoles», «mujeres», etc.
+  const [demo, setDemo] = useState(() => {
+    try {
+      return { ...DEMO_VACIO, ...JSON.parse(localStorage.getItem('gaps_demo_filters') || '{}') };
+    } catch {
+      return { ...DEMO_VACIO };
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem('gaps_demo_filters', JSON.stringify(demo));
+  }, [demo]);
+  const setDemoFilter = (k) => (v) => setDemo((prev) => ({ ...prev, [k]: v }));
+  const demoActivo = Object.values(demo).some(Boolean);
+  // opciones de continente/país: se piden la primera vez que se entra a un top
+  const [demoOpts, setDemoOpts] = useState(null);
+  useEffect(() => {
+    if ((tab === 'director' || tab === 'actor') && !demoOpts)
+      api('/people/filter-options').then((o) => !o.error && setDemoOpts(o));
+  }, [tab, demoOpts]);
+  const demoQs = Object.entries(demo)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `&${k}=${encodeURIComponent(v)}`)
+    .join('');
+  // la parte del padre de «limpiar filtros»: listón de nota, filtros de tipo y
+  // demografía (la vista y los órdenes viven en GapsView, que completa la limpieza)
   const clearBaseFilters = () => {
     setMinScore(0);
     resetTypes();
+    setDemo({ ...DEMO_VACIO });
   };
   const [dismissed, setDismissed] = useState(new Set());
   useEffect(() => {
@@ -646,6 +685,29 @@ export default function Discover() {
         ))}
       </div>
 
+      {(tab === 'director' || tab === 'actor') && (
+        <div className="flex flex-wrap gap-2 mb-4 items-center">
+          <Select value={demo.gender} onChange={setDemoFilter('gender')} placeholder="Género"
+            options={[['female', 'Mujer'], ['male', 'Hombre'], ['other', 'No binario']]} />
+          <Select value={demo.life} onChange={setDemoFilter('life')} placeholder="Vivo/fallecido"
+            options={[['alive', 'Vivos'], ['dead', 'Fallecidos']]} />
+          <Select value={demo.continent} onChange={setDemoFilter('continent')} placeholder="Continente"
+            options={(demoOpts?.continents || []).map((c) => [c, c])} />
+          <Select value={demo.country} onChange={setDemoFilter('country')} placeholder="País (nacimiento)"
+            options={(demoOpts?.countries || []).map((c) => [c, c])} />
+          {demoActivo && (
+            <button className="btn-ghost !py-1 text-xs" onClick={() => setDemo({ ...DEMO_VACIO })}>
+              ✕ Limpiar
+            </button>
+          )}
+          {demoOpts && (
+            <span className="text-xs text-zinc-500 ml-auto">
+              Datos demográficos de {demoOpts.enriched.toLocaleString('es-ES')} personas · amplíalos en Ajustes → «Actualizar estado vital»
+            </span>
+          )}
+        </div>
+      )}
+
       {tab === 'favorites' && (
         <div className="flex gap-2 mb-4 flex-wrap items-center">
           <span className="text-xs text-zinc-500">Faceta:</span>
@@ -674,11 +736,11 @@ export default function Discover() {
       ) : (
         <GapsView
           key={tab}
-          endpoint={`/discover/gaps?role=${tab}`}
+          endpoint={`/discover/gaps?role=${tab}${demoQs}`}
           role={tab}
           paginated
           {...gapProps}
-          intro={`Qué te falta de las filmografías de ${tab === 'director' ? 'directores/as' : 'actores/actrices'} más presentes en tu biblioteca.`}
+          intro={`Qué te falta de las filmografías de ${tab === 'director' ? 'directores/as' : 'actores/actrices'} más presentes en tu biblioteca${demoActivo ? ', con tus filtros demográficos aplicados' : ''}.`}
         />
       )}
     </div>

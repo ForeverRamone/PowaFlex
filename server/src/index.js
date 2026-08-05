@@ -1365,6 +1365,11 @@ app.get('/api/discover/gaps', async (req, reply) => {
       // the ranking can be walked down to the first 500 people
       offset: Math.min(Math.max(Number(req.query.offset) || 0, 0), 500),
       refresh: req.query.refresh === '1',
+      // mismos filtros demográficos que la página Personas
+      gender: req.query.gender || '',
+      life: req.query.life || '',
+      continent: req.query.continent || '',
+      country: req.query.country || '',
     });
   } catch (err) {
     reply.code(502);

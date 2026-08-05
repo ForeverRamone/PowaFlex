@@ -14,8 +14,9 @@
  */
 export const CACHE_VERSIONS = {
   calendar: 7,
-  // v8/v9: el umbral de ruido pasó a mirar también los votos de Letterboxd
-  discover_gaps: 8,
+  // v8: el umbral de ruido pasó a mirar también los votos de Letterboxd
+  // v9: la clave lleva los filtros demográficos (género/vida/continente/país)
+  discover_gaps: 9,
   discover_favorites: 9,
   discover_absent: 5,
   // v2: el emparejado con TMDB se verifica contra el director/a (antes un
