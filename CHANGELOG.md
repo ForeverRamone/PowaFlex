@@ -1,5 +1,17 @@
 # Changelog
 
+## Beta 1.02 (1.0.2-beta) — 2026-08-06
+
+**Arreglo urgente de la 1.01: tres páginas rotas.** Taller, Descubrir huecos y Estrenos morían
+al abrirlas («This page has broken · e is not a function»), en los dos idiomas.
+
+- Las tres pintaban sus pestañas con `TABS.map(([t, label, Icon]) => … t(label) …)`: la clave de
+  la pestaña se llamaba igual que la función de traducción `t()` introducida en la 1.01, así que
+  al pintar se intentaba llamar a una cadena de texto. Renombrada la variable en las tres.
+- **Prueba de regresión nueva** (`server/test/i18n-shadow.test.js`): recorre `web/src` y falla si
+  alguna variable local llamada `t` tapa la función de traducción dentro de un ámbito donde se
+  llama a `t(...)`. Verificada reintroduciendo el fallo. Suite 125 → 126.
+
 ## Beta 1.01 (1.0.1-beta) — 2026-08-06
 
 **PowaFlex habla inglés.** Nuevo selector de idioma de la interfaz (ES/EN) en Ajustes, separado

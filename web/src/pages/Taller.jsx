@@ -31,11 +31,13 @@ export default function Taller() {
         subtitle={t('El mantenimiento de la colección: calidad de los archivos, disco, deuda de Radarr y auditorías de los datos.')}
       />
       <div className="flex gap-2 mb-5 flex-wrap">
-        {TABS.map(([t, label, Icon]) => (
+        {/* la clave de pestaña NO puede llamarse t: pisaría la función de
+            traducción importada y el {t(label)} de abajo reventaría la página */}
+        {TABS.map(([key, label, Icon]) => (
           <button
-            key={t}
-            onClick={() => setParams({ tab: t })}
-            className={`${tab === t ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}
+            key={key}
+            onClick={() => setParams({ tab: key })}
+            className={`${tab === key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}
           >
             <Icon size={15} strokeWidth={1.75} /> {t(label)}
           </button>

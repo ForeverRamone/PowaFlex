@@ -670,8 +670,10 @@ export default function Discover() {
       </p>
 
       <div className="flex gap-2 mb-4 flex-wrap">
-        {TABS.map(([t, label, Icon]) => (
-          <button key={t} onClick={() => setTab(t)} className={`${tab === t ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
+        {/* la clave de pestaña NO puede llamarse t: pisaría la función de
+            traducción importada y el {t(label)} de abajo reventaría la página */}
+        {TABS.map(([key, label, Icon]) => (
+          <button key={key} onClick={() => setTab(key)} className={`${tab === key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
             <Icon size={15} strokeWidth={1.75} /> {t(label)}
           </button>
         ))}
