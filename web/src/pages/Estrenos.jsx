@@ -8,6 +8,7 @@ import {
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
+import { t, locale } from '../i18n.js';
 
 const TABS = [
   ['cine-es', 'Cines · España', Ticket],
@@ -30,8 +31,8 @@ const SORTS = {
 };
 
 function fmtFecha(iso) {
-  if (!iso) return 'sin fecha';
-  return new Date(`${iso}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  if (!iso) return t('sin fecha');
+  return new Date(`${iso}T12:00:00`).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 }
 
 function EstrenoCard({ f, radarrIds, addRadarrId, onDismiss, conProviders }) {
@@ -45,7 +46,7 @@ function EstrenoCard({ f, radarrIds, addRadarrId, onDismiss, conProviders }) {
       )}
       {conProviders && (f.providers?.length > 0 || f.rentBuy) && (
         <div className="text-[11px] text-zinc-400 truncate" title={(f.providers || []).join(', ')}>
-          {f.providers?.length ? f.providers.slice(0, 2).join(' · ') : 'alquiler/compra'}
+          {f.providers?.length ? f.providers.slice(0, 2).join(' · ') : t('alquiler/compra')}
           {f.providers?.length > 2 ? ` +${f.providers.length - 2}` : ''}
         </div>
       )}
@@ -54,7 +55,7 @@ function EstrenoCard({ f, radarrIds, addRadarrId, onDismiss, conProviders }) {
           <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={radarrIds.has(f.tmdb_id)} onAdded={addRadarrId} />
         )}
         <button
-          title="No me interesa: no volverá a aparecer (compartido con Descubrir)"
+          title={t('No me interesa: no volverá a aparecer (compartido con Descubrir)')}
           onClick={() => onDismiss(f)}
           className="text-zinc-500 hover:text-red-400 text-xs px-1 shrink-0"
         >
@@ -100,16 +101,16 @@ export default function Estrenos() {
     const r = await api(`/discover/dismiss/${f.tmdb_id}`, { method: 'DELETE' });
     if (r.error) return toast(`⚠️ ${r.error}`, 'error');
     setDismissed((prev) => { const n = new Set(prev); n.delete(f.tmdb_id); return n; });
-    toast(`↩︎ «${f.title}» vuelve a la lista`);
+    toast(t('↩︎ «{title}» vuelve a la lista', { title: f.title }));
   };
   const onDismiss = async (f) => {
     setDismissed((prev) => new Set(prev).add(f.tmdb_id));
     const r = await api('/discover/dismiss', { method: 'POST', body: { tmdbId: f.tmdb_id, title: f.title } });
     if (r.error) {
       setDismissed((prev) => { const n = new Set(prev); n.delete(f.tmdb_id); return n; });
-      return toast(`⚠️ No se ha podido descartar: ${r.error}`, 'error');
+      return toast(t('⚠️ No se ha podido descartar: {error}', { error: r.error }), 'error');
     }
-    toast(`✕ «${f.title}» descartada`, 'info', { label: 'Deshacer', onClick: () => undismiss(f) });
+    toast(t('✕ «{title}» descartada', { title: f.title }), 'info', { label: t('Deshacer'), onClick: () => undismiss(f) });
   };
 
   // como en Descubrir: cada petición lleva su número y solo la última pinta
@@ -180,34 +181,33 @@ export default function Estrenos() {
 
   return (
     <div>
-      <PageHeader eyebrow="La caza" title="Estrenos" />
+      <PageHeader eyebrow={t('La caza')} title={t('Estrenos')} />
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-        Qué acaba de llegar y qué viene: a los <b>cines de España y de EE UU</b> y a las{' '}
-        <b>plataformas españolas</b> (fecha de estreno digital de TMDB, con dónde verla). Solo cine largometraje.
-        El listón Σ separa el estreno que importa del relleno de cartelera; lo aún sin nota no se oculta.
+        {t('Qué acaba de llegar y qué viene: a los ')}<b>{t('cines de España y de EE UU')}</b>{t(' y a las ')}
+        <b>{t('plataformas españolas')}</b>{t(' (fecha de estreno digital de TMDB, con dónde verla). Solo cine largometraje. El listón Σ separa el estreno que importa del relleno de cartelera; lo aún sin nota no se oculta.')}
       </p>
 
       <div className="flex gap-2 mb-4 flex-wrap">
         {TABS.map(([t, label, Icon]) => (
           <button key={t} onClick={() => setTab(t)} className={`${tab === t ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
-            <Icon size={15} strokeWidth={1.75} /> {label}
+            <Icon size={15} strokeWidth={1.75} /> {t(label)}
           </button>
         ))}
       </div>
 
       <div className="card p-3 mb-4 space-y-3">
         <div className="flex items-center gap-2 flex-wrap text-sm">
-          <span className="text-xs text-zinc-500">Estrenadas en:</span>
+          <span className="text-xs text-zinc-500">{t('Estrenadas en:')}</span>
           {WINDOWS.map(([v, label]) => (
             <button key={v} onClick={() => setWin(v)} className={`btn-ghost !py-1 text-xs ${win === v ? '!border-gold-400 text-gold-400' : ''}`}>
-              {label}
+              {t(label)}
             </button>
           ))}
-          <span className="text-xs text-zinc-500 ml-2">Ordenar:</span>
+          <span className="text-xs text-zinc-500 ml-2">{t('Ordenar:')}</span>
           <Select className="!py-1 text-xs" value={sort} onChange={setSort}
-            options={Object.entries(SORTS).map(([k, s]) => [k, s.label])} />
+            options={Object.entries(SORTS).map(([k, s]) => [k, t(s.label)])} />
           {conProviders && providerOptions.length > 0 && (
-            <Select className="!py-1 text-xs" value={provider} onChange={setProvider} placeholder="Plataforma"
+            <Select className="!py-1 text-xs" value={provider} onChange={setProvider} placeholder={t('Plataforma')}
               options={providerOptions.map((p) => [p, p])} />
           )}
         </div>
@@ -215,53 +215,53 @@ export default function Estrenos() {
           <div className="flex items-center gap-2 flex-wrap text-sm">
             {[['', 'Todas'], ['missing', 'Me faltan'], ['owned', 'Las tengo']].map(([v, label]) => (
               <button key={v} onClick={() => setOwn(v)} className={`btn-ghost !py-1 text-xs ${own === v ? '!border-gold-400 text-gold-400' : ''}`}>
-                {label}
+                {t(label)}
               </button>
             ))}
           </div>
           <MinScoreBar minScore={minScore} setMinScore={setMinScore} />
           {hayFiltros && (
-            <button className="btn-ghost !py-1 text-xs" onClick={limpiarFiltros}>✕ Limpiar filtros</button>
+            <button className="btn-ghost !py-1 text-xs" onClick={limpiarFiltros}>{t('✕ Limpiar filtros')}</button>
           )}
-          {ocultas > 0 && <span className="text-xs text-zinc-500">{ocultas} ocultas por tus filtros</span>}
+          {ocultas > 0 && <span className="text-xs text-zinc-500">{t('{n} ocultas por tus filtros', { n: ocultas })}</span>}
         </div>
       </div>
 
       <TypeFilterBar show={show} toggle={toggle} counts={counts} />
 
       {error ? (
-        <ErrorBox error={`${error} — comprueba la API key de TMDB en Ajustes.`} />
+        <ErrorBox error={`${error}${t(' — comprueba la API key de TMDB en Ajustes.')}`} />
       ) : !data ? (
-        <BuildProgress label="Consultando los estrenos en TMDB…" />
+        <BuildProgress label={t('Consultando los estrenos en TMDB…')} />
       ) : (
         <>
           <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
             <p className="text-sm text-zinc-500">
-              Actualizado {new Date(data.generatedAt).toLocaleString('es-ES')}.
+              {t('Actualizado {date}.', { date: new Date(data.generatedAt).toLocaleString(locale()) })}
               {data.errors?.length > 0 && (
-                <span className="text-orange-300"> · TMDB cortó a mitad: lista incompleta, recarga en un rato</span>
+                <span className="text-orange-300"> · {t('TMDB cortó a mitad: lista incompleta, recarga en un rato')}</span>
               )}
             </p>
             <div className="flex gap-2 flex-wrap">
               {pendingIds.length > 1 && (
                 <button className="btn-gold !py-1 text-xs inline-flex items-center gap-1.5" onClick={sendBulk}>
-                  <Plus size={13} strokeWidth={2.5} /> Añadir {Math.min(pendingIds.length, 300)} visibles a Radarr
+                  <Plus size={13} strokeWidth={2.5} /> {t('Añadir {n} visibles a Radarr', { n: Math.min(pendingIds.length, 300) })}
                 </button>
               )}
               <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={() => load(true)} disabled={refreshing}>
-                {refreshing ? 'Actualizando…' : <><RotateCw size={13} strokeWidth={2} /> Actualizar</>}
+                {refreshing ? t('Actualizando…') : <><RotateCw size={13} strokeWidth={2} /> {t('Actualizar')}</>}
               </button>
             </div>
           </div>
 
           {recent.length === 0 && upcoming.length === 0 ? (
-            <Empty>Nada que enseñar con estos filtros.</Empty>
+            <Empty>{t('Nada que enseñar con estos filtros.')}</Empty>
           ) : (
             <>
               {recent.length > 0 && (
                 <section className="mb-8">
                   <h2 className="font-semibold text-zinc-100 mb-3">
-                    Ya estrenadas <span className="text-zinc-500 text-sm font-normal">· {recent.length}</span>
+                    {t('Ya estrenadas')} <span className="text-zinc-500 text-sm font-normal">· {recent.length}</span>
                   </h2>
                   {grid(recent)}
                 </section>
@@ -269,7 +269,7 @@ export default function Estrenos() {
               {upcoming.length > 0 && (
                 <section className="mb-8">
                   <h2 className="font-semibold text-zinc-100 mb-3">
-                    Próximas <span className="text-zinc-500 text-sm font-normal">· {upcoming.length} en {tab === 'plataformas-es' ? 'plataformas' : 'cines'} en 60 días</span>
+                    {t('Próximas')} <span className="text-zinc-500 text-sm font-normal">· {t(tab === 'plataformas-es' ? '{n} en plataformas en 60 días' : '{n} en cines en 60 días', { n: upcoming.length })}</span>
                   </h2>
                   {grid(upcoming)}
                 </section>

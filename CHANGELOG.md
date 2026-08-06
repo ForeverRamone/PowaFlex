@@ -1,5 +1,25 @@
 # Changelog
 
+## Beta 1.01 (1.0.1-beta) — 2026-08-06
+
+**PowaFlex habla inglés.** Nuevo selector de idioma de la interfaz (ES/EN) en Ajustes, separado
+del idioma de datos de TMDB: solo cambia los textos de la app, no las sinopsis ni los títulos.
+Además, la publicación de la imagen Docker se moderniza.
+
+- **Selector de idioma ES/EN** en Ajustes (junto al tema visual). El ajuste `ui_language` vive en
+  el servidor —te sigue en todos tus dispositivos y entra en el export/import de ajustes— y se
+  espeja en el navegador para pintar en el idioma correcto desde el primer frame. Cambiarlo
+  recarga la página y toda la interfaz cambia de golpe.
+- **Traducción completa de la interfaz al inglés**: las 13 secciones, la paleta ⌘K, los avisos,
+  tooltips, filtros y los textos largos de ayuda (~1.100 cadenas). Las fechas y números se
+  formatean según el idioma (es-ES / en-GB). El castellano sigue siendo el idioma por defecto y
+  no cambia ni una coma.
+- Lo que genera el **servidor** (mensajes de error, avisos de tareas, textos de Novedades) sigue
+  en castellano de momento; es candidato para una próxima versión.
+- **CI**: las GitHub Actions del workflow de Docker suben a sus versiones sobre Node 24
+  (`checkout@v7`, `setup-qemu@v4`, `setup-buildx@v4`, `login@v4`, `metadata@v6`,
+  `build-push@v7`) — desaparece el aviso de deprecación de Node 20 en los runners.
+
 ## Beta 1.00 (1.0.0-beta) — 2026-08-06
 
 **La gran reorganización.** Mismas funciones, la mitad de menú: la app se agrupa en 13 secciones

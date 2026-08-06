@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { t } from './i18n.js';
 
 /**
  * Mandar una tanda de películas a Radarr.
@@ -30,8 +31,8 @@ export async function addBulkToRadarr(tmdbIds, { onAdded, verb = 'añadidas', ta
   return {
     res,
     summary:
-      `✓ ${res.added} ${verb}${target}` +
-      (res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : '') +
-      (res.failed ? ` · ⚠️ ${res.failed} fallaron` : ''),
+      `✓ ${res.added} ${t(verb)}${t(target)}` +
+      (res.alreadyInRadarr ? t(' · {n} ya estaban', { n: res.alreadyInRadarr }) : '') +
+      (res.failed ? t(' · ⚠️ {n} fallaron', { n: res.failed }) : ''),
   };
 }

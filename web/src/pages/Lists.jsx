@@ -6,6 +6,7 @@ import {
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 import { useChartTheme } from '../charts.js';
+import { t } from '../i18n.js';
 
 // --- Letterboxd completista rings -------------------------------------------
 
@@ -67,7 +68,7 @@ function ChallengeRow({ listId, item, radarrIds, onAdded, onOpenOwned }) {
       setTmdbId(r.tmdbId);
       return r.tmdbId;
     }
-    toast(`⚠️ ${r?.error || 'No encuentro esta película en TMDB'}`, 'error');
+    toast(`⚠️ ${r?.error || t('No encuentro esta película en TMDB')}`, 'error');
     return null;
   };
 
@@ -83,14 +84,14 @@ function ChallengeRow({ listId, item, radarrIds, onAdded, onOpenOwned }) {
         className="text-zinc-200 hover:text-gold-400 truncate text-left min-w-0"
         onClick={openFicha}
         disabled={resolving}
-        title={`${item.title} — ver ficha`}
+        title={t('{title} — ver ficha', { title: item.title })}
       >
-        {item.title} <span className="text-zinc-500">({item.year ?? '¿?'})</span>
-        {resolving && <span className="text-zinc-500"> · buscando…</span>}
+        {item.title} <span className="text-zinc-500">({item.year ?? t('¿?')})</span>
+        {resolving && <span className="text-zinc-500">{t(' · buscando…')}</span>}
       </button>
       <span className="ml-auto flex items-center gap-2 shrink-0 text-xs">
-        {item.movie_id && <span className="text-gold-400" title="En tu Plex">📀</span>}
-        {item.watched && <span className="text-emerald-400" title="Vista">👁️</span>}
+        {item.movie_id && <span className="text-gold-400" title={t('En tu Plex')}>📀</span>}
+        {item.watched && <span className="text-emerald-400" title={t('Vista')}>👁️</span>}
         {!item.movie_id && (
           <RadarrButton
             tmdbId={tmdbId}
@@ -130,25 +131,25 @@ function ChallengeDetail({ listId, onChanged }) {
     const res = await api(`/letterboxd/lists/${listId}/radarr`, { method: 'POST' });
     setBulk({
       running: false,
-      msg: res.error ? `⚠️ ${res.error}` : `✓ ${res.added} añadidas${res.alreadyInRadarr ? ` · ${res.alreadyInRadarr} ya estaban` : ''}${res.failed ? ` · ${res.failed} fallaron` : ''}`,
+      msg: res.error ? `⚠️ ${res.error}` : `✓ ${t('{n} añadidas', { n: res.added })}${res.alreadyInRadarr ? ` · ${t('{n} ya estaban', { n: res.alreadyInRadarr })}` : ''}${res.failed ? ` · ${t('{n} fallaron', { n: res.failed })}` : ''}`,
     });
   };
 
   return (
     <div className="mt-3">
       <div className="flex gap-2 mb-2 flex-wrap items-center">
-        <button className={`btn-ghost !py-1 text-xs ${view === 'missing' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('missing')}>No tengo ({missing.length})</button>
-        <button className={`btn-ghost !py-1 text-xs ${view === 'owned' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('owned')}>Tengo ({owned.length})</button>
-        <button className={`btn-ghost !py-1 text-xs ${view === 'unwatched' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('unwatched')}>Sin ver ({unwatched.length})</button>
+        <button className={`btn-ghost !py-1 text-xs ${view === 'missing' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('missing')}>{t('No tengo ({n})', { n: missing.length })}</button>
+        <button className={`btn-ghost !py-1 text-xs ${view === 'owned' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('owned')}>{t('Tengo ({n})', { n: owned.length })}</button>
+        <button className={`btn-ghost !py-1 text-xs ${view === 'unwatched' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('unwatched')}>{t('Sin ver ({n})', { n: unwatched.length })}</button>
         {missing.length > 0 && (
           <button className="btn-gold !py-1 text-xs ml-auto" onClick={sendMissing} disabled={bulk.running}>
-            {bulk.running ? 'Resolviendo en TMDB…' : `➕ Mandar las ${Math.min(missing.length, 300)} que faltan a Radarr`}
+            {bulk.running ? t('Resolviendo en TMDB…') : t('➕ Mandar las {n} que faltan a Radarr', { n: Math.min(missing.length, 300) })}
           </button>
         )}
       </div>
       {bulk.msg && <div className="text-xs text-emerald-400 mb-2">{bulk.msg}</div>}
       {shown.length === 0 ? (
-        <Empty>{view === 'missing' ? '¡Lista completa! 🏆' : view === 'unwatched' ? 'Todas vistas 👁️' : 'Ninguna todavía.'}</Empty>
+        <Empty>{view === 'missing' ? t('¡Lista completa! 🏆') : view === 'unwatched' ? t('Todas vistas 👁️') : t('Ninguna todavía.')}</Empty>
       ) : (
         <div className="max-h-96 overflow-y-auto card divide-y divide-ink-800">
           {shown.map((i, idx) => (
@@ -186,21 +187,21 @@ function ChallengeCard({ l, mode, open, setOpen, load }) {
             {l.official ? '🏅 ' : ''}{l.name}
           </button>
           <div className="text-xs text-zinc-400 mt-1 flex flex-wrap gap-x-3">
-            <span title="En tu Plex"><b className="text-gold-400">{l.owned || 0}</b>/{l.item_count} tengo</span>
-            <span title="Vistas (Plex o Letterboxd)"><b className="text-emerald-400">{l.watched || 0}</b>/{l.item_count} vistas</span>
+            <span title={t('En tu Plex')}><b className="text-gold-400">{l.owned || 0}</b>/{l.item_count} {t('tengo')}</span>
+            <span title={t('Vistas (Plex o Letterboxd)')}><b className="text-emerald-400">{l.watched || 0}</b>/{l.item_count} {t('vistas')}</span>
           </div>
           <div className="flex flex-wrap items-center gap-x-3 mt-1 text-xs">
             {l.url && <a href={l.url} target="_blank" rel="noreferrer" className="text-zinc-500 hover:text-gold-400">Letterboxd ↗</a>}
             <button
               className="text-zinc-500 hover:text-gold-400"
-              title={l.hidden ? 'Mostrar' : 'Ocultar este reto'}
+              title={l.hidden ? t('Mostrar') : t('Ocultar este reto')}
               onClick={async () => { await api(`/letterboxd/lists/${l.id}/hide`, { method: 'POST', body: { hidden: !l.hidden } }); load(); }}
             >
-              {l.hidden ? '👁 Mostrar' : '🚫 Ocultar'}
+              {l.hidden ? t('👁 Mostrar') : t('🚫 Ocultar')}
             </button>
             <button
               className="text-zinc-500 hover:text-red-400"
-              title="Quitar reto"
+              title={t('Quitar reto')}
               onClick={async () => { await api(`/letterboxd/lists/${l.id}`, { method: 'DELETE' }); if (open === l.id) setOpen(null); load(); }}
             >
               ✕
@@ -233,17 +234,17 @@ function LbWatchlist() {
     <div className="card p-4 mb-6">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
         <h2 className="font-semibold text-zinc-100">
-          Watchlist de Letterboxd <span className="text-zinc-500 text-xs font-normal">· te faltan {missing.length} en Plex</span>
+          {t('Watchlist de Letterboxd')} <span className="text-zinc-500 text-xs font-normal">{t('· te faltan {n} en Plex', { n: missing.length })}</span>
         </h2>
       </div>
       {missing.length === 0 ? (
-        <Empty>Tu watchlist entera está en Plex. 🏆</Empty>
+        <Empty>{t('Tu watchlist entera está en Plex. 🏆')}</Empty>
       ) : (
         <div className="max-h-96 overflow-y-auto">
           {missing.map((m, i) => (
             <div key={i} className="flex items-center justify-between py-1 border-b border-ink-800 text-sm gap-2">
               <span className="text-zinc-200 min-w-0 truncate">
-                {m.title} <span className="text-zinc-500">({m.year ?? '¿?'})</span>
+                {m.title} <span className="text-zinc-500">({m.year ?? t('¿?')})</span>
               </span>
               <span className="flex items-center gap-2 shrink-0">
                 {m.tmdb_id && (
@@ -262,7 +263,7 @@ function LbWatchlist() {
       {owned.length > 0 && (
         <details className="mt-3">
           <summary className="text-sm text-zinc-400 cursor-pointer hover:text-zinc-200">
-            Ver las {owned.length} de tu watchlist que ya tienes
+            {t('Ver las {n} de tu watchlist que ya tienes', { n: owned.length })}
           </summary>
           <div className="max-h-64 overflow-y-auto mt-2">
             {owned.map((m, i) => (
@@ -307,27 +308,25 @@ function LetterboxdChallenges() {
   return (
     <div>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-        <h2 className="text-lg font-semibold text-zinc-100">Anillos de completista</h2>
+        <h2 className="text-lg font-semibold text-zinc-100">{t('Anillos de completista')}</h2>
         <div className="flex gap-1">
           {[['owned', '📀 Tengo'], ['watched', '👁️ Visto'], ['both', 'Ambos']].map(([v, label]) => (
-            <button key={v} onClick={() => setMode(v)} className={`btn-ghost !py-1 text-xs ${mode === v ? '!border-gold-400 text-gold-400' : ''}`}>{label}</button>
+            <button key={v} onClick={() => setMode(v)} className={`btn-ghost !py-1 text-xs ${mode === v ? '!border-gold-400 text-gold-400' : ''}`}>{t(label)}</button>
           ))}
         </div>
       </div>
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-        Tus listas de Letterboxd como anillos de completismo. El anillo <span className="text-gold-400 font-semibold">exterior</span> son
-        las que <b>tienes en Plex</b>; el <span className="text-emerald-400 font-semibold">interior</span>, las que <b>has visto</b> (Plex o Letterboxd).
-        Importa el zip en <a href="/letterboxd" className="text-gold-400 hover:underline">Letterboxd</a> o pega la URL de cualquier lista pública.
+        {t('Tus listas de Letterboxd como anillos de completismo. El anillo ')}<span className="text-gold-400 font-semibold">{t('exterior')}</span>{t(' son las que ')}<b>{t('tienes en Plex')}</b>{t('; el ')}<span className="text-emerald-400 font-semibold">{t('interior')}</span>{t(', las que ')}<b>{t('has visto')}</b>{t(' (Plex o Letterboxd). Importa el zip en ')}<a href="/letterboxd" className="text-gold-400 hover:underline">Letterboxd</a>{t(' o pega la URL de cualquier lista pública.')}
       </p>
 
       <form onSubmit={addByUrl} className="card p-4 mb-6 flex gap-2 max-w-2xl">
-        <input className="input" placeholder="Pega una lista: https://letterboxd.com/usuario/list/slug/" value={url} onChange={(e) => setUrl(e.target.value)} />
-        <button className="btn-gold shrink-0" disabled={busy}>{busy ? 'Leyendo…' : 'Añadir'}</button>
+        <input className="input" placeholder={t('Pega una lista: https://letterboxd.com/usuario/list/slug/')} value={url} onChange={(e) => setUrl(e.target.value)} />
+        <button className="btn-gold shrink-0" disabled={busy}>{busy ? t('Leyendo…') : t('Añadir')}</button>
       </form>
       {error && <ErrorBox error={error} />}
 
       {visible.length === 0 && hidden.length === 0 ? (
-        <Empty>Aún no hay listas de Letterboxd. Importa tu zip o pega una URL.</Empty>
+        <Empty>{t('Aún no hay listas de Letterboxd. Importa tu zip o pega una URL.')}</Empty>
       ) : (
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
           {visible.map((l) => <ChallengeCard key={l.id} l={l} mode={mode} open={open} setOpen={setOpen} load={load} />)}
@@ -337,7 +336,7 @@ function LetterboxdChallenges() {
       {hidden.length > 0 && (
         <div className="mt-6">
           <button className="text-sm text-zinc-400 hover:text-gold-400" onClick={() => setShowHidden(!showHidden)}>
-            {showHidden ? '▾' : '▸'} Retos ocultos ({hidden.length})
+            {showHidden ? '▾' : '▸'} {t('Retos ocultos ({n})', { n: hidden.length })}
           </button>
           {showHidden && (
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3 mt-3 opacity-70">
@@ -358,15 +357,15 @@ function MdbRow({ item, radarrIds, onAdded, onOpenOwned }) {
       {item.rank != null && <span className="text-zinc-600 w-10 text-right shrink-0 tabular">{item.rank}.</span>}
       <button
         className="text-zinc-200 hover:text-gold-400 truncate text-left min-w-0"
-        title={`${item.title} — ver ficha`}
+        title={t('{title} — ver ficha', { title: item.title })}
         onClick={() => (item.owned && item.rating_key ? onOpenOwned(item.rating_key) : setFicha(true))}
       >
-        {item.title} <span className="text-zinc-500">({item.year ?? '¿?'})</span>
+        {item.title} <span className="text-zinc-500">({item.year ?? t('¿?')})</span>
       </button>
       <span className="ml-auto flex items-center gap-2 sm:gap-3 shrink-0 text-xs text-zinc-500">
         {item.imdb != null && <span className="hidden sm:inline">IMDb {Number(item.imdb).toFixed(1)}</span>}
         {item.owned ? (
-          <span className="text-emerald-400">✓{item.view_count > 0 ? ' vista' : ''}</span>
+          <span className="text-emerald-400">✓{item.view_count > 0 ? t(' vista') : ''}</span>
         ) : (
           <RadarrButton
             tmdbId={item.tmdb_id}
@@ -412,20 +411,20 @@ function ListDetail({ listId, onChanged }) {
     <div className="mt-4">
       <div className="flex gap-2 items-center flex-wrap mb-3">
         <button className={view === 'missing' ? 'btn-gold' : 'btn-ghost'} onClick={() => setView('missing')}>
-          Te faltan ({missing.length})
+          {t('Te faltan ({n})', { n: missing.length })}
         </button>
         <button className={view === 'owned' ? 'btn-gold' : 'btn-ghost'} onClick={() => setView('owned')}>
-          Las tienes ({owned.length})
+          {t('Las tienes ({n})', { n: owned.length })}
         </button>
         {missing.length > 0 && (
           <button className="btn-gold ml-auto" onClick={bulkAdd} disabled={bulk.running}>
-            {bulk.running ? 'Añadiendo…' : `➕ Añadir ${Math.min(missing.length, 300)} a Radarr`}
+            {bulk.running ? t('Añadiendo…') : t('➕ Añadir {n} a Radarr', { n: Math.min(missing.length, 300) })}
           </button>
         )}
         {bulk.summary && <span className="text-xs text-emerald-400 w-full">{bulk.summary}</span>}
       </div>
       {shown.length === 0 ? (
-        <Empty>{view === 'missing' ? '¡Lista completa! 🏆' : 'Ninguna todavía.'}</Empty>
+        <Empty>{view === 'missing' ? t('¡Lista completa! 🏆') : t('Ninguna todavía.')}</Empty>
       ) : (
         <div className="max-h-96 overflow-y-auto card divide-y divide-ink-800">
           {shown.map((i) => (
@@ -504,13 +503,13 @@ export default function Lists() {
 
   return (
     <div>
-      <PageHeader eyebrow="La caza" title="Listas y retos" />
+      <PageHeader eyebrow={t('La caza')} title={t('Listas y retos')} />
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-        Convierte listas famosas en retos de completismo: qué % tienes, qué has visto, qué te falta y envío a Radarr.
+        {t('Convierte listas famosas en retos de completismo: qué % tienes, qué has visto, qué te falta y envío a Radarr.')}
       </p>
       <div className="flex gap-2 mb-6">
-        <button onClick={() => setTab('letterboxd')} className={tab === 'letterboxd' ? 'btn-gold' : 'btn-ghost'}>🟠 Retos de Letterboxd</button>
-        <button onClick={() => setTab('mdblist')} className={tab === 'mdblist' ? 'btn-gold' : 'btn-ghost'}>Listas de MDBList</button>
+        <button onClick={() => setTab('letterboxd')} className={tab === 'letterboxd' ? 'btn-gold' : 'btn-ghost'}>{t('🟠 Retos de Letterboxd')}</button>
+        <button onClick={() => setTab('mdblist')} className={tab === 'mdblist' ? 'btn-gold' : 'btn-ghost'}>{t('Listas de MDBList')}</button>
       </div>
 
       {tab === 'letterboxd' ? (
@@ -521,49 +520,48 @@ export default function Lists() {
       ) : (
       <>
       <p className="text-sm text-zinc-500 mb-5 max-w-3xl">
-        Sigue listas de MDBList (1001 películas, palmarés de premios, tops de la comunidad…). Necesita la API key de
-        MDBList en Ajustes.
+        {t('Sigue listas de MDBList (1001 películas, palmarés de premios, tops de la comunidad…). Necesita la API key de MDBList en Ajustes.')}
       </p>
 
       <div className="card p-4 mb-6 grid md:grid-cols-2 gap-4">
         <form onSubmit={addByUrl} className="flex gap-2">
           <input
             className="input"
-            placeholder="Pega una URL: https://mdblist.com/lists/usuario/lista"
+            placeholder={t('Pega una URL: https://mdblist.com/lists/usuario/lista')}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
-          <button className="btn-gold shrink-0" disabled={busy}>Añadir</button>
+          <button className="btn-gold shrink-0" disabled={busy}>{t('Añadir')}</button>
         </form>
         <form onSubmit={search} className="flex gap-2">
           <input
             className="input"
-            placeholder="…o busca listas: «1001 movies», «palme d'or»"
+            placeholder={t("…o busca listas: «1001 movies», «palme d'or»")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button className="btn-ghost shrink-0" disabled={busy}>Buscar</button>
+          <button className="btn-ghost shrink-0" disabled={busy}>{t('Buscar')}</button>
         </form>
       </div>
 
       {error && <ErrorBox error={error} />}
-      {busy && !results && <Spinner label="Consultando MDBList…" />}
+      {busy && !results && <Spinner label={t('Consultando MDBList…')} />}
 
       {results && (
         <div className="card p-4 mb-6">
-          <h3 className="text-sm font-semibold text-zinc-300 mb-2">Resultados ({results.length})</h3>
-          {results.length === 0 && <Empty>Nada encontrado.</Empty>}
+          <h3 className="text-sm font-semibold text-zinc-300 mb-2">{t('Resultados ({n})', { n: results.length })}</h3>
+          {results.length === 0 && <Empty>{t('Nada encontrado.')}</Empty>}
           <div className="divide-y divide-ink-800">
             {results.slice(0, 20).map((r) => (
               <div key={r.mdb_id} className="flex items-center gap-3 py-2 text-sm">
                 <div className="min-w-0">
                   <div className="text-zinc-200 truncate">{r.name}</div>
                   <div className="text-xs text-zinc-500">
-                    de {r.user_name ?? '¿?'} · {r.item_count ?? '¿?'} títulos{r.likes != null && ` · ${r.likes} ❤`}
+                    {t('de {user} · {n} títulos', { user: r.user_name ?? t('¿?'), n: r.item_count ?? t('¿?') })}{r.likes != null && ` · ${r.likes} ❤`}
                   </div>
                 </div>
                 <button className="btn-gold ml-auto shrink-0" onClick={() => addFromSearch(r)} disabled={busy}>
-                  Seguir
+                  {t('Seguir')}
                 </button>
               </div>
             ))}
@@ -572,7 +570,7 @@ export default function Lists() {
       )}
 
       {lists.length === 0 ? (
-        <Empty>No sigues ninguna lista todavía. Añade una por URL o búscala arriba.</Empty>
+        <Empty>{t('No sigues ninguna lista todavía. Añade una por URL o búscala arriba.')}</Empty>
       ) : (
         lists.map((l) => {
           const pct = l.items ? Math.round(((l.owned || 0) / l.items) * 100) : 0;
@@ -596,7 +594,7 @@ export default function Lists() {
                   )}
                   <button
                     className="text-zinc-500 hover:text-gold-400"
-                    title="Actualizar la lista desde MDBList"
+                    title={t('Actualizar la lista desde MDBList')}
                     onClick={async () => {
                       await api(`/mdblist/lists/${l.id}/refresh`, { method: 'POST' });
                       load();
@@ -606,7 +604,7 @@ export default function Lists() {
                   </button>
                   <button
                     className="text-zinc-500 hover:text-red-400"
-                    title="Dejar de seguir"
+                    title={t('Dejar de seguir')}
                     onClick={async () => {
                       await api(`/mdblist/lists/${l.id}`, { method: 'DELETE' });
                       if (open === l.id) setOpen(null);

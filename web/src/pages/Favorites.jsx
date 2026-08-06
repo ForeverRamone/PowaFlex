@@ -4,6 +4,7 @@ import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Search, Scissors, X } from 'lucide-react';
 import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature, ErrorBox, Select } from '../components.jsx';
 import { toast } from '../toast.js';
+import { t } from '../i18n.js';
 
 // el catálogo de 680 directores de Wikidata vive aquí, en «Añadir»: es una
 // herramienta de captación de favoritos, no un listado de tu biblioteca.
@@ -16,8 +17,8 @@ const ROLES = [
   ['director', 'Directores/as', 'dirigidas'],
   ['actor', 'Actores/actrices', 'interpretadas'],
 ];
-const roleLabel = (r) => ROLES.find(([k]) => k === r)?.[1] || r;
-const roleVerb = (r) => ROLES.find(([k]) => k === r)?.[2] || 'películas';
+const roleLabel = (r) => t(ROLES.find(([k]) => k === r)?.[1] || r);
+const roleVerb = (r) => t(ROLES.find(([k]) => k === r)?.[2] || 'películas');
 
 // A TMDB person tile with a star to add/remove from favorites.
 function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
@@ -34,13 +35,13 @@ function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-zinc-200 truncate">{person.name}</div>
         <div className="text-[11px] text-zinc-500 truncate">
-          {person.dept ? `${person.dept === 'Directing' ? 'Dirección' : person.dept === 'Acting' ? 'Interpretación' : person.dept} · ` : ''}
+          {person.dept ? `${person.dept === 'Directing' ? t('Dirección') : person.dept === 'Acting' ? t('Interpretación') : person.dept} · ` : ''}
           {(person.knownFor || []).join(', ')}
         </div>
       </div>
       <button
         onClick={() => (isTracked ? onRemove(person) : onAdd(person))}
-        title={isTracked ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+        title={isTracked ? t('Quitar de favoritos') : t('Añadir a favoritos')}
         className={`text-lg cursor-pointer shrink-0 ${isTracked ? 'text-gold-400' : 'text-zinc-600 hover:text-gold-400'}`}
       >
         ★
@@ -84,23 +85,23 @@ function FavoriteCard({ p, role, alsoOther, selectable, selected, onSelect, onRe
           className="text-[11px] text-zinc-500 mt-0.5"
           title={
             p.moviesAll != null && p.moviesAll !== p.movies
-              ? `Solo largometrajes. En tu Plex hay ${p.moviesAll} títulos suyos contando cortos, documentales, TV y conciertos.`
+              ? t('Solo largometrajes. En tu Plex hay {n} títulos suyos contando cortos, documentales, TV y conciertos.', { n: p.moviesAll })
               : undefined
           }
         >
-          <b className="text-zinc-300">{p.movies || 0}</b> {roleVerb(role)} en tu Plex
-          {p.upcoming > 0 && <span className="text-sky-300"> · {p.upcoming} por venir</span>}
+          <b className="text-zinc-300">{p.movies || 0}</b> {roleVerb(role)} {t('en tu Plex')}
+          {p.upcoming > 0 && <span className="text-sky-300"> · {p.upcoming} {t('por venir')}</span>}
         </div>
 
         {p.pct != null ? (
           <div className="mt-2">
             <ProgressBar pct={p.pct} />
             <div className="flex justify-between text-[11px] mt-1">
-              <span className="text-zinc-500">{p.pct}% de su filmografía</span>
+              <span className="text-zinc-500">{t('{pct}% de su filmografía', { pct: p.pct })}</span>
               {complete ? (
-                <span className="text-emerald-400">✓ completa</span>
+                <span className="text-emerald-400">{t('✓ completa')}</span>
               ) : (
-                <Link to="/descubrir" className="text-gold-400 hover:underline">te faltan {gaps}</Link>
+                <Link to="/descubrir" className="text-gold-400 hover:underline">{t('te faltan {n}', { n: gaps })}</Link>
               )}
             </div>
           </div>
@@ -109,28 +110,28 @@ function FavoriteCard({ p, role, alsoOther, selectable, selected, onSelect, onRe
           // siempre es un homónimo mal emparejado, no una carrera vacía. Y eso
           // no lo va a arreglar ningún reintento: hay que elegir la ficha buena.
           <div className="text-[11px] text-orange-300 mt-2">
-            Sin ficha de TMDB fiable · no se puede calcular su completismo ·{' '}
+            {t('Sin ficha de TMDB fiable · no se puede calcular su completismo ·')}{' '}
             <Link
               to={`/personas/${p.id}?role=${role}`}
               className="text-gold-400 hover:underline"
-              title="Abre su ficha para elegir a mano la persona correcta en TMDB"
+              title={t('Abre su ficha para elegir a mano la persona correcta en TMDB')}
             >
-              ✎ corregir
+              {t('✎ corregir')}
             </Link>
           </div>
         ) : (
           <div className="text-[11px] text-zinc-600 mt-2">
-            Huecos sin calcular · <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir</Link>
+            {t('Huecos sin calcular ·')} <Link to="/descubrir" className="text-gold-400 hover:underline">{t('Descubrir')}</Link>
           </div>
         )}
       </div>
       <div className="flex flex-col gap-1 shrink-0">
-        <button onClick={() => onRemove(p)} title={`Quitar de ${roleLabel(role).toLowerCase()}`} className="text-zinc-600 hover:text-red-400">
+        <button onClick={() => onRemove(p)} title={t('Quitar de {faceta}', { faceta: roleLabel(role).toLowerCase() })} className="text-zinc-600 hover:text-red-400">
           <X size={15} />
         </button>
         {alsoOther ? (
           <span
-            title={`También le sigues como ${role === 'director' ? 'actor/actriz' : 'director/a'}`}
+            title={t('También le sigues como {faceta}', { faceta: role === 'director' ? t('actor/actriz') : t('director/a') })}
             className="text-gold-400/60"
           >
             {role === 'director' ? <Drama size={15} /> : <Clapperboard size={15} />}
@@ -138,7 +139,7 @@ function FavoriteCard({ p, role, alsoOther, selectable, selected, onSelect, onRe
         ) : (
           <button
             onClick={() => onAddOtherFacet(p)}
-            title={`Seguirle TAMBIÉN como ${role === 'director' ? 'actor/actriz' : 'director/a'} (sin dejar esta faceta)`}
+            title={t('Seguirle TAMBIÉN como {faceta} (sin dejar esta faceta)', { faceta: role === 'director' ? t('actor/actriz') : t('director/a') })}
             className="text-zinc-600 hover:text-gold-400"
           >
             {role === 'director' ? <Drama size={15} /> : <Clapperboard size={15} />}
@@ -181,22 +182,22 @@ function CanonPacks({ role, onDone }) {
   // mientras corre, se pregunta cada segundo y medio
   useEffect(() => {
     if (!estado?.running) return undefined;
-    const t = setInterval(async () => {
+    const timer = setInterval(async () => {
       const r = await api('/tracked/from-canon');
       if (r.error) return;
       setEstado(r);
       if (!r.running) {
-        clearInterval(t);
+        clearInterval(timer);
         onDone();
         toast(
-          `⭐ ${r.added} añadidos de «${r.canon}»` +
-            (r.skipped ? ` · ${r.skipped} ya estaban o los habías quitado` : '') +
-            (r.notFound?.length ? ` · ${r.notFound.length} sin ficha en TMDB` : ''),
+          t('⭐ {n} añadidos de «{canon}»', { n: r.added, canon: r.canon }) +
+            (r.skipped ? t(' · {n} ya estaban o los habías quitado', { n: r.skipped }) : '') +
+            (r.notFound?.length ? t(' · {n} sin ficha en TMDB', { n: r.notFound.length }) : ''),
           'success'
         );
       }
     }, 1500);
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
   }, [estado?.running]);
 
   const añadir = async (c) => {
@@ -207,15 +208,15 @@ function CanonPacks({ role, onDone }) {
 
   if (!canons.length) return null;
   return (
-    <Section title="Listas y cánones">
+    <Section title={t('Listas y cánones')}>
       <p className="text-xs text-zinc-500 -mt-2 mb-3 max-w-3xl">
-        Las mismas listas de <Link to="/descubrir" className="text-gold-400 hover:underline">Grandes ausentes</Link>,
-        para volcarlas de golpe a tus favoritos. A quien hayas quitado con la ✕ no vuelve a entrar.
+        {t('Las mismas listas de')} <Link to="/descubrir" className="text-gold-400 hover:underline">{t('Grandes ausentes')}</Link>
+        {t(', para volcarlas de golpe a tus favoritos. A quien hayas quitado con la ✕ no vuelve a entrar.')}
       </p>
       {estado?.running && (
         <div className="card p-3 mb-3">
           <div className="text-sm text-zinc-300 mb-2">
-            Añadiendo «{estado.canon}»… <span className="tabular">{estado.added || 0}</span> de {estado.total}
+            {t('Añadiendo «{canon}»…', { canon: estado.canon })} <span className="tabular">{estado.added || 0}</span> {t('de')} {estado.total}
           </div>
           <ProgressBar pct={estado.total ? Math.round(((estado.added || 0) / estado.total) * 100) : 0} />
         </div>
@@ -226,16 +227,16 @@ function CanonPacks({ role, onDone }) {
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium text-zinc-200 truncate">{c.label}</div>
               <div className="text-[11px] text-zinc-500">
-                {c.count != null ? `${c.count} nombres` : 'se actualiza sola con TMDB'}
+                {c.count != null ? t('{n} nombres', { n: c.count }) : t('se actualiza sola con TMDB')}
               </div>
             </div>
             <button
               className="btn-ghost !py-1 text-xs shrink-0"
               disabled={estado?.running}
               onClick={() => añadir(c)}
-              title={`Añadir a tus ${roleLabel(role).toLowerCase()}`}
+              title={t('Añadir a tus {faceta}', { faceta: roleLabel(role).toLowerCase() })}
             >
-              Añadir
+              {t('Añadir')}
             </button>
           </div>
         ))}
@@ -285,7 +286,7 @@ export default function Favorites() {
     a.download = `powaflex-${role === 'director' ? 'directores' : 'actores'}-${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(a.href);
-    toast(`⬇ ${roleFavs.length} nombres exportados`);
+    toast(t('⬇ {n} nombres exportados', { n: roleFavs.length }));
   };
   const hayFiltros = () => favSearch.trim() || favSort !== 'titulos';
   const [pruneMode, setPruneMode] = useState(false);
@@ -301,7 +302,7 @@ export default function Favorites() {
         setLoadError(null);
       } else if (Array.isArray(r)) setTracked(r);
       // si no, el spinner se quedaba girando indefinidamente sin decir nada
-      else setLoadError(r?.error || 'No se han podido cargar tus favoritos');
+      else setLoadError(r?.error || t('No se han podido cargar tus favoritos'));
     });
 
   // los «habituales de festival» llegan por su propio endpoint: la primera
@@ -321,12 +322,12 @@ export default function Favorites() {
 
   const addTmdb = async (p) => {
     await api('/tracked/tmdb', { method: 'POST', body: { tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path, role } });
-    toast(`⭐ ${p.name} añadido como ${role === 'director' ? 'director/a' : 'actor/actriz'}`, 'success');
+    toast(t('⭐ {nombre} añadido como {faceta}', { nombre: p.name, faceta: role === 'director' ? t('director/a') : t('actor/actriz') }), 'success');
     loadTracked();
   };
   const removeTmdb = async (p) => {
-    const t = (tracked || []).find((x) => x.tmdb_id === p.tmdb_id && (x.role || 'director') === role);
-    if (t) { await api(`/tracked/${t.id}?role=${role}`, { method: 'DELETE' }); toast(`${p.name} fuera de ${roleLabel(role).toLowerCase()}`); loadTracked(); }
+    const fav = (tracked || []).find((x) => x.tmdb_id === p.tmdb_id && (x.role || 'director') === role);
+    if (fav) { await api(`/tracked/${fav.id}?role=${role}`, { method: 'DELETE' }); toast(t('{nombre} fuera de {faceta}', { nombre: p.name, faceta: roleLabel(role).toLowerCase() })); loadTracked(); }
   };
   const addByNames = async () => {
     if (!bulkNames.trim()) return;
@@ -336,7 +337,7 @@ export default function Favorites() {
     setBulkBusy(false);
     if (res.ok) {
       setBulkResult(res);
-      toast(`⭐ ${res.added} añadidos a ${roleLabel(role).toLowerCase()}`, 'success');
+      toast(t('⭐ {n} añadidos a {faceta}', { n: res.added, faceta: roleLabel(role).toLowerCase() }), 'success');
       setBulkNames('');
       loadTracked();
     } else toast(`⚠️ ${res.error || 'error'}`, 'error');
@@ -348,7 +349,7 @@ export default function Favorites() {
       body: { role, people: pack.people.map((p) => ({ tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path })) },
     });
     setPackBusy(null);
-    if (res.ok) { toast(`⭐ ${res.added} de «${pack.title}» añadidos`, 'success'); loadTracked(); }
+    if (res.ok) { toast(t('⭐ {n} de «{pack}» añadidos', { n: res.added, pack: pack.title }), 'success'); loadTracked(); }
     else toast(`⚠️ ${res.error || 'error'}`, 'error');
   };
   const searchPeople = async (e) => {
@@ -365,14 +366,14 @@ export default function Favorites() {
   const removeFav = async (p) => {
     setTracked((prev) => prev.filter((t) => !(t.id === p.id && (t.role || 'director') === role)));
     await api(`/tracked/${p.id}?role=${p.role || role}`, { method: 'DELETE' });
-    toast(`${p.name} fuera de ${roleLabel(role).toLowerCase()}`);
+    toast(t('{nombre} fuera de {faceta}', { nombre: p.name, faceta: roleLabel(role).toLowerCase() }));
     loadTracked();
   };
   // seguirle también en la otra faceta, sin dejar esta
   const addOtherFacet = async (p) => {
     const next = (p.role || 'director') === 'director' ? 'actor' : 'director';
     await api(`/tracked/${p.id}`, { method: 'POST', body: { role: next } });
-    toast(`⭐ ${p.name} también en ${next === 'director' ? 'directores/as' : 'actores/actrices'}`, 'success');
+    toast(t('⭐ {nombre} también en {faceta}', { nombre: p.name, faceta: next === 'director' ? t('directores/as') : t('actores/actrices') }), 'success');
     loadTracked();
   };
 
@@ -385,7 +386,7 @@ export default function Favorites() {
     setConfirmClear(false);
     const ids = shownFavs.map((t) => t.id);
     await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids, role } });
-    toast(`Quitados ${ids.length} ${favSearch.trim() ? 'favoritos de los que se ven ahora' : `favoritos de ${roleLabel(role).toLowerCase()}`}`);
+    toast(favSearch.trim() ? t('Quitados {n} favoritos de los que se ven ahora', { n: ids.length }) : t('Quitados {n} favoritos de {faceta}', { n: ids.length, faceta: roleLabel(role).toLowerCase() }));
     loadTracked();
   };
 
@@ -393,13 +394,13 @@ export default function Favorites() {
     const ids = shownFavs.filter((t) => t.deathday).map((t) => t.id);
     if (!ids.length) return;
     const r = await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids, role } });
-    if (r.ok) { toast(`✝ ${r.removed} fallecidos/as retirados/as`); loadTracked(); }
+    if (r.ok) { toast(t('✝ {n} fallecidos/as retirados/as', { n: r.removed })); loadTracked(); }
   };
 
   const pruneSelected = async () => {
     const r = await api('/tracked/batch', { method: 'DELETE', body: { personIds: [...selected], role } });
     if (r.ok) {
-      toast(`✂️ ${r.removed} favoritos quitados`);
+      toast(t('✂️ {n} favoritos quitados', { n: r.removed }));
       setSelected(new Set());
       setPruneMode(false);
       loadTracked();
@@ -422,11 +423,11 @@ export default function Favorites() {
     actor: tracked.filter((t) => (t.role || 'director') === 'actor').length,
   };
   const FAV_SORTS = {
-    titulos: { label: `Más ${roleVerb(role)} en tu Plex`, fn: (a, b) => (b.movies || 0) - (a.movies || 0) },
-    huecos: { label: 'Más huecos', fn: (a, b) => (b.gaps ?? -1) - (a.gaps ?? -1) },
-    completismo: { label: 'Menos completos', fn: (a, b) => (a.pct ?? 101) - (b.pct ?? 101) },
-    aporte: { label: 'Menos aporte', fn: (a, b) => ((a.gaps ?? 0) + (a.upcoming ?? 0)) - ((b.gaps ?? 0) + (b.upcoming ?? 0)) },
-    nombre: { label: 'Nombre (A-Z)', fn: (a, b) => a.name.localeCompare(b.name) },
+    titulos: { label: t('Más {verbo} en tu Plex', { verbo: roleVerb(role) }), fn: (a, b) => (b.movies || 0) - (a.movies || 0) },
+    huecos: { label: t('Más huecos'), fn: (a, b) => (b.gaps ?? -1) - (a.gaps ?? -1) },
+    completismo: { label: t('Menos completos'), fn: (a, b) => (a.pct ?? 101) - (b.pct ?? 101) },
+    aporte: { label: t('Menos aporte'), fn: (a, b) => ((a.gaps ?? 0) + (a.upcoming ?? 0)) - ((b.gaps ?? 0) + (b.upcoming ?? 0)) },
+    nombre: { label: t('Nombre (A-Z)'), fn: (a, b) => a.name.localeCompare(b.name) },
   };
   const shownFavs = roleFavs
     .filter((t) => !favSearch.trim() || t.name.toLowerCase().includes(favSearch.trim().toLowerCase()))
@@ -440,12 +441,12 @@ export default function Favorites() {
 
   return (
     <div>
-      <PageHeader eyebrow="La caza" title="Favoritos" />
+      <PageHeader eyebrow={t('La caza')} title={t('Favoritos')} />
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-        La gente que sigues, <b>separada por faceta</b>: a quien sigues como director/a solo cuenta por lo que dirige,
-        y a quien sigues como actor/actriz solo por lo que interpreta. Todos entran en{' '}
-        <Link to="/calendario" className="text-gold-400 hover:underline">Cine venidero</Link> y en{' '}
-        <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir huecos</Link>.
+        {t('La gente que sigues,')} <b>{t('separada por faceta')}</b>
+        {t(': a quien sigues como director/a solo cuenta por lo que dirige, y a quien sigues como actor/actriz solo por lo que interpreta. Todos entran en')}{' '}
+        <Link to="/calendario" className="text-gold-400 hover:underline">{t('Cine venidero')}</Link> {t('y en')}{' '}
+        <Link to="/descubrir" className="text-gold-400 hover:underline">{t('Descubrir huecos')}</Link>.
       </p>
 
       {/* role scope: the whole page follows this switch */}
@@ -457,20 +458,20 @@ export default function Favorites() {
             className={`${role === r ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}
           >
             {r === 'director' ? <Clapperboard size={15} strokeWidth={1.75} /> : <Drama size={15} strokeWidth={1.75} />}
-            {label} ({counts[r]})
+            {t(label)} ({counts[r]})
           </button>
         ))}
-        <span className="text-xs text-zinc-600 ml-2">Cada faceta se gestiona por separado</span>
+        <span className="text-xs text-zinc-600 ml-2">{t('Cada faceta se gestiona por separado')}</span>
       </div>
 
       {/* flex-wrap: en móvil los dos botones no caben y, sin él, se estrujaban
           en bloques de tres líneas en vez de pasar cada uno a su fila */}
       <div className="flex gap-2 mb-6 flex-wrap">
         <button onClick={() => setTab('mine')} className={`${tab === 'mine' ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
-          <Star size={15} strokeWidth={1.75} /> Mis {roleLabel(role).toLowerCase()} ({counts[role]})
+          <Star size={15} strokeWidth={1.75} /> {t('Mis {faceta}', { faceta: roleLabel(role).toLowerCase() })} ({counts[role]})
         </button>
         <button onClick={() => setTab('discover')} className={`${tab === 'discover' ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
-          <Search size={15} strokeWidth={1.75} /> Añadir {roleLabel(role).toLowerCase()}
+          <Search size={15} strokeWidth={1.75} /> {t('Añadir {faceta}', { faceta: roleLabel(role).toLowerCase() })}
         </button>
       </div>
 
@@ -481,34 +482,34 @@ export default function Favorites() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <div className="card p-3">
                 <div className="text-xl font-bold text-gold-400">{counts[role]}</div>
-                <div className="text-xs text-zinc-500">{roleLabel(role).toLowerCase()} que sigues</div>
+                <div className="text-xs text-zinc-500">{t('{faceta} que sigues', { faceta: roleLabel(role).toLowerCase() })}</div>
               </div>
               <div className="card p-3">
                 <div className="text-xl font-bold text-zinc-200">{roleFavs.reduce((n, t) => n + (t.movies || 0), 0)}</div>
-                <div className="text-xs text-zinc-500">{roleVerb(role)} suyas en tu Plex</div>
+                <div className="text-xs text-zinc-500">{t('{verbo} suyas en tu Plex', { verbo: roleVerb(role) })}</div>
               </div>
               <div className="card p-3">
                 <div className="text-xl font-bold text-orange-300">{anyComputed ? totalGaps : '—'}</div>
-                <div className="text-xs text-zinc-500">huecos por rellenar</div>
+                <div className="text-xs text-zinc-500">{t('huecos por rellenar')}</div>
               </div>
               <div className="card p-3">
                 <div className="text-xl font-bold text-emerald-400">{anyComputed ? completeCount : '—'}</div>
-                <div className="text-xs text-zinc-500">filmografías completas</div>
+                <div className="text-xs text-zinc-500">{t('filmografías completas')}</div>
               </div>
             </div>
           )}
 
           {roleFavs.length === 0 ? (
             <Empty>
-              Aún no sigues a nadie como {role === 'director' ? 'director/a' : 'actor/actriz'}. Usa{' '}
-              <button className="text-gold-400 hover:underline" onClick={() => setTab('discover')}>Añadir {roleLabel(role).toLowerCase()}</button>.
+              {t('Aún no sigues a nadie como {faceta}. Usa', { faceta: role === 'director' ? t('director/a') : t('actor/actriz') })}{' '}
+              <button className="text-gold-400 hover:underline" onClick={() => setTab('discover')}>{t('Añadir {faceta}', { faceta: roleLabel(role).toLowerCase() })}</button>.
             </Empty>
           ) : (
             <>
               <div className="flex gap-2 mb-3 flex-wrap items-center">
                 <input
                   className="input !py-1.5 text-sm !w-auto flex-1 min-w-48"
-                  placeholder={`Filtrar ${roleLabel(role).toLowerCase()}…`}
+                  placeholder={t('Filtrar {faceta}…', { faceta: roleLabel(role).toLowerCase() })}
                   value={favSearch}
                   onChange={(e) => setFavSearch(e.target.value)}
                 />
@@ -518,54 +519,54 @@ export default function Favorites() {
                   onClick={() => { setPruneMode((v) => !v); setSelected(new Set()); }}
                   className={`btn-ghost !py-1.5 text-xs inline-flex items-center gap-1.5 ${pruneMode ? '!border-gold-400 text-gold-400' : ''}`}
                 >
-                  <Scissors size={13} strokeWidth={2} /> Podar
+                  <Scissors size={13} strokeWidth={2} /> {t('Podar')}
                 </button>
                 {deceasedCount > 0 && (
                   <button className="btn-ghost !py-1.5 text-xs" onClick={clearDeceased}>
-                    † Quitar fallecidos/as ({deceasedCount})
+                    {t('† Quitar fallecidos/as')} ({deceasedCount})
                   </button>
                 )}
                 <button className="btn-ghost !py-1.5 text-xs !border-red-500/40 text-red-400" onClick={clearAll}>
-                  {confirmClear ? `¿Seguro? Vaciar ${shownFavs.length}` : 'Vaciar'}
+                  {confirmClear ? t('¿Seguro? Vaciar {n}', { n: shownFavs.length }) : t('Vaciar')}
                 </button>
                 {hayFiltros() && (
-                  <button className="btn-ghost !py-1.5 text-xs" onClick={limpiarFiltros}>✕ Limpiar filtros</button>
+                  <button className="btn-ghost !py-1.5 text-xs" onClick={limpiarFiltros}>{t('✕ Limpiar filtros')}</button>
                 )}
                 <button
                   className="btn-ghost !py-1.5 text-xs"
                   onClick={exportarTxt}
-                  title="Un nombre por línea, listo para pegarlo en «añadir por nombres» de otra instalación"
+                  title={t('Un nombre por línea, listo para pegarlo en «añadir por nombres» de otra instalación')}
                 >
-                  ⬇ Exportar .txt
+                  {t('⬇ Exportar .txt')}
                 </button>
               </div>
 
               {pruneMode && (
                 <div className="card p-3 mb-3 flex gap-2 flex-wrap items-center text-xs">
-                  <span className="text-zinc-400">Poda rápida:</span>
+                  <span className="text-zinc-400">{t('Poda rápida:')}</span>
                   <button
                     className="btn-ghost !py-1 text-xs"
                     onClick={() => setSelected(new Set(shownFavs.filter((t) => t.deathday && noContribution(t)).map((t) => t.id)))}
                   >
-                    Fallecidos/as con filmografía completa
+                    {t('Fallecidos/as con filmografía completa')}
                   </button>
                   <button
                     className="btn-ghost !py-1 text-xs"
                     onClick={() => setSelected(new Set(shownFavs.filter(noContribution).map((t) => t.id)))}
                   >
-                    Sin huecos ni proyectos
+                    {t('Sin huecos ni proyectos')}
                   </button>
                   <button className="btn-gold !py-1 text-xs ml-auto" onClick={pruneSelected} disabled={!selected.size}>
-                    Quitar seleccionados ({selected.size})
+                    {t('Quitar seleccionados')} ({selected.size})
                   </button>
                 </div>
               )}
 
               {!anyComputed && (
                 <p className="text-[11px] text-zinc-500 mb-3">
-                  Los huecos y el completismo se calculan al visitar{' '}
-                  <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir huecos</Link>, o con
-                  «Actualizar todo» en <Link to="/ajustes" className="text-gold-400 hover:underline">Ajustes</Link>.
+                  {t('Los huecos y el completismo se calculan al visitar')}{' '}
+                  <Link to="/descubrir" className="text-gold-400 hover:underline">{t('Descubrir huecos')}</Link>
+                  {t(', o con «Actualizar todo» en')} <Link to="/ajustes" className="text-gold-400 hover:underline">{t('Ajustes')}</Link>.
                 </p>
               )}
 
@@ -591,11 +592,10 @@ export default function Favorites() {
               Personas tiene la ★ y el alta top-N, y aquí queda el puente */}
           <div className="card p-4 flex items-center justify-between flex-wrap gap-2 text-sm">
             <span className="text-zinc-400">
-              ¿Buscas el ranking de {roleLabel(role).toLowerCase()} por títulos en tu Plex? Vive en Personas, con la ★
-              para seguir y el alta de «los N primeros».
+              {t('¿Buscas el ranking de {faceta} por títulos en tu Plex? Vive en Personas, con la ★ para seguir y el alta de «los N primeros».', { faceta: roleLabel(role).toLowerCase() })}
             </span>
             <Link to={`/personas?role=${role}`} className="btn-ghost !py-1.5 text-xs shrink-0 inline-flex items-center gap-1.5">
-              <Star size={13} strokeWidth={2} /> Ir a Personas
+              <Star size={13} strokeWidth={2} /> {t('Ir a Personas')}
             </Link>
           </div>
         </>
@@ -604,8 +604,8 @@ export default function Favorites() {
       {tab === 'discover' && (
         <>
           <p className="text-xs text-zinc-500 mb-4">
-            Lo que añadas aquí se sigue como <b>{role === 'director' ? 'director/a' : 'actor/actriz'}</b>. Cambia la
-            faceta arriba si quieres seguir a alguien por la otra.
+            {t('Lo que añadas aquí se sigue como')} <b>{role === 'director' ? t('director/a') : t('actor/actriz')}</b>
+            {t('. Cambia la faceta arriba si quieres seguir a alguien por la otra.')}
           </p>
 
           {/* La puerta grande, y por eso LA PRIMERA. Aquí había cuatro
@@ -623,14 +623,12 @@ export default function Favorites() {
               >
                 <div className="text-2xl w-11 h-11 rounded-lg flex items-center justify-center shrink-0 bg-gold-400/15">🎬</div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="font-semibold text-zinc-100">Añadir directores en activo · el catálogo</h2>
+                  <h2 className="font-semibold text-zinc-100">{t('Añadir directores en activo · el catálogo')}</h2>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y
-                    ordena por importancia, premios, número de largometrajes o taquilla: españoles, premiados,
-                    emergentes o taquilleros salen de aquí con dos clics, con la ☆ para seguirlos.
+                    {t('680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y ordena por importancia, premios, número de largometrajes o taquilla: españoles, premiados, emergentes o taquilleros salen de aquí con dos clics, con la ☆ para seguirlos.')}
                   </p>
                 </div>
-                <span className="text-gold-400 shrink-0 text-sm">{catalogoAbierto ? 'Plegar ▴' : 'Explorar ▾'}</span>
+                <span className="text-gold-400 shrink-0 text-sm">{catalogoAbierto ? t('Plegar ▴') : t('Explorar ▾')}</span>
               </button>
               {catalogoAbierto && (
                 <div className="mt-4 border-t border-ink-700 pt-4">
@@ -643,9 +641,10 @@ export default function Favorites() {
           )}
 
           <div className="card p-4 mb-6">
-            <h2 className="font-semibold text-zinc-100 mb-1">Añadir una lista de nombres</h2>
+            <h2 className="font-semibold text-zinc-100 mb-1">{t('Añadir una lista de nombres')}</h2>
             <p className="text-xs text-zinc-500 mb-3 max-w-2xl">
-              Pega nombres <b>separados por comas o uno por línea</b>. PowaFlex los busca en TMDB y los añade a{' '}
+              {t('Pega nombres')} <b>{t('separados por comas o uno por línea')}</b>
+              {t('. PowaFlex los busca en TMDB y los añade a')}{' '}
               {roleLabel(role).toLowerCase()}.
             </p>
             <textarea
@@ -656,14 +655,14 @@ export default function Favorites() {
             />
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <button className="btn-gold shrink-0 inline-flex items-center gap-2" onClick={addByNames} disabled={bulkBusy || !bulkNames.trim()}>
-                {bulkBusy ? 'Añadiendo…' : <><Star size={13} strokeWidth={2} /> Añadir a {roleLabel(role).toLowerCase()}</>}
+                {bulkBusy ? t('Añadiendo…') : <><Star size={13} strokeWidth={2} /> {t('Añadir a {faceta}', { faceta: roleLabel(role).toLowerCase() })}</>}
               </button>
             </div>
             {bulkResult && (
               <div className="text-xs text-zinc-400 mt-2">
-                ✓ {bulkResult.added} añadidos de {bulkResult.total}.
+                {t('✓ {n} añadidos de {total}.', { n: bulkResult.added, total: bulkResult.total })}
                 {bulkResult.notFound?.length > 0 && (
-                  <span className="text-orange-300"> No encontrados en TMDB: {bulkResult.notFound.join(', ')}.</span>
+                  <span className="text-orange-300"> {t('No encontrados en TMDB: {lista}.', { lista: bulkResult.notFound.join(', ') })}</span>
                 )}
               </div>
             )}
@@ -671,13 +670,13 @@ export default function Favorites() {
 
           <div className="card p-4 mb-6">
             <form onSubmit={searchPeople} className="flex gap-2 max-w-xl">
-              <input className="input" placeholder="Buscar por nombre en TMDB…" value={pq} onChange={(e) => setPq(e.target.value)} />
-              <button className="btn-gold shrink-0" disabled={searching}>{searching ? 'Buscando…' : 'Buscar'}</button>
+              <input className="input" placeholder={t('Buscar por nombre en TMDB…')} value={pq} onChange={(e) => setPq(e.target.value)} />
+              <button className="btn-gold shrink-0" disabled={searching}>{searching ? t('Buscando…') : t('Buscar')}</button>
               {presults && <button type="button" className="btn-ghost shrink-0" onClick={() => { setPresults(null); setPq(''); }}>✕</button>}
             </form>
             {presults && (
               presults.length === 0 ? (
-                <div className="text-sm text-zinc-500 mt-3">Nadie con ese nombre en TMDB.</div>
+                <div className="text-sm text-zinc-500 mt-3">{t('Nadie con ese nombre en TMDB.')}</div>
               ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">
                   {presults.map((p) => <SuggestionCard key={p.tmdb_id} person={p} trackedIds={trackedTmdb} onAdd={addTmdb} onRemove={removeTmdb} />)}
@@ -706,9 +705,9 @@ export default function Favorites() {
                         className={`btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5 ${pending ? `!border-current ${accent.text}` : 'opacity-50'}`}
                         disabled={!pending || packBusy === pack.key}
                         onClick={() => addPack(pack)}
-                        title={pending ? `Añade los ${pending} que aún no sigues` : 'Ya los sigues a todos'}
+                        title={pending ? t('Añade los {n} que aún no sigues', { n: pending }) : t('Ya los sigues a todos')}
                       >
-                        {packBusy === pack.key ? 'Añadiendo…' : pending ? <><Star size={12} strokeWidth={2} /> Añadir todos ({pending})</> : '✓ Todos añadidos'}
+                        {packBusy === pack.key ? t('Añadiendo…') : pending ? <><Star size={12} strokeWidth={2} /> {t('Añadir todos')} ({pending})</> : t('✓ Todos añadidos')}
                       </button>
                     </div>
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 p-4 pt-0">

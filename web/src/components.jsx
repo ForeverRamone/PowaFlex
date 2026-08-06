@@ -2,6 +2,7 @@ import { Component, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { api, fmtDuration, tmdbImg, ratingLinks, primaryRating } from './api.js';
+import { t } from './i18n.js';
 import { onToast, toast } from './toast.js';
 
 // Letterboxd's three-dot mark (orange/green/blue), used wherever we'd otherwise
@@ -44,10 +45,10 @@ export function StatusLegend({ className = '' }) {
   return (
     <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500 ${className}`}>
       <span className="flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,.9)]" /> En Plex
+        <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,.9)]" /> {t('En Plex')}
       </span>
-      <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border border-zinc-500" /> Te falta</span>
-      <span className="flex items-center gap-1.5"><span className="text-gold-400">★</span> Vista</span>
+      <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border border-zinc-500" /> {t('Te falta')}</span>
+      <span className="flex items-center gap-1.5"><span className="text-gold-400">★</span> {t('Vista')}</span>
     </div>
   );
 }
@@ -78,7 +79,7 @@ export function PageHeader({ eyebrow, title, subtitle, action, children }) {
 function WatchedStar({ watched }) {
   if (!watched) return null;
   return (
-    <span className="on-art on-art-gold top-1.5 left-1.5" title="Vista (Plex o Letterboxd)">
+    <span className="on-art on-art-gold top-1.5 left-1.5" title={t('Vista (Plex o Letterboxd)')}>
       ★
     </span>
   );
@@ -87,27 +88,27 @@ function WatchedStar({ watched }) {
 // Secciones de la app, para saltar a cualquiera desde la paleta. Incluye las
 // que ahora son pestañas de otra página (Sagas, Calidad, Salud, catálogo).
 const PALETTE_SECTIONS = [
-  ['Dashboard', '/'],
-  ['Biblioteca', '/biblioteca'],
-  ['Directores y actores', '/personas'],
-  ['Directores en activo (catálogo)', '/favoritos?add=activos'],
-  ['Visionado', '/visionado'],
-  ['Taller', '/taller'],
-  ['Calidad y disco', '/taller?tab=calidad'],
-  ['Salud de los datos', '/taller?tab=datos'],
-  ['Favoritos', '/favoritos'],
-  ['Descubrir huecos', '/descubrir'],
-  ['Sagas', '/descubrir?tab=sagas'],
-  ['Cine venidero', '/calendario'],
-  ['Festivales y premios', '/festivales'],
-  ['Estrenos (cines y plataformas)', '/estrenos'],
-  ['Estrenos en cines de España', '/estrenos'],
-  ['Estrenos en cines de EE UU', '/estrenos?tab=cine-us'],
-  ['Estrenos en plataformas', '/estrenos?tab=plataformas-es'],
-  ['Listas y retos', '/listas'],
-  ['Letterboxd (importar)', '/ajustes'],
-  ['Ajustes', '/ajustes'],
-  ['¿Qué es PowaFlex?', '/acerca'],
+  [t('Dashboard'), '/'],
+  [t('Biblioteca'), '/biblioteca'],
+  [t('Directores y actores'), '/personas'],
+  [t('Directores en activo (catálogo)'), '/favoritos?add=activos'],
+  [t('Visionado'), '/visionado'],
+  [t('Taller'), '/taller'],
+  [t('Calidad y disco'), '/taller?tab=calidad'],
+  [t('Salud de los datos'), '/taller?tab=datos'],
+  [t('Favoritos'), '/favoritos'],
+  [t('Descubrir huecos'), '/descubrir'],
+  [t('Sagas'), '/descubrir?tab=sagas'],
+  [t('Cine venidero'), '/calendario'],
+  [t('Festivales y premios'), '/festivales'],
+  [t('Estrenos (cines y plataformas)'), '/estrenos'],
+  [t('Estrenos en cines de España'), '/estrenos'],
+  [t('Estrenos en cines de EE UU'), '/estrenos?tab=cine-us'],
+  [t('Estrenos en plataformas'), '/estrenos?tab=plataformas-es'],
+  [t('Listas y retos'), '/listas'],
+  [t('Letterboxd (importar)'), '/ajustes'],
+  [t('Ajustes'), '/ajustes'],
+  [t('¿Qué es PowaFlex?'), '/acerca'],
 ];
 
 // acentos fuera y a minúsculas, para que «oscar» encuentre «Óscar»
@@ -150,33 +151,33 @@ export function GlobalSearch() {
   const flat = [];
   const grupo = (label, items) => { if (items.length) flat.push({ header: label }, ...items); };
   if (term) {
-    grupo('Personas', (res?.people || []).map((p) => ({
+    grupo(t('Personas'), (res?.people || []).map((p) => ({
       key: `p${p.id}`, kind: 'person', p,
       run: () => go(`/personas/${p.id}?role=${p.role}`),
     })));
-    grupo('Películas', (res?.movies || []).map((m) => ({
+    grupo(t('Películas'), (res?.movies || []).map((m) => ({
       key: `m${m.rating_key}`, kind: 'movie', m,
       run: () => setSel(m.rating_key),
     })));
-    grupo('Sagas', (res?.sagas || []).map((s) => ({
-      key: `s${s.id}`, kind: 'plain', label: s.name, sub: `${s.n} en tu Plex`,
+    grupo(t('Sagas'), (res?.sagas || []).map((s) => ({
+      key: `s${s.id}`, kind: 'plain', label: s.name, sub: t('{n} en tu Plex', { n: s.n }),
       run: () => go('/descubrir?tab=sagas'),
     })));
-    grupo('Listas y retos', (res?.lists || []).map((l) => ({
+    grupo(t('Listas y retos'), (res?.lists || []).map((l) => ({
       key: `l${l.kind}${l.id}`, kind: 'plain', label: l.name, sub: l.kind === 'lb' ? 'Letterboxd' : 'MDBList',
       run: () => go('/listas'),
     })));
-    grupo('Festivales y premios', (fests || [])
+    grupo(t('Festivales y premios'), (fests || [])
       .filter((f) => fold(f.name).includes(term) || fold(f.award).includes(term))
       .slice(0, 5)
       .map((f) => ({
-        key: `f${f.key}`, kind: 'plain', label: f.name, sub: f.award || 'Festivales',
+        key: `f${f.key}`, kind: 'plain', label: f.name, sub: f.award || t('Festivales'),
         run: () => go(`/festivales?f=${encodeURIComponent(f.key)}`),
       })));
-    grupo('Secciones', PALETTE_SECTIONS
+    grupo(t('Secciones'), PALETTE_SECTIONS
       .filter(([label]) => fold(label).includes(term))
       .slice(0, 5)
-      .map(([label, path]) => ({ key: `sec${path}${label}`, kind: 'plain', label, sub: 'Ir a', run: () => go(path) })));
+      .map(([label, path]) => ({ key: `sec${path}${label}`, kind: 'plain', label, sub: t('Ir a'), run: () => go(path) })));
   }
   const rows = flat.filter((f) => !f.header);
   const clamp = (i) => (rows.length ? (i + rows.length) % rows.length : 0);
@@ -200,14 +201,14 @@ export function GlobalSearch() {
         ref={dialogo}
         role="dialog"
         aria-modal="true"
-        aria-label="Buscar en PowaFlex"
+        aria-label={t('Buscar en PowaFlex')}
         className="card-float w-full max-w-xl p-3"
         onClick={(e) => e.stopPropagation()}
       >
         <input
           autoFocus
           className="input"
-          placeholder="Película, persona, saga, lista, festival o sección…"
+          placeholder={t('Película, persona, saga, lista, festival o sección…')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onInputKey}
@@ -239,7 +240,7 @@ export function GlobalSearch() {
                       </span>
                     )}
                     <span className="truncate">{p.name}</span>
-                    <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{p.total} títulos</span>
+                    <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{t('{n} títulos', { n: p.total })}</span>
                   </button>
                 );
               }
@@ -254,7 +255,7 @@ export function GlobalSearch() {
                       className="w-7 h-10 rounded-sm object-cover bg-ink-800 ring-art shrink-0"
                     />
                     <span className="truncate">{m.title}</span>
-                    <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{m.year ?? '¿?'}</span>
+                    <span className="text-zinc-500 text-xs ml-auto shrink-0 tabular">{m.year ?? t('¿?')}</span>
                   </button>
                 );
               }
@@ -265,13 +266,12 @@ export function GlobalSearch() {
                 </button>
               );
             })}
-            {rows.length === 0 && <div className="text-sm text-zinc-500 px-2 py-3">Nada encontrado.</div>}
+            {rows.length === 0 && <div className="text-sm text-zinc-500 px-2 py-3">{t('Nada encontrado.')}</div>}
           </div>
         )}
         {!term && (
           <div className="text-xs text-zinc-500 px-2 py-3">
-            Escribe para buscar películas, personas, sagas, listas, festivales o saltar a una sección. ↑↓ para moverte,
-            Enter para abrir. Atajo: Ctrl/⌘ + K.
+            {t('Escribe para buscar películas, personas, sagas, listas, festivales o saltar a una sección. ↑↓ para moverte, Enter para abrir. Atajo: Ctrl/⌘ + K.')}
           </div>
         )}
       </div>
@@ -335,7 +335,7 @@ export function Dropzone({ accept, multiple = true, onFiles, busy = false, label
     <div
       role="button"
       tabIndex={0}
-      aria-label={label || 'Elegir archivos para importar'}
+      aria-label={label || t('Elegir archivos para importar')}
       aria-busy={busy || undefined}
       onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
       onDragLeave={() => setDrag(false)}
@@ -359,10 +359,10 @@ export function Dropzone({ accept, multiple = true, onFiles, busy = false, label
         onChange={(e) => pick(e.target.files)}
       />
       <div className="text-3xl mb-2">{busy ? '⏳' : '📥'}</div>
-      <div className="text-sm text-zinc-200">{busy ? 'Importando…' : label || 'Arrastra aquí tus archivos o haz clic para elegir'}</div>
+      <div className="text-sm text-zinc-200">{busy ? t('Importando…') : label || t('Arrastra aquí tus archivos o haz clic para elegir')}</div>
       {hint && <div className="text-xs text-zinc-500 mt-1">{hint}</div>}
       {names.length > 0 && !busy && (
-        <div className="text-xs text-gold-400 mt-2 truncate">{names.length} archivo(s): {names.join(', ')}</div>
+        <div className="text-xs text-gold-400 mt-2 truncate">{t('{n} archivo(s): {names}', { n: names.length, names: names.join(', ') })}</div>
       )}
     </div>
   );
@@ -375,7 +375,7 @@ export function RatingsChips({ ratings, movie, className = '' }) {
   const links = ratingLinks(movie || {});
   const Chip = ({ href, cls, children }) =>
     href ? (
-      <a href={href} target="_blank" rel="noreferrer" className={`${cls} hover:brightness-125 transition`} title="Abrir en su web">
+      <a href={href} target="_blank" rel="noreferrer" className={`${cls} hover:brightness-125 transition`} title={t('Abrir en su web')}>
         {children}
       </a>
     ) : (
@@ -398,7 +398,7 @@ export function RatingsChips({ ratings, movie, className = '' }) {
   return <div className={`flex flex-wrap gap-1.5 text-[11px] ${className}`}>{chips}</div>;
 }
 
-export function Spinner({ label = 'Cargando…' }) {
+export function Spinner({ label = t('Cargando…') }) {
   return (
     <div className="flex items-center gap-3 text-zinc-400 py-10 justify-center">
       <div className="w-5 h-5 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
@@ -432,19 +432,19 @@ export class ErrorBoundary extends Component {
     if (versionNueva) {
       return (
         <div className="alert my-6">
-          <div className="font-semibold mb-1">Hay una versión nueva de PowaFlex</div>
-          <p className="text-sm">Esta pestaña se quedó con la anterior. Recárgala y sigues donde estabas.</p>
-          <button className="btn-gold mt-3" onClick={() => window.location.reload()}>Recargar</button>
+          <div className="font-semibold mb-1">{t('Hay una versión nueva de PowaFlex')}</div>
+          <p className="text-sm">{t('Esta pestaña se quedó con la anterior. Recárgala y sigues donde estabas.')}</p>
+          <button className="btn-gold mt-3" onClick={() => window.location.reload()}>{t('Recargar')}</button>
         </div>
       );
     }
     return (
       <div className="alert my-6">
-        <div className="font-semibold mb-1">Esta página se ha roto.</div>
+        <div className="font-semibold mb-1">{t('Esta página se ha roto.')}</div>
         <p className="text-sm">{msg}</p>
         <div className="flex gap-2 mt-3">
-          <button className="btn-ghost" onClick={() => this.setState({ error: null })}>Reintentar</button>
-          <button className="btn-ghost" onClick={() => window.location.reload()}>Recargar la app</button>
+          <button className="btn-ghost" onClick={() => this.setState({ error: null })}>{t('Reintentar')}</button>
+          <button className="btn-ghost" onClick={() => window.location.reload()}>{t('Recargar la app')}</button>
         </div>
       </div>
     );
@@ -489,7 +489,7 @@ export function MovieCard({ movie, onClick }) {
     <button
       onClick={onClick}
       className="group text-left cursor-pointer w-full"
-      title={`${movie.title} (${movie.year ?? '¿?'})`}
+      title={`${movie.title} (${movie.year ?? t('¿?')})`}
     >
       {/* everything here is in your library, so no "owned" colour: a clean
           poster with a quiet ring, lifting on hover */}
@@ -532,7 +532,7 @@ export function TmdbCard({ item, badge, children }) {
         type="button"
         onClick={() => item.tmdb_id && setOpenFicha(true)}
         className="block w-full poster cursor-pointer"
-        title={`${item.title} — ver ficha`}
+        title={t('{title} — ver ficha', { title: item.title })}
       >
         {img ? (
           <img src={img} alt={item.title} loading="lazy" />
@@ -545,7 +545,7 @@ export function TmdbCard({ item, badge, children }) {
         {/* "in Plex" is information, not decoration: a dot, not a green frame */}
         {item.owned && !badge && (
           <span
-            title="Ya está en tu Plex"
+            title={t('Ya está en tu Plex')}
             className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,.9)]"
           />
         )}
@@ -554,7 +554,7 @@ export function TmdbCard({ item, badge, children }) {
       <div className="mt-1.5 text-xs text-zinc-300 truncate group-hover:text-zinc-100 transition-colors" title={item.title}>
         {item.title}
       </div>
-      <div className="text-[11px] text-zinc-500 tabular">{item.date ? item.date.slice(0, 4) : 'Sin fecha'}</div>
+      <div className="text-[11px] text-zinc-500 tabular">{item.date ? item.date.slice(0, 4) : t('Sin fecha')}</div>
       {children}
       {openFicha && <MediaModal tmdbId={item.tmdb_id} onClose={() => setOpenFicha(false)} />}
     </div>
@@ -584,8 +584,8 @@ export function RadarrButton({ tmdbId, resolveTmdbId, small = false, inline = fa
     const id = tmdbId || (resolveTmdbId ? await resolveTmdbId() : null);
     if (!id) {
       setState('error');
-      setErr('Sin ficha en TMDB');
-      toast('⚠️ No encuentro esta película en TMDB', 'error');
+      setErr(t('Sin ficha en TMDB'));
+      toast(t('⚠️ No encuentro esta película en TMDB'), 'error');
       return;
     }
     const res = await api('/radarr/add', { method: 'POST', body: { tmdbId: id } });
@@ -593,11 +593,11 @@ export function RadarrButton({ tmdbId, resolveTmdbId, small = false, inline = fa
     if (res.ok) {
       setState('done');
       onAdded?.(id);
-      toast(`✓ ${res.title || 'Película'} añadida a Radarr`, 'success');
+      toast(t('✓ {title} añadida a Radarr', { title: res.title || t('Película') }), 'success');
     } else if (/already/i.test(res.error || '')) {
       setState('done');
       onAdded?.(id);
-      toast('Ya estaba en Radarr', 'info');
+      toast(t('Ya estaba en Radarr'), 'info');
     } else {
       setState('error');
       setErr(res.error || 'Error');
@@ -605,7 +605,7 @@ export function RadarrButton({ tmdbId, resolveTmdbId, small = false, inline = fa
     }
   };
   if (state === 'done')
-    return <span className={`text-emerald-400 ${small ? 'text-[11px]' : 'text-sm'}`}>✓ En Radarr</span>;
+    return <span className={`text-emerald-400 ${small ? 'text-[11px]' : 'text-sm'}`}>{t('✓ En Radarr')}</span>;
   return (
     <div>
       <button
@@ -613,7 +613,7 @@ export function RadarrButton({ tmdbId, resolveTmdbId, small = false, inline = fa
         disabled={state === 'busy'}
         className={`btn-gold ${small ? `text-[11px] px-2 py-1 ${inline ? '' : 'mt-1'}` : ''}`}
       >
-        {state === 'busy' ? 'Añadiendo…' : '+ Radarr'}
+        {state === 'busy' ? t('Añadiendo…') : '+ Radarr'}
       </button>
       {state === 'error' && <div className="text-[11px] text-red-400 mt-1 max-w-40">{err}</div>}
     </div>
@@ -632,20 +632,20 @@ export function JustWatchCheck({ tmdbId, result = null }) {
     setBusy(false);
   };
   if (r) {
-    if (r.error) return <span className="text-[11px] text-red-400">JustWatch no responde</span>;
-    if (!r.maxQuality) return <span className="text-[11px] text-zinc-500">Sin oferta digital encontrada</span>;
+    if (r.error) return <span className="text-[11px] text-red-400">{t('JustWatch no responde')}</span>;
+    if (!r.maxQuality) return <span className="text-[11px] text-zinc-500">{t('Sin oferta digital encontrada')}</span>;
     return (
       <span
         className={`text-[11px] ${r.upgradeable ? 'text-emerald-400' : 'text-zinc-500'}`}
-        title={r.providers?.length ? `En ${r.providers.join(', ')}` : ''}
+        title={r.providers?.length ? t('En {providers}', { providers: r.providers.join(', ') }) : ''}
       >
-        {r.upgradeable ? `↑ Hay ${r.maxQuality} en el mercado` : `Máx. ${r.maxQuality} disponible`}
+        {r.upgradeable ? t('↑ Hay {q} en el mercado', { q: r.maxQuality }) : t('Máx. {q} disponible', { q: r.maxQuality })}
       </span>
     );
   }
   return (
     <button onClick={check} disabled={busy} className="text-[11px] text-sky-300 hover:underline cursor-pointer">
-      {busy ? 'Consultando…' : '¿existe mejor versión?'}
+      {busy ? t('Consultando…') : t('¿existe mejor versión?')}
     </button>
   );
 }
@@ -682,8 +682,8 @@ export function PersonCard({ person, role, follow = null }) {
           <DeathBadge deathday={person.deathday} />
         </div>
         <div className="text-xs text-zinc-500">
-          {person.n} películas
-          {person.watched != null && <span> · {person.watched} vistas</span>}
+          {t('{n} películas', { n: person.n })}
+          {person.watched != null && <span>{t(' · {n} vistas', { n: person.watched })}</span>}
         </div>
       </div>
       {follow && (
@@ -749,17 +749,17 @@ export const passesScore = (i, minScore) => !minScore || i.mdb?.score == null ||
 export function MinScoreBar({ minScore, setMinScore }) {
   return (
     <div className="flex items-center gap-2 flex-wrap text-sm">
-      <span className="text-xs text-zinc-500">Nota mínima Σ:</span>
+      <span className="text-xs text-zinc-500">{t('Nota mínima Σ:')}</span>
       {[0, 40, 50, 60, 70].map((v) => (
         <button
           key={v}
           onClick={() => setMinScore(v)}
           className={`btn-ghost !py-1 text-xs ${minScore === v ? '!border-gold-400 text-gold-400' : ''}`}
         >
-          {v === 0 ? 'Todas' : `Σ ≥ ${v}`}
+          {v === 0 ? t('Todas') : `Σ ≥ ${v}`}
         </button>
       ))}
-      <span className="text-xs text-zinc-600">(las sin nota no se ocultan)</span>
+      <span className="text-xs text-zinc-600">{t('(las sin nota no se ocultan)')}</span>
     </div>
   );
 }
@@ -785,7 +785,7 @@ export function MatchCorrector({
   searchPath = null,
   onPick,
   onClear = null,
-  clearLabel = 'Quitar corrección / volver al automático',
+  clearLabel = t('Quitar corrección / volver al automático'),
   onClose,
 }) {
   const esPersona = kind === 'person';
@@ -824,18 +824,18 @@ export function MatchCorrector({
         ref={dialogo}
         role="dialog"
         aria-modal="true"
-        aria-label={`Corregir emparejado de ${title}`}
+        aria-label={t('Corregir emparejado de {title}', { title })}
         className="card-raised p-4 w-full max-w-lg mt-16"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2 mb-1">
-          <h3 className="font-semibold text-zinc-100 text-sm">Corregir emparejado · «{title}»</h3>
-          <button className="text-zinc-500 hover:text-zinc-200 shrink-0" onClick={onClose} aria-label="Cerrar">✕</button>
+          <h3 className="font-semibold text-zinc-100 text-sm">{t('Corregir emparejado · «{title}»', { title })}</h3>
+          <button className="text-zinc-500 hover:text-zinc-200 shrink-0" onClick={onClose} aria-label={t('Cerrar')}>✕</button>
         </div>
         <p className="text-[11px] text-zinc-500 mb-3">
           {subtitle || (esPersona
-            ? 'Busca en TMDB y elige la ficha correcta. Se recuerda para siempre y ningún automatismo la revisa.'
-            : 'Busca en TMDB y elige la ficha correcta. Se recuerda y sobrevive a las sincronizaciones de Plex.')}
+            ? t('Busca en TMDB y elige la ficha correcta. Se recuerda para siempre y ningún automatismo la revisa.')
+            : t('Busca en TMDB y elige la ficha correcta. Se recuerda y sobrevive a las sincronizaciones de Plex.'))}
         </p>
 
         <form className="flex gap-2 mb-3" onSubmit={(e) => { e.preventDefault(); buscar(); }}>
@@ -843,21 +843,21 @@ export function MatchCorrector({
             className="input flex-1"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={esPersona ? 'Nombre a buscar en TMDB…' : 'Título a buscar en TMDB…'}
+            placeholder={esPersona ? t('Nombre a buscar en TMDB…') : t('Título a buscar en TMDB…')}
           />
-          <button type="submit" className="btn-gold" disabled={buscando}>{buscando ? '…' : 'Buscar'}</button>
+          <button type="submit" className="btn-gold" disabled={buscando}>{buscando ? '…' : t('Buscar')}</button>
         </form>
 
-        {cands && cands.length === 0 && <Empty>Nada en TMDB con esa búsqueda.</Empty>}
+        {cands && cands.length === 0 && <Empty>{t('Nada en TMDB con esa búsqueda.')}</Empty>}
         {cands?.length > 0 && (
           <div className="divide-y divide-ink-800 max-h-80 overflow-y-auto">
             {cands.map((c) => {
               const id = esPersona ? c.tmdb_id : c.id;
               const img = esPersona ? c.profile_path : c.poster_path;
               const pie = esPersona
-                ? [c.dept === 'Directing' ? 'Dirección' : c.dept === 'Acting' ? 'Interpretación' : c.dept, (c.knownFor || []).join(', ')]
+                ? [c.dept === 'Directing' ? t('Dirección') : c.dept === 'Acting' ? t('Interpretación') : c.dept, (c.knownFor || []).join(', ')]
                     .filter(Boolean).join(' · ')
-                : [c.date ? c.date.slice(0, 4) : 'sin fecha',
+                : [c.date ? c.date.slice(0, 4) : t('sin fecha'),
                    c.original_title && c.original_title !== c.title ? c.original_title : null]
                     .filter(Boolean).join(' · ');
               return (
@@ -875,7 +875,7 @@ export function MatchCorrector({
                     />
                   ) : (
                     <span className="w-10 h-14 shrink-0 border border-ink-700 rounded flex items-center justify-center text-[9px] text-zinc-500">
-                      {esPersona ? 'sin foto' : 'sin cartel'}
+                      {esPersona ? t('sin foto') : t('sin cartel')}
                     </span>
                   )}
                   <span className="min-w-0">
@@ -908,7 +908,7 @@ export function SkeletonGrid({ n = 20 }) {
 }
 
 // Polls /build-progress so long TMDB-building pages show a real bar (#5).
-export function BuildProgress({ label = 'Construyendo desde TMDB…' }) {
+export function BuildProgress({ label = t('Construyendo desde TMDB…') }) {
   const [p, setP] = useState(null);
   useEffect(() => {
     const t = setInterval(() => {
@@ -979,22 +979,22 @@ export const matchesTypeFilters = (item, show) =>
 // "unavailable", and this bar sits above the gaps grid all day long.
 export function TypeFilterBar({ show, toggle, counts }) {
   const items = [
-    ['shorts', 'Cortos', counts?.shorts],
-    ['docs', 'Documentales', counts?.docs],
-    ['music', 'Conciertos', counts?.music],
-    ['tv', 'Películas de TV', counts?.tv],
-    ['coral', 'Dirección coral', counts?.coral],
-    ['cameos', 'Cameos', counts?.cameos],
+    ['shorts', t('Cortos'), counts?.shorts],
+    ['docs', t('Documentales'), counts?.docs],
+    ['music', t('Conciertos'), counts?.music],
+    ['tv', t('Películas de TV'), counts?.tv],
+    ['coral', t('Dirección coral'), counts?.coral],
+    ['cameos', t('Cameos'), counts?.cameos],
   ].filter(([, , n]) => n == null || n > 0);
   if (!items.length) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 mb-4 text-sm">
-      <span className="text-zinc-500 text-xs mr-1">Mostrar:</span>
+      <span className="text-zinc-500 text-xs mr-1">{t('Mostrar:')}</span>
       {items.map(([k, label, n]) => (
         <button
           key={k}
           onClick={() => toggle(k)}
-          title={show[k] ? `Ocultar ${label.toLowerCase()}` : `Mostrar ${label.toLowerCase()}`}
+          title={show[k] ? t('Ocultar {x}', { x: label.toLowerCase() }) : t('Mostrar {x}', { x: label.toLowerCase() })}
           className={`chip ${show[k] ? 'chip-on' : ''}`}
         >
           {label}
@@ -1030,7 +1030,7 @@ export function DeathBadge({ deathday, className = '' }) {
   if (!deathday) return null;
   const year = String(deathday).slice(0, 4);
   return (
-    <span title={`Fallecido${year ? ` en ${year}` : ''}`} className={`badge-quiet shrink-0 ${className}`}>
+    <span title={year ? t('Fallecido en {year}', { year }) : t('Fallecido')} className={`badge-quiet shrink-0 ${className}`}>
       ✝ {year}
     </span>
   );
@@ -1144,7 +1144,7 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
     const r = await api(`/movies/${ratingKey}/match`, { method: 'POST', body: { tmdbId: nuevoId } });
     if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
     setCorrigiendo(false);
-    toast(nuevoId ? '✓ Emparejado corregido' : '✓ Corrección quitada');
+    toast(nuevoId ? t('✓ Emparejado corregido') : t('✓ Corrección quitada'));
     cargar();
   };
 
@@ -1170,19 +1170,19 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
         ref={dialogo}
         role="dialog"
         aria-modal="true"
-        aria-label={vm?.title || 'Ficha de película'}
+        aria-label={vm?.title || t('Ficha de película')}
         className="card-float max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6 flex gap-6 relative"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          aria-label="Cerrar"
+          aria-label={t('Cerrar')}
           className="absolute top-3 right-3 text-zinc-500 hover:text-zinc-100 transition-colors z-10"
         >
           <X size={18} />
         </button>
         {!vm ? (
-          err ? <ErrorBox error={err} /> : <Spinner label="Cargando ficha…" />
+          err ? <ErrorBox error={err} /> : <Spinner label={t('Cargando ficha…')} />
         ) : (
           <>
             {vm.posterUrl && (
@@ -1194,7 +1194,7 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
             )}
             <div className="min-w-0">
               <h2 className="font-display text-3xl text-zinc-100 leading-tight text-balance">
-                {vm.title} <span className="text-zinc-500 font-normal">({vm.year ?? '¿?'})</span>
+                {vm.title} <span className="text-zinc-500 font-normal">({vm.year ?? t('¿?')})</span>
               </h2>
               {vm.tagline && <div className="text-zinc-400 text-sm italic mt-1">{vm.tagline}</div>}
               {vm.originalTitle && vm.originalTitle !== vm.title && (
@@ -1205,16 +1205,16 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
                 {owned?.resolution && <span className="text-zinc-300">{owned.resolution.toUpperCase?.() || owned.resolution}</span>}
                 {owned?.hdr && <span className="text-sky-300">{owned.hdr}</span>}
                 {owned?.video_codec && <span>{owned.video_codec}</span>}
-                {owned?.view_count > 0 && <span className="text-gold-400">★ Vista {owned.view_count}×</span>}
+                {owned?.view_count > 0 && <span className="text-gold-400">{t('★ Vista {n}×', { n: owned.view_count })}</span>}
               </div>
               <RatingsChips ratings={vm.ratings} movie={vm} className="mt-2" />
               {vm.overview && <p className="text-sm text-zinc-300 mt-3 leading-relaxed">{vm.overview}</p>}
               <div className="mt-3 text-sm">
                 {vm.directors.length > 0 && (
-                  <div><span className="text-zinc-500">Dirección: </span><PersonLinks people={vm.directors} role="director" cls="text-zinc-100 hover:text-gold-400 hover:underline" /></div>
+                  <div><span className="text-zinc-500">{t('Dirección: ')}</span><PersonLinks people={vm.directors} role="director" cls="text-zinc-100 hover:text-gold-400 hover:underline" /></div>
                 )}
                 {vm.cast.length > 0 && (
-                  <div className="mt-1"><span className="text-zinc-500">Reparto: </span><PersonLinks people={vm.cast} role="actor" cls="text-zinc-300 hover:text-gold-400 hover:underline" /></div>
+                  <div className="mt-1"><span className="text-zinc-500">{t('Reparto: ')}</span><PersonLinks people={vm.cast} role="actor" cls="text-zinc-300 hover:text-gold-400 hover:underline" /></div>
                 )}
                 {(vm.genres.length > 0 || vm.countries.length > 0) && (
                   <div className="mt-1 text-zinc-400 text-xs">{vm.genres.join(' · ')}{vm.countries.length > 0 && ` · ${vm.countries.join(', ')}`}</div>
@@ -1224,11 +1224,11 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
                 {owned ? (
                   SUB_1080.includes(owned.resolution) && vm.tmdb_id ? (
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] text-orange-400">{owned.resolution?.toUpperCase()} · por debajo de 1080p — pedir upgrade:</span>
+                      <span className="text-[11px] text-orange-400">{t('{res} · por debajo de 1080p — pedir upgrade:', { res: owned.resolution?.toUpperCase() })}</span>
                       <RadarrButton tmdbId={vm.tmdb_id} small alreadyInRadarr={vm.inRadarr} />
                     </div>
                   ) : (
-                    <span className="text-emerald-400 text-sm">✓ En tu biblioteca</span>
+                    <span className="text-emerald-400 text-sm">{t('✓ En tu biblioteca')}</span>
                   )
                 ) : (
                   vm.tmdb_id && <RadarrButton tmdbId={vm.tmdb_id} alreadyInRadarr={vm.inRadarr} />
@@ -1241,9 +1241,9 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
                   <button
                     onClick={() => setCorrigiendo(true)}
                     className="text-[11px] text-zinc-500 hover:text-gold-400 cursor-pointer"
-                    title="Elegir a mano su ficha de TMDB"
+                    title={t('Elegir a mano su ficha de TMDB')}
                   >
-                    ✎ {vm.tmdbLocked ? 'emparejado a mano' : 'corregir emparejado con TMDB'}
+                    ✎ {vm.tmdbLocked ? t('emparejado a mano') : t('corregir emparejado con TMDB')}
                   </button>
                 </div>
               )}
@@ -1258,10 +1258,10 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
           title={vm.title}
           initialQuery={vm.originalTitle || vm.title}
           year={vm.year}
-          subtitle="Elige su ficha de TMDB. De ahí salen las notas, el reparto y el completismo de su gente. La corrección se recuerda y sobrevive a las sincronizaciones de Plex."
+          subtitle={t('Elige su ficha de TMDB. De ahí salen las notas, el reparto y el completismo de su gente. La corrección se recuerda y sobrevive a las sincronizaciones de Plex.')}
           onPick={fijarPelicula}
           onClear={vm.tmdbLocked ? () => fijarPelicula(null) : null}
-          clearLabel="Quitar la corrección y volver a lo que diga Plex"
+          clearLabel={t('Quitar la corrección y volver a lo que diga Plex')}
           onClose={() => setCorrigiendo(false)}
         />
       )}

@@ -6,6 +6,7 @@ import { Spinner, Section, MovieCard, MovieModal, Empty, RadarrButton, useRadarr
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 import { useChartTheme } from '../charts.js';
+import { t } from '../i18n.js';
 
 export default function Quality({ embedded = false }) {
   const pollRef = useRef(null);
@@ -46,12 +47,12 @@ export default function Quality({ embedded = false }) {
     const r = await api('/radarr/search-again', { method: 'POST', body: { tmdbId: m.tmdb_id } });
     setSearchBusy(null);
     if (r.error) toast(`⚠️ ${r.error}`, 'error');
-    else toast(`🔍 Radarr vuelve a buscar «${m.title}»`);
+    else toast(t('🔍 Radarr vuelve a buscar «{title}»', { title: m.title }));
   };
   const antiguedad = (added) => {
     if (!added) return null;
     const dias = Math.floor((Date.now() - Date.parse(added)) / 86400000);
-    return dias >= 365 ? `${Math.floor(dias / 365)} a` : dias >= 30 ? `${Math.floor(dias / 30)} m` : `${dias} d`;
+    return dias >= 365 ? t('{n} a', { n: Math.floor(dias / 365) }) : dias >= 30 ? t('{n} m', { n: Math.floor(dias / 30) }) : t('{n} d', { n: dias });
   };
   // la fase de estreno explica POR QUÉ una pedida no aparece
   const hoy = new Date().toLocaleDateString('en-CA');
@@ -61,19 +62,19 @@ export default function Quality({ embedded = false }) {
       const ya = phases.digital <= hoy;
       return (
         <span className={`text-[11px] shrink-0 ${ya ? 'text-emerald-400' : 'text-sky-300'}`}
-          title={ya ? 'Ya existe copia digital: debería poder conseguirse' : 'Aún no ha salido en digital'}>
-          💿 {ya ? 'en digital' : `digital ${fmtDate(phases.digital)}`}
+          title={ya ? t('Ya existe copia digital: debería poder conseguirse') : t('Aún no ha salido en digital')}>
+          💿 {ya ? t('en digital') : t('digital {date}', { date: fmtDate(phases.digital) })}
         </span>
       );
     }
     if (phases.theatrical) {
       return (
-        <span className="text-[11px] text-zinc-500 shrink-0" title="Estrenada en salas, sin fecha digital anunciada: normal que no aparezca todavía">
-          🎬 solo cines
+        <span className="text-[11px] text-zinc-500 shrink-0" title={t('Estrenada en salas, sin fecha digital anunciada: normal que no aparezca todavía')}>
+          🎬 {t('solo cines')}
         </span>
       );
     }
-    return <span className="text-[11px] text-zinc-600 shrink-0" title="Sin fechas de estreno en TMDB">sin fecha</span>;
+    return <span className="text-[11px] text-zinc-600 shrink-0" title={t('Sin fechas de estreno en TMDB')}>{t('sin fecha')}</span>;
   };
 
   // Ask JustWatch about every candidate at once, so the list can be filtered by
@@ -104,7 +105,7 @@ export default function Quality({ embedded = false }) {
     }
     setJw({ busy: false, done: ids.length, total: ids.length, checked: r.checked, upgradeable: r.upgradeable, results: r.results || {} });
     setJwFilter(r.upgradeable > 0 ? 'mejor' : 'todas');
-    toast(`${r.upgradeable} de ${r.checked} tienen mejor versión disponible`);
+    toast(t('{a} de {b} tienen mejor versión disponible', { a: r.upgradeable, b: r.checked }));
   };
 
   const upgradeList = upgrades || [];
@@ -134,19 +135,19 @@ export default function Quality({ embedded = false }) {
 
   return (
     <div>
-      {!embedded && <PageHeader eyebrow="Colección" title="Calidad y disco" />}
+      {!embedded && <PageHeader eyebrow={t('Colección')} title={t('Calidad y disco')} />}
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {[
-          ['Resolución', ov.byResolution, 0, (p) => `${p.payload.n} pelis · ${fmtBytes(p.payload.size)}`, true],
-          ['Códecs de vídeo', ov.byCodec, 2, (p) => `${p.payload.n} películas`, false],
-          ['HDR / Dolby Vision', ov.hdr, 4, (p) => `${p.payload.n} películas`, false],
+          [t('Resolución'), ov.byResolution, 0, (p) => t('{n} pelis · {size}', { n: p.payload.n, size: fmtBytes(p.payload.size) }), true],
+          [t('Códecs de vídeo'), ov.byCodec, 2, (p) => t('{n} películas', { n: p.payload.n }), false],
+          ['HDR / Dolby Vision', ov.hdr, 4, (p) => t('{n} películas', { n: p.payload.n }), false],
         ].map(([title, data, shift, fmt, clickable]) => (
           <Section
             key={title}
             title={title}
             className="min-w-0"
-            action={clickable && <span className="text-[11px] text-zinc-500">clic para filtrar</span>}
+            action={clickable && <span className="text-[11px] text-zinc-500">{t('clic para filtrar')}</span>}
           >
             <div className="card p-4 h-80 min-w-0">
               <ResponsiveContainer>
@@ -189,7 +190,7 @@ export default function Quality({ embedded = false }) {
         ))}
       </div>
 
-      <Section title="Espacio en disco por década">
+      <Section title={t('Espacio en disco por década')}>
         <div className="card p-4 h-64 mb-8 min-w-0">
           <ResponsiveContainer>
             <BarChart data={sizeByDecade}>
@@ -208,28 +209,28 @@ export default function Quality({ embedded = false }) {
         </div>
       </Section>
 
-      <Section title="Candidatas a upgrade (bien valoradas, por debajo de 1080p)">
+      <Section title={t('Candidatas a upgrade (bien valoradas, por debajo de 1080p)')}>
         {!upgrades ? (
           <Spinner />
         ) : upgrades.length === 0 ? (
-          <Empty>Todo está al menos en 1080p.</Empty>
+          <Empty>{t('Todo está al menos en 1080p.')}</Empty>
         ) : (
           <>
             <div className="card p-3 mb-4 flex flex-wrap items-center gap-2 text-sm">
               <button className="btn-ghost !py-1.5 text-xs" onClick={checkAllJw} disabled={jw.busy}>
-                {jw.busy ? `Consultando… ${jw.done}/${jw.total}` : '¿Cuáles tienen mejor versión?'}
+                {jw.busy ? t('Consultando… {done}/{total}', { done: jw.done, total: jw.total }) : t('¿Cuáles tienen mejor versión?')}
               </button>
 
               {jw.checked > 0 && (
                 <>
                   <span className="text-[11px] text-zinc-500">
-                    {jw.upgradeable} de {jw.checked} con mejor versión en el mercado
+                    {t('{a} de {b} con mejor versión en el mercado', { a: jw.upgradeable, b: jw.checked })}
                   </span>
                   <span className="mx-1 text-zinc-600">·</span>
                   {[
-                    ['todas', `Todas (${upgrades.length})`],
-                    ['mejor', `Con mejor versión (${upgradeableCount})`],
-                    ['sin', `Sin mejor versión (${jw.checked - upgradeableCount})`],
+                    ['todas', t('Todas ({n})', { n: upgrades.length })],
+                    ['mejor', t('Con mejor versión ({n})', { n: upgradeableCount })],
+                    ['sin', t('Sin mejor versión ({n})', { n: jw.checked - upgradeableCount })],
                   ].map(([k, label]) => (
                     <button key={k} onClick={() => setJwFilter(k)} className={`chip ${jwFilter === k ? 'chip-on' : ''}`}>
                       {label}
@@ -241,8 +242,8 @@ export default function Quality({ embedded = false }) {
               {shownUpgrades.length > 0 && (
                 <button className="btn-gold !py-1.5 text-xs ml-auto" onClick={requestAllUpgrades} disabled={bulkBusy}>
                   {bulkBusy
-                    ? 'Pidiendo…'
-                    : `Pedir ${pendingUpgradeIds.length} a Radarr${jwFilter === 'mejor' ? '' : ' (todas las visibles)'}`}
+                    ? t('Pidiendo…')
+                    : t('Pedir {n} a Radarr', { n: pendingUpgradeIds.length }) + (jwFilter === 'mejor' ? '' : t(' (todas las visibles)'))}
                 </button>
               )}
             </div>
@@ -268,21 +269,20 @@ export default function Quality({ embedded = false }) {
 
       {/* la deuda de Radarr: qué pediste que nunca llegó, y qué llegó peor que tu perfil */}
       {Array.isArray(wanted) && wanted.length > 0 && (
-        <Section title={`Pedidas a Radarr que siguen sin aparecer (${wanted.length})`}>
+        <Section title={t('Pedidas a Radarr que siguen sin aparecer ({n})', { n: wanted.length })}>
           <p className="text-xs text-zinc-500 mb-2 max-w-3xl">
-            Monitorizadas sin archivo, las más antiguas primero: son las que piden una decisión
-            (volver a buscar, esperar al estreno digital o quitar de Radarr).
+            {t('Monitorizadas sin archivo, las más antiguas primero: son las que piden una decisión (volver a buscar, esperar al estreno digital o quitar de Radarr).')}
           </p>
           <div className="card divide-y divide-ink-800 max-h-96 overflow-y-auto">
             {wanted.map((m) => (
               <div key={m.tmdb_id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
                 <span className="text-zinc-200 truncate flex-1">
-                  {m.title} <span className="text-zinc-500">({m.year ?? '¿?'})</span>
+                  {m.title} <span className="text-zinc-500">({m.year ?? t('¿?')})</span>
                 </span>
                 <FasePill phases={m.phases} />
                 {antiguedad(m.added) && (
-                  <span className="text-[11px] text-zinc-500 shrink-0 tabular" title="Tiempo en Radarr sin conseguirse">
-                    hace {antiguedad(m.added)}
+                  <span className="text-[11px] text-zinc-500 shrink-0 tabular" title={t('Tiempo en Radarr sin conseguirse')}>
+                    {t('hace {t}', { t: antiguedad(m.added) })}
                   </span>
                 )}
                 <button
@@ -290,7 +290,7 @@ export default function Quality({ embedded = false }) {
                   disabled={searchBusy === m.tmdb_id}
                   onClick={() => searchAgain(m)}
                 >
-                  {searchBusy === m.tmdb_id ? '…' : '🔍 Buscar de nuevo'}
+                  {searchBusy === m.tmdb_id ? '…' : t('🔍 Buscar de nuevo')}
                 </button>
               </div>
             ))}
@@ -298,16 +298,15 @@ export default function Quality({ embedded = false }) {
         </Section>
       )}
       {Array.isArray(cutoff) && cutoff.length > 0 && (
-        <Section title={`Por debajo del corte de tu perfil de Radarr (${cutoff.length})`}>
+        <Section title={t('Por debajo del corte de tu perfil de Radarr ({n})', { n: cutoff.length })}>
           <p className="text-xs text-zinc-500 mb-2 max-w-3xl">
-            Tienen archivo, pero de menos calidad de la que pide tu perfil: Radarr las mejorará si
-            aparece algo mejor, y puedes forzar la búsqueda ya.
+            {t('Tienen archivo, pero de menos calidad de la que pide tu perfil: Radarr las mejorará si aparece algo mejor, y puedes forzar la búsqueda ya.')}
           </p>
           <div className="card divide-y divide-ink-800 max-h-96 overflow-y-auto">
             {cutoff.map((m) => (
               <div key={m.tmdb_id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
                 <span className="text-zinc-200 truncate flex-1">
-                  {m.title} <span className="text-zinc-500">({m.year ?? '¿?'})</span>
+                  {m.title} <span className="text-zinc-500">({m.year ?? t('¿?')})</span>
                 </span>
                 {m.quality && <span className="badge-quiet shrink-0">{m.quality}</span>}
                 <button
@@ -315,7 +314,7 @@ export default function Quality({ embedded = false }) {
                   disabled={searchBusy === m.tmdb_id}
                   onClick={() => searchAgain(m)}
                 >
-                  {searchBusy === m.tmdb_id ? '…' : '🔍 Buscar mejor'}
+                  {searchBusy === m.tmdb_id ? '…' : t('🔍 Buscar mejor')}
                 </button>
               </div>
             ))}
@@ -324,43 +323,43 @@ export default function Quality({ embedded = false }) {
       )}
 
       {dups && (dups.multiVersion.length > 0 || dups.sameTmdb.length > 0) && (
-        <Section title="Duplicados y versiones múltiples">
+        <Section title={t('Duplicados y versiones múltiples')}>
           <div className="grid md:grid-cols-2 gap-4 mb-8">
             <div className="card p-4">
-              <h3 className="text-sm font-semibold text-zinc-300 mb-2">Con varias versiones/archivos ({dups.multiVersion.length})</h3>
+              <h3 className="text-sm font-semibold text-zinc-300 mb-2">{t('Con varias versiones/archivos ({n})', { n: dups.multiVersion.length })}</h3>
               <div className="max-h-80 overflow-y-auto text-sm">
                 {dups.multiVersion.map((m) => (
                   <div key={m.rating_key} className="flex justify-between py-1 border-b border-ink-800 gap-2">
                     <button className="text-zinc-200 hover:text-gold-400 text-left truncate" onClick={() => setSelected(m.rating_key)}>
                       {m.title} ({m.year})
                     </button>
-                    <span className="text-zinc-500 shrink-0">{m.media_count} versiones · {fmtBytes(m.size_bytes)}</span>
+                    <span className="text-zinc-500 shrink-0">{t('{n} versiones · {size}', { n: m.media_count, size: fmtBytes(m.size_bytes) })}</span>
                   </div>
                 ))}
-                {dups.multiVersion.length === 0 && <Empty>Ninguna.</Empty>}
+                {dups.multiVersion.length === 0 && <Empty>{t('Ninguna.')}</Empty>}
               </div>
             </div>
             <div className="card p-4">
-              <h3 className="text-sm font-semibold text-zinc-300 mb-2">Mismo TMDB ID repetido ({dups.sameTmdb.length})</h3>
+              <h3 className="text-sm font-semibold text-zinc-300 mb-2">{t('Mismo TMDB ID repetido ({n})', { n: dups.sameTmdb.length })}</h3>
               <div className="max-h-80 overflow-y-auto text-sm">
                 {dups.sameTmdb.map((d) => (
                   <div key={d.tmdb_id} className="py-1 border-b border-ink-800 text-zinc-300">
-                    {d.titles} <span className="text-zinc-500">({d.n} entradas)</span>
+                    {d.titles} <span className="text-zinc-500">{t('({n} entradas)', { n: d.n })}</span>
                   </div>
                 ))}
-                {dups.sameTmdb.length === 0 && <Empty>Ninguno.</Empty>}
+                {dups.sameTmdb.length === 0 && <Empty>{t('Ninguno.')}</Empty>}
               </div>
             </div>
           </div>
         </Section>
       )}
 
-      <Section title="Los 30 archivos más pesados">
+      <Section title={t('Los 30 archivos más pesados')}>
         <div className="card p-4 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-zinc-500 text-left border-b border-ink-700">
-                <th className="py-2">Título</th><th>Año</th><th>Resolución</th><th>Códec</th><th className="text-right">Tamaño</th>
+                <th className="py-2">{t('Título')}</th><th>{t('Año')}</th><th>{t('Resolución')}</th><th>{t('Códec')}</th><th className="text-right">{t('Tamaño')}</th>
               </tr>
             </thead>
             <tbody>

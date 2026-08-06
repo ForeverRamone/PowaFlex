@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Spinner, Toaster, GlobalSearch, ErrorBoundary } from './components.jsx';
 import { api, applyTheme } from './api.js';
+import { t, getLang, setLang, locale } from './i18n.js';
 import { ScrollMemory } from './scroll.js';
 
 // lazy per route so heavy pages (and recharts) don't weigh down the first paint.
@@ -27,33 +28,35 @@ const About = lazy(() => import('./pages/About.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
 // grouped so the eye finds things: what you have, what you hunt, everything else
+// t() en tiempo de módulo vale: el idioma queda fijado antes del primer render
+// y cambiarlo recarga la página entera
 const NAV_GROUPS = [
   {
-    label: 'Tu colección',
+    label: t('Tu colección'),
     items: [
       { to: '/', label: 'Dashboard', Icon: LayoutDashboard },
-      { to: '/biblioteca', label: 'Biblioteca', Icon: Film },
-      { to: '/personas', label: 'Directores y actores', Icon: Users },
-      { to: '/visionado', label: 'Visionado', Icon: Eye },
-      { to: '/taller', label: 'Taller', Icon: Wrench },
+      { to: '/biblioteca', label: t('Biblioteca'), Icon: Film },
+      { to: '/personas', label: t('Directores y actores'), Icon: Users },
+      { to: '/visionado', label: t('Visionado'), Icon: Eye },
+      { to: '/taller', label: t('Taller'), Icon: Wrench },
     ],
   },
   {
-    label: 'La caza',
+    label: t('La caza'),
     items: [
-      { to: '/favoritos', label: 'Favoritos', Icon: Star },
-      { to: '/descubrir', label: 'Descubrir huecos', Icon: Compass },
-      { to: '/calendario', label: 'Cine venidero', Icon: CalendarDays },
-      { to: '/festivales', label: 'Festivales y premios', Icon: Award },
-      { to: '/estrenos', label: 'Estrenos', Icon: Ticket },
-      { to: '/listas', label: 'Listas y retos', Icon: Trophy },
+      { to: '/favoritos', label: t('Favoritos'), Icon: Star },
+      { to: '/descubrir', label: t('Descubrir huecos'), Icon: Compass },
+      { to: '/calendario', label: t('Cine venidero'), Icon: CalendarDays },
+      { to: '/festivales', label: t('Festivales y premios'), Icon: Award },
+      { to: '/estrenos', label: t('Estrenos'), Icon: Ticket },
+      { to: '/listas', label: t('Listas y retos'), Icon: Trophy },
     ],
   },
   {
-    label: 'Cuenta',
+    label: t('Cuenta'),
     items: [
-      { to: '/ajustes', label: 'Ajustes', Icon: SettingsIcon },
-      { to: '/acerca', label: '¿Qué es PowaFlex?', Icon: HelpCircle },
+      { to: '/ajustes', label: t('Ajustes'), Icon: SettingsIcon },
+      { to: '/acerca', label: t('¿Qué es PowaFlex?'), Icon: HelpCircle },
     ],
   },
 ];
@@ -89,9 +92,16 @@ function Shell() {
     // mirror display prefs locally: cards read the rating synchronously and
     // index.html applies the look before paint
     api('/settings').then((st) => {
-      if (!st) return;
+      // api() no rechaza nunca: un fallo devuelve { error } truthy. Sin este
+      // guard, un corte transitorio reseteaba el idioma a ES y recargaba.
+      if (!st || st.error) return;
       localStorage.setItem('primary_rating', st.primary_rating || 'score');
       applyTheme(st.ui_theme || 'cartelera');
+      // el idioma vive en el servidor pero se lee de localStorage al pintar;
+      // si otro dispositivo lo cambió, un reload único lo pone al día (tras él
+      // ambos coinciden y no se vuelve a entrar aquí)
+      const remoteLang = st.ui_language === 'en' ? 'en' : 'es';
+      if (remoteLang !== getLang()) { setLang(remoteLang); window.location.reload(); }
     });
   }, []);
 
@@ -100,14 +110,14 @@ function Shell() {
       <ScrollMemory />
       {/* mobile top bar */}
       <div className="app-nav md:hidden fixed top-0 inset-x-0 z-30 flex items-center gap-3 bg-ink-900 border-b border-ink-700 px-4 h-14">
-        <button onClick={() => setOpen(true)} className="text-zinc-300 hover:text-zinc-100" aria-label="Menú">
+        <button onClick={() => setOpen(true)} className="text-zinc-300 hover:text-zinc-100" aria-label={t('Menú')}>
           <Menu size={20} strokeWidth={1.75} />
         </button>
         <Wordmark className="text-lg text-zinc-100" />
         <button
           onClick={() => window.dispatchEvent(new Event('powaflex-search'))}
           className="ml-auto text-zinc-300 hover:text-zinc-100"
-          aria-label="Buscar"
+          aria-label={t('Buscar')}
         >
           <Search size={18} strokeWidth={1.75} />
         </button>
@@ -124,7 +134,7 @@ function Shell() {
       >
         <div className="mb-4 px-5 flex items-center justify-between">
           <Wordmark className="text-2xl text-zinc-100" />
-          <button onClick={() => setOpen(false)} className="md:hidden text-zinc-500" aria-label="Cerrar">
+          <button onClick={() => setOpen(false)} className="md:hidden text-zinc-500" aria-label={t('Cerrar')}>
             <X size={18} />
           </button>
         </div>
@@ -132,7 +142,7 @@ function Shell() {
           onClick={() => { setOpen(false); window.dispatchEvent(new Event('powaflex-search')); }}
           className="mb-4 mx-4 flex items-center gap-2 text-sm text-zinc-400 bg-ink-800 border border-ink-600 rounded-lg px-3 py-2 hover:border-zinc-500 hover:text-zinc-200 transition-colors"
         >
-          <Search size={15} strokeWidth={1.75} /> Buscar…
+          <Search size={15} strokeWidth={1.75} /> {t('Buscar…')}
           <span className="ml-auto text-[11px] text-zinc-600">⌘K</span>
         </button>
 
@@ -163,8 +173,8 @@ function Shell() {
                     className="ml-auto w-2 h-2 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,.9)] shrink-0"
                     title={
                       setup.nightly.stale
-                        ? 'La última actualización completa tiene más de 26 horas: el pase nocturno puede no estar corriendo'
-                        : `La última pasada terminó con ${setup.nightly.errores} error(es): mira el histórico en Ajustes`
+                        ? t('La última actualización completa tiene más de 26 horas: el pase nocturno puede no estar corriendo')
+                        : t('La última pasada terminó con {n} error(es): mira el histórico en Ajustes', { n: setup.nightly.errores })
                     }
                   />
                 )}
@@ -175,10 +185,10 @@ function Shell() {
 
         {setup && setup.movies > 0 && (
           <div className="mt-auto pt-4 text-xs text-zinc-500 px-5">
-            <span className="tabular">{setup.movies.toLocaleString('es-ES')}</span> películas sincronizadas
+            <span className="tabular">{setup.movies.toLocaleString(locale())}</span> {t('películas sincronizadas')}
             {setup.newlyAdded > 0 && (
-              <span className="text-emerald-400" title="Añadidas en la última sincronización">
-                {' '}+{setup.newlyAdded.toLocaleString('es-ES')}
+              <span className="text-emerald-400" title={t('Añadidas en la última sincronización')}>
+                {' '}+{setup.newlyAdded.toLocaleString(locale())}
               </span>
             )}
           </div>
@@ -189,7 +199,7 @@ function Shell() {
           href={`${version.repo}/releases`}
           target="_blank"
           rel="noreferrer"
-          title={`PowaFlex ${version.version} — ver novedades en GitHub`}
+          title={t('PowaFlex {v} — ver novedades en GitHub', { v: version.version })}
           /* sobre el papel de «Cartelera» un texto suelto en zinc-600 no se
              leía: va sellado en su propia tarjeta, como el resto de la app.
              En móvil se oculta: flotando sobre una columna tapaba contenido. */

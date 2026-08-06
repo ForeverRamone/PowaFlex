@@ -8,6 +8,7 @@ import {
   MinScoreBar, passesScore } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
+import { t, locale } from '../i18n.js';
 
 // las sagas se cazan aquí desde que /colecciones dejó de ser página propia
 const Sagas = lazy(() => import('./Sagas.jsx'));
@@ -47,7 +48,7 @@ function GapCard({ f, radarrIds, addRadarrId, onDismiss, person }) {
       <div className="flex items-center gap-1">
         <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={radarrIds.has(f.tmdb_id)} onAdded={addRadarrId} />
         <button
-          title="No me interesa: no volverá a aparecer en los huecos"
+          title={t('No me interesa: no volverá a aparecer en los huecos')}
           onClick={() => onDismiss(f)}
           className="text-zinc-500 hover:text-red-400 text-xs px-1 shrink-0"
         >
@@ -73,7 +74,7 @@ function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, 
           {p.name} →<Signature films={p.signature} />
         </Link>
         <span className="text-xs text-zinc-500">
-          {p.missingTotal === 0 ? '✓ filmografía completa' : `${p.missingTotal} te faltan · todas ocultas por tus filtros`}
+          {p.missingTotal === 0 ? t('✓ filmografía completa') : t('{n} te faltan · todas ocultas por tus filtros', { n: p.missingTotal })}
         </span>
       </section>
     );
@@ -87,12 +88,12 @@ function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, 
         </Link>
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs text-zinc-400">
-            Tienes <b className="text-gold-400">{p.owned}</b> de {p.released} estrenadas ({p.pct}%) · {p.missingTotal} te faltan
-            {hidden > 0 ? ` · ${hidden} ocultas por filtros` : ''}
+            {t('Tienes')} <b className="text-gold-400">{p.owned}</b> {t('de {released} estrenadas ({pct}%) · {missing} te faltan', { released: p.released, pct: p.pct, missing: p.missingTotal })}
+            {hidden > 0 ? t(' · {n} ocultas por filtros', { n: hidden }) : ''}
           </span>
           {pendingIds.length > 1 && (
             <button className="btn-ghost !py-1 text-xs shrink-0 inline-flex items-center gap-1.5" onClick={() => sendBulk(pendingIds, addRadarrId)}>
-<Plus size={13} strokeWidth={2.5} /> Añadir {pendingIds.length > 300 ? '300 de las ' + pendingIds.length : 'las ' + pendingIds.length} visibles a Radarr
+<Plus size={13} strokeWidth={2.5} /> {pendingIds.length > 300 ? t('Añadir 300 de las {n} visibles a Radarr', { n: pendingIds.length }) : t('Añadir las {n} visibles a Radarr', { n: pendingIds.length })}
             </button>
           )}
         </div>
@@ -144,16 +145,16 @@ function FilmGrid({ people, show, minScore, dismissed, onDismiss, radarrIds, add
   const films = [...byId.values()].sort(FILM_SORTS[sort]?.fn || FILM_SORTS.score.fn);
   const pendingIds = films.filter((f) => !radarrIds.has(f.tmdb_id)).map((f) => f.tmdb_id);
 
-  if (!films.length) return <Empty>Nada que rellenar con estos filtros.</Empty>;
+  if (!films.length) return <Empty>{t('Nada que rellenar con estos filtros.')}</Empty>;
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <span className="text-sm text-zinc-400">
-          <b className="text-gold-400">{films.length}</b> películas te faltan en total
+          <b className="text-gold-400">{films.length}</b> {t('películas te faltan en total')}
         </span>
         {pendingIds.length > 1 && (
           <button className="btn-gold !py-1 text-xs inline-flex items-center gap-1.5" onClick={() => sendBulk(pendingIds.slice(0, 300), addRadarrId)}>
-<Plus size={13} strokeWidth={2.5} /> Añadir {Math.min(pendingIds.length, 300)} a Radarr
+<Plus size={13} strokeWidth={2.5} /> {t('Añadir {n} a Radarr', { n: Math.min(pendingIds.length, 300) })}
           </button>
         )}
       </div>
@@ -220,8 +221,8 @@ function GapsView({
     });
   };
 
-  if (error) return <ErrorBox error={`${error} — comprueba la API key de TMDB en Ajustes.`} />;
-  if (!data) return <BuildProgress label="Cruzando filmografías con TMDB…" />;
+  if (error) return <ErrorBox error={t('{error} — comprueba la API key de TMDB en Ajustes.', { error })} />;
+  if (!data) return <BuildProgress label={t('Cruzando filmografías con TMDB…')} />;
 
   // people with something still missing drive this page
   const withGaps = (data.people || []).filter((p) => (p.missingTotal || 0) > 0);
@@ -232,54 +233,54 @@ function GapsView({
     <div>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
         <p className="text-sm text-zinc-500">
-          {intro} Actualizado {new Date(data.generatedAt).toLocaleString('es-ES')}.
-          {complete > 0 && <span className="text-emerald-400"> · {complete} con filmografía completa</span>}
+          {intro} {t('Actualizado {date}.', { date: new Date(data.generatedAt).toLocaleString(locale()) })}
+          {complete > 0 && <span className="text-emerald-400"> · {t('{n} con filmografía completa', { n: complete })}</span>}
         </p>
         <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={() => load(true)} disabled={refreshing}>
-          {refreshing ? 'Actualizando…' : <><RotateCw size={13} strokeWidth={2} /> Actualizar</>}
+          {refreshing ? t('Actualizando…') : <><RotateCw size={13} strokeWidth={2} /> {t('Actualizar')}</>}
         </button>
       </div>
 
       {data.people.length === 0 ? (
         <Empty>
           {data.totalPeople === 0
-            ? 'Nadie en tu biblioteca casa con esos filtros. Puede que falten datos demográficos: amplíalos en Ajustes → «Actualizar estado vital».'
-            : 'Nada que rellenar aquí: filmografías completas.'}
+            ? t('Nadie en tu biblioteca casa con esos filtros. Puede que falten datos demográficos: amplíalos en Ajustes → «Actualizar estado vital».')
+            : t('Nada que rellenar aquí: filmografías completas.')}
         </Empty>
       ) : (
         <>
           <div className="card p-3 mb-4 space-y-3">
             <div className="flex items-center gap-2 flex-wrap text-sm">
-              <span className="text-xs text-zinc-500">Vista:</span>
+              <span className="text-xs text-zinc-500">{t('Vista:')}</span>
               <button
                 onClick={() => setViewPref('person')}
                 className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${view === 'person' ? '!border-gold-400 text-gold-400' : ''}`}
               >
-<User size={13} strokeWidth={2} /> Por persona
+<User size={13} strokeWidth={2} /> {t('Por persona')}
               </button>
               <button
                 onClick={() => setViewPref('grid')}
                 className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${view === 'grid' ? '!border-gold-400 text-gold-400' : ''}`}
               >
-<LayoutGrid size={13} strokeWidth={2} /> Todas las películas juntas
+<LayoutGrid size={13} strokeWidth={2} /> {t('Todas las películas juntas')}
               </button>
-              <span className="text-xs text-zinc-500 ml-2">Ordenar:</span>
+              <span className="text-xs text-zinc-500 ml-2">{t('Ordenar:')}</span>
               {view === 'person' ? (
                 <Select className="!py-1 text-xs" value={personSort} onChange={setPersonSortPref}
-                  options={Object.entries(PERSON_SORTS).map(([k, s]) => [k, s.label])} />
+                  options={Object.entries(PERSON_SORTS).map(([k, s]) => [k, t(s.label)])} />
               ) : (
                 <Select className="!py-1 text-xs" value={filmSort} onChange={setFilmSortPref}
-                  options={Object.entries(FILM_SORTS).map(([k, s]) => [k, s.label])} />
+                  options={Object.entries(FILM_SORTS).map(([k, s]) => [k, t(s.label)])} />
               )}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <MinScoreBar minScore={minScore} setMinScore={setMinScore} />
               <button
                 className="btn-ghost !py-1 text-xs"
-                title="Vuelve la página a su estado de fábrica: vista, orden, nota mínima y filtros de tipo"
+                title={t('Vuelve la página a su estado de fábrica: vista, orden, nota mínima y filtros de tipo')}
                 onClick={() => { clearBaseFilters?.(); setViewPref('person'); setPersonSortPref('huecos'); setFilmSortPref('score'); }}
               >
-                ✕ Limpiar filtros
+                ✕ {t('Limpiar filtros')}
               </button>
             </div>
           </div>
@@ -305,8 +306,8 @@ function GapsView({
             <div className="text-center mt-4">
               <button className="btn-ghost" onClick={loadMore} disabled={loadingMore}>
                 {loadingMore
-                  ? 'Cargando…'
-                  : `Ver más (${data.offset + data.pageSize} de ${Math.min(data.totalPeople, 500)})`}
+                  ? t('Cargando…')
+                  : t('Ver más ({shown} de {total})', { shown: data.offset + data.pageSize, total: Math.min(data.totalPeople, 500) })}
               </button>
             </div>
           )}
@@ -335,7 +336,7 @@ function NewCanonForm({ onSaved }) {
     const r = await api('/discover/canons', { method: 'POST', body: { label, names } });
     setBusy(false);
     if (r.error) return toast(`⚠️ ${r.error}`, 'error');
-    toast(`✓ «${r.label}» guardada con ${r.count} nombres`, 'success');
+    toast(t('✓ «{label}» guardada con {n} nombres', { label: r.label, n: r.count }), 'success');
     setLabel(''); setNames(''); setOpen(false);
     onSaved(r.key);
   };
@@ -343,19 +344,18 @@ function NewCanonForm({ onSaved }) {
   if (!open) {
     return (
       <button className="btn-ghost !py-1 text-sm inline-flex items-center gap-1.5" onClick={() => setOpen(true)}>
-        <Plus size={13} strokeWidth={2.5} /> Lista propia
+        <Plus size={13} strokeWidth={2.5} /> {t('Lista propia')}
       </button>
     );
   }
   return (
     <div className="card p-4 mb-4 w-full">
       <div className="text-sm text-zinc-300 mb-2">
-        Pega aquí cualquier lista de directores/as —una por línea— y se convierte en un canon más.
-        Vale copiada de IMDb, de un libro o escrita a mano; la numeración («12. Chantal Akerman») se ignora sola.
+        {t('Pega aquí cualquier lista de directores/as —una por línea— y se convierte en un canon más. Vale copiada de IMDb, de un libro o escrita a mano; la numeración («12. Chantal Akerman») se ignora sola.')}
       </div>
       <input
         className="input mb-2"
-        placeholder="Nombre de la lista (p. ej. «IMDb · 501 Directors»)"
+        placeholder={t('Nombre de la lista (p. ej. «IMDb · 501 Directors»)')}
         value={label}
         onChange={(e) => setLabel(e.target.value)}
       />
@@ -367,9 +367,9 @@ function NewCanonForm({ onSaved }) {
       />
       <div className="flex gap-2 mt-2">
         <button className="btn-gold" onClick={save} disabled={busy || !names.trim()}>
-          {busy ? 'Guardando…' : 'Guardar canon'}
+          {busy ? t('Guardando…') : t('Guardar canon')}
         </button>
-        <button className="btn-ghost" onClick={() => setOpen(false)}>Cancelar</button>
+        <button className="btn-ghost" onClick={() => setOpen(false)}>{t('Cancelar')}</button>
       </div>
     </div>
   );
@@ -392,14 +392,14 @@ function AbsentName({ person }) {
     });
     setYendo(false);
     if (r.personId) navigate(`/personas/${r.personId}?role=director`);
-    else toast(`⚠️ ${r.error || 'No se ha podido abrir su ficha'}`, 'error');
+    else toast(`⚠️ ${r.error || t('No se ha podido abrir su ficha')}`, 'error');
   };
   return (
     <button
       onClick={abrir}
       disabled={yendo}
       className="font-semibold text-zinc-100 hover:text-gold-400 transition-colors text-left truncate block max-w-full"
-      title={`Ver la ficha de ${person.name}`}
+      title={t('Ver la ficha de {name}', { name: person.name })}
     >
       {person.name} {yendo ? '…' : '→'}
     </button>
@@ -411,8 +411,8 @@ function FollowButton({ person, seguido, onSeguir }) {
   const [ocupado, setOcupado] = useState(false);
   if (seguido) {
     return (
-      <span className="text-xs text-gold-400 shrink-0 inline-flex items-center gap-1" title="Ya lo sigues">
-        <Star size={13} strokeWidth={2.5} /> En favoritos
+      <span className="text-xs text-gold-400 shrink-0 inline-flex items-center gap-1" title={t('Ya lo sigues')}>
+        <Star size={13} strokeWidth={2.5} /> {t('En favoritos')}
       </span>
     );
   }
@@ -420,10 +420,10 @@ function FollowButton({ person, seguido, onSeguir }) {
     <button
       className="btn-ghost !py-1 text-xs shrink-0 inline-flex items-center gap-1.5"
       disabled={ocupado}
-      title="Añadir a tus directores/as favoritos: entrará en el calendario y en los huecos"
+      title={t('Añadir a tus directores/as favoritos: entrará en el calendario y en los huecos')}
       onClick={async () => { setOcupado(true); await onSeguir(person); setOcupado(false); }}
     >
-      <Star size={13} strokeWidth={2.5} /> {ocupado ? 'Añadiendo…' : 'Seguir'}
+      <Star size={13} strokeWidth={2.5} /> {ocupado ? t('Añadiendo…') : t('Seguir')}
     </button>
   );
 }
@@ -453,7 +453,7 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
     });
     if (r.error) return toast(`⚠️ ${r.error}`, 'error');
     setSeguidos((prev) => new Set(prev).add(person.tmdb_id));
-    toast(`⭐ ${person.name} añadido a tus directores/as favoritos`, 'success');
+    toast(t('⭐ {name} añadido a tus directores/as favoritos', { name: person.name }), 'success');
   };
 
   const removeCanon = async (key) => {
@@ -484,7 +484,7 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
           <span key={c.key} className="inline-flex items-center">
             <button
               onClick={() => setCanon(c.key)}
-              title={c.count ? `${c.count} nombres` : 'Se actualiza solo con el ranking de TMDB'}
+              title={c.count ? t('{n} nombres', { n: c.count }) : t('Se actualiza solo con el ranking de TMDB')}
               className={`btn-ghost !py-1 text-sm ${canon === c.key ? '!border-gold-400 text-gold-400' : ''}`}
             >
               {c.label}
@@ -492,7 +492,7 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
             {!c.builtin && (
               <button
                 onClick={() => removeCanon(c.key)}
-                title="Borrar esta lista"
+                title={t('Borrar esta lista')}
                 className="text-zinc-600 hover:text-red-400 ml-1"
               >
                 <X size={13} />
@@ -504,30 +504,30 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
       </div>
 
       {error ? (
-        <ErrorBox error={`${error} — comprueba la API key de TMDB en Ajustes.`} />
+        <ErrorBox error={t('{error} — comprueba la API key de TMDB en Ajustes.', { error })} />
       ) : !data ? (
-        <Spinner label="Comprobando el canon de grandes directores/as contra tu Plex…" />
+        <Spinner label={t('Comprobando el canon de grandes directores/as contra tu Plex…')} />
       ) : (
       <>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
         <p className="text-sm text-zinc-500">
-          De los {data.checked} directores/as de{' '}
+          {t('De los {n} directores/as de', { n: data.checked })}{' '}
           {canonUrl ? (
             <a href={canonUrl} target="_blank" rel="noreferrer" className="underline hover:text-gold-400">
-              {activo?.label || 'la lista'}
+              {activo?.label || t('la lista')}
             </a>
           ) : (
-            <b className="text-zinc-300">{activo?.label || 'tu lista'}</b>
+            <b className="text-zinc-300">{activo?.label || t('tu lista')}</b>
           )}
           ,{' '}
-          <b className="text-gold-400">{data.absent.length} no tienen ni una película en tu Plex</b> ({data.present.length} sí están).
+          <b className="text-gold-400">{t('{n} no tienen ni una película en tu Plex', { n: data.absent.length })}</b> {t('({n} sí están).', { n: data.present.length })}
         </p>
         <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={() => load(true)} disabled={refreshing}>
-          {refreshing ? 'Actualizando…' : <><RotateCw size={13} strokeWidth={2} /> Actualizar</>}
+          {refreshing ? t('Actualizando…') : <><RotateCw size={13} strokeWidth={2} /> {t('Actualizar')}</>}
         </button>
       </div>
       {data.absent.length === 0 ? (
-        <Empty>Están todos. Eres un completista de verdad.</Empty>
+        <Empty>{t('Están todos. Eres un completista de verdad.')}</Empty>
       ) : (
         data.absent.map((d) => {
           const top = d.top.filter((f) => !dismissed.has(f.tmdb_id));
@@ -543,12 +543,12 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
               )}
               <div className="flex-1 min-w-0">
                 <AbsentName person={d} />
-                <div className="text-xs text-zinc-500">{d.filmCount} películas dirigidas · 0 en tu Plex</div>
+                <div className="text-xs text-zinc-500">{t('{n} películas dirigidas · 0 en tu Plex', { n: d.filmCount })}</div>
               </div>
               <FollowButton person={d} seguido={seguidos.has(d.tmdb_id)} onSeguir={onSeguir} />
               {pendingIds.length > 1 && (
                 <button className="btn-ghost !py-1 text-xs shrink-0 inline-flex items-center gap-1.5" onClick={() => sendBulk(pendingIds, addRadarrId)}>
-<Plus size={13} strokeWidth={2.5} /> Añadir las {pendingIds.length} a Radarr
+<Plus size={13} strokeWidth={2.5} /> {t('Añadir las {n} a Radarr', { n: pendingIds.length })}
                 </button>
               )}
             </div>
@@ -564,7 +564,7 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
       {data.present.length > 0 && (
         <details className="mt-6">
           <summary className="text-sm text-zinc-400 cursor-pointer hover:text-zinc-200">
-            Ver los {data.present.length} del canon que sí tienes
+            {t('Ver los {n} del canon que sí tienes', { n: data.present.length })}
           </summary>
           <div className="flex flex-wrap gap-2 mt-3">
             {data.present.map((p) => (
@@ -640,7 +640,7 @@ export default function Discover() {
     const r = await api(`/discover/dismiss/${f.tmdb_id}`, { method: 'DELETE' });
     if (r.error) return toast(`⚠️ ${r.error}`, 'error');
     setDismissed((prev) => { const n = new Set(prev); n.delete(f.tmdb_id); return n; });
-    toast(`↩︎ «${f.title}» vuelve a la lista`);
+    toast(t('↩︎ «{title}» vuelve a la lista', { title: f.title }));
   };
   const onDismiss = async (f) => {
     setDismissed((prev) => new Set(prev).add(f.tmdb_id));
@@ -648,9 +648,9 @@ export default function Discover() {
     // si el servidor no la aceptó, no se puede cantar que está descartada
     if (r.error) {
       setDismissed((prev) => { const n = new Set(prev); n.delete(f.tmdb_id); return n; });
-      return toast(`⚠️ No se ha podido descartar: ${r.error}`, 'error');
+      return toast(t('⚠️ No se ha podido descartar: {error}', { error: r.error }), 'error');
     }
-    toast(`✕ «${f.title}» descartada`, 'info', { label: 'Deshacer', onClick: () => undismiss(f) });
+    toast(t('✕ «{title}» descartada', { title: f.title }), 'info', { label: t('Deshacer'), onClick: () => undismiss(f) });
   };
   const setFavRolePref = (r) => { setFavRole(r); localStorage.setItem('gaps_fav_role', r); };
 
@@ -658,41 +658,43 @@ export default function Discover() {
 
   return (
     <div>
-      <PageHeader eyebrow="La caza" title="Descubrir huecos" />
+      <PageHeader eyebrow={t('La caza')} title={t('Descubrir huecos')} />
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-        Lo que le falta a tu colección. <b>Tus favoritos</b> son los que tú eliges en{' '}
-        <Link to="/favoritos" className="text-gold-400 hover:underline">Favoritos</Link>, cada uno en la faceta por la
-        que le sigues; los <b>top</b> son los más presentes en tu biblioteca; <b>grandes ausentes</b> son nombres del
-        canon que aún no tienes; y <b>sagas</b> son tus franquicias a medias. ¿Buscas a alguien concreto? Usa ⌘K o{' '}
-        <Link to="/personas" className="text-gold-400 hover:underline">Personas</Link>.
+        {t('Lo que le falta a tu colección.')} <b>{t('Tus favoritos')}</b> {t('son los que tú eliges en')}{' '}
+        <Link to="/favoritos" className="text-gold-400 hover:underline">{t('Favoritos')}</Link>
+        {t(', cada uno en la faceta por la que le sigues; los ')}<b>top</b>
+        {t(' son los más presentes en tu biblioteca; ')}<b>{t('grandes ausentes')}</b>
+        {t(' son nombres del canon que aún no tienes; y ')}<b>{t('sagas')}</b>
+        {t(' son tus franquicias a medias. ¿Buscas a alguien concreto? Usa ⌘K o')}{' '}
+        <Link to="/personas" className="text-gold-400 hover:underline">{t('Personas')}</Link>.
       </p>
 
       <div className="flex gap-2 mb-4 flex-wrap">
         {TABS.map(([t, label, Icon]) => (
           <button key={t} onClick={() => setTab(t)} className={`${tab === t ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
-            <Icon size={15} strokeWidth={1.75} /> {label}
+            <Icon size={15} strokeWidth={1.75} /> {t(label)}
           </button>
         ))}
       </div>
 
       {(tab === 'director' || tab === 'actor') && (
         <div className="flex flex-wrap gap-2 mb-4 items-center">
-          <Select value={demo.gender} onChange={setDemoFilter('gender')} placeholder="Género"
-            options={[['female', 'Mujer'], ['male', 'Hombre'], ['other', 'No binario']]} />
-          <Select value={demo.life} onChange={setDemoFilter('life')} placeholder="Vivo/fallecido"
-            options={[['alive', 'Vivos'], ['dead', 'Fallecidos']]} />
-          <Select value={demo.continent} onChange={setDemoFilter('continent')} placeholder="Continente"
+          <Select value={demo.gender} onChange={setDemoFilter('gender')} placeholder={t('Género||persona')}
+            options={[['female', t('Mujer')], ['male', t('Hombre')], ['other', t('No binario')]]} />
+          <Select value={demo.life} onChange={setDemoFilter('life')} placeholder={t('Vivo/fallecido')}
+            options={[['alive', t('Vivos')], ['dead', t('Fallecidos')]]} />
+          <Select value={demo.continent} onChange={setDemoFilter('continent')} placeholder={t('Continente')}
             options={(demoOpts?.continents || []).map((c) => [c, c])} />
-          <Select value={demo.country} onChange={setDemoFilter('country')} placeholder="País (nacimiento)"
+          <Select value={demo.country} onChange={setDemoFilter('country')} placeholder={t('País (nacimiento)')}
             options={(demoOpts?.countries || []).map((c) => [c, c])} />
           {demoActivo && (
             <button className="btn-ghost !py-1 text-xs" onClick={() => setDemo({ ...DEMO_VACIO })}>
-              ✕ Limpiar
+              ✕ {t('Limpiar')}
             </button>
           )}
           {demoOpts && (
             <span className="text-xs text-zinc-500 ml-auto">
-              Datos demográficos de {demoOpts.enriched.toLocaleString('es-ES')} personas · amplíalos en Ajustes → «Actualizar estado vital»
+              {t('Datos demográficos de {n} personas · amplíalos en Ajustes → «Actualizar estado vital»', { n: demoOpts.enriched.toLocaleString(locale()) })}
             </span>
           )}
         </div>
@@ -700,14 +702,14 @@ export default function Discover() {
 
       {tab === 'favorites' && (
         <div className="flex gap-2 mb-4 flex-wrap items-center">
-          <span className="text-xs text-zinc-500">Faceta:</span>
+          <span className="text-xs text-zinc-500">{t('Faceta:')}</span>
           {[['director', 'Como directores/as', Clapperboard], ['actor', 'Como actores/actrices', Drama]].map(([r, label, Icon]) => (
             <button
               key={r}
               onClick={() => setFavRolePref(r)}
               className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${favRole === r ? '!border-gold-400 text-gold-400' : ''}`}
             >
-              <Icon size={13} strokeWidth={2} /> {label}
+              <Icon size={13} strokeWidth={2} /> {t(label)}
             </button>
           ))}
         </div>
@@ -725,7 +727,7 @@ export default function Discover() {
           endpoint={`/discover/favorites?role=${favRole}`}
           role={favRole}
           {...gapProps}
-          intro={`Qué te falta (ya estrenado) de tus favoritos seguidos como ${favRole === 'director' ? 'directores/as' : 'actores/actrices'}.`}
+          intro={t('Qué te falta (ya estrenado) de tus favoritos seguidos como {role}.', { role: favRole === 'director' ? t('directores/as') : t('actores/actrices') })}
         />
       ) : (
         <GapsView
@@ -734,7 +736,9 @@ export default function Discover() {
           role={tab}
           paginated
           {...gapProps}
-          intro={`Qué te falta de las filmografías de ${tab === 'director' ? 'directores/as' : 'actores/actrices'} más presentes en tu biblioteca${demoActivo ? ', con tus filtros demográficos aplicados' : ''}.`}
+          intro={demoActivo
+            ? t('Qué te falta de las filmografías de {role} más presentes en tu biblioteca, con tus filtros demográficos aplicados.', { role: tab === 'director' ? t('directores/as') : t('actores/actrices') })
+            : t('Qué te falta de las filmografías de {role} más presentes en tu biblioteca.', { role: tab === 'director' ? t('directores/as') : t('actores/actrices') })}
         />
       )}
     </div>

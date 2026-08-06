@@ -8,6 +8,7 @@ import {
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
+import { t } from '../i18n.js';
 
 const VIEWS = [
   ['all', 'Todas'],
@@ -99,8 +100,8 @@ export default function PersonDetail() {
       }
       return next;
     });
-    if (!siguiendo && r?.directorAlso) toast('⭐ Añadido también a directores/as: dirige 4+ películas de tu biblioteca');
-    if (!siguiendo && r?.actorAlso) toast('⭐ Añadido también a actores/actrices: tiene 8+ interpretadas en tu biblioteca');
+    if (!siguiendo && r?.directorAlso) toast(t('⭐ Añadido también a directores/as: dirige 4+ películas de tu biblioteca'));
+    if (!siguiendo && r?.actorAlso) toast(t('⭐ Añadido también a actores/actrices: tiene 8+ interpretadas en tu biblioteca'));
   };
 
   // El corrector manual: para homónimos y para quien tiene la obra repartida en
@@ -111,7 +112,7 @@ export default function PersonDetail() {
     const r = await api(`/people/${id}/match`, { method: 'POST', body: { tmdbId } });
     if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
     setCorrigiendo(false);
-    toast(tmdbId ? `✓ ${nombre} emparejado a mano` : '✓ Corrección quitada');
+    toast(tmdbId ? t('✓ {name} emparejado a mano', { name: nombre }) : t('✓ Corrección quitada'));
     cargarFilmografia();
   };
   const corrector = corrigiendo && (
@@ -120,10 +121,10 @@ export default function PersonDetail() {
       role={wantRole === 'actor' ? 'actor' : 'director'}
       title={nombre}
       initialQuery={nombre}
-      subtitle="Elige su ficha de TMDB. Se recuerda para siempre y ningún automatismo vuelve a revisarla: úsalo cuando haya dos personas con el mismo nombre o cuando su obra esté repartida en dos fichas."
+      subtitle={t('Elige su ficha de TMDB. Se recuerda para siempre y ningún automatismo vuelve a revisarla: úsalo cuando haya dos personas con el mismo nombre o cuando su obra esté repartida en dos fichas.')}
       onPick={fijarPersona}
       onClear={data?.person?.tmdb_locked ? () => fijarPersona(null) : null}
-      clearLabel="Quitar la corrección y volver al emparejado automático"
+      clearLabel={t('Quitar la corrección y volver al emparejado automático')}
       onClose={() => setCorrigiendo(false)}
     />
   );
@@ -131,19 +132,19 @@ export default function PersonDetail() {
     <button
       onClick={() => setCorrigiendo(true)}
       className="text-xs text-zinc-500 hover:text-gold-400 cursor-pointer"
-      title="Corregir a mano su ficha de TMDB"
+      title={t('Corregir a mano su ficha de TMDB')}
     >
-      ✎ {data?.person?.tmdb_locked ? 'emparejado a mano' : 'corregir emparejado'}
+      ✎ {data?.person?.tmdb_locked ? t('emparejado a mano') : t('corregir emparejado')}
     </button>
   );
 
-  if (error) return <ErrorBox error={`No se pudo cargar la filmografía: ${error}. ¿Está configurada la API key de TMDB en Ajustes?`} />;
-  if (!data) return <Spinner label="Consultando TMDB…" />;
+  if (error) return <ErrorBox error={t('No se pudo cargar la filmografía: {error}. ¿Está configurada la API key de TMDB en Ajustes?', { error })} />;
+  if (!data) return <Spinner label={t('Consultando TMDB…')} />;
   if (!data.matched)
     return (
       <div>
         <h1 className="text-2xl font-bold mb-2">{data.person?.name}</h1>
-        <Empty>No se encontró esta persona en TMDB.</Empty>
+        <Empty>{t('No se encontró esta persona en TMDB.')}</Empty>
         <div className="text-center">{botonCorregir}</div>
         {corrector}
       </div>
@@ -156,7 +157,7 @@ export default function PersonDetail() {
     return (
       <div>
         <h1 className="text-2xl font-bold mb-2">{person?.name}</h1>
-        <Empty>No hay filmografía que mostrar.</Empty>
+        <Empty>{t('No hay filmografía que mostrar.')}</Empty>
         <div className="text-center">{botonCorregir}</div>
         {corrector}
       </div>
@@ -222,16 +223,16 @@ export default function PersonDetail() {
               className={trackedRoles.has(active === 'actor' ? 'actor' : 'director') ? 'btn-gold' : 'btn-ghost'}
               title={
                 person.deathday
-                  ? 'Ya fallecido: no tendrá nuevos estrenos, no hace falta seguirlo'
-                  : 'Sigue ESTA faceta: puedes tenerle a la vez en directores y en actores'
+                  ? t('Ya fallecido: no tendrá nuevos estrenos, no hace falta seguirlo')
+                  : t('Sigue ESTA faceta: puedes tenerle a la vez en directores y en actores')
               }
             >
               {trackedRoles.has(active === 'actor' ? 'actor' : 'director')
-                ? `★ Siguiendo como ${active === 'actor' ? 'actor/actriz' : 'director/a'}`
-                : `☆ Seguir como ${active === 'actor' ? 'actor/actriz' : 'director/a'}`}
+                ? t('★ Siguiendo como {role}', { role: active === 'actor' ? t('actor/actriz') : t('director/a') })
+                : t('☆ Seguir como {role}', { role: active === 'actor' ? t('actor/actriz') : t('director/a') })}
             </button>
             <Link to={`/biblioteca?personId=${person.id}&personRole=${active}&personName=${encodeURIComponent(person.name)}`} className="btn-ghost">
-              Ver en tu biblioteca
+              {t('Ver en tu biblioteca')}
             </Link>
             {botonCorregir}
           </div>
@@ -251,7 +252,7 @@ export default function PersonDetail() {
                   onClick={() => { setRole(r); setViewPref('all'); }}
                   className={`btn-ghost !py-1 text-xs ${active === r ? '!border-gold-400 text-gold-400' : ''}`}
                 >
-                  {ROLE_TAB[r] || r} ({roles[r].stats.owned}/{roles[r].stats.released})
+                  {t(ROLE_TAB[r] || r)} ({roles[r].stats.owned}/{roles[r].stats.released})
                 </button>
               ))}
             </div>
@@ -259,7 +260,7 @@ export default function PersonDetail() {
 
           <div className="mt-3 max-w-md">
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-zinc-300">Completismo (como {ROLE_LABEL[active] || active})</span>
+              <span className="text-zinc-300">{t('Completismo (como {role})', { role: t(ROLE_LABEL[active] || active) })}</span>
               <span className="text-gold-400 font-semibold">
                 {stats.owned} / {stats.released} · {stats.pct}%
               </span>
@@ -267,14 +268,14 @@ export default function PersonDetail() {
             <ProgressBar pct={stats.pct} />
             {active === 'director' && (
               <div className="text-[11px] text-zinc-500 mt-1">
-                Solo largometrajes
-                {stats.documentarian ? ' (incluye documentales: es documentalista)' : ''}
-                {stats.concertFilmmaker ? ' (incluye conciertos: los filma a menudo)' : ''}
-                {stats.excludedFromCompletion > 0 && ` · ${stats.excludedFromCompletion} fuera del cómputo (cortos, TV, docs, conciertos o dirección coral)`}
+                {t('Solo largometrajes')}
+                {stats.documentarian ? t(' (incluye documentales: es documentalista)') : ''}
+                {stats.concertFilmmaker ? t(' (incluye conciertos: los filma a menudo)') : ''}
+                {stats.excludedFromCompletion > 0 && t(' · {n} fuera del cómputo (cortos, TV, docs, conciertos o dirección coral)', { n: stats.excludedFromCompletion })}
               </div>
             )}
             {stats.upcoming > 0 && (
-              <div className="text-xs text-sky-300 mt-2">🗓️ {stats.upcoming} proyectos anunciados o por estrenar</div>
+              <div className="text-xs text-sky-300 mt-2">{t('🗓️ {n} proyectos anunciados o por estrenar', { n: stats.upcoming })}</div>
             )}
           </div>
           {person.biography && (
@@ -286,7 +287,7 @@ export default function PersonDetail() {
       <div className="flex gap-2 mb-3 flex-wrap items-center">
         {VIEWS.map(([v, label]) => (
           <button key={v} onClick={() => setViewPref(v)} className={view === v ? 'btn-gold' : 'btn-ghost'}>
-            {label}
+            {t(label)}
             {v === 'missing' && ` (${stats.released - stats.owned})`}
             {v === 'upcoming' && ` (${stats.upcoming})`}
           </button>
@@ -296,7 +297,7 @@ export default function PersonDetail() {
             como una pestaña más */}
         {missingPendingIds.length > 0 && (
           <button className="btn-gold ml-auto" disabled={bulkBusy} onClick={bulkAddMissing}>
-            {bulkBusy ? 'Añadiendo…' : `➕ Mandar a Radarr las ${missingPendingIds.length} que te faltan`}
+            {bulkBusy ? t('Añadiendo…') : t('➕ Mandar a Radarr las {n} que te faltan', { n: missingPendingIds.length })}
           </button>
         )}
       </div>
@@ -304,7 +305,7 @@ export default function PersonDetail() {
         <StatusLegend />
         {hiddenMissing > 0 && (
           <span className="text-[11px] text-zinc-500">
-            {hiddenMissing} más quedan fuera por los filtros de abajo (tipo o nota mínima)
+            {t('{n} más quedan fuera por los filtros de abajo (tipo o nota mínima)', { n: hiddenMissing })}
           </span>
         )}
       </div>
@@ -316,18 +317,18 @@ export default function PersonDetail() {
       {/* orden y listón de nota, con las notas de MDBList que trae el servidor */}
       <div className="flex items-center gap-x-4 gap-y-2 flex-wrap mb-4 text-sm">
         <label className="flex items-center gap-2 text-xs text-zinc-500">
-          Ordenar:
+          {t('Ordenar:')}
           <Select className="!py-1 text-xs" value={sort} onChange={setSortPref}
-            options={Object.entries(SORTS).map(([k, s]) => [k, s.label])} />
+            options={Object.entries(SORTS).map(([k, s]) => [k, t(s.label)])} />
         </label>
         <MinScoreBar minScore={minScore} setMinScore={setMinScorePref} />
         {hayFiltros && (
-          <button className="btn-ghost !py-1 text-xs" onClick={limpiarFiltros}>✕ Limpiar filtros</button>
+          <button className="btn-ghost !py-1 text-xs" onClick={limpiarFiltros}>{t('✕ Limpiar filtros')}</button>
         )}
       </div>
 
       {filtered.length === 0 ? (
-        <Empty>Nada que mostrar aquí. {view === 'missing' && '¡Filmografía completa! 🏆'}</Empty>
+        <Empty>{t('Nada que mostrar aquí.')} {view === 'missing' && t('¡Filmografía completa! 🏆')}</Empty>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
           {filtered.map((item) => (
@@ -336,10 +337,10 @@ export default function PersonDetail() {
               item={item}
               badge={
                 item.owned ? (
-                  <span className="absolute top-1.5 right-1.5 bg-emerald-600/90 text-white text-[11px] px-1.5 py-0.5 rounded">✓ La tienes</span>
+                  <span className="absolute top-1.5 right-1.5 bg-emerald-600/90 text-white text-[11px] px-1.5 py-0.5 rounded">{t('✓ La tienes')}</span>
                 ) : !item.released ? (
                   <span className="absolute top-1.5 right-1.5 bg-sky-600/90 text-white text-[11px] px-1.5 py-0.5 rounded">
-                    {item.date ? fmtDate(item.date) : 'Anunciada'}
+                    {item.date ? fmtDate(item.date) : t('Anunciada')}
                   </span>
                 ) : null
               }

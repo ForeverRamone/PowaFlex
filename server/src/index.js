@@ -215,7 +215,7 @@ const WRITABLE_SETTINGS = new Set([
   'auto_radarr_enabled', 'auto_radarr_months', 'auto_radarr_lookback_days', 'auto_radarr_include_docs',
   'cal_top_directors', 'cal_top_actors',
   'gaps_min_votes_director', 'gaps_min_votes_actor',
-  'ratings_sources', 'primary_rating', 'ui_theme', 'jw_country',
+  'ratings_sources', 'primary_rating', 'ui_theme', 'ui_language', 'jw_country',
 ]);
 
 // Ajustes cuyo cambio deja obsoletas las páginas ya calculadas.

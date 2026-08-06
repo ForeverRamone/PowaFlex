@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { HardDrive, HeartPulse } from 'lucide-react';
 import { Spinner, PageHeader } from '../components.jsx';
+import { t } from '../i18n.js';
 
 // las dos mitades siguen siendo páginas completas; el Taller solo las agrupa
 const Quality = lazy(() => import('./Quality.jsx'));
@@ -25,9 +26,9 @@ export default function Taller() {
   return (
     <div>
       <PageHeader
-        eyebrow="Tu colección"
-        title="Taller"
-        subtitle="El mantenimiento de la colección: calidad de los archivos, disco, deuda de Radarr y auditorías de los datos."
+        eyebrow={t('Tu colección')}
+        title={t('Taller')}
+        subtitle={t('El mantenimiento de la colección: calidad de los archivos, disco, deuda de Radarr y auditorías de los datos.')}
       />
       <div className="flex gap-2 mb-5 flex-wrap">
         {TABS.map(([t, label, Icon]) => (
@@ -36,7 +37,7 @@ export default function Taller() {
             onClick={() => setParams({ tab: t })}
             className={`${tab === t ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}
           >
-            <Icon size={15} strokeWidth={1.75} /> {label}
+            <Icon size={15} strokeWidth={1.75} /> {t(label)}
           </button>
         ))}
       </div>

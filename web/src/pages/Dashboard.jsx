@@ -4,6 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line,
 } from 'recharts';
 import { api, fmtBytes, fmtDate, tmdbImg } from '../api.js';
+import { t, locale } from '../i18n.js';
 import { Spinner, StatCard, Section, PersonCard, Empty, MovieModal, LetterboxdLogo, PageHeader, ErrorBox} from '../components.jsx';
 import { useChartTheme } from '../charts.js';
 
@@ -34,7 +35,7 @@ function PosterTile({ item, onClick, badge, sub }) {
 }
 
 function RecentStrip({ items, onSelect, kind }) {
-  if (!items?.length) return <Empty>Nada todavía.</Empty>;
+  if (!items?.length) return <Empty>{t('Nada todavía.')}</Empty>;
   return (
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
       {items.map((m, i) => (
@@ -44,7 +45,7 @@ function RecentStrip({ items, onSelect, kind }) {
           onClick={() => m.rating_key && onSelect(m.rating_key)}
           badge={
             kind === 'watched' && m.source === 'letterboxd' ? (
-              <span className="absolute top-1 right-1 bg-black/70 px-1 py-1 rounded" title="Vista en Letterboxd"><LetterboxdLogo size={9} /></span>
+              <span className="absolute top-1 right-1 bg-black/70 px-1 py-1 rounded" title={t('Vista en Letterboxd')}><LetterboxdLogo size={9} /></span>
             ) : kind === 'watched' && m.source === 'plex' ? (
               <span className="absolute top-1 right-1 bg-emerald-600/90 text-white text-[11px] px-1 py-0.5 rounded">Plex</span>
             ) : null
@@ -90,27 +91,28 @@ export default function Dashboard() {
   if (!ov.movies)
     return (
       <Empty>
-        Aún no hay películas sincronizadas. Ve a <Link className="text-gold-400" to="/ajustes">Ajustes</Link> para
-        conectar con Plex y lanzar la primera sincronización.
+        {t('Aún no hay películas sincronizadas. Ve a')}{' '}
+        <Link className="text-gold-400" to="/ajustes">{t('Ajustes')}</Link>{' '}
+        {t('para conectar con Plex y lanzar la primera sincronización.')}
       </Empty>
     );
 
   return (
     <div>
-      <PageHeader eyebrow="Colección" title="Tu cinemateca" />
+      <PageHeader eyebrow={t('Colección')} title={t('Tu cinemateca')} />
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
-        <StatCard label="Películas" value={ov.movies.toLocaleString('es-ES')} />
-        <StatCard label="Horas de cine" value={ov.hours.toLocaleString('es-ES')} sub={`≈ ${Math.round(ov.hours / 24)} días`} />
-        <StatCard label="En disco" value={fmtBytes(ov.sizeBytes)} />
-        <StatCard label="Vistas" value={ov.watched.toLocaleString('es-ES')} sub={`${Math.round((ov.watched / ov.movies) * 100)}% de la biblioteca`} />
-        <StatCard label="Directores/as" value={ov.directors.toLocaleString('es-ES')} />
-        <StatCard label="En 4K" value={ov.fourK.toLocaleString('es-ES')} />
+        <StatCard label={t('Películas')} value={ov.movies.toLocaleString(locale())} />
+        <StatCard label={t('Horas de cine')} value={ov.hours.toLocaleString(locale())} sub={t('≈ {n} días', { n: Math.round(ov.hours / 24) })} />
+        <StatCard label={t('En disco')} value={fmtBytes(ov.sizeBytes)} />
+        <StatCard label={t('Vistas')} value={ov.watched.toLocaleString(locale())} sub={t('{pct}% de la biblioteca', { pct: Math.round((ov.watched / ov.movies) * 100) })} />
+        <StatCard label={t('Directores/as')} value={ov.directors.toLocaleString(locale())} />
+        <StatCard label={t('En 4K')} value={ov.fourK.toLocaleString(locale())} />
       </div>
 
       {/* lo que el pase nocturno ha detectado desde tu última visita */}
       {events?.length > 0 && (
-        <Section title={`🔔 Novedades (${events.length} en 14 días)`}>
+        <Section title={t('🔔 Novedades ({n} en 14 días)', { n: events.length })}>
           <div className="card divide-y divide-ink-800 max-h-72 overflow-y-auto">
             {events.map((e) => (
               <div key={e.id} className="px-3 py-2 text-sm">
@@ -132,22 +134,22 @@ export default function Dashboard() {
       {/* pedidas que POR FIN han llegado: el cierre del ciclo de captura */}
       {captures?.length > 0 && (
         <Section
-          title={`🎬 Capturadas esta semana (${captures.length})`}
-          action={<Link to="/taller?tab=calidad" className="text-xs text-gold-400 hover:underline">Pendientes →</Link>}
+          title={t('🎬 Capturadas esta semana ({n})', { n: captures.length })}
+          action={<Link to="/taller?tab=calidad" className="text-xs text-gold-400 hover:underline">{t('Pendientes →')}</Link>}
         >
           <div className="card divide-y divide-ink-800 max-h-72 overflow-y-auto">
             {captures.map((c) => (
               <div key={c.id ?? `${c.tmdb_id}-${c.captured_at}`} className="flex items-center gap-2 px-3 py-2 text-sm">
                 <span className="text-emerald-400">✓</span>
                 <span className="text-zinc-200 truncate flex-1">
-                  {c.title} <span className="text-zinc-500">({c.year ?? '¿?'})</span>
+                  {c.title} <span className="text-zinc-500">({c.year ?? t('¿?')})</span>
                 </span>
                 {c.quality && <span className="badge-quiet shrink-0">{c.quality}</span>}
                 <span
                   className={`text-[11px] shrink-0 ${c.rating_key ? 'text-emerald-400' : 'text-zinc-500'}`}
-                  title={c.rating_key ? 'Ya sincronizada en tu Plex' : 'Descargada; entrará en Plex en la próxima sincronización'}
+                  title={c.rating_key ? t('Ya sincronizada en tu Plex') : t('Descargada; entrará en Plex en la próxima sincronización')}
                 >
-                  {c.rating_key ? 'en Plex' : 'aún sin sincronizar'}
+                  {c.rating_key ? t('en Plex') : t('aún sin sincronizar')}
                 </span>
                 <span className="text-[11px] text-zinc-500 shrink-0 tabular">{fmtDate(c.captured_at)}</span>
               </div>
@@ -159,67 +161,67 @@ export default function Dashboard() {
       {/* recent activity (#8) */}
       {recent && (
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
-          <Section title="Últimas añadidas a Plex" action={<Link to="/biblioteca?sort=added" className="text-xs text-gold-400 hover:underline">Ver más →</Link>}>
+          <Section title={t('Últimas añadidas a Plex')} action={<Link to="/biblioteca?sort=added" className="text-xs text-gold-400 hover:underline">{t('Ver más →')}</Link>}>
             <RecentStrip items={recent.recentlyAdded} onSelect={setSelected} kind="added" />
           </Section>
-          <Section title="Últimas vistas" action={<Link to="/visionado" className="text-xs text-gold-400 hover:underline">Ver más →</Link>}>
+          <Section title={t('Últimas vistas')} action={<Link to="/visionado" className="text-xs text-gold-400 hover:underline">{t('Ver más →')}</Link>}>
             {recent.recentlyWatched?.length ? (
               <RecentStrip items={recent.recentlyWatched} onSelect={setSelected} kind="watched" />
             ) : (
-              <Empty>Sin visionados de Plex ni de Letterboxd todavía. Configura tu RSS en «Letterboxd».</Empty>
+              <Empty>{t('Sin visionados de Plex ni de Letterboxd todavía. Configura tu RSS en «Letterboxd».')}</Empty>
             )}
           </Section>
-          <Section title="Últimas peticiones a Radarr" action={<Link to="/ajustes" className="text-xs text-gold-400 hover:underline">Ajustes →</Link>}>
+          <Section title={t('Últimas peticiones a Radarr')} action={<Link to="/ajustes" className="text-xs text-gold-400 hover:underline">{t('Ajustes →')}</Link>}>
             {recent.radarrRecent?.length ? (
               <div className="card divide-y divide-ink-800 max-h-[420px] overflow-y-auto">
                 {recent.radarrRecent.map((m, i) => (
                   <div key={i} className="flex items-center gap-2 px-3 py-2 text-sm">
                     <span className={m.has_file ? 'text-emerald-400' : 'text-zinc-500'}>{m.has_file ? '✓' : '⏳'}</span>
-                    <span className="text-zinc-200 truncate flex-1">{m.title} <span className="text-zinc-500">({m.year ?? '¿?'})</span></span>
+                    <span className="text-zinc-200 truncate flex-1">{m.title} <span className="text-zinc-500">({m.year ?? t('¿?')})</span></span>
                     <span className="text-[11px] text-zinc-500 shrink-0">{fmtDate(m.added)}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <Empty>Sincroniza Radarr en Ajustes para ver aquí las últimas peticiones.</Empty>
+              <Empty>{t('Sincroniza Radarr en Ajustes para ver aquí las últimas peticiones.')}</Empty>
             )}
           </Section>
         </div>
       )}
 
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
-        <Section title="Películas por década" className="min-w-0">
+        <Section title={t('Películas por década')} className="min-w-0">
           <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
               <BarChart data={charts.byDecade} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
                 <XAxis dataKey="decade" stroke={ch.axis} fontSize={12} tickMargin={6} />
                 <YAxis stroke={ch.axis} fontSize={12} width={38} />
                 <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
-                <Bar dataKey="n" name="Películas" fill={ch.accent} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="n" name={t('Películas')} fill={ch.accent} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Section>
-        <Section title="Géneros principales" className="min-w-0">
+        <Section title={t('Géneros principales')} className="min-w-0">
           <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
               <BarChart data={charts.byGenre.slice(0, 12)} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
                 <XAxis type="number" stroke={ch.axis} fontSize={12} />
                 <YAxis type="category" dataKey="name" width={110} stroke={ch.axis} fontSize={11} interval={0} tickMargin={4} />
                 <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
-                <Bar dataKey="n" name="Películas" fill={ch.ramp[1] || ch.accent} radius={[0, 4, 4, 0]} />
+                <Bar dataKey="n" name={t('Películas')} fill={ch.ramp[1] || ch.accent} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Section>
-        <Section title="Crecimiento de la biblioteca (añadidas por mes)" className="min-w-0">
+        <Section title={t('Crecimiento de la biblioteca (añadidas por mes)')} className="min-w-0">
           <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
               <LineChart data={charts.addedByMonth} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
                 <XAxis dataKey="month" stroke={ch.axis} fontSize={10} tickMargin={6} minTickGap={24} />
                 <YAxis stroke={ch.axis} fontSize={12} width={38} />
                 <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ stroke: ch.axis }} />
-                <Line type="monotone" dataKey="n" name="Añadidas" stroke={ch.accent} dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="n" name={t('Añadidas')} stroke={ch.accent} dot={false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -228,16 +230,16 @@ export default function Dashboard() {
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Section
-          title="Directores/as con más películas"
-          action={<Link to="/personas" className="text-xs text-gold-400 hover:underline">Ver todos →</Link>}
+          title={t('Directores/as con más películas')}
+          action={<Link to="/personas" className="text-xs text-gold-400 hover:underline">{t('Ver todos →')}</Link>}
         >
           <div className="grid sm:grid-cols-2 gap-2">
             {directors.map((p) => <PersonCard key={p.id} person={p} role="director" />)}
           </div>
         </Section>
         <Section
-          title="Actores/actrices con más películas"
-          action={<Link to="/personas?role=actor" className="text-xs text-gold-400 hover:underline">Ver todos →</Link>}
+          title={t('Actores/actrices con más películas')}
+          action={<Link to="/personas?role=actor" className="text-xs text-gold-400 hover:underline">{t('Ver todos →')}</Link>}
         >
           <div className="grid sm:grid-cols-2 gap-2">
             {actors.map((p) => <PersonCard key={p.id} person={p} role="actor" />)}

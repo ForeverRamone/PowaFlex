@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, fmtDate } from '../api.js';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, useRadarrIds, PageHeader } from '../components.jsx';
+import { t, locale } from '../i18n.js';
 
 function SagaDetail({ id, radarrIds, addRadarrId }) {
   const [detail, setDetail] = useState(null);
@@ -14,15 +15,15 @@ function SagaDetail({ id, radarrIds, addRadarrId }) {
   }, [id]);
 
   if (error) return <ErrorBox error={error} />;
-  if (!detail) return <Spinner label="Consultando TMDB…" />;
+  if (!detail) return <Spinner label={t('Consultando TMDB…')} />;
 
   return (
     <div className="card p-5 mt-4">
       <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
         <h2 className="text-lg font-semibold text-zinc-100">{detail.name}</h2>
         <span className="text-gold-400 font-semibold text-sm">
-          {detail.stats.owned} / {detail.stats.released} estrenadas
-          {detail.stats.upcoming > 0 && <span className="text-sky-300"> · {detail.stats.upcoming} por estrenar</span>}
+          {t('{owned} / {released} estrenadas', { owned: detail.stats.owned, released: detail.stats.released })}
+          {detail.stats.upcoming > 0 && <span className="text-sky-300"> · {t('{n} por estrenar', { n: detail.stats.upcoming })}</span>}
         </span>
       </div>
       <div className="max-w-md mb-5">
@@ -38,7 +39,7 @@ function SagaDetail({ id, radarrIds, addRadarrId }) {
                 <span className="absolute top-1.5 right-1.5 bg-emerald-600/90 text-white text-[11px] px-1.5 py-0.5 rounded">✓</span>
               ) : !p.released ? (
                 <span className="absolute top-1.5 right-1.5 bg-sky-600/90 text-white text-[11px] px-1.5 py-0.5 rounded">
-                  {p.date ? fmtDate(p.date) : 'Anunciada'}
+                  {p.date ? fmtDate(p.date) : t('Anunciada')}
                 </span>
               ) : null
             }
@@ -113,10 +114,9 @@ export default function Sagas({ embedded = false }) {
 
   return (
     <div>
-      {!embedded && <PageHeader eyebrow="Colección" title="Sagas" />}
+      {!embedded && <PageHeader eyebrow={t('Colección')} title={t('Sagas')} />}
       <p className="text-sm text-zinc-500 mb-5 max-w-3xl">
-        Franquicias detectadas cruzando cada película de tu biblioteca con su colección real de TMDB (no con las
-        etiquetas manuales de Plex). Abre cualquiera para ver qué partes te faltan y mandarlas a Radarr.
+        {t('Franquicias detectadas cruzando cada película de tu biblioteca con su colección real de TMDB (no con las etiquetas manuales de Plex). Abre cualquiera para ver qué partes te faltan y mandarlas a Radarr.')}
       </p>
 
       {/* scan control */}
@@ -124,23 +124,22 @@ export default function Sagas({ embedded = false }) {
         {scan?.running || state.running ? (
           <div className="w-full">
             <div className="text-zinc-300 mb-2">
-              Escaneando colecciones en TMDB… {scan?.done ?? state.done} de {scan?.total ?? state.total}
+              {t('Escaneando colecciones en TMDB… {done} de {total}', { done: scan?.done ?? state.done, total: scan?.total ?? state.total })}
             </div>
             <ProgressBar pct={(scan?.total ?? state.total) ? ((scan?.done ?? state.done) / (scan?.total ?? state.total)) * 100 : 0} />
           </div>
         ) : (
           <>
             <span className="text-zinc-400">
-              {state.scanned.toLocaleString('es-ES')} / {state.totalMovies.toLocaleString('es-ES')} películas
-              analizadas · <b className="text-gold-400">{state.collections}</b> franquicias
+              {t('{scanned} / {total} películas analizadas ·', { scanned: state.scanned.toLocaleString(locale()), total: state.totalMovies.toLocaleString(locale()) })} <b className="text-gold-400">{state.collections}</b> {t('franquicias')}
             </span>
             {pendingScan > 0 ? (
               <button className="btn-gold" onClick={() => startScan(false)}>
-                Analizar {pendingScan.toLocaleString('es-ES')} pendientes
+                {t('Analizar {n} pendientes', { n: pendingScan.toLocaleString(locale()) })}
               </button>
             ) : (
-              <button className="btn-ghost" onClick={() => startScan(true)} title="Volver a analizar todo">
-                ↻ Re-analizar
+              <button className="btn-ghost" onClick={() => startScan(true)} title={t('Volver a analizar todo')}>
+                {t('↻ Re-analizar')}
               </button>
             )}
           </>
@@ -150,17 +149,17 @@ export default function Sagas({ embedded = false }) {
       {sagas.length === 0 ? (
         <Empty>
           {state.scanned === 0
-            ? 'Pulsa «Analizar» para detectar tus franquicias a partir de TMDB.'
-            : 'No se han detectado franquicias con más de una película tuya.'}
+            ? t('Pulsa «Analizar» para detectar tus franquicias a partir de TMDB.')
+            : t('No se han detectado franquicias con más de una película tuya.')}
         </Empty>
       ) : (
         <>
           {/* compute what's missing per franchise (#H) */}
           {sagas.some((s) => s.missing == null) && (
             <div className="card p-3 mb-3 flex flex-wrap items-center gap-3 text-sm">
-              <span className="text-zinc-400">Calcula cuántas partes te faltan en cada saga (consulta TMDB):</span>
+              <span className="text-zinc-400">{t('Calcula cuántas partes te faltan en cada saga (consulta TMDB):')}</span>
               <button className="btn-gold !py-1 shrink-0" onClick={computeStats} disabled={statsBusy}>
-                {statsBusy ? 'Calculando…' : 'Calcular lo que falta'}
+                {statsBusy ? t('Calculando…') : t('Calcular lo que falta')}
               </button>
             </div>
           )}
@@ -175,12 +174,12 @@ export default function Sagas({ embedded = false }) {
                     {open === s.collection_id ? '▾' : '▸'} {s.name}
                   </span>
                   <span className="text-xs text-zinc-400 shrink-0 flex items-center gap-2">
-                    <span><b className="text-gold-400">{s.owned}</b> {s.owned === 1 ? 'tuya' : 'tuyas'}</span>
+                    <span><b className="text-gold-400">{s.owned}</b> {s.owned === 1 ? t('tuya') : t('tuyas')}</span>
                     {s.missing != null && s.missing > 0 && (
-                      <span className="text-orange-300">· te faltan {s.missing}</span>
+                      <span className="text-orange-300">· {t('te faltan {n}', { n: s.missing })}</span>
                     )}
-                    {s.missing === 0 && <span className="text-emerald-400">· completa ✓</span>}
-                    {s.upcoming > 0 && <span className="text-sky-300">· {s.upcoming} por estrenar</span>}
+                    {s.missing === 0 && <span className="text-emerald-400">· {t('completa ✓')}</span>}
+                    {s.upcoming > 0 && <span className="text-sky-300">· {t('{n} por estrenar', { n: s.upcoming })}</span>}
                   </span>
                 </button>
                 {/* missing titles at a glance, without opening (#H) */}
@@ -192,7 +191,7 @@ export default function Sagas({ embedded = false }) {
                       </span>
                     ))}
                     {s.missingTitles.length > 8 && (
-                      <span className="text-[11px] text-zinc-500 px-1 py-0.5">+{s.missingTitles.length - 8} más</span>
+                      <span className="text-[11px] text-zinc-500 px-1 py-0.5">{t('+{n} más', { n: s.missingTitles.length - 8 })}</span>
                     )}
                   </div>
                 )}

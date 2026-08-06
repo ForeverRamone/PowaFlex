@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Spinner, Empty, PageHeader, ErrorBox, Select } from '../components.jsx';
 import { toast } from '../toast.js';
+import { t } from '../i18n.js';
 
 /**
  * El catálogo de directores en activo: 680 nombres de Wikidata con su
@@ -72,7 +73,7 @@ function Ficha({ d, foto, onFollow, busy }) {
       <button
         onClick={() => !seguido && onFollow(d)}
         disabled={seguido || busy}
-        title={seguido ? 'Ya le sigues como director/a' : `Seguir a ${d.name} como director/a`}
+        title={seguido ? t('Ya le sigues como director/a') : t('Seguir a {nombre} como director/a', { nombre: d.name })}
         className={`text-lg leading-none shrink-0 mt-0.5 cursor-pointer disabled:cursor-default ${
           seguido ? 'text-gold-400' : 'text-zinc-600 hover:text-gold-400'
         }`}
@@ -83,18 +84,18 @@ function Ficha({ d, foto, onFollow, busy }) {
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="text-sm font-medium text-zinc-100">{d.name}</span>
           {d.importance != null && (
-            <span className="text-[11px] text-gold-400 tabular" title="Índice de importancia (0–100)">
+            <span className="text-[11px] text-gold-400 tabular" title={t('Índice de importancia (0–100)')}>
               {d.importance}
             </span>
           )}
           {d.status === 'Sin estreno reciente' && (
-            <span className="badge-quiet text-zinc-500" title="Sin largometraje estrenado en los últimos ocho años">
-              sin estreno reciente
+            <span className="badge-quiet text-zinc-500" title={t('Sin largometraje estrenado en los últimos ocho años')}>
+              {t('sin estreno reciente')}
             </span>
           )}
         </div>
         <div className="text-[11px] text-zinc-500 mt-0.5">
-          {[d.country, d.age ? `${d.age} años` : null, d.features ? `${d.features} largos` : null,
+          {[d.country, d.age ? t('{n} años', { n: d.age }) : null, d.features ? t('{n} largos', { n: d.features }) : null,
             d.first && d.last ? `${d.first}–${d.last}` : null].filter(Boolean).join(' · ')}
         </div>
         {d.awardsText && (
@@ -146,7 +147,7 @@ export default function Directors({ embedded = false }) {
     const paises = [...cuenta(enRegion, 'country').entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
     const regiones = cuenta(todos, 'region');
     return {
-      regiones: ORDEN_REGIONES.filter((r) => regiones.has(r)).map((r) => [r, `${r} (${regiones.get(r)})`]),
+      regiones: ORDEN_REGIONES.filter((r) => regiones.has(r)).map((r) => [r, `${t(r)} (${regiones.get(r)})`]),
       paises: paises.map(([p, n]) => [p, `${p} (${n})`]),
     };
   }, [todos, f.region]);
@@ -216,9 +217,9 @@ export default function Directors({ embedded = false }) {
     // `added` cuenta ALTAS: cero también significa «ya estaba», y decir
     // entonces «no se encontró en TMDB» era mentir. Quien no se resuelve viene
     // en notFound.
-    if (r.notFound?.length) { toast(`No se ha podido identificar a ${d.name} en TMDB`, 'error'); return; }
+    if (r.notFound?.length) { toast(t('No se ha podido identificar a {nombre} en TMDB', { nombre: d.name }), 'error'); return; }
     marcar(new Set([d.name]));
-    toast(r.added ? `⭐ ${d.name} en favoritos (directores/as)` : `${d.name} ya estaba en favoritos`, 'success');
+    toast(r.added ? t('⭐ {nombre} en favoritos (directores/as)', { nombre: d.name }) : t('{nombre} ya estaba en favoritos', { nombre: d.name }), 'success');
   };
 
   const seguirVisibles = async () => {
@@ -234,13 +235,13 @@ export default function Directors({ embedded = false }) {
     const noEncontrados = new Set(r.notFound || []);
     marcar(new Set(pendientes.map((d) => d.name).filter((n) => !noEncontrados.has(n))));
     toast(
-      `⭐ ${r.added} añadidos a favoritos${r.notFound?.length ? ` · ${r.notFound.length} sin identificar en TMDB` : ''}`,
+      t('⭐ {n} añadidos a favoritos', { n: r.added }) + (r.notFound?.length ? t(' · {n} sin identificar en TMDB', { n: r.notFound.length }) : ''),
       'success'
     );
   };
 
   if (error) return <ErrorBox error={error} />;
-  if (!data) return <Spinner label="Cargando el catálogo de directores…" />;
+  if (!data) return <Spinner label={t('Cargando el catálogo de directores…')} />;
 
   const pendientesVisibles = filtrados.filter((d) => !d.tracked).length;
 
@@ -248,72 +249,69 @@ export default function Directors({ embedded = false }) {
     <div>
       {!embedded && (
         <PageHeader
-          eyebrow="La caza"
-          title="Directores en activo"
-          subtitle="680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Filtra por región, país o género, ordena por lo que te interese y ve marcando con la estrella a quién quieres seguir."
+          eyebrow={t('La caza')}
+          title={t('Directores en activo')}
+          subtitle={t('680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Filtra por región, país o género, ordena por lo que te interese y ve marcando con la estrella a quién quieres seguir.')}
         />
       )}
       {embedded && (
         <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-          680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han
-          ganado. Este catálogo no sale de tu biblioteca — sirve para descubrir a quién seguir con la estrella.
+          {t('680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Este catálogo no sale de tu biblioteca — sirve para descubrir a quién seguir con la estrella.')}
         </p>
       )}
 
       <div className="flex flex-wrap gap-2 items-center mb-3">
         <input
           className="input !w-64 max-sm:!w-full"
-          placeholder="Buscar nombre o país…"
+          placeholder={t('Buscar nombre o país…')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <Select value={f.region} onChange={setFiltro('region')} placeholder="Región" options={opciones.regiones} />
-        <Select value={f.country} onChange={setFiltro('country')} placeholder="País" options={opciones.paises} />
-        <Select value={f.gender} onChange={setFiltro('gender')} placeholder="Sexo/género"
-          options={[['Mujer', 'Mujeres'], ['Hombre', 'Hombres']]} />
-        <Select value={f.status} onChange={setFiltro('status')} placeholder="Actividad"
-          options={[['activo', 'En activo'], ['parado', 'Sin estreno reciente']]} />
+        <Select value={f.region} onChange={setFiltro('region')} placeholder={t('Región')} options={opciones.regiones} />
+        <Select value={f.country} onChange={setFiltro('country')} placeholder={t('País')} options={opciones.paises} />
+        <Select value={f.gender} onChange={setFiltro('gender')} placeholder={t('Sexo/género')}
+          options={[['Mujer', t('Mujeres')], ['Hombre', t('Hombres')]]} />
+        <Select value={f.status} onChange={setFiltro('status')} placeholder={t('Actividad')}
+          options={[['activo', t('En activo')], ['parado', t('Sin estreno reciente')]]} />
         <button
           className={`chip ${f.pendientes ? 'chip-on' : ''}`}
           onClick={() => setF((p) => ({ ...p, pendientes: !p.pendientes }))}
-          title="Esconde a quien ya sigues como director/a"
+          title={t('Esconde a quien ya sigues como director/a')}
         >
-          ☆ Solo los que no sigo
+          {t('☆ Solo los que no sigo')}
         </button>
-        {hayFiltros && <button className="btn-ghost" onClick={limpiar}>✕ Limpiar filtros</button>}
+        {hayFiltros && <button className="btn-ghost" onClick={limpiar}>{t('✕ Limpiar filtros')}</button>}
       </div>
 
       <div className="flex flex-wrap gap-2 items-center mb-4">
-        <span className="text-xs text-zinc-500">Ordenar por:</span>
+        <span className="text-xs text-zinc-500">{t('Ordenar por:')}</span>
         {/* sin placeholder: aquí siempre hay un orden puesto, no existe el
             «sin ordenar» que justifica la opción vacía de los filtros */}
         <Select value={orden} onChange={setOrdenPref}
-          options={Object.entries(ORDENES).map(([k, o]) => [k, o.label])} />
+          options={Object.entries(ORDENES).map(([k, o]) => [k, t(o.label)])} />
         <span className="text-xs text-zinc-400 tabular">
-          {filtrados.length} de {todos.length}
-          {pendientesVisibles < filtrados.length && ` · ${filtrados.length - pendientesVisibles} ya en favoritos`}
+          {filtrados.length} {t('de')} {todos.length}
+          {pendientesVisibles < filtrados.length && t(' · {n} ya en favoritos', { n: filtrados.length - pendientesVisibles })}
         </span>
         {pendientesVisibles > 0 && (
           <button
             className="btn-gold !py-1 text-xs ml-auto"
             disabled={bulkBusy}
             onClick={seguirVisibles}
-            title="Los busca en TMDB y los añade a tus favoritos como directores/as"
+            title={t('Los busca en TMDB y los añade a tus favoritos como directores/as')}
           >
-            {bulkBusy ? 'Añadiendo…' : `⭐ Seguir a los ${Math.min(pendientesVisibles, 150)} que faltan de esta lista`}
+            {bulkBusy ? t('Añadiendo…') : t('⭐ Seguir a los {n} que faltan de esta lista', { n: Math.min(pendientesVisibles, 150) })}
           </button>
         )}
       </div>
 
       <p className="text-[11px] text-zinc-500 mb-4 max-w-3xl leading-relaxed">
-        La <b className="text-zinc-400">importancia</b> combina prestigio (premios y reconocimiento crítico, 60 %) e
-        impacto (notoriedad, alcance de la obra y taquilla, 40 %). Es una convención operativa, no un juicio de valor:
-        Wikidata no es exhaustiva ni neutral y su cobertura de premios está sesgada hacia Europa y Norteamérica.
-        «En activo» significa al menos un largometraje en los últimos ocho años.
+        {t('La')} <b className="text-zinc-400">{t('importancia')}</b>{' '}
+        {t('combina prestigio (premios y reconocimiento crítico, 60 %) e impacto (notoriedad, alcance de la obra y taquilla, 40 %). Es una convención operativa, no un juicio de valor: Wikidata no es exhaustiva ni neutral y su cobertura de premios está sesgada hacia Europa y Norteamérica. «En activo» significa al menos un largometraje en los últimos ocho años.')}
       </p>
 
       {filtrados.length === 0 ? (
-        <Empty>Nadie con esos filtros. <button className="text-gold-400 hover:underline" onClick={limpiar}>Limpiar</button></Empty>
+        <Empty>{t('Nadie con esos filtros.')} <button className="text-gold-400 hover:underline" onClick={limpiar}>{t('Limpiar')}</button></Empty>
       ) : (
         <>
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2">
@@ -324,7 +322,7 @@ export default function Directors({ embedded = false }) {
           {filtrados.length > visibles.length && (
             <div className="text-center mt-6">
               <button className="btn-ghost" onClick={() => setLimite((l) => l + 120)}>
-                Ver más ({visibles.length} de {filtrados.length})
+                {t('Ver más')} ({visibles.length} {t('de')} {filtrados.length})
               </button>
             </div>
           )}
@@ -332,10 +330,10 @@ export default function Directors({ embedded = false }) {
       )}
 
       <p className="text-[11px] text-zinc-600 mt-8">
-        Fuente: {data.source}, consulta del {data.generatedAt}. Lo que sigas aquí alimenta{' '}
-        <Link to="/calendario" className="text-gold-400 hover:underline">Cine venidero</Link> y{' '}
-        <Link to="/descubrir" className="text-gold-400 hover:underline">Descubrir huecos</Link>, igual que el resto de
-        tus <Link to="/favoritos" className="text-gold-400 hover:underline">favoritos</Link>.
+        {t('Fuente: {fuente}, consulta del {fecha}. Lo que sigas aquí alimenta', { fuente: data.source, fecha: data.generatedAt })}{' '}
+        <Link to="/calendario" className="text-gold-400 hover:underline">{t('Cine venidero')}</Link> {t('y')}{' '}
+        <Link to="/descubrir" className="text-gold-400 hover:underline">{t('Descubrir huecos')}</Link>
+        {t(', igual que el resto de tus')} <Link to="/favoritos" className="text-gold-400 hover:underline">{t('favoritos')}</Link>.
       </p>
     </div>
   );

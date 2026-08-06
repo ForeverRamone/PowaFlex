@@ -7,6 +7,7 @@ import {
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
+import { t } from '../i18n.js';
 
 // La celda de dirección de Wikipedia puede traer varios nombres («Javier Calvo
 // and Javier Ambrossi»): se parte aquí para pintar UNA estrella por persona —
@@ -144,7 +145,7 @@ export default function Festivals() {
     setDirBusy(null);
     if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
     setFollowedDirs((prev) => new Set(prev).add(name));
-    toast(r.added ? `⭐ ${name} en favoritos (directores/as)` : `${name} ya estaba en favoritos`, 'success');
+    toast(r.added ? t('⭐ {name} en favoritos (directores/as)', { name }) : t('{name} ya estaba en favoritos', { name }), 'success');
   };
 
   // para las ediciones venideras: en cuanto se anuncie la sección oficial,
@@ -157,7 +158,7 @@ export default function Festivals() {
     setFollowAllBusy(false);
     if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
     setFollowedDirs((prev) => new Set([...prev, ...pendingDirs]));
-    toast(`⭐ ${r.added} directores/as añadidos a favoritos${r.notFound?.length ? ` · ${r.notFound.length} sin resolver` : ''}`, 'success');
+    toast(t('⭐ {n} directores/as añadidos a favoritos', { n: r.added }) + (r.notFound?.length ? t(' · {n} sin resolver', { n: r.notFound.length }) : ''), 'success');
   };
 
   const fijarMatch = async (tmdbId) => {
@@ -170,7 +171,7 @@ export default function Festivals() {
       toast(`⚠️ ${r.error}`, 'error');
       return;
     }
-    toast(tmdbId ? '✓ Emparejado corregido' : '✓ Corrección quitada');
+    toast(tmdbId ? t('✓ Emparejado corregido') : t('✓ Corrección quitada'));
     setEditar(null);
     load(fest, year, view);
   };
@@ -178,9 +179,9 @@ export default function Festivals() {
   return (
     <div>
       <PageHeader
-        eyebrow="La caza"
-        title="Festivales y premios"
-        subtitle="Las secciones oficiales de los grandes festivales (los seis de la vía Óscar más San Sebastián), el palmarés y las nominadas de los premios de cada año, y los cánones de la crítica."
+        eyebrow={t('La caza')}
+        title={t('Festivales y premios')}
+        subtitle={t('Las secciones oficiales de los grandes festivales (los seis de la vía Óscar más San Sebastián), el palmarés y las nominadas de los premios de cada año, y los cánones de la crítica.')}
       />
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
@@ -193,7 +194,7 @@ export default function Festivals() {
           if (!del.length) return null;
           return (
             <div key={g} className="flex gap-2 items-center flex-wrap">
-              <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{label}:</span>
+              <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{t(label)}:</span>
               {del.map((f) => (
                 <button
                   key={f.key}
@@ -213,20 +214,20 @@ export default function Festivals() {
         })}
         {view === 'seleccion' && (
           <div className="flex items-center gap-1 ml-auto">
-            <button className="btn-ghost !py-1" onClick={() => setYear((y) => y - 1)} title="Edición anterior">←</button>
+            <button className="btn-ghost !py-1" onClick={() => setYear((y) => y - 1)} title={t('Edición anterior')}>←</button>
             {/* desplegable en vez de campo numérico: el centro es clicable y
                 fuera las flechitas de arriba/abajo (ya están ← →) */}
             <select
               className="input !w-24 text-center !py-1 tabular cursor-pointer"
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
-              title="Elegir edición"
+              title={t('Elegir edición')}
             >
               {años.map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
-            <button className="btn-ghost !py-1" onClick={() => setYear((y) => y + 1)} title="Edición siguiente">→</button>
+            <button className="btn-ghost !py-1" onClick={() => setYear((y) => y + 1)} title={t('Edición siguiente')}>→</button>
           </div>
         )}
       </div>
@@ -235,24 +236,24 @@ export default function Festivals() {
         {!soloPalmares && (
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => setView('seleccion')} className={`${view === 'seleccion' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
-              {info?.editionLabel || (info?.awardNominees ? 'Nominadas por año' : 'Sección oficial por año')}
+              {info?.editionLabel || (info?.awardNominees ? t('Nominadas por año') : t('Sección oficial por año'))}
             </button>
             <button onClick={() => setView('palmares')} className={`${view === 'palmares' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
-              🏆 Palmarés histórico
+              {t('🏆 Palmarés histórico')}
             </button>
           </div>
         )}
         {info && (
           <span className="text-xs text-zinc-500">
-            {soloPalmares || info.group === 'canon' ? 'Canon: ' : 'Premio que clasifica: '}
+            {soloPalmares || info.group === 'canon' ? t('Canon: ') : t('Premio que clasifica: ')}
             <b className="text-zinc-300">{info.award}</b>
-            {view === 'seleccion' && info.sinceYear > 1990 && ` · esta sección existe desde ${info.sinceYear}`}
+            {view === 'seleccion' && info.sinceYear > 1990 && t(' · esta sección existe desde {y}', { y: info.sinceYear })}
           </span>
         )}
       </div>
 
       {error && <ErrorBox error={error} />}
-      {loading && <Spinner label="Leyendo la selección en Wikipedia y casándola con TMDB…" />}
+      {loading && <Spinner label={t('Leyendo la selección en Wikipedia y casándola con TMDB…')} />}
 
       {data && (
         <>
@@ -261,30 +262,30 @@ export default function Festivals() {
               <b className="text-gold-400">
                 {data.name} {data.year ?? ''}
               </b>{' '}
-              · {data.section || `todas las ganadoras (${data.award})`} · {films.length} películas
+              · {data.section || t('todas las ganadoras ({award})', { award: data.award })} · {t('{n} películas', { n: films.length })}
               {data.unresolved > 0 && (
-                <span className="text-zinc-500"> · {data.unresolved} sin casar con TMDB</span>
+                <span className="text-zinc-500"> · {t('{n} sin casar con TMDB', { n: data.unresolved })}</span>
               )}
               {data.resolveErrors > 0 && (
-                <span className="text-orange-300" title="TMDB cortó el grifo a mitad de comprobación; este resultado no se guarda en caché">
-                  {' '}· {data.resolveErrors} sin comprobar por fallos de red — recarga en un rato
+                <span className="text-orange-300" title={t('TMDB cortó el grifo a mitad de comprobación; este resultado no se guarda en caché')}>
+                  {' '}· {t('{n} sin comprobar por fallos de red — recarga en un rato', { n: data.resolveErrors })}
                 </span>
               )}
             </span>
             <a href={data.source} target="_blank" rel="noreferrer" className="text-[11px] text-zinc-500 hover:text-gold-400 underline">
-              fuente: Wikipedia
+              {t('fuente: Wikipedia')}
             </a>
-            <button className="btn-ghost !py-1 text-xs" onClick={() => load(fest, year, view, true)}>↻ Recargar</button>
+            <button className="btn-ghost !py-1 text-xs" onClick={() => load(fest, year, view, true)}>{t('↻ Recargar')}</button>
             <div className="flex gap-2 ml-auto flex-wrap">
               {pendingDirs.length > 1 && (
                 <button className="btn-ghost" disabled={followAllBusy} onClick={followAll}
-                  title="Sus estrenos futuros entrarán en el calendario de cine venidero">
-                  {followAllBusy ? 'Añadiendo…' : `⭐ Seguir a sus ${pendingDirs.length} directores/as`}
+                  title={t('Sus estrenos futuros entrarán en el calendario de cine venidero')}>
+                  {followAllBusy ? t('Añadiendo…') : t('⭐ Seguir a sus {n} directores/as', { n: pendingDirs.length })}
                 </button>
               )}
               {missingIds.length > 0 && (
                 <button className="btn-gold" disabled={bulkBusy} onClick={bulkAdd}>
-                  {bulkBusy ? 'Añadiendo…' : `➕ Mandar a Radarr las ${missingIds.length} que te faltan`}
+                  {bulkBusy ? t('Añadiendo…') : t('➕ Mandar a Radarr las {n} que te faltan', { n: missingIds.length })}
                 </button>
               )}
             </div>
@@ -301,22 +302,22 @@ export default function Festivals() {
                   onClick={() => setOwn(v)}
                   className={`btn-ghost !py-1 text-xs ${own === v ? '!border-gold-400 text-gold-400' : ''}`}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
             <MinScoreBar minScore={minScore} setMinScore={setMinScore} />
             {(own || minScore > 0) && (
               <button className="btn-ghost !py-1 text-xs" onClick={() => { setOwn(''); setMinScore(0); }}>
-                ✕ Limpiar filtros
+                {t('✕ Limpiar filtros')}
               </button>
             )}
-            {hidden > 0 && <span className="text-xs text-zinc-500">{hidden} ocultas por tus filtros</span>}
+            {hidden > 0 && <span className="text-xs text-zinc-500">{t('{n} ocultas por tus filtros', { n: hidden })}</span>}
           </div>
           <StatusLegend className="mb-4" />
 
           {shown.length === 0 ? (
-            <Empty>{films.length === 0 ? 'Sin películas en esta edición.' : 'Nada que enseñar con estos filtros.'}</Empty>
+            <Empty>{films.length === 0 ? t('Sin películas en esta edición.') : t('Nada que enseñar con estos filtros.')}</Empty>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {shown.map((f, i) => (
@@ -326,7 +327,7 @@ export default function Festivals() {
                       item={f}
                       badge={
                         f.winner ? (
-                          <span className="absolute top-1.5 right-1.5 on-art bg-black/70 text-[11px] px-1.5 py-0.5 rounded">🏆 Ganadora</span>
+                          <span className="absolute top-1.5 right-1.5 on-art bg-black/70 text-[11px] px-1.5 py-0.5 rounded">{t('🏆 Ganadora')}</span>
                         ) : undefined
                       }
                     >
@@ -341,20 +342,20 @@ export default function Festivals() {
                       )}
                     </TmdbCard>
                   ) : (
-                    <div className="poster flex items-center justify-center text-center p-2 text-[11px] text-zinc-400" title="Sin ficha en TMDB (todavía)">
+                    <div className="poster flex items-center justify-center text-center p-2 text-[11px] text-zinc-400" title={t('Sin ficha en TMDB (todavía)')}>
                       {f.title}
                     </div>
                   )}
                   <div className="flex items-baseline gap-1.5">
                     <button
                       onClick={() => setEditar(f)}
-                      title="Corregir el emparejado con TMDB a mano"
+                      title={t('Corregir el emparejado con TMDB a mano')}
                       className="text-[11px] text-zinc-600 hover:text-gold-400 shrink-0 cursor-pointer"
                     >
                       ✎
                     </button>
                     {f.rank && (
-                      <span className="text-[11px] text-gold-400 font-semibold tabular shrink-0" title={f.tied ? `Puesto ${f.rank} (empate)` : `Puesto ${f.rank}`}>
+                      <span className="text-[11px] text-gold-400 font-semibold tabular shrink-0" title={f.tied ? t('Puesto {n} (empate)', { n: f.rank }) : t('Puesto {n}', { n: f.rank })}>
                         #{f.rank}
                       </span>
                     )}
@@ -368,7 +369,7 @@ export default function Festivals() {
                             onClick={() => followDirector(d)}
                             disabled={dirBusy === d || followedDirs.has(d)}
                             className="mt-1 text-[11px] text-zinc-400 hover:text-gold-400 text-left leading-tight cursor-pointer disabled:cursor-default"
-                            title={followedDirs.has(d) ? 'Ya en favoritos' : `Seguir a ${d} como director/a`}
+                            title={followedDirs.has(d) ? t('Ya en favoritos') : t('Seguir a {name} como director/a', { name: d })}
                           >
                             {followedDirs.has(d) ? '⭐' : dirBusy === d ? '…' : '☆'} {d}
                           </button>
@@ -392,7 +393,7 @@ export default function Festivals() {
           initialQuery={editar.title || ''}
           searchPath={(term) =>
             `/festivals/match-candidates?q=${encodeURIComponent(term)}&year=${(view === 'palmares' ? editar.year : data?.year) || ''}`}
-          subtitle="Busca en TMDB y elige la ficha correcta. La corrección se recuerda y manda sobre el emparejado automático."
+          subtitle={t('Busca en TMDB y elige la ficha correcta. La corrección se recuerda y manda sobre el emparejado automático.')}
           onPick={fijarMatch}
           onClear={editar.tmdb_id ? () => fijarMatch(null) : null}
           onClose={() => setEditar(null)}

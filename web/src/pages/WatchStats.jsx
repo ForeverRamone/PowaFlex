@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import { Spinner, Section, MovieCard, Empty, PageHeader, ErrorBox } from '../components.jsx';
 import { MovieModal } from '../components.jsx';
 import { useChartTheme } from '../charts.js';
+import { t, locale } from '../i18n.js';
 
 function InsightGrid({ title, hint, items, caption, onSelect }) {
   if (!items?.length) return null;
@@ -45,18 +46,18 @@ export default function WatchStats() {
 
   const resolveUnmatched = async () => {
     setResolving(true);
-    setResolveMsg('Buscando en TMDB las vistas sin emparejar…');
+    setResolveMsg(t('Buscando en TMDB las vistas sin emparejar…'));
     const r = await api('/letterboxd/resolve', { method: 'POST' });
     setResolving(false);
     if (r.error) {
       setResolveMsg(`✗ ${r.error}`);
     } else {
-      const bits = [`✓ ${r.matched} emparejadas`];
-      if (r.library?.resolved) bits.push(`${r.library.resolved} películas de Plex ganaron ficha TMDB`);
-      if (r.unmatched?.sinTmdb) bits.push(`${r.unmatched.sinTmdb} sin ficha en TMDB`);
-      if (r.unmatched?.noEnBiblioteca) bits.push(`${r.unmatched.noEnBiblioteca} vistas fuera de tu colección`);
+      const bits = [t('✓ {n} emparejadas', { n: r.matched })];
+      if (r.library?.resolved) bits.push(t('{n} películas de Plex ganaron ficha TMDB', { n: r.library.resolved }));
+      if (r.unmatched?.sinTmdb) bits.push(t('{n} sin ficha en TMDB', { n: r.unmatched.sinTmdb }));
+      if (r.unmatched?.noEnBiblioteca) bits.push(t('{n} vistas fuera de tu colección', { n: r.unmatched.noEnBiblioteca }));
       if (r.englishPending)
-        bits.push(`completando ${r.englishPending.toLocaleString('es-ES')} títulos en inglés en segundo plano — reintenta en unos minutos`);
+        bits.push(t('completando {n} títulos en inglés en segundo plano — reintenta en unos minutos', { n: r.englishPending.toLocaleString(locale()) }));
       setResolveMsg(bits.join(' · '));
     }
     load();
@@ -69,33 +70,33 @@ export default function WatchStats() {
 
   return (
     <div>
-      <PageHeader eyebrow="Colección" title="Visionado" />
+      <PageHeader eyebrow={t('Colección')} title={t('Visionado')} />
 
       {/* watched counter (#1) */}
       {s && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <div className="card p-4">
-            <div className="text-2xl font-bold text-gold-400">{s.total.toLocaleString('es-ES')}</div>
-            <div className="text-sm text-zinc-400 mt-1">Marcadas como vistas</div>
-            <div className="text-xs text-zinc-500 mt-1">{s.library ? `${Math.round((s.total / s.library) * 100)}% de tu biblioteca` : 'sin biblioteca sincronizada'}</div>
+            <div className="text-2xl font-bold text-gold-400">{s.total.toLocaleString(locale())}</div>
+            <div className="text-sm text-zinc-400 mt-1">{t('Marcadas como vistas')}</div>
+            <div className="text-xs text-zinc-500 mt-1">{s.library ? t('{pct}% de tu biblioteca', { pct: Math.round((s.total / s.library) * 100) }) : t('sin biblioteca sincronizada')}</div>
           </div>
           <div className="card p-4">
-            <div className="text-2xl font-bold text-zinc-200">{s.plex.toLocaleString('es-ES')}</div>
-            <div className="text-sm text-zinc-400 mt-1">Vistas en Plex</div>
-            <div className="text-xs text-zinc-500 mt-1">con reproducción registrada</div>
+            <div className="text-2xl font-bold text-zinc-200">{s.plex.toLocaleString(locale())}</div>
+            <div className="text-sm text-zinc-400 mt-1">{t('Vistas en Plex')}</div>
+            <div className="text-xs text-zinc-500 mt-1">{t('con reproducción registrada')}</div>
           </div>
           <div className="card p-4">
-            <div className="text-2xl font-bold text-orange-300">{s.lbInLibrary.toLocaleString('es-ES')}</div>
-            <div className="text-sm text-zinc-400 mt-1">Solo por Letterboxd</div>
-            <div className="text-xs text-zinc-500 mt-1">en tu biblioteca, sin verlas en Plex</div>
+            <div className="text-2xl font-bold text-orange-300">{s.lbInLibrary.toLocaleString(locale())}</div>
+            <div className="text-sm text-zinc-400 mt-1">{t('Solo por Letterboxd')}</div>
+            <div className="text-xs text-zinc-500 mt-1">{t('en tu biblioteca, sin verlas en Plex')}</div>
           </div>
           <div className="card p-4">
-            <div className="text-2xl font-bold text-zinc-200">{s.lbTotal.toLocaleString('es-ES')}</div>
-            <div className="text-sm text-zinc-400 mt-1">Total en Letterboxd</div>
+            <div className="text-2xl font-bold text-zinc-200">{s.lbTotal.toLocaleString(locale())}</div>
+            <div className="text-sm text-zinc-400 mt-1">{t('Total en Letterboxd')}</div>
             <div className="text-xs text-zinc-500 mt-1">
               {s.lbUnmatched > 0
-                ? `${s.lbUnmatched.toLocaleString('es-ES')} sin emparejar con tu Plex`
-                : 'todas emparejadas'}
+                ? t('{n} sin emparejar con tu Plex', { n: s.lbUnmatched.toLocaleString(locale()) })
+                : t('todas emparejadas')}
             </div>
           </div>
         </div>
@@ -104,18 +105,17 @@ export default function WatchStats() {
       {s && s.lbUnmatched > 0 && (
         <div className="card p-3 mb-8 flex flex-wrap items-center gap-3 text-sm">
           <span className="text-zinc-400">
-            Tienes <b className="text-orange-300">{s.lbUnmatched.toLocaleString('es-ES')}</b> películas vistas en Letterboxd que
-            no cuadran con tu biblioteca (a menudo por el idioma del título). Búscalas en TMDB para emparejarlas:
+            {t('Tienes ')}<b className="text-orange-300">{s.lbUnmatched.toLocaleString(locale())}</b>{t(' películas vistas en Letterboxd que no cuadran con tu biblioteca (a menudo por el idioma del título). Búscalas en TMDB para emparejarlas:')}
           </span>
           <button className="btn-gold !py-1 shrink-0" onClick={resolveUnmatched} disabled={resolving}>
-            {resolving ? 'Emparejando…' : '↻ Reintentar emparejado por TMDB'}
+            {resolving ? t('Emparejando…') : t('↻ Reintentar emparejado por TMDB')}
           </button>
           {resolveMsg && <span className="text-xs text-zinc-400">{resolveMsg}</span>}
         </div>
       )}
 
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
-        <Section title="Visto vs. pendiente por década" className="min-w-0">
+        <Section title={t('Visto vs. pendiente por década')} className="min-w-0">
           <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
               <BarChart data={data.watchedByDecade} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
@@ -128,13 +128,13 @@ export default function WatchStats() {
                   wrapperStyle={{ fontSize: 12 }}
                   formatter={(v) => <span style={{ color: ch.axis }}>{v}</span>}
                 />
-                <Bar dataKey="watched" name="Vistas" stackId="a" fill={ch.positive} />
-                <Bar dataKey="total" name="Total" fill={ch.muted} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="watched" name={t('Vistas')} stackId="a" fill={ch.positive} />
+                <Bar dataKey="total" name={t('Total')} fill={ch.muted} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Section>
-        <Section title="Visto vs. total por género" className="min-w-0">
+        <Section title={t('Visto vs. total por género')} className="min-w-0">
           <div className="card p-4 h-72 min-w-0">
             <ResponsiveContainer>
               <BarChart data={data.watchedByGenre} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
@@ -147,24 +147,24 @@ export default function WatchStats() {
                   wrapperStyle={{ fontSize: 12 }}
                   formatter={(v) => <span style={{ color: ch.axis }}>{v}</span>}
                 />
-                <Bar dataKey="watched" name="Vistas" fill={ch.positive} />
-                <Bar dataKey="total" name="Total" fill={ch.muted} />
+                <Bar dataKey="watched" name={t('Vistas')} fill={ch.positive} />
+                <Bar dataKey="total" name={t('Total')} fill={ch.muted} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Section>
       </div>
 
-      <Section title="Directores/as con obra pendiente en tu biblioteca">
+      <Section title={t('Directores/as con obra pendiente en tu biblioteca')}>
         {data.directorsPending.length === 0 ? (
-          <Empty>Nada pendiente. 🏆</Empty>
+          <Empty>{t('Nada pendiente. 🏆')}</Empty>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
             {data.directorsPending.map((d) => (
               <Link key={d.id} to={`/biblioteca?personId=${d.id}&personRole=director&watched=no&personName=${encodeURIComponent(d.name)}`} className="card p-3 hover:border-gold-400 transition-colors">
                 <div className="text-sm font-medium text-zinc-200">{d.name}</div>
                 <div className="text-xs text-zinc-500 mt-1">
-                  {d.watched} vistas de {d.total} · <span className="text-gold-400">{d.total - d.watched} pendientes</span>
+                  {t('{w} vistas de {total}', { w: d.watched, total: d.total })} · <span className="text-gold-400">{t('{n} pendientes', { n: d.total - d.watched })}</span>
                 </div>
               </Link>
             ))}
@@ -172,15 +172,13 @@ export default function WatchStats() {
         )}
       </Section>
 
-      <Section title="Directores/as que más has visto">
+      <Section title={t('Directores/as que más has visto')}>
         {!data.directorsMostWatched?.length ? (
-          <Empty>Aún no hay visionados registrados.</Empty>
+          <Empty>{t('Aún no hay visionados registrados.')}</Empty>
         ) : (
           <>
             <p className="text-xs text-zinc-500 -mt-2 mb-3 max-w-3xl">
-              Por número de películas suyas que has visto, contando lo reproducido en Plex y lo que
-              tienes marcado en Letterboxd. Solo entran las que están emparejadas con tu biblioteca:
-              de una entrada de Letterboxd suelta no se sabe quién la dirigió.
+              {t('Por número de películas suyas que has visto, contando lo reproducido en Plex y lo que tienes marcado en Letterboxd. Solo entran las que están emparejadas con tu biblioteca: de una entrada de Letterboxd suelta no se sabe quién la dirigió.')}
             </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
               {data.directorsMostWatched.map((d, i) => (
@@ -193,7 +191,7 @@ export default function WatchStats() {
                   <span className="min-w-0 flex-1">
                     <span className="text-sm font-medium text-zinc-200 block truncate">{d.name}</span>
                     <span className="text-xs text-zinc-500">
-                      <b className="text-gold-400 tabular">{d.watched}</b> vistas de {d.total} suyas que tienes
+                      <b className="text-gold-400 tabular">{d.watched}</b> {t('vistas de {total} suyas que tienes', { total: d.total })}
                     </span>
                   </span>
                 </Link>
@@ -208,8 +206,8 @@ export default function WatchStats() {
           una sola sección, con la de MDBList cuando hay notas y la de la
           biblioteca como respaldo. */}
       <InsightGrid
-        title="🏛️ Lo mejor valorado que tienes sin ver"
-        hint="Películas de tu Plex que ni has reproducido ni tienes marcadas en Letterboxd, ordenadas por la nota combinada de MDBList."
+        title={t('🏛️ Lo mejor valorado que tienes sin ver')}
+        hint={t('Películas de tu Plex que ni has reproducido ni tienes marcadas en Letterboxd, ordenadas por la nota combinada de MDBList.')}
         items={ins?.consensusUnwatched?.length ? ins.consensusUnwatched : data.unwatchedTopRated}
         caption={(m) => {
           const score = m.score ?? m.mdb_score;
@@ -223,42 +221,42 @@ export default function WatchStats() {
       {ins && (
         <>
           <InsightGrid
-            title="🏅 «Must-see» de Metacritic que tienes sin ver (metascore ≥ 81)"
-            hint="El listón de consenso crítico más exigente, avalado por volumen de votos en IMDb. Todo sale de las notas de MDBList ya descargadas."
+            title={t('🏅 «Must-see» de Metacritic que tienes sin ver (metascore ≥ 81)')}
+            hint={t('El listón de consenso crítico más exigente, avalado por volumen de votos en IMDb. Todo sale de las notas de MDBList ya descargadas.')}
             items={ins.mustSee}
             caption={(m) => `MC ${m.metacritic}${m.imdb != null ? ` · IMDb ${Number(m.imdb).toFixed(1)}` : ''}`}
             onSelect={setSelected}
           />
           <InsightGrid
-            title="💎 Joyas tuyas que la crítica no entendió (tu nota LB ≥ 8, RT ≤ 55%)"
+            title={t('💎 Joyas tuyas que la crítica no entendió (tu nota LB ≥ 8, RT ≤ 55%)')}
             items={ins.hiddenGems}
-            caption={(m) => `Tú: ${Number(m.my_rating).toFixed(1)} · 🍅 ${m.rt_critic}%`}
+            caption={(m) => t('Tú: {r} · 🍅 {rt}%', { r: Number(m.my_rating).toFixed(1), rt: m.rt_critic })}
             onSelect={setSelected}
           />
           <InsightGrid
-            title="🎈 El mundo las ama, tú no (tu nota LB ≤ 5, consenso ≥ 75)"
+            title={t('🎈 El mundo las ama, tú no (tu nota LB ≤ 5, consenso ≥ 75)')}
             items={ins.overrated}
-            caption={(m) => `Tú: ${Number(m.my_rating).toFixed(1)} · Σ ${m.score}`}
+            caption={(m) => t('Tú: {r} · Σ {s}', { r: Number(m.my_rating).toFixed(1), s: m.score })}
             onSelect={setSelected}
           />
           <InsightGrid
-            title="↔️ Donde más discrepas de la comunidad de Letterboxd"
+            title={t('↔️ Donde más discrepas de la comunidad de Letterboxd')}
             items={ins.letterboxdDivergence}
-            caption={(m) => `Tú: ${Number(m.my_rating).toFixed(1)}/10 · comunidad ${Number(m.letterboxd).toFixed(1)}/10`}
+            caption={(m) => t('Tú: {r}/10 · comunidad {c}/10', { r: Number(m.my_rating).toFixed(1), c: Number(m.letterboxd).toFixed(1) })}
             onSelect={setSelected}
           />
         </>
       )}
 
       {lbCompare?.length > 0 && (
-        <Section title="Tus notas de Letterboxd vs. la comunidad">
+        <Section title={t('Tus notas de Letterboxd vs. la comunidad')}>
           <div className="card p-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-zinc-500 text-left border-b border-ink-700">
-                  <th className="py-2">Título</th><th>Año</th>
-                  <th className="text-right">Tu nota /10</th>
-                  <th className="text-right">Comunidad LB /10</th>
+                  <th className="py-2">{t('Título')}</th><th>{t('Año')}</th>
+                  <th className="text-right">{t('Tu nota /10')}</th>
+                  <th className="text-right">{t('Comunidad LB /10')}</th>
                   <th className="text-right">Σ MDBList</th>
                 </tr>
               </thead>
@@ -280,9 +278,9 @@ export default function WatchStats() {
         </Section>
       )}
 
-      <Section title="Vistas recientemente">
+      <Section title={t('Vistas recientemente')}>
         {data.recentlyViewed.length === 0 ? (
-          <Empty>Plex no registra visionados aún.</Empty>
+          <Empty>{t('Plex no registra visionados aún.')}</Empty>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-12 gap-3">
             {data.recentlyViewed.map((m) => (
