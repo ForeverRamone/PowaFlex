@@ -1,7 +1,7 @@
 {
   "name": "powaflex-server",
-  "version": "1.0.2-beta",
-  "versionLabel": "Beta 1.02",
+  "version": "1.0.3-beta",
+  "versionLabel": "Beta 1.03",
   "private": true,
   "type": "module",
   "scripts": {

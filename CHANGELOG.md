@@ -1,5 +1,22 @@
 # Changelog
 
+## Beta 1.03 (1.0.3-beta) — 2026-08-06
+
+**Estrenos: plataformas y VOD, ahora también de EE UU.** La pestaña de plataformas pasa a
+llamarse «Plataformas y VOD» y deja de ser solo un nombre: el alquiler y la compra ya se ven y se
+filtran. Y hay una cuarta pestaña con lo mismo para Estados Unidos.
+
+- **Nueva pestaña «Plataformas y VOD · EE UU»**: estrenos digitales de la región US con su propio
+  «dónde verla» (Max, Hulu, Peacock, Criterion Channel…). No cuesta ni una llamada más a TMDB: la
+  caché de proveedores es por película y ya guardaba todas las regiones.
+- **El VOD deja de ser un sí/no.** Antes, una película que solo se alquilaba ponía
+  «alquiler/compra» sin decir dónde, y no aparecía en el desplegable de plataforma. Ahora se
+  recogen los **nombres** de dónde se alquila o compra, la ficha los muestra («VOD: Apple TV», en
+  tinta más apagada para distinguir lo que se paga por título de lo que ya tienes con tu
+  suscripción) y el filtro —ahora «Plataforma o VOD»— busca en ambas.
+- La caché de estrenos sube a v2: al actualizar, cada pestaña se reconstruye una vez para traer
+  los datos nuevos.
+
 ## Beta 1.02 (1.0.2-beta) — 2026-08-06
 
 **Arreglo urgente de la 1.01: tres páginas rotas.** Taller, Descubrir huecos y Estrenos morían

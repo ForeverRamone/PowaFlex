@@ -220,8 +220,8 @@ export default function About() {
             {t('Qué acaba de llegar y qué viene: a los')}{' '}
             <b>{t('cines de España')}</b>{t(', a los')}{' '}
             <b>{t('cines de EE UU')}</b> {t('y a las')}{' '}
-            <b>{t('plataformas españolas')}</b>{' '}
-            {t('(fecha de estreno digital de TMDB, con chips de dónde verla: Netflix, Filmin, Movistar…). Solo cine largometraje, con ventana de 7/30/90 días más lo próximo, y los filtros de la casa: listón Σ de MDBList para separar el estreno que importa del relleno, Me faltan / Las tengo, tipos, plataforma concreta, y envío a Radarr suelto o en bloque.')}
+            <b>{t('plataformas y VOD de España y de EE UU')}</b>{' '}
+            {t('(fecha de estreno digital de TMDB, con chips de dónde verla en cada país: Netflix, Filmin, Movistar…, y con nombre también cuando solo se alquila). Solo cine largometraje, con ventana de 7/30/90 días más lo próximo, y los filtros de la casa: listón Σ de MDBList para separar el estreno que importa del relleno, Me faltan / Las tengo, tipos, plataforma o VOD concretos, y envío a Radarr suelto o en bloque.')}
           </p>
         </Block>
         <Block icon="🏆" title={t('Listas y retos')} to="/listas">

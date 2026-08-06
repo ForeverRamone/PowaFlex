@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { esLargometraje, partirPorFecha, RELEASE_KINDS } from '../src/releases.js';
+import { esLargometraje, partirPorFecha, RELEASE_KINDS, providersDeRegion } from '../src/releases.js';
 
 test('esLargometraje: solo cine largometraje', () => {
   assert.equal(esLargometraje({ runtime: 95 }), true);
@@ -35,9 +35,38 @@ test('partirPorFecha: recientes hacia atrás, próximas hacia delante', () => {
   assert.deepEqual(upcoming.map((r) => r.title), ['mañana', 'lejos', 'sin fecha']);
 });
 
-test('las tres pestañas existen con su región y tipo', () => {
+test('las cuatro pestañas existen con su región y tipo', () => {
   assert.equal(RELEASE_KINDS['cine-es'].region, 'ES');
   assert.equal(RELEASE_KINDS['cine-us'].region, 'US');
   assert.equal(RELEASE_KINDS['plataformas-es'].types, '4');
   assert.equal(RELEASE_KINDS['plataformas-es'].providers, true);
+  // plataformas y VOD de EE UU: mismo tipo digital, otra región — el «dónde
+  // verla» sale de results.US de la MISMA caché de providers, sin llamadas extra
+  assert.equal(RELEASE_KINDS['plataformas-us'].region, 'US');
+  assert.equal(RELEASE_KINDS['plataformas-us'].types, '4');
+  assert.equal(RELEASE_KINDS['plataformas-us'].providers, true);
+  // las de cine NO piden providers: son cartelera, no dónde verla en casa
+  assert.ok(!RELEASE_KINDS['cine-es'].providers && !RELEASE_KINDS['cine-us'].providers);
+});
+
+test('providersDeRegion separa lo incluido del VOD, con nombres', () => {
+  const { providers, vod } = providersDeRegion({
+    flatrate: [{ provider_name: 'Filmin' }, { provider_name: 'MUBI' }],
+    ads: [{ provider_name: 'Plex' }],
+    rent: [{ provider_name: 'Apple TV' }, { provider_name: 'Amazon Video' }],
+    buy: [{ provider_name: 'Apple TV' }], // el mismo en alquiler y compra: una vez
+  });
+  assert.deepEqual(providers, ['Filmin', 'MUBI', 'Plex']);
+  assert.deepEqual(vod, ['Apple TV', 'Amazon Video']);
+});
+
+test('providersDeRegion: solo alquiler ya trae dónde, y una región vacía no rompe', () => {
+  // este era el agujero: sin nombres, la ficha decía «alquiler/compra» a secas
+  // y el filtro por plataforma no podía verla
+  assert.deepEqual(providersDeRegion({ rent: [{ provider_name: 'Movistar Plus+' }] }), {
+    providers: [],
+    vod: ['Movistar Plus+'],
+  });
+  assert.deepEqual(providersDeRegion({}), { providers: [], vod: [] });
+  assert.deepEqual(providersDeRegion(undefined), { providers: [], vod: [] });
 });

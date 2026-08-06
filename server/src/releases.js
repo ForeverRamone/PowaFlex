@@ -10,11 +10,11 @@ const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
 
 /**
- * Estrenos: qué llega (y qué acaba de llegar) a los cines de España y de
- * EE UU y a las plataformas españolas. La lista sale del discover de TMDB
- * acotado por región y tipo de estreno —la única fuente consistente de fechas
- * por país—; el «dónde verla» de plataformas sale de los watch providers de
- * TMDB (datos de JustWatch licenciados). Solo largometrajes: fuera cortos,
+ * Estrenos: qué llega (y qué acaba de llegar) a los cines y a las plataformas
+ * y VOD de España y de EE UU. La lista sale del discover de TMDB acotado por
+ * región y tipo de estreno —la única fuente consistente de fechas por país—;
+ * el «dónde verla» sale de los watch providers de TMDB (datos de JustWatch
+ * licenciados) de esa misma región. Solo largometrajes: fuera cortos,
  * telefilmes y vídeos, que discover también lista.
  */
 export const RELEASE_KINDS = {
@@ -22,6 +22,7 @@ export const RELEASE_KINDS = {
   'cine-es': { region: 'ES', types: '3|2' },
   'cine-us': { region: 'US', types: '3|2' },
   'plataformas-es': { region: 'ES', types: '4', providers: true },
+  'plataformas-us': { region: 'US', types: '4', providers: true },
 };
 
 const RECENT_PAGES = 3; // 60 títulos por popularidad bastan: el resto es cola
@@ -79,18 +80,31 @@ async function discoverWindow(kind, gte, lte, pages) {
   return { results: out, errors };
 }
 
-// las plataformas de España donde está disponible, para los chips y el filtro
-async function attachProviders(items, { concurrency = 6 } = {}) {
+/**
+ * Reparte los proveedores de una región de TMDB en las dos formas de ver una
+ * película, que para el bolsillo NO son lo mismo: `providers` es lo que ya
+ * tienes pagado (suscripción o gratis con anuncios) y `vod` lo que se paga por
+ * título (alquiler o compra). Antes el alquiler era un sí/no sin nombres, así
+ * que una película solo alquilable ponía «alquiler/compra» y no se podía
+ * filtrar por dónde. Pura y exportada para poder testearla.
+ */
+export function providersDeRegion(reg = {}) {
+  const incluido = [...(reg.flatrate || []), ...(reg.ads || [])].map((p) => p.provider_name);
+  const vod = [...(reg.rent || []), ...(reg.buy || [])].map((p) => p.provider_name);
+  return { providers: [...new Set(incluido)], vod: [...new Set(vod)] };
+}
+
+// Dónde está disponible en ESA región, para los chips y el filtro. La caché es
+// por película y guarda la respuesta entera de TMDB (todas las regiones), así
+// que servir también EE UU no cuesta ni una llamada más.
+async function attachProviders(items, region, { concurrency = 6 } = {}) {
   await mapPool(items, concurrency, async (i) => {
     try {
       const data = await tmdbGet(`/movie/${i.tmdb_id}/watch/providers`, {}, { cacheKey: `movie_prov:${i.tmdb_id}`, cacheMs: 3 * DAY });
-      const es = data?.results?.ES || {};
-      const flat = [...(es.flatrate || []), ...(es.ads || [])].map((p) => p.provider_name);
-      i.providers = [...new Set(flat)];
-      i.rentBuy = !!(es.rent?.length || es.buy?.length);
+      Object.assign(i, providersDeRegion(data?.results?.[region]));
     } catch {
       i.providers = [];
-      i.rentBuy = false;
+      i.vod = [];
     }
   });
 }
@@ -141,7 +155,7 @@ export async function releases({ kind = 'cine-es', window = 30, refresh = false 
     i.watched = isWatched({ tmdb_id: i.tmdb_id, title: i.title, year }, widx);
   }
 
-  if (RELEASE_KINDS[kind].providers) await attachProviders(features);
+  if (RELEASE_KINDS[kind].providers) await attachProviders(features, RELEASE_KINDS[kind].region);
   await enrichWithScores(features, { maxFetch: 250 });
 
   const { recent, upcoming } = partirPorFecha(features, hoy);

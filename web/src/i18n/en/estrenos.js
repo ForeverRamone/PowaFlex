@@ -1,8 +1,9 @@
-// Traducciones EN de Estrenos.jsx (Estrenos: cines ES/US y plataformas ES). Clave = texto castellano.
+// Traducciones EN de Estrenos.jsx (cines ES/US y plataformas y VOD ES/US). Clave = texto castellano.
 export default {
   'Cines · España': 'Theaters · Spain',
   'Cines · EE UU': 'Theaters · US',
-  'Plataformas · España': 'Streaming · Spain',
+  'Plataformas y VOD · España': 'Streaming & VOD · Spain',
+  'Plataformas y VOD · EE UU': 'Streaming & VOD · US',
   'Esta semana': 'This week',
   'Último mes': 'Last month',
   'Últimos 3 meses': 'Last 3 months',
@@ -12,6 +13,8 @@ export default {
   'Más votadas': 'Most voted',
   'sin fecha': 'no date',
   'alquiler/compra': 'rent/buy',
+  'VOD': 'VOD',
+  'Plataforma o VOD': 'Platform or VOD',
   'No me interesa: no volverá a aparecer (compartido con Descubrir)':
     'Not interested: it will not show up again (shared with Discover)',
   '↩︎ «{title}» vuelve a la lista': '↩︎ “{title}” is back on the list',
@@ -21,12 +24,11 @@ export default {
   'Qué acaba de llegar y qué viene: a los ': "What just landed and what's coming: in ",
   'cines de España y de EE UU': 'theaters in Spain and the US',
   ' y a las ': ' and on ',
-  'plataformas españolas': 'Spanish streaming platforms',
-  ' (fecha de estreno digital de TMDB, con dónde verla). Solo cine largometraje. El listón Σ separa el estreno que importa del relleno de cartelera; lo aún sin nota no se oculta.':
-    ' (TMDB digital release date, with where to watch). Feature films only. The Σ bar separates the release that matters from the filler in the listings; titles without a score yet are not hidden.',
+  'plataformas y VOD de España y de EE UU': 'streaming and VOD in Spain and the US',
+  ' (fecha de estreno digital de TMDB, con dónde verla en cada país). Solo cine largometraje. El listón Σ separa el estreno que importa del relleno de cartelera; lo aún sin nota no se oculta.':
+    ' (TMDB digital release date, with where to watch in each country). Feature films only. The Σ bar separates the release that matters from the filler in the listings; titles without a score yet are not hidden.',
   'Estrenadas en:': 'Released in:',
   'Ordenar:': 'Sort:',
-  'Plataforma': 'Platform',
   'Todas': 'All',
   'Me faltan': 'Missing',
   'Las tengo': 'Owned',
@@ -42,6 +44,6 @@ export default {
   'Nada que enseñar con estos filtros.': 'Nothing to show with these filters.',
   'Ya estrenadas': 'Already released',
   'Próximas': 'Upcoming',
-  '{n} en plataformas en 60 días': '{n} on streaming in the next 60 days',
+  '{n} en plataformas y VOD en 60 días': '{n} on streaming & VOD in the next 60 days',
   '{n} en cines en 60 días': '{n} in theaters in the next 60 days',
 };

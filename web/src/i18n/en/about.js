@@ -179,9 +179,9 @@ export default {
   ', a los': ', to',
   'cines de EE UU': 'US theaters',
   'y a las': 'and to',
-  'plataformas españolas': 'Spanish streaming platforms',
-  '(fecha de estreno digital de TMDB, con chips de dónde verla: Netflix, Filmin, Movistar…). Solo cine largometraje, con ventana de 7/30/90 días más lo próximo, y los filtros de la casa: listón Σ de MDBList para separar el estreno que importa del relleno, Me faltan / Las tengo, tipos, plataforma concreta, y envío a Radarr suelto o en bloque.':
-    '(TMDB digital release date, with chips showing where to watch: Netflix, Filmin, Movistar…). Feature films only, with a 7/30/90-day window plus what\'s next, and the house filters: an MDBList Σ bar to separate the release that matters from the filler, Missing / Owned, types, a specific platform, and Radarr sending one by one or in bulk.',
+  'plataformas y VOD de España y de EE UU': 'streaming and VOD in Spain and the US',
+  '(fecha de estreno digital de TMDB, con chips de dónde verla en cada país: Netflix, Filmin, Movistar…, y con nombre también cuando solo se alquila). Solo cine largometraje, con ventana de 7/30/90 días más lo próximo, y los filtros de la casa: listón Σ de MDBList para separar el estreno que importa del relleno, Me faltan / Las tengo, tipos, plataforma o VOD concretos, y envío a Radarr suelto o en bloque.':
+    '(TMDB digital release date, with chips showing where to watch in each country: Netflix, Filmin, Movistar…, named too when it is rent-only). Feature films only, with a 7/30/90-day window plus what\'s next, and the house filters: an MDBList Σ bar to separate the release that matters from the filler, Missing / Owned, types, a specific platform or VOD service, and Radarr sending one by one or in bulk.',
 
   // Listas y retos
   'Listas y retos': 'Lists & challenges',

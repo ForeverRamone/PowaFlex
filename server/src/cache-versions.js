@@ -32,7 +32,9 @@ export const CACHE_VERSIONS = {
   // con vista de nominadas por año
   festival: 6,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
-  releases: 1,
+  // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
+  // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)
+  releases: 2,
 };
 
 /** Prefijo con versión de una caché: `calendar:v7`, `discover_gaps:v7`… */

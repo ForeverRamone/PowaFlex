@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Ticket, Flag, MonitorPlay, Plus, RotateCw } from 'lucide-react';
+import { Ticket, Flag, MonitorPlay, Tv, Plus, RotateCw } from 'lucide-react';
 import {
   ErrorBox, TmdbCard, RadarrButton, Empty, BuildProgress, PageHeader, Select,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, MinScoreBar, passesScore,
@@ -13,9 +13,12 @@ import { t, locale } from '../i18n.js';
 const TABS = [
   ['cine-es', 'Cines · España', Ticket],
   ['cine-us', 'Cines · EE UU', Flag],
-  ['plataformas-es', 'Plataformas · España', MonitorPlay],
+  ['plataformas-es', 'Plataformas y VOD · España', MonitorPlay],
+  ['plataformas-us', 'Plataformas y VOD · EE UU', Tv],
 ];
-const TAB_KEYS = new Set(TABS.map(([t]) => t));
+const TAB_KEYS = new Set(TABS.map(([key]) => key));
+// las dos pestañas de plataformas traen el «dónde verla» de su región
+const esPlataformas = (tab) => tab.startsWith('plataformas-');
 
 const WINDOWS = [
   ['7', 'Esta semana'],
@@ -35,6 +38,9 @@ function fmtFecha(iso) {
   return new Date(`${iso}T12:00:00`).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 }
 
+/** Dos nombres y «+N»: en una carátula pequeña no cabe más. */
+const resumen = (lista) => lista.slice(0, 2).join(' · ') + (lista.length > 2 ? ` +${lista.length - 2}` : '');
+
 function EstrenoCard({ f, radarrIds, addRadarrId, onDismiss, conProviders }) {
   return (
     <TmdbCard item={f}>
@@ -44,10 +50,19 @@ function EstrenoCard({ f, radarrIds, addRadarrId, onDismiss, conProviders }) {
           Σ {f.mdb.score}{f.mdb.imdb != null ? ` · IMDb ${Number(f.mdb.imdb).toFixed(1)}` : ''}
         </div>
       )}
-      {conProviders && (f.providers?.length > 0 || f.rentBuy) && (
-        <div className="text-[11px] text-zinc-400 truncate" title={(f.providers || []).join(', ')}>
-          {f.providers?.length ? f.providers.slice(0, 2).join(' · ') : t('alquiler/compra')}
-          {f.providers?.length > 2 ? ` +${f.providers.length - 2}` : ''}
+      {/* primero lo que ya tienes pagado; si solo se alquila, el VOD con nombre
+          y en tinta más apagada, que no es lo mismo pagar por título */}
+      {conProviders && (f.providers?.length > 0 || f.vod?.length > 0) && (
+        <div
+          className={`text-[11px] truncate ${f.providers?.length ? 'text-zinc-400' : 'text-zinc-500'}`}
+          title={[
+            ...(f.providers || []),
+            ...(f.vod || []).map((v) => `${v} (${t('alquiler/compra')})`),
+          ].join(', ')}
+        >
+          {f.providers?.length
+            ? resumen(f.providers)
+            : `${t('VOD')}: ${resumen(f.vod)}`}
         </div>
       )}
       <div className="flex items-center gap-1">
@@ -67,10 +82,10 @@ function EstrenoCard({ f, radarrIds, addRadarrId, onDismiss, conProviders }) {
 }
 
 /**
- * Estrenos: lo que llega a los cines de España y de EE UU y a las plataformas
- * españolas, recién estrenado y venidero, con los filtros de la casa — el
- * listón Σ de MDBList sobre todo, que es lo que separa el estreno que importa
- * del relleno de cartelera.
+ * Estrenos: lo que llega a los cines y a las plataformas y VOD de España y de
+ * EE UU, recién estrenado y venidero, con los filtros de la casa — el listón Σ
+ * de MDBList sobre todo, que es lo que separa el estreno que importa del
+ * relleno de cartelera.
  */
 export default function Estrenos() {
   const [params, setParams] = useSearchParams();
@@ -132,7 +147,7 @@ export default function Estrenos() {
   const limpiarFiltros = () => { setMinScore(0); setOwn(''); setSort('fecha'); setProvider(''); resetTypes(); };
   const hayFiltros = minScore > 0 || own || sort !== 'fecha' || provider;
 
-  const conProviders = tab === 'plataformas-es';
+  const conProviders = esPlataformas(tab);
   const visibles = (list) => {
     let out = list.filter(
       (f) =>
@@ -140,7 +155,8 @@ export default function Estrenos() {
         matchesTypeFilters(f, show) &&
         passesScore(f, minScore) &&
         (own === '' || (own === 'missing' ? !f.owned : !!f.owned)) &&
-        (!provider || (f.providers || []).includes(provider))
+        // el filtro mira las dos formas: donde está incluida y donde se alquila
+        (!provider || (f.providers || []).includes(provider) || (f.vod || []).includes(provider))
     );
     if (SORTS[sort]?.fn) out = [...out].sort(SORTS[sort].fn);
     return out;
@@ -150,7 +166,11 @@ export default function Estrenos() {
   const ocultas = (data ? (data.recent?.length || 0) + (data.upcoming?.length || 0) : 0) - recent.length - upcoming.length;
   // el filtro por plataforma se construye con lo que la carga trae de verdad
   const providerOptions = conProviders
-    ? [...new Set([...(data?.recent || []), ...(data?.upcoming || [])].flatMap((f) => f.providers || []))].sort()
+    ? [
+        ...new Set(
+          [...(data?.recent || []), ...(data?.upcoming || [])].flatMap((f) => [...(f.providers || []), ...(f.vod || [])])
+        ),
+      ].sort()
     : [];
 
   const pendingIds = [...recent, ...upcoming].filter((f) => !f.owned && !radarrIds.has(f.tmdb_id)).map((f) => f.tmdb_id);
@@ -184,7 +204,7 @@ export default function Estrenos() {
       <PageHeader eyebrow={t('La caza')} title={t('Estrenos')} />
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
         {t('Qué acaba de llegar y qué viene: a los ')}<b>{t('cines de España y de EE UU')}</b>{t(' y a las ')}
-        <b>{t('plataformas españolas')}</b>{t(' (fecha de estreno digital de TMDB, con dónde verla). Solo cine largometraje. El listón Σ separa el estreno que importa del relleno de cartelera; lo aún sin nota no se oculta.')}
+        <b>{t('plataformas y VOD de España y de EE UU')}</b>{t(' (fecha de estreno digital de TMDB, con dónde verla en cada país). Solo cine largometraje. El listón Σ separa el estreno que importa del relleno de cartelera; lo aún sin nota no se oculta.')}
       </p>
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -209,7 +229,7 @@ export default function Estrenos() {
           <Select className="!py-1 text-xs" value={sort} onChange={setSort}
             options={Object.entries(SORTS).map(([k, s]) => [k, t(s.label)])} />
           {conProviders && providerOptions.length > 0 && (
-            <Select className="!py-1 text-xs" value={provider} onChange={setProvider} placeholder={t('Plataforma')}
+            <Select className="!py-1 text-xs" value={provider} onChange={setProvider} placeholder={t('Plataforma o VOD')}
               options={providerOptions.map((p) => [p, p])} />
           )}
         </div>
@@ -271,7 +291,7 @@ export default function Estrenos() {
               {upcoming.length > 0 && (
                 <section className="mb-8">
                   <h2 className="font-semibold text-zinc-100 mb-3">
-                    {t('Próximas')} <span className="text-zinc-500 text-sm font-normal">· {t(tab === 'plataformas-es' ? '{n} en plataformas en 60 días' : '{n} en cines en 60 días', { n: upcoming.length })}</span>
+                    {t('Próximas')} <span className="text-zinc-500 text-sm font-normal">· {t(conProviders ? '{n} en plataformas y VOD en 60 días' : '{n} en cines en 60 días', { n: upcoming.length })}</span>
                   </h2>
                   {grid(upcoming)}
                 </section>
