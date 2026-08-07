@@ -43,9 +43,6 @@ export default {
 
   // ── integraciones ──
   'Falta la API key de TMDB en Ajustes': 'The TMDB API key is missing in Settings',
-  'Bazarr no está configurado': 'Bazarr is not set up',
-  'Sin id de Radarr: sincroniza Radarr y vuelve a intentarlo':
-    'No Radarr id: sync Radarr and try again',
 
   // ── imágenes ──
   'sin imagen': 'no image',

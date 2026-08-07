@@ -163,17 +163,6 @@ export default {
   'La descarga son unos 8 MB comprimidos y tarda un par de minutos. El pase nocturno la repite sola una vez por semana, así que no hace falta que la lances a mano.':
     'The download is about 8 MB compressed and takes a couple of minutes. The nightly run repeats it on its own once a week, so you do not need to trigger it by hand.',
 
-  // ── Bazarr ─────────────────────────────────────────────────────────────────
-  '(opcional: buscar los subtítulos que faltan)': '(optional: search for missing subtitles)',
-  'Con Bazarr configurado, desde la pestaña Subtítulos del Taller puedes pedirle que busque los subtítulos que a una película le faltan, sin salir de PowaFlex.':
-    'With Bazarr configured, from the Subtitles tab in the Workshop you can ask it to search for the subtitles a movie is missing, without leaving PowaFlex.',
-  'URL de Bazarr': 'Bazarr URL',
-  '¿Dónde está la API key de Bazarr?': 'Where is the Bazarr API key?',
-  'En Bazarr: ': 'In Bazarr: ',
-  '. La URL es la misma con la que abres Bazarr en el navegador, típicamente el puerto ':
-    '. The URL is the same one you open Bazarr with in your browser, typically port ',
-  'Bazarr localiza las películas por su id de Radarr, así que necesita Radarr configurado y sincronizado más arriba.':
-    'Bazarr finds movies by their Radarr id, so it needs Radarr configured and synced above.',
 
   // ── Aspecto ────────────────────────────────────────────────────────────────
   'Aspecto': 'Appearance',
@@ -190,16 +179,8 @@ export default {
   '«Clásico» recupera la paleta y la tipografía anteriores al rediseño. Los iconos y la agrupación del menú son comunes a los dos.':
     '“Classic” brings back the palette and typography from before the redesign. Icons and menu grouping are shared by both.',
 
-  // ── Criterio de subtítulos ─────────────────────────────────────────────────
-  'Criterio de subtítulos': 'Subtitle criteria',
-  'Elige qué pistas de subtítulos te sirven, en cualquier combinación. Una película cuenta como cubierta si tiene al menos una de las marcadas. Sin ninguna marcada, la auditoría de subtítulos se apaga.':
-    'Choose which subtitle tracks work for you, in any combination. A movie counts as covered if it has at least one of the ticked ones. With none ticked, the subtitle audit is switched off.',
-  'Versión original||ajustes': 'Original language',
-  'Español||ajustes': 'Spanish',
-  'Inglés||ajustes': 'English',
   '«Versión original» es el idioma en que se rodó cada película, según TMDB: para el cine japonés vale una pista japonesa, para el francés una francesa.':
     '“Original language” is the language each movie was shot in, according to TMDB: for Japanese cinema a Japanese track works, for French cinema a French one.',
-  'Ver el resultado en Taller → Subtítulos →': 'See the result in Workshop → Subtitles →',
 
   // ── Notas y puntuaciones ───────────────────────────────────────────────────
   'Notas y puntuaciones que mostrar': 'Ratings and scores to show',

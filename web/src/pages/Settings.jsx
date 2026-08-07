@@ -793,36 +793,6 @@ export default function Settings() {
         </p>
       </section>
 
-      {/* BAZARR */}
-      <section className="card p-5 mb-5">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-zinc-100">
-            Bazarr <span className="text-zinc-500 text-xs font-normal">{t('(opcional: buscar los subtítulos que faltan)')}</span>
-          </h2>
-          <TestBadge result={tests.bazarr} />
-        </div>
-        <p className="text-xs text-zinc-500 mt-1 max-w-2xl">
-          {t('Con Bazarr configurado, desde la pestaña Subtítulos del Taller puedes pedirle que busque los subtítulos que a una película le faltan, sin salir de PowaFlex.')}
-        </p>
-        <div className="grid sm:grid-cols-2 gap-3 mt-3">
-          <div>
-            <label className="text-xs text-zinc-400">{t('URL de Bazarr')}</label>
-            <input className="input mt-1" placeholder="http://192.168.1.50:6767" value={s.bazarr_url || ''} onChange={set('bazarr_url')} />
-          </div>
-          <div>
-            <label className="text-xs text-zinc-400">API key</label>
-            <input className="input mt-1" type="password" autoComplete="off" placeholder="Bazarr → Settings → General" value={s.bazarr_key || ''} onChange={set('bazarr_key')} />
-          </div>
-        </div>
-        <div className="mt-3 flex gap-2">
-          <button className="btn-ghost" onClick={() => test('bazarr')}>{t('Probar conexión')}</button>
-        </div>
-        <Guide title={t('¿Dónde está la API key de Bazarr?')}>
-          <p>{t('En Bazarr: ')}<b>Settings → General → Security → API Key</b>{t('. La URL es la misma con la que abres Bazarr en el navegador, típicamente el puerto ')}<b>6767</b>.</p>
-          <p>{t('Bazarr localiza las películas por su id de Radarr, así que necesita Radarr configurado y sincronizado más arriba.')}</p>
-        </Guide>
-      </section>
-
       <LetterboxdSection />
 
       {/* LOOK */}
@@ -849,45 +819,6 @@ export default function Settings() {
           {t('«Clásico» recupera la paleta y la tipografía anteriores al rediseño. Los iconos y la agrupación del menú son comunes a los dos.')}
         </p>
       </section>
-
-      {/* CRITERIO DE SUBTÍTULOS */}
-      {(() => {
-        // el sufijo «||» acota la clave a esta pantalla: las mismas etiquetas las
-        // pinta el Taller desde el servidor y no deben compartir entrada
-        const SUBS = [['vo', 'Versión original||ajustes'], ['spa', 'Español||ajustes'], ['eng', 'Inglés||ajustes']];
-        const marcados = (s.subs_ok_langs || '').split(',').map((x) => x.trim()).filter(Boolean);
-        const alternar = (k) => {
-          const next = marcados.includes(k) ? marcados.filter((x) => x !== k) : [...marcados, k];
-          // se reordena según SUBS para que el CSV guardado no dependa del orden
-          // en que hayas ido pulsando las casillas
-          setS({ ...s, subs_ok_langs: SUBS.map(([key]) => key).filter((key) => next.includes(key)).join(',') });
-        };
-        return (
-          <section className="card p-5 mb-5">
-            <h2 className="font-semibold text-zinc-100 mb-1">{t('Criterio de subtítulos')}</h2>
-            <p className="text-xs text-zinc-500 mb-3 max-w-2xl">
-              {t('Elige qué pistas de subtítulos te sirven, en cualquier combinación. Una película cuenta como cubierta si tiene al menos una de las marcadas. Sin ninguna marcada, la auditoría de subtítulos se apaga.')}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {SUBS.map(([k, label]) => (
-                <label
-                  key={k}
-                  className={`btn-ghost !py-1.5 flex items-center gap-2 select-none cursor-pointer ${marcados.includes(k) ? '!border-gold-400 text-gold-400' : 'opacity-60'}`}
-                >
-                  <input type="checkbox" className="accent-gold-500" checked={marcados.includes(k)} onChange={() => alternar(k)} />
-                  {t(label)}
-                </label>
-              ))}
-            </div>
-            <p className="text-[11px] text-zinc-500 mt-2">
-              {t('«Versión original» es el idioma en que se rodó cada película, según TMDB: para el cine japonés vale una pista japonesa, para el francés una francesa.')}
-            </p>
-            <div className="mt-3">
-              <Link to="/taller?tab=subs" className="btn-ghost !py-1 text-xs">{t('Ver el resultado en Taller → Subtítulos →')}</Link>
-            </div>
-          </section>
-        );
-      })()}
 
       {/* IDIOMA DE LA INTERFAZ */}
       <section className="card p-5 mb-5">

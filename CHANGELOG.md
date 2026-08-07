@@ -1,5 +1,24 @@
 # Changelog
 
+## Beta 1.05 (1.0.5-beta) — 2026-08-07
+
+**Fuera los subtítulos.** La auditoría de subtítulos que estrenó la 1.04 se retira entera: Bazarr
+ya hace ese trabajo y tener dos sitios diciendo cosas parecidas confundía más que ayudaba.
+
+- Desaparecen la **pestaña Subtítulos** del Taller, el criterio de idiomas de Ajustes, la
+  auditoría de audio en versión original y la integración con **Bazarr** (que solo existía para
+  pedirle búsquedas de subtítulos).
+- El sync **vuelve a leer solo la pista de vídeo**, como antes de la 1.04: nada de guardar las de
+  audio y subtítulo. Al arrancar se borra la tabla `movie_streams` —en una biblioteca grande eran
+  más de cien mil filas de dato muerto— y se limpian los ajustes que quedaban huérfanos,
+  **incluida la API key de Bazarr**, que si no se quedaría guardada sin dueño ni forma de borrarla.
+- Se retira también el paso nocturno que resolvía el idioma original de cada película, que solo
+  servía para el criterio «versión original».
+- Un marcador viejo a `/taller?tab=subs` no se rompe: cae en «Calidad y disco».
+
+Todo lo demás de la 1.04 sigue igual: los cuatro oficios nuevos, las notas de IMDb, la copia de
+seguridad automática, el veto al auto-Radarr y los mensajes del servidor en inglés.
+
 ## Beta 1.04 (1.0.4-beta) — 2026-08-06
 
 **El archivo y los oficios.** La versión más grande desde la reorganización: PowaFlex ya sabe si

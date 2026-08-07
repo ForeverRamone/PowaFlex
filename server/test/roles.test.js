@@ -115,11 +115,12 @@ test('seguir a alguien guarda EL oficio pedido, no uno colapsado', async () => {
   assert.equal(followFacets(id2, 'astronauta').role, 'director');
 });
 
-test('la clave de Bazarr se trata como credencial, no como ajuste normal', async () => {
-  // Se guardaba en claro y /api/settings la devolvía SIN enmascarar mientras
-  // las otras cuatro llegaban tapadas — y encima viaja en las copias nocturnas.
+test('todas las claves de servicio se tratan como credenciales', async () => {
+  // La lista estaba escrita dos veces y bastaba añadir un servicio en una para
+  // que la otra lo dejara al descubierto; en la 1.04 pasó con la de Bazarr, que
+  // se guardaba en claro y se servía sin enmascarar.
   const { SECRET_SETTING_KEYS } = await import('../src/db.js');
-  for (const k of ['plex_token', 'tmdb_key', 'radarr_key', 'mdblist_key', 'bazarr_key']) {
+  for (const k of ['plex_token', 'tmdb_key', 'radarr_key', 'mdblist_key']) {
     assert.ok(SECRET_SETTING_KEYS.has(k), `${k} debería tratarse como credencial`);
   }
 });

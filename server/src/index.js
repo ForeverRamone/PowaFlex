@@ -79,8 +79,6 @@ import {
 import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
 import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
 import { ROLES } from './roles.js';
-import { subtitleAudit, audioAudit, SUB_LANG_OPTIONS } from './subs.js';
-import { testBazarr, buscarSubtitulos, bazarrConfigured } from './bazarr.js';
 import { importImdbRatings, imdbInfo } from './imdb.js';
 import { listarCopias, hacerCopia, BACKUP_DIR } from './backup.js';
 import { festivalsIndex, festivalEdition, festivalWinners, festivalOverrideKey, festivalDirectorPacks } from './festivals.js';
@@ -222,7 +220,6 @@ const WRITABLE_SETTINGS = new Set([
   'cal_top_directors', 'cal_top_actors',
   'gaps_min_votes_director', 'gaps_min_votes_actor',
   'ratings_sources', 'primary_rating', 'ui_theme', 'ui_language', 'jw_country',
-  'subs_ok_langs', 'bazarr_url', 'bazarr_key',
   'backup_auto', 'backup_keep',
 ]);
 
@@ -294,7 +291,6 @@ app.post('/api/settings/test/:service', async (req, reply) => {
     if (service === 'plex') return await plexTest();
     if (service === 'tmdb') return await tmdbTest();
     if (service === 'radarr') return await radarrTest();
-    if (service === 'bazarr') return await testBazarr();
     if (service === 'mdblist') {
       const r = await mdbTest();
       if (r.limit) setSetting('mdblist_detected_limit', String(r.limit));
@@ -1296,26 +1292,6 @@ app.post('/api/radarr/auto/veto', async (req, reply) => {
 app.delete('/api/radarr/auto/veto/:tmdbId', async (req) => {
   db.prepare('DELETE FROM auto_radarr_vetoed WHERE tmdb_id = ?').run(Number(req.params.tmdbId));
   return { ok: true };
-});
-
-// ── Subtítulos y audio ────────────────────────────────────────────────────
-// La auditoría se calcula al vuelo: son consultas sobre movie_streams, que ya
-// está indexada, y así el criterio de Ajustes surte efecto al instante.
-app.get('/api/subs/audit', async (req) => {
-  const limit = Math.min(Number(req.query.limit) || 300, 1000);
-  return { ...subtitleAudit({ limit }), options: SUB_LANG_OPTIONS, bazarr: bazarrConfigured() };
-});
-app.get('/api/subs/audio-audit', async (req) => {
-  const limit = Math.min(Number(req.query.limit) || 300, 1000);
-  return audioAudit({ limit });
-});
-app.post('/api/subs/search/:radarrId', async (req, reply) => {
-  try {
-    return await buscarSubtitulos(Number(req.params.radarrId));
-  } catch (err) {
-    reply.code(400);
-    return { error: String(err.message || err) };
-  }
 });
 
 // ── Notas de IMDb ─────────────────────────────────────────────────────────

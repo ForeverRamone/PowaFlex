@@ -491,10 +491,9 @@ export async function enrichRuntimes(items, { concurrency = 6, withCredits = fal
       // With credits we can also count co-directors → "dirección coral" (#7).
       const det = await movieDetail(it.tmdb_id, { withCredits });
       it.runtime = det.runtime || null;
-      // el detalle ya trae estos dos y no costaban nada: el id de IMDb permite
-      // cruzar con el volcado de notas, y el idioma original es el criterio «VO»
+      // el detalle ya lo trae y no cuesta nada: el id de IMDb permite cruzar
+      // con el volcado local de notas para el umbral de ruido
       if (det.imdb_id) it.imdb_id = det.imdb_id;
-      if (det.original_language) it.original_language = det.original_language;
       if (det.genres?.length) classifyGenres(it, det.genres.map((x) => x.id));
       if (withCredits) {
         const dirs = new Set((det.credits?.crew || []).filter((c) => c.job === 'Director').map((c) => c.id));
@@ -748,41 +747,6 @@ export async function normalizeLibraryTitles({ concurrency = 6 } = {}) {
   });
   clearBuildProgress('titles:movies');
   return { checked: pending.length, renamed };
-}
-
-/**
- * Rellena el idioma original de la biblioteca. Sin esto, la columna existía y
- * nadie la escribía: el criterio «VO» de la auditoría de subtítulos no casaba
- * NUNCA y la auditoría de doblaje no acusaba a nadie — dos pantallas muertas.
- *
- * Va por tandas porque son 12.000 fichas: el detalle está cacheado para muchas,
- * pero no para todas. Cada noche avanza un trozo y devuelve lo que queda, para
- * poder decirlo en el histórico en vez de fingir que ya está.
- */
-export async function backfillOriginalLanguages({ budget = 1500, concurrency = 6 } = {}) {
-  const pend = db
-    .prepare('SELECT rating_key, tmdb_id FROM movies WHERE tmdb_id IS NOT NULL AND original_language IS NULL LIMIT ?')
-    .all(budget);
-  const quedan = () =>
-    db.prepare('SELECT COUNT(*) n FROM movies WHERE tmdb_id IS NOT NULL AND original_language IS NULL').get().n;
-  if (!pend.length) return { done: 0, pending: quedan() };
-
-  const upd = db.prepare('UPDATE movies SET original_language = ? WHERE rating_key = ?');
-  let done = 0;
-  await mapPool(pend, concurrency, async (r) => {
-    try {
-      const det = await movieDetail(r.tmdb_id);
-      if (det?.original_language) {
-        upd.run(det.original_language, r.rating_key);
-        done++;
-      }
-    } catch {
-      // sin red se reintenta la noche siguiente: no se marca nada
-    }
-    setBuildProgress('origlang', 'Idioma original de tu biblioteca', done, pend.length);
-  });
-  clearBuildProgress('origlang');
-  return { done, pending: quedan() };
 }
 
 /** El título internacional (inglés) de una película, cacheado 30 días. */

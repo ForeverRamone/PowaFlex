@@ -1,7 +1,7 @@
 import { db, getSetting, setSetting } from './db.js';
 import { runSync, syncStatus } from './plex.js';
 import { rematchLetterboxd, resolveUnmatchedLb, importLetterboxdRss } from './letterboxd.js';
-import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames, syncPersonChanges, backfillOriginalLanguages } from './tmdb.js';
+import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames, syncPersonChanges } from './tmdb.js';
 import { syncRatings } from './mdblist.js';
 import { radarrSyncMovies, checkDigitalReleases } from './radarr.js';
 import { runAutoRadarr } from './automation.js';
@@ -99,16 +99,6 @@ function buildSteps({ includeAutoRadarr }) {
         if (!ids.length) return 'sin favoritos';
         const r = await enrichPeopleLife(ids);
         return `${r?.done ?? ids.length} revisados · ${r?.deceased ?? 0} fallecidos/as`;
-      },
-    },
-    {
-      key: 'origlang',
-      label: 'Idioma original de las películas (para subtítulos y doblaje)',
-      // por tandas: son 12.000 fichas y el detalle no está cacheado para todas
-      enabled: () => has('tmdb_key'),
-      run: async () => {
-        const r = await backfillOriginalLanguages();
-        return r.pending ? `${r.done} resueltas · quedan ${r.pending}` : `${r.done} resueltas · al día`;
       },
     },
     {

@@ -109,10 +109,6 @@ const insertMoviePerson = db.prepare(
   'INSERT OR REPLACE INTO movie_people (movie_id, person_id, role, character, ord) VALUES (?, ?, ?, ?, ?)'
 );
 const deleteMoviePeople = db.prepare('DELETE FROM movie_people WHERE movie_id = ?');
-const delMovieStreams = db.prepare('DELETE FROM movie_streams WHERE movie_id = ?');
-const insMovieStream = db.prepare(
-  'INSERT OR REPLACE INTO movie_streams (movie_id, kind, lang, codec, forced) VALUES (?, ?, ?, ?, ?)'
-);
 
 const tagIdStmt = db.prepare('SELECT id FROM tags WHERE type = ? AND name = ?');
 const insertTag = db.prepare('INSERT INTO tags (type, name) VALUES (?, ?)');
@@ -238,34 +234,16 @@ export function applyDetail(ratingKey, meta) {
     // HDR / Dolby Vision / bit depth from video streams
     let hdr = null;
     let bitDepth = null;
-    // streamType: 1 = vídeo, 2 = audio, 3 = subtítulo. Hasta la 1.04 los dos
-    // últimos se descartaban aquí mismo aunque ya venían en la respuesta: por
-    // eso no se podía saber si una película se puede ver de verdad y en qué
-    // idioma. Ahora se guardan (los subtítulos externos también: Plex los
-    // lista igual, con su `key`).
-    const streams = new Map(); // clave compuesta → fila, para no repetir pistas
     for (const media of meta.Media || []) {
       for (const part of media.Part || []) {
         for (const s of part.Stream || []) {
-          if (s.streamType === 1) {
-            bitDepth = bitDepth || s.bitDepth || null;
-            if (s.DOVIPresent) hdr = 'Dolby Vision';
-            else if (!hdr && (s.colorTrc === 'smpte2084' || s.colorTrc === 'arib-std-b67')) hdr = 'HDR10';
-            continue;
-          }
-          if (s.streamType !== 2 && s.streamType !== 3) continue;
-          const kind = s.streamType === 2 ? 'audio' : 'sub';
-          // Plex da el ISO-639 en languageCode; sin él la pista existe pero no
-          // se sabe de qué idioma es, y eso es información en sí misma
-          const lang = (s.languageCode || '').toLowerCase() || null;
-          const codec = (s.codec || '').toLowerCase() || null;
-          const forced = s.forced ? 1 : 0;
-          streams.set(`${kind}|${lang}|${codec}|${forced}`, { kind, lang, codec, forced });
+          if (s.streamType !== 1) continue;
+          bitDepth = bitDepth || s.bitDepth || null;
+          if (s.DOVIPresent) hdr = 'Dolby Vision';
+          else if (!hdr && (s.colorTrc === 'smpte2084' || s.colorTrc === 'arib-std-b67')) hdr = 'HDR10';
         }
       }
     }
-    delMovieStreams.run(ratingKey);
-    for (const st of streams.values()) insMovieStream.run(ratingKey, st.kind, st.lang, st.codec, st.forced);
     db.prepare('UPDATE movies SET hdr = ?, bit_depth = ?, full_synced = 1 WHERE rating_key = ?').run(
       hdr,
       bitDepth,

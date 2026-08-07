@@ -65,8 +65,8 @@ export function storeRadarrMovies(movies) {
     );
     db.prepare('DELETE FROM radarr_movies').run();
     const ins = db.prepare(
-      `INSERT OR REPLACE INTO radarr_movies (tmdb_id, title, year, added, has_file, monitored, synced_at, radarr_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO radarr_movies (tmdb_id, title, year, added, has_file, monitored, synced_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
     const cap = db.prepare(
       'INSERT INTO radarr_captures (tmdb_id, title, year, quality, captured_at) VALUES (?, ?, ?, ?, ?)'
@@ -75,7 +75,7 @@ export function storeRadarrMovies(movies) {
     for (const m of movies) {
       if (!m.tmdbId) continue;
       ins.run(m.tmdbId, m.title || '', m.year || null, m.added || null,
-        m.hasFile ? 1 : 0, m.monitored ? 1 : 0, now, m.id ?? null);
+        m.hasFile ? 1 : 0, m.monitored ? 1 : 0, now);
       if (m.hasFile && sinArchivo.has(m.tmdbId)) {
         cap.run(m.tmdbId, m.title || '', m.year || null, m.movieFile?.quality?.quality?.name || null, now);
       }
