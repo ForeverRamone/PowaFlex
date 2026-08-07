@@ -143,7 +143,7 @@ export default function Festivals() {
     setDirBusy(name);
     const r = await api('/tracked/by-names', { method: 'POST', body: { names: name, role: 'director' } });
     setDirBusy(null);
-    if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    if (r.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     setFollowedDirs((prev) => new Set(prev).add(name));
     toast(r.added ? t('⭐ {name} en favoritos (directores/as)', { name }) : t('{name} ya estaba en favoritos', { name }), 'success');
   };
@@ -156,7 +156,7 @@ export default function Festivals() {
     setFollowAllBusy(true);
     const r = await api('/tracked/by-names', { method: 'POST', body: { names: pendingDirs.join('\n'), role: 'director' } });
     setFollowAllBusy(false);
-    if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    if (r.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     setFollowedDirs((prev) => new Set([...prev, ...pendingDirs]));
     toast(t('⭐ {n} directores/as añadidos a favoritos', { n: r.added }) + (r.notFound?.length ? t(' · {n} sin resolver', { n: r.notFound.length }) : ''), 'success');
   };
@@ -168,7 +168,7 @@ export default function Festivals() {
       body: { title: editar.title, year: keyYear, director: editar.director, tmdbId },
     });
     if (r.error) {
-      toast(`⚠️ ${r.error}`, 'error');
+      toast(`⚠️ ${t(r.error)}`, 'error');
       return;
     }
     toast(tmdbId ? t('✓ Emparejado corregido') : t('✓ Corrección quitada'));

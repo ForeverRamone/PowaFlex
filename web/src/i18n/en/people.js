@@ -7,6 +7,10 @@ export default {
   'Directores/as': 'Directors',
   'Actores/actrices': 'Actors',
   'Guionistas': 'Screenwriters',
+  'Dirección de fotografía': 'Cinematography',
+  'Música': 'Music',
+  'Montaje': 'Editing',
+  'y también': 'and also',
   'Buscar nombre…': 'Search by name…',
 
   // roles sueltos (se interpolan en plantillas)
@@ -15,6 +19,9 @@ export default {
   'director/a': 'director',
   'actor/actriz': 'actor',
   'guionista': 'screenwriter',
+  'director/a de fotografía': 'cinematographer',
+  'compositor/a': 'composer',
+  'montador/a': 'editor',
 
   // filtros demográficos
   'Género||persona': 'Gender',
@@ -46,6 +53,17 @@ export default {
   ' · y a directores/as: dirige 4+ películas': ' · and to directors: directs 4+ films',
   ' · y a actores/actrices: tiene 8+ interpretadas': ' · and to actors: 8+ acted films',
 
+  // seguir por nombre: la única vía en los oficios que Plex no acredita
+  'Seguir por nombre': 'Follow by name',
+  'Plex no guarda estos créditos, así que aquí no hay «top de tu biblioteca»: busca a la persona en TMDB y síguela como {role} con la ★.':
+    'Plex does not store these credits, so there is no “top of your library” here: look the person up on TMDB and follow them as {role} with the ★.',
+  'Buscar por nombre en TMDB…': 'Search TMDB by name…',
+  'Buscando…': 'Searching…',
+  'Buscar': 'Search',
+  'Nadie con ese nombre en TMDB.': 'Nobody with that name on TMDB.',
+  'Quitar de favoritos': 'Remove from favorites',
+  'Añadir a favoritos': 'Add to favorites',
+
   // tooltips de la estrella en las tarjetas
   'Quitar de {role}': 'Remove from {role}',
   'Le sigues como {other}: seguirle TAMBIÉN como {role}':
@@ -76,10 +94,8 @@ export default {
   '⭐ Añadido también a actores/actrices: tiene 8+ interpretadas en tu biblioteca':
     '⭐ Also added to actors: 8+ acted films in your library',
 
-  // pestañas de rol y completismo
-  '🎬 Como director/a': '🎬 As director',
-  '🎭 Como actor/actriz': '🎭 As actor',
-  '✍️ Como guionista': '✍️ As screenwriter',
+  // pestañas de rol y completismo (el icono va aparte, sin traducir)
+  'Como {oficio}': 'As {oficio}',
   'Completismo (como {role})': 'Completism (as {role})',
   'Solo largometrajes': 'Feature films only',
   ' (incluye documentales: es documentalista)': ' (includes documentaries: they are a documentarian)',
@@ -121,4 +137,6 @@ export default {
     'Remove the correction and go back to automatic matching',
   '✓ {name} emparejado a mano': '✓ {name} matched by hand',
   '✓ Corrección quitada': '✓ Correction removed',
+
+  'Directores, actores y equipo': 'Directors, actors & crew',
 };

@@ -17,8 +17,15 @@ const VIEWS = [
   ['upcoming', 'Próximas'],
 ];
 
-const ROLE_LABEL = { director: 'director/a', actor: 'actor/actriz', writer: 'guionista' };
-const ROLE_TAB = { director: '🎬 Como director/a', actor: '🎭 Como actor/actriz', writer: '✍️ Como guionista' };
+// Las etiquetas de los oficios las sirve el servidor (GET /roles); aquí solo
+// queda el icono de cada pestaña, que es decoración y no texto traducible.
+// Mientras llega la lista se pintan dirección e interpretación, las dos que
+// abren la ficha en la inmensa mayoría de los casos.
+const ROLES_INICIALES = [
+  { key: 'director', label: 'Directores/as', singular: 'director/a', rankable: true, principal: true },
+  { key: 'actor', label: 'Actores/actrices', singular: 'actor/actriz', rankable: true, principal: true },
+];
+const ROLE_ICON = { director: '🎬', actor: '🎭', writer: '✍️', dop: '📷', composer: '🎼', editor: '✂️' };
 
 // Orden de la parrilla. «reciente» replica el orden que ya traía el servidor
 // (fecha descendente, las sin fecha/anunciadas primero).
@@ -38,6 +45,11 @@ export default function PersonDetail() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [role, setRole] = useState(null); // active role tab
+  const [roles, setRoles] = useState(ROLES_INICIALES);
+  useEffect(() => {
+    api('/roles').then((r) => Array.isArray(r) && r.length && setRoles(r));
+  }, []);
+  const roleSingular = (r) => t(roles.find((x) => x.key === r)?.singular || r); // «director/a»
   // vista, orden y listón sobreviven a la navegación hasta pulsar «Limpiar filtros»
   const [view, setView] = useState(() => localStorage.getItem('person_view') || 'all');
   const [trackedRoles, setTrackedRoles] = useState(new Set()); // facetas seguidas
@@ -110,7 +122,7 @@ export default function PersonDetail() {
   const nombre = data?.person?.name || '';
   const fijarPersona = async (tmdbId) => {
     const r = await api(`/people/${id}/match`, { method: 'POST', body: { tmdbId } });
-    if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    if (r.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     setCorrigiendo(false);
     toast(tmdbId ? t('✓ {name} emparejado a mano', { name: nombre }) : t('✓ Corrección quitada'));
     cargarFilmografia();
@@ -118,7 +130,7 @@ export default function PersonDetail() {
   const corrector = corrigiendo && (
     <MatchCorrector
       kind="person"
-      role={wantRole === 'actor' ? 'actor' : 'director'}
+      role={wantRole}
       title={nombre}
       initialQuery={nombre}
       subtitle={t('Elige su ficha de TMDB. Se recuerda para siempre y ningún automatismo vuelve a revisarla: úsalo cuando haya dos personas con el mismo nombre o cuando su obra esté repartida en dos fichas.')}
@@ -150,9 +162,11 @@ export default function PersonDetail() {
       </div>
     );
 
-  const { person, roles } = data;
-  const roleKeys = Object.keys(roles || {});
-  const active = (role && roles[role] && role) || (roles[data.primary] && data.primary) || roleKeys[0];
+  // `facetas` y no `roles`: aquí son las facetas CON filmografía de ESTA
+  // persona, no el catálogo de oficios del servidor que hay más arriba
+  const { person, roles: facetas } = data;
+  const roleKeys = Object.keys(facetas || {});
+  const active = (role && facetas[role] && role) || (facetas[data.primary] && data.primary) || roleKeys[0];
   if (!active)
     return (
       <div>
@@ -162,7 +176,7 @@ export default function PersonDetail() {
         {corrector}
       </div>
     );
-  const { stats, items } = roles[active];
+  const { stats, items } = facetas[active];
 
   // En la ficha de un/a documentalista (o de quien filma conciertos), su obra
   // principal no puede llegar escondida por el filtro global de tipos: aquí
@@ -219,17 +233,17 @@ export default function PersonDetail() {
             <h1 className="font-display text-3xl text-zinc-100 leading-tight">{person.name}</h1>
             <DeathBadge deathday={person.deathday} />
             <button
-              onClick={() => toggleTrack(active === 'actor' ? 'actor' : 'director')}
-              className={trackedRoles.has(active === 'actor' ? 'actor' : 'director') ? 'btn-gold' : 'btn-ghost'}
+              onClick={() => toggleTrack(active)}
+              className={trackedRoles.has(active) ? 'btn-gold' : 'btn-ghost'}
               title={
                 person.deathday
                   ? t('Ya fallecido: no tendrá nuevos estrenos, no hace falta seguirlo')
                   : t('Sigue ESTA faceta: puedes tenerle a la vez en directores y en actores')
               }
             >
-              {trackedRoles.has(active === 'actor' ? 'actor' : 'director')
-                ? t('★ Siguiendo como {role}', { role: active === 'actor' ? t('actor/actriz') : t('director/a') })
-                : t('☆ Seguir como {role}', { role: active === 'actor' ? t('actor/actriz') : t('director/a') })}
+              {trackedRoles.has(active)
+                ? t('★ Siguiendo como {role}', { role: roleSingular(active) })
+                : t('☆ Seguir como {role}', { role: roleSingular(active) })}
             </button>
             <Link to={`/biblioteca?personId=${person.id}&personRole=${active}&personName=${encodeURIComponent(person.name)}`} className="btn-ghost">
               {t('Ver en tu biblioteca')}
@@ -252,7 +266,7 @@ export default function PersonDetail() {
                   onClick={() => { setRole(r); setViewPref('all'); }}
                   className={`btn-ghost !py-1 text-xs ${active === r ? '!border-gold-400 text-gold-400' : ''}`}
                 >
-                  {t(ROLE_TAB[r] || r)} ({roles[r].stats.owned}/{roles[r].stats.released})
+                  {ROLE_ICON[r] || '·'} {t('Como {oficio}', { oficio: roleSingular(r) })} ({facetas[r].stats.owned}/{facetas[r].stats.released})
                 </button>
               ))}
             </div>
@@ -260,7 +274,7 @@ export default function PersonDetail() {
 
           <div className="mt-3 max-w-md">
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-zinc-300">{t('Completismo (como {role})', { role: t(ROLE_LABEL[active] || active) })}</span>
+              <span className="text-zinc-300">{t('Completismo (como {role})', { role: roleSingular(active) })}</span>
               <span className="text-gold-400 font-semibold">
                 {stats.owned} / {stats.released} · {stats.pct}%
               </span>

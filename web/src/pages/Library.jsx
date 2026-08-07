@@ -78,7 +78,7 @@ export default function Library() {
     try {
       const qs = new URLSearchParams({ limit: '60', ...q, offset: String(movies.length) });
       const d = await api(`/movies?${qs}`);
-      if (d.error) return toast(`⚠️ ${d.error}`, 'error');
+      if (d.error) return toast(`⚠️ ${t(d.error)}`, 'error');
       setMovies((prev) => {
         const vistas = new Set(prev.map((m) => m.rating_key));
         return [...prev, ...(d.movies || []).filter((m) => !vistas.has(m.rating_key))];
@@ -100,10 +100,17 @@ export default function Library() {
   const VALUE_LABELS = { yes: t('Vistas'), no: t('Sin ver'), feature: t('Largometraje'), short: t('Corto'), hdr: 'HDR/DV', dv: 'Dolby Vision', sdr: 'SDR' };
   const activeKeys = Object.keys(q).filter((k) => FILTER_LABELS[k] && q[k]);
   // el deep-link de una ficha trae personId (+personRole); el nombre viaja en
+  // qué hace esa persona en la película, por oficio (los seis de la 1.04)
+  const VERBO_ROL = {
+    director: 'dirige', actor: 'actúa', writer: 'escribe',
+    dop: 'fotografía', composer: 'compone', editor: 'monta',
+  };
   // personName solo para que el chip no enseñe un id numérico crudo
   const chipLabel = (k) =>
     k === 'personId'
-      ? `${t('Persona')}: ${q.personName || `#${q.personId}`}${q.personRole ? ` (${q.personRole === 'director' ? t('dirige') : t('actúa')})` : ''}`
+      // el verbo salía de un ternario de dos oficios: desde los seis de la 1.04,
+      // la ficha de un director de fotografía llegaba aquí diciendo «(actúa)»
+      ? `${t('Persona')}: ${q.personName || `#${q.personId}`}${q.personRole ? ` (${t(VERBO_ROL[q.personRole] || 'participa')})` : ''}`
       : `${FILTER_LABELS[k]}: ${VALUE_LABELS[q[k]] || q[k]}`;
   const clearChip = (k) => {
     if (k !== 'personId') return set(k, '');

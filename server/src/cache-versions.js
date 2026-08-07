@@ -17,7 +17,9 @@ export const CACHE_VERSIONS = {
   // v8: el umbral de ruido pasó a mirar también los votos de Letterboxd
   // v9: la clave lleva los filtros demográficos (género/vida/continente/país)
   discover_gaps: 9,
-  discover_favorites: 9,
+  // v10: el umbral de ruido mira también los votos de IMDb del volcado local,
+  // así que lo cacheado con dos fuentes escondía películas que ahora sí pasan
+  discover_favorites: 10,
   discover_absent: 5,
   // v2: el emparejado con TMDB se verifica contra el director/a (antes un
   // título genérico enganchaba otra película del mismo año)

@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { addBulkToRadarr } from '../radarr.js';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
-import { Plus, RotateCw } from 'lucide-react';
+import { Plus, RotateCw, Ban } from 'lucide-react';
 import {
   ErrorBox, RadarrButton, Empty, useRadarrIds, MediaModal, BuildProgress,
   useTypeFilters, matchesTypeFilters, TypeFilterBar, Select,
 } from '../components.jsx';
+import { toast } from '../toast.js';
 import { t, locale } from '../i18n.js';
 
 function monthLabel(ym) {
@@ -25,7 +26,7 @@ function typeBadges(ev) {
   return badges;
 }
 
-function EventCard({ ev, radarrIds, onAdded }) {
+function EventCard({ ev, radarrIds, onAdded, vetada, onToggleVeto }) {
   const img = tmdbImg(ev.poster_path, 'w185');
   const [ficha, setFicha] = useState(false);
   return (
@@ -71,11 +72,31 @@ function EventCard({ ev, radarrIds, onAdded }) {
           ))}
         </div>
         {ev.overview && <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{ev.overview}</p>}
-        <div className="mt-2">
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
           {ev.inLibrary ? (
             <span className="text-emerald-400 text-xs">{t('✓ Ya en tu biblioteca')}</span>
           ) : (
             <RadarrButton tmdbId={ev.tmdb_id} small alreadyInRadarr={radarrIds.has(ev.tmdb_id)} onAdded={onAdded} />
+          )}
+          {/* el veto solo tiene sentido en lo que el robot podría coger: lo que
+              ya tienes en Plex no lo mira nadie */}
+          {!ev.inLibrary && (
+            vetada ? (
+              <span className="text-xs text-zinc-500 inline-flex items-center gap-1">
+                <Ban size={12} strokeWidth={2} /> {t('El automático la ignora')}
+                <button className="text-gold-400 hover:underline ml-1" onClick={() => onToggleVeto(ev, false)}>
+                  {t('deshacer')}
+                </button>
+              </span>
+            ) : (
+              <button
+                className="text-xs text-zinc-500 hover:text-red-400 inline-flex items-center gap-1"
+                title={t('Que el pase automático de Radarr no la coja. Se sigue viendo aquí y puedes añadirla a mano.')}
+                onClick={() => onToggleVeto(ev, true)}
+              >
+                <Ban size={12} strokeWidth={2} /> {t('Fuera del automático')}
+              </button>
+            )
           )}
         </div>
       </div>
@@ -94,6 +115,25 @@ export default function Calendar() {
   const [horizon, setHorizonState] = useState(() => localStorage.getItem('cal_horizon') || '6');
   const setHorizon = (v) => { setHorizonState(v); localStorage.setItem('cal_horizon', v); };
   const [bulk, setBulk] = useState({ running: false, summary: null });
+  // vetadas al pase automático: se pintan apagadas y el añadido masivo las salta
+  const [vetadas, setVetadas] = useState(new Set());
+  useEffect(() => {
+    api('/radarr/auto/veto').then((r) => Array.isArray(r) && setVetadas(new Set(r.map((v) => v.tmdb_id))));
+  }, []);
+  const toggleVeto = async (ev, veto) => {
+    // optimista: la ficha responde al instante y se revierte si el servidor falla
+    setVetadas((prev) => { const n = new Set(prev); veto ? n.add(ev.tmdb_id) : n.delete(ev.tmdb_id); return n; });
+    const r = veto
+      ? await api('/radarr/auto/veto', { method: 'POST', body: { tmdbId: ev.tmdb_id, title: ev.title } })
+      : await api(`/radarr/auto/veto/${ev.tmdb_id}`, { method: 'DELETE' });
+    if (r?.error) {
+      setVetadas((prev) => { const n = new Set(prev); veto ? n.delete(ev.tmdb_id) : n.add(ev.tmdb_id); return n; });
+      return toast(t('⚠️ No se ha podido guardar: {error}', { error: r.error }), 'error');
+    }
+    toast(veto
+      ? t('🚫 «{title}» queda fuera del pase automático', { title: ev.title })
+      : t('↩︎ «{title}» vuelve al pase automático', { title: ev.title }));
+  };
 
   const load = (refresh = false) => {
     setError(null);
@@ -143,8 +183,12 @@ export default function Calendar() {
     d.setMonth(d.getMonth() + Number(horizon));
     return d.toISOString().slice(0, 10);
   })();
-  // pending = not owned and not already in Radarr; eligible = pending within the horizon
-  const pending = [...upcoming, ...undated].filter((e) => !e.inLibrary && !radarrIds.has(e.tmdb_id));
+  // pending = not owned and not already in Radarr; eligible = pending within the horizon.
+  // Las vetadas quedan fuera también aquí: pediste que el automático no las
+  // cogiera, y mandarlas en bloque sería colarlas por la puerta de al lado.
+  const pending = [...upcoming, ...undated].filter(
+    (e) => !e.inLibrary && !radarrIds.has(e.tmdb_id) && !vetadas.has(e.tmdb_id)
+  );
   const eligible = pending.filter((e) => (horizon === 'all' ? true : e.date && e.date <= horizonEnd));
   const beyondHorizon = pending.length - eligible.length;
 
@@ -215,7 +259,7 @@ export default function Calendar() {
         <section key={ym} className="mb-8">
           <h2 className="text-lg font-semibold text-gold-400 mb-3 capitalize">{monthLabel(ym)}</h2>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {evs.map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} onAdded={addRadarrId} />)}
+            {evs.map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} onAdded={addRadarrId} vetada={vetadas.has(ev.tmdb_id)} onToggleVeto={toggleVeto} />)}
           </div>
         </section>
       ))}
@@ -224,7 +268,7 @@ export default function Calendar() {
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-sky-300 mb-3">{t('Anunciadas, sin fecha')}</h2>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {undated.map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} onAdded={addRadarrId} />)}
+            {undated.map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} onAdded={addRadarrId} vetada={vetadas.has(ev.tmdb_id)} onToggleVeto={toggleVeto} />)}
           </div>
         </section>
       )}
@@ -233,7 +277,7 @@ export default function Calendar() {
         <section className="mb-8">
           <h2 className="text-lg font-semibold text-zinc-400 mb-3">{t('Estrenadas recientemente (últimos 60 días)')}</h2>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {recent.reverse().map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} onAdded={addRadarrId} />)}
+            {recent.reverse().map((ev) => <EventCard key={ev.tmdb_id} ev={ev} radarrIds={radarrIds} onAdded={addRadarrId} vetada={vetadas.has(ev.tmdb_id)} onToggleVeto={toggleVeto} />)}
           </div>
         </section>
       )}

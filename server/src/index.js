@@ -77,6 +77,12 @@ import {
   letterboxdSummary,
 } from './letterboxd.js';
 import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
+import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
+import { ROLES } from './roles.js';
+import { subtitleAudit, audioAudit, SUB_LANG_OPTIONS } from './subs.js';
+import { testBazarr, buscarSubtitulos, bazarrConfigured } from './bazarr.js';
+import { importImdbRatings, imdbInfo } from './imdb.js';
+import { listarCopias, hacerCopia, BACKUP_DIR } from './backup.js';
 import { festivalsIndex, festivalEdition, festivalWinners, festivalOverrideKey, festivalDirectorPacks } from './festivals.js';
 import { DIRECTORS_2026 } from './data/directors-2026.js';
 import { dataHealth } from './datahealth.js';
@@ -216,6 +222,8 @@ const WRITABLE_SETTINGS = new Set([
   'cal_top_directors', 'cal_top_actors',
   'gaps_min_votes_director', 'gaps_min_votes_actor',
   'ratings_sources', 'primary_rating', 'ui_theme', 'ui_language', 'jw_country',
+  'subs_ok_langs', 'bazarr_url', 'bazarr_key',
+  'backup_auto', 'backup_keep',
 ]);
 
 // Ajustes cuyo cambio deja obsoletas las páginas ya calculadas.
@@ -286,6 +294,7 @@ app.post('/api/settings/test/:service', async (req, reply) => {
     if (service === 'plex') return await plexTest();
     if (service === 'tmdb') return await tmdbTest();
     if (service === 'radarr') return await radarrTest();
+    if (service === 'bazarr') return await testBazarr();
     if (service === 'mdblist') {
       const r = await mdbTest();
       if (r.limit) setSetting('mdblist_detected_limit', String(r.limit));
@@ -766,7 +775,7 @@ app.get('/api/people/search-tmdb', async (req, reply) => {
   try {
     const query = String(req.query.q || '').trim();
     if (!query) return [];
-    const role = ['director', 'actor'].includes(req.query.role) ? req.query.role : null;
+    const role = asRole(req.query.role);
     return await searchPeople(query, role);
   } catch (err) {
     reply.code(502);
@@ -793,8 +802,8 @@ app.post('/api/tracked/tmdb', async (req, reply) => {
 app.post('/api/tracked/by-names', async (req, reply) => {
   try {
     const raw = String(req.body?.names || '');
-    const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : null;
-    const hint = role === 'director' ? 'Directing' : role === 'actor' ? 'Acting' : null;
+    const role = asRole(req.body?.role);
+    const hint = roleHint(role);
     const names = [...new Set(
       raw.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean)
     )].slice(0, 300);
@@ -834,7 +843,7 @@ export const canonAddStatus = { running: false, canon: null, added: 0, skipped: 
 app.post('/api/tracked/from-canon', async (req, reply) => {
   if (canonAddStatus.running) return { started: false, ...canonAddStatus };
   const canon = String(req.body?.canon || '');
-  const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : 'director';
+  const role = asRole(req.body?.role, 'director');
   let nombres;
   try {
     nombres = await canonNames(canon);
@@ -852,7 +861,7 @@ app.post('/api/tracked/from-canon', async (req, reply) => {
   });
 
   (async () => {
-    const hint = role === 'director' ? 'Directing' : 'Acting';
+    const hint = roleHint(role);
     const bloqueados = new Set(db.prepare('SELECT person_id FROM unfollowed_people').all().map((r) => r.person_id));
     try {
       for (let i = 0; i < nombres.length; i++) {
@@ -895,7 +904,7 @@ app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
       reply.code(400);
       return { error: 'Faltan personas' };
     }
-    const packRole = ['director', 'actor'].includes(req.body?.role) ? req.body.role : 'director';
+    const packRole = asRole(req.body?.role, 'director');
     const blocked = new Set(db.prepare('SELECT person_id FROM unfollowed_people').all().map((r) => r.person_id));
     let added = 0;
     let skipped = 0;
@@ -925,7 +934,7 @@ app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
 
 app.get('/api/people/:id/filmography', async (req, reply) => {
   try {
-    const wantRole = ['director', 'actor', 'writer'].includes(req.query.role) ? req.query.role : null;
+    const wantRole = asRole(req.query.role);
     return await filmographyProfile(Number(req.params.id), wantRole);
   } catch (err) {
     reply.code(502);
@@ -1094,7 +1103,9 @@ const invalidateFavoritesCaches = () =>
 
 app.post('/api/tracked/bulk', async (req, reply) => {
   const { role, top, personIds, preview } = req.body || {};
-  const followRole = role === 'actor' ? 'actor' : 'director';
+  // el ÚLTIMO colapso a dos oficios que sobrevivió al refactor: daba de alta a
+  // los guionistas del alta masiva como directores, en silencio
+  const followRole = asRole(role, 'director');
 
   // confirmed selection coming back from the preview dialog
   if (Array.isArray(personIds) && personIds.length) {
@@ -1107,9 +1118,11 @@ app.post('/api/tracked/bulk', async (req, reply) => {
     return { ok: true, added, total: personIds.length };
   }
 
-  if (!['director', 'actor'].includes(role) || !Number(top)) {
+  // el alta por «top de tu biblioteca» sale de los créditos que guarda Plex:
+  // fotografía, música y montaje no están ahí y no admiten ranking
+  if (!isRankable(role) || !Number(top)) {
     reply.code(400);
-    return { error: 'Parámetros: role (director|actor) y top (número), o personIds' };
+    return { error: `Parámetros: role (${RANKABLE_ROLES.join('|')}) y top (número), o personIds` };
   }
   const candidates = db
     .prepare(
@@ -1136,7 +1149,7 @@ app.delete('/api/tracked/batch', async (req, reply) => {
   const ids = Array.isArray(req.body?.personIds) ? req.body.personIds.map(Number).filter(Boolean) : [];
   // con role, la poda solo toca esa faceta (la página de Favoritos trabaja
   // siempre dentro de una); sin él, se lleva a la persona entera
-  const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : null;
+  const role = asRole(req.body?.role);
   if (!ids.length) {
     reply.code(400);
     return { error: 'Faltan personIds' };
@@ -1261,9 +1274,82 @@ app.delete('/api/discover/dismiss/:tmdbId', async (req) => {
   return { ok: true };
 });
 
+// Veto al pase automático de Radarr (🚫 en las fichas de Cine venidero). No
+// oculta ni borra nada: la película se sigue viendo y se puede mandar a Radarr
+// a mano; solo queda fuera del pase nocturno.
+app.get('/api/radarr/auto/veto', async () =>
+  db.prepare('SELECT tmdb_id, title, at FROM auto_radarr_vetoed ORDER BY at DESC').all()
+);
+app.post('/api/radarr/auto/veto', async (req, reply) => {
+  const tmdbId = Number(req.body?.tmdbId);
+  if (!tmdbId) {
+    reply.code(400);
+    return { error: 'Falta tmdbId' };
+  }
+  db.prepare('INSERT OR REPLACE INTO auto_radarr_vetoed (tmdb_id, title, at) VALUES (?, ?, ?)').run(
+    tmdbId,
+    req.body?.title || null,
+    Date.now()
+  );
+  return { ok: true };
+});
+app.delete('/api/radarr/auto/veto/:tmdbId', async (req) => {
+  db.prepare('DELETE FROM auto_radarr_vetoed WHERE tmdb_id = ?').run(Number(req.params.tmdbId));
+  return { ok: true };
+});
+
+// ── Subtítulos y audio ────────────────────────────────────────────────────
+// La auditoría se calcula al vuelo: son consultas sobre movie_streams, que ya
+// está indexada, y así el criterio de Ajustes surte efecto al instante.
+app.get('/api/subs/audit', async (req) => {
+  const limit = Math.min(Number(req.query.limit) || 300, 1000);
+  return { ...subtitleAudit({ limit }), options: SUB_LANG_OPTIONS, bazarr: bazarrConfigured() };
+});
+app.get('/api/subs/audio-audit', async (req) => {
+  const limit = Math.min(Number(req.query.limit) || 300, 1000);
+  return audioAudit({ limit });
+});
+app.post('/api/subs/search/:radarrId', async (req, reply) => {
+  try {
+    return await buscarSubtitulos(Number(req.params.radarrId));
+  } catch (err) {
+    reply.code(400);
+    return { error: String(err.message || err) };
+  }
+});
+
+// ── Notas de IMDb ─────────────────────────────────────────────────────────
+app.get('/api/imdb/status', async () => imdbInfo());
+app.post('/api/imdb/sync', async (req, reply) => {
+  try {
+    return await importImdbRatings();
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// ── Copias de seguridad automáticas ───────────────────────────────────────
+app.get('/api/backup/list', async () => ({ dir: BACKUP_DIR, copias: listarCopias() }));
+app.post('/api/backup/run', async (req, reply) => {
+  try {
+    return await hacerCopia();
+  } catch (err) {
+    reply.code(500);
+    return { error: String(err.message || err) };
+  }
+});
+
+// ── Oficios que este servidor sabe seguir ─────────────────────────────────
+// La interfaz los pide en vez de llevar su propia copia de la lista: así no
+// puede volver a desincronizarse con el servidor.
+app.get('/api/roles', async () =>
+  ROLES.map((r) => ({ key: r.key, label: r.label, singular: r.singular, rankable: r.fromPlex, principal: r.principal }))
+);
+
 app.post('/api/tracked/:personId', async (req) => {
   const id = Number(req.params.personId);
-  const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : null;
+  const role = asRole(req.body?.role);
   // a manual, explicit add clears any ✕ block (C)
   db.prepare('DELETE FROM unfollowed_people WHERE person_id = ?').run(id);
   // without an explicit role, follow them for whatever they do most in your library
@@ -1284,7 +1370,7 @@ app.post('/api/tracked/:personId', async (req) => {
   return { ok: true, role: f.role, directorAlso: f.directorAlso, actorAlso: f.actorAlso };
 });
 app.get('/api/tracked', async (req) => {
-  const role = ['director', 'actor'].includes(req.query.role) ? req.query.role : null;
+  const role = asRole(req.query.role);
   // una fila por (persona, faceta): quien tiene las dos sale dos veces, cada
   // una con el conteo de SU faceta
   return db
@@ -1306,7 +1392,7 @@ app.get('/api/tracked', async (req) => {
 app.delete('/api/tracked/:personId', async (req) => {
   const id = Number(req.params.personId);
   // con ?role= se quita SOLO esa faceta; sin él, la persona entera
-  const role = ['director', 'actor'].includes(req.query.role) ? req.query.role : null;
+  const role = asRole(req.query.role);
   const r = role
     ? db.prepare('DELETE FROM tracked_people WHERE person_id = ? AND role = ?').run(id, role)
     : db.prepare('DELETE FROM tracked_people WHERE person_id = ?').run(id);
@@ -1342,10 +1428,10 @@ app.post('/api/people/from-tmdb', async (req, reply) => {
 // facetas dobles esto significa «quédate SOLO con esta»: para añadir la otra
 // sin perder la actual está el POST normal con role.
 app.patch('/api/tracked/:personId/role', async (req, reply) => {
-  const role = ['director', 'actor'].includes(req.body?.role) ? req.body.role : null;
+  const role = asRole(req.body?.role);
   if (!role) {
     reply.code(400);
-    return { error: 'role debe ser director o actor' };
+    return { error: 'Ese oficio no existe' };
   }
   const id = Number(req.params.personId);
   db.transaction(() => {
@@ -1374,7 +1460,8 @@ app.get('/api/releases', async (req, reply) => {
 app.get('/api/discover/gaps', async (req, reply) => {
   try {
     return await libraryGaps({
-      role: ['director', 'actor'].includes(req.query.role) ? req.query.role : 'director',
+      // los huecos de biblioteca también se apoyan en el ranking de Plex
+      role: isRankable(req.query.role) ? req.query.role : 'director',
       people: Math.min(Number(req.query.people) || 20, 60),
       perPerson: Math.min(Number(req.query.perPerson) || 8, 20),
       // the ranking can be walked down to the first 500 people
@@ -1396,7 +1483,7 @@ app.get('/api/discover/favorites', async (req, reply) => {
   try {
     return await favoritesGaps({
       perPerson: Math.min(Number(req.query.perPerson) || 8, 20),
-      role: ['director', 'actor'].includes(req.query.role) ? req.query.role : null,
+      role: asRole(req.query.role),
       refresh: req.query.refresh === '1',
     });
   } catch (err) {
@@ -1940,8 +2027,13 @@ setInterval(() => {
   // ideas de qué día es dentro del mismo proceso
   const todayStr = today();
   // guard so a restart inside the 03:00 window doesn't re-trigger the whole run
+  // Ventana de recuperación hasta las 06:00. Antes era solo 03:00-03:05: si a
+  // esa hora había una sincronización en marcha, el pase se saltaba el día
+  // entero sin reintentarlo — y la 1.04 es justo la versión que empuja a hacer
+  // una re-sincronización completa, que en 12.000 películas dura media hora.
+  // El guardia contra reentradas es `nightly_last_run`, no la ventana estrecha.
   if (
-    h === 3 && m < 5 &&
+    h >= 3 && h < 6 &&
     getSetting('nightly_last_run') !== todayStr &&
     !syncStatus.running && getSetting('plex_url') && getSetting('plex_token')
   ) {

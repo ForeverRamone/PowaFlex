@@ -46,7 +46,7 @@ export default function Quality({ embedded = false }) {
     setSearchBusy(m.tmdb_id);
     const r = await api('/radarr/search-again', { method: 'POST', body: { tmdbId: m.tmdb_id } });
     setSearchBusy(null);
-    if (r.error) toast(`⚠️ ${r.error}`, 'error');
+    if (r.error) toast(`⚠️ ${t(r.error)}`, 'error');
     else toast(t('🔍 Radarr vuelve a buscar «{title}»', { title: m.title }));
   };
   const antiguedad = (added) => {
@@ -100,7 +100,7 @@ export default function Quality({ embedded = false }) {
     }
     if (r.error) {
       setJw((j) => ({ ...j, busy: false }));
-      toast(`⚠️ ${r.error}`, 'error');
+      toast(`⚠️ ${t(r.error)}`, 'error');
       return;
     }
     setJw({ busy: false, done: ids.length, total: ids.length, checked: r.checked, upgradeable: r.upgradeable, results: r.results || {} });

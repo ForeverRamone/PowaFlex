@@ -1,5 +1,35 @@
 # Changelog
 
+## Beta 1.04 (1.0.4-beta) — 2026-08-06
+
+**El archivo y los oficios.** La versión más grande desde la reorganización: PowaFlex ya sabe si
+puedes ver de verdad lo que tienes, sigue a más gente que a directores y actores, y se hace su
+propia copia de seguridad.
+
+- **Subtítulos y audio, con criterio tuyo.** El sync ya descargaba las pistas de cada fichero y
+  las tiraba: ahora se guardan. En Ajustes eliges qué subtítulos te valen —**versión original,
+  español, inglés, en cualquier combinación**— y el Taller estrena tercera pestaña con lo que no
+  llega a ese listón, filtrable y con el botón para que **Bazarr** los busque, suelto o en bloque.
+  De regalo, la auditoría hermana: películas sin pista de audio en su idioma original.
+  Ojo: las pistas solo llegan al sincronizar el detalle, así que hace falta una
+  **re-sincronización completa** para analizar lo que ya tenías. La página lo avisa y no cuenta
+  como «sin subtítulos» lo que aún no ha mirado.
+- **Cuatro oficios nuevos**: guion, dirección de fotografía, música y montaje, con seguir, huecos
+  y completismo, y su faceta propia en Favoritos y en Descubrir. La **dirección conserva el lugar
+  central**: abre por defecto y mantiene su tratamiento; los demás van agrupados detrás. Los tres
+  que Plex no registra no tienen ranking «top de tu biblioteca» —no habría de dónde sacarlo— y
+  ofrecen búsqueda por nombre en TMDB.
+- **Notas de IMDb en local**: un volcado semanal de 8 MB que se suma a TMDB y Letterboxd como
+  tercera fuente del umbral de ruido de Descubrir, sin gastar ni una petición de API.
+- **Copia de seguridad automática** al final del pase nocturno, con rotación de las últimas N.
+  Viene apagada; enciéndela en Ajustes.
+- **Veto al auto-Radarr por película**: un 🚫 en cada ficha de Cine venidero para que el pase
+  automático no la coja. Y los descartes (✕ «no me interesa») **también** lo bloquean ahora: antes
+  podías descartar una película y encontrártela descargada esa misma noche.
+- Los **mensajes del servidor** (errores, validaciones) ya se traducen al inglés.
+- La ventana del pase nocturno se amplía a las 06:00: si a las 03:00 había una sincronización en
+  marcha, antes se saltaba el día entero sin reintentarlo.
+
 ## Beta 1.03 (1.0.3-beta) — 2026-08-06
 
 **Estrenos: plataformas y VOD, ahora también de EE UU.** La pestaña de plataformas pasa a

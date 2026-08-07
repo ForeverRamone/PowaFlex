@@ -13,12 +13,16 @@ const Directors = lazy(() => import('./Directors.jsx'));
 
 // The whole page is scoped to ONE role at a time: a director you follow is
 // never counted, sorted or shown together with their acting work.
-const ROLES = [
-  ['director', 'Directores/as', 'dirigidas'],
-  ['actor', 'Actores/actrices', 'interpretadas'],
+//
+// La lista de oficios la sirve el servidor (GET /roles); esto es solo lo que se
+// pinta mientras llega, con la dirección primero.
+const ROLES_INICIALES = [
+  { key: 'director', label: 'Directores/as', singular: 'director/a', rankable: true, principal: true },
+  { key: 'actor', label: 'Actores/actrices', singular: 'actor/actriz', rankable: true, principal: true },
 ];
-const roleLabel = (r) => t(ROLES.find(([k]) => k === r)?.[1] || r);
-const roleVerb = (r) => t(ROLES.find(([k]) => k === r)?.[2] || 'películas');
+// el endpoint no lleva verbo de conteo: solo dirección e interpretación tienen
+// uno propio, el resto cuenta «películas» a secas
+const VERBOS = { director: 'dirigidas', actor: 'interpretadas' };
 
 // A TMDB person tile with a star to add/remove from favorites.
 function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
@@ -60,7 +64,7 @@ const Avatar = ({ person, size = 'w-12 h-12' }) =>
   );
 
 /** One favorite: who they are, what you have of theirs, and what you're missing. */
-function FavoriteCard({ p, role, alsoOther, selectable, selected, onSelect, onRemove, onAddOtherFacet }) {
+function FavoriteCard({ p, role, faceta, verbo, crossFacet, alsoOther, selectable, selected, onSelect, onRemove, onAddOtherFacet }) {
   const gaps = p.gaps;
   const complete = gaps === 0;
   return (
@@ -89,7 +93,7 @@ function FavoriteCard({ p, role, alsoOther, selectable, selected, onSelect, onRe
               : undefined
           }
         >
-          <b className="text-zinc-300">{p.movies || 0}</b> {roleVerb(role)} {t('en tu Plex')}
+          <b className="text-zinc-300">{p.movies || 0}</b> {verbo} {t('en tu Plex')}
           {p.upcoming > 0 && <span className="text-sky-300"> · {p.upcoming} {t('por venir')}</span>}
         </div>
 
@@ -126,10 +130,12 @@ function FavoriteCard({ p, role, alsoOther, selectable, selected, onSelect, onRe
         )}
       </div>
       <div className="flex flex-col gap-1 shrink-0">
-        <button onClick={() => onRemove(p)} title={t('Quitar de {faceta}', { faceta: roleLabel(role).toLowerCase() })} className="text-zinc-600 hover:text-red-400">
+        <button onClick={() => onRemove(p)} title={t('Quitar de {faceta}', { faceta })} className="text-zinc-600 hover:text-red-400">
           <X size={15} />
         </button>
-        {alsoOther ? (
+        {/* el atajo dirección↔interpretación (el caso Eastwood) solo tiene
+            sentido entre esos dos oficios; en los demás no se pinta */}
+        {!crossFacet ? null : alsoOther ? (
           <span
             title={t('También le sigues como {faceta}', { faceta: role === 'director' ? t('actor/actriz') : t('director/a') })}
             className="text-gold-400/60"
@@ -170,7 +176,7 @@ const ACCENTS = {
  * Resolver 500 nombres contra TMDB lleva su rato, así que el servidor lo hace en
  * segundo plano y aquí se sigue el progreso.
  */
-function CanonPacks({ role, onDone }) {
+function CanonPacks({ role, faceta, onDone }) {
   const [canons, setCanons] = useState([]);
   const [estado, setEstado] = useState(null);
 
@@ -202,7 +208,7 @@ function CanonPacks({ role, onDone }) {
 
   const añadir = async (c) => {
     const r = await api('/tracked/from-canon', { method: 'POST', body: { canon: c.key, role } });
-    if (r.error) return toast(`⚠️ ${r.error}`, 'error');
+    if (r.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     setEstado({ running: true, canon: c.label, added: 0, total: r.total });
   };
 
@@ -234,7 +240,7 @@ function CanonPacks({ role, onDone }) {
               className="btn-ghost !py-1 text-xs shrink-0"
               disabled={estado?.running}
               onClick={() => añadir(c)}
-              title={t('Añadir a tus {faceta}', { faceta: roleLabel(role).toLowerCase() })}
+              title={t('Añadir a tus {faceta}', { faceta })}
             >
               {t('Añadir')}
             </button>
@@ -250,6 +256,19 @@ export default function Favorites() {
   // la faceta y los filtros sobreviven a la navegación hasta pulsar «Limpiar»
   const [role, setRoleState] = useState(() => localStorage.getItem('fav_role') || 'director'); // scopes the entire page
   const setRole = (r) => { setRoleState(r); localStorage.setItem('fav_role', r); };
+  const [roles, setRoles] = useState(ROLES_INICIALES);
+  useEffect(() => {
+    api('/roles').then((r) => Array.isArray(r) && r.length && setRoles(r));
+  }, []);
+  const info = (r) => roles.find((x) => x.key === r) || { key: r, label: r, singular: r, rankable: false, principal: false };
+  const roleLabel = (r) => t(info(r).label); // «Directores/as»
+  const roleSingular = (r) => t(info(r).singular); // «director/a»
+  const roleVerb = (r) => t(VERBOS[r] || 'películas');
+  const faceta = roleLabel(role).toLowerCase();
+  const secundarios = roles.filter((r) => !r.principal);
+  // dirección e interpretación van emparejadas: es la otra cara del atajo
+  // Eastwood, y solo entre esas dos se ofrece «seguirle TAMBIÉN como…»
+  const parejaDe = (r) => (r === 'director' ? 'actor' : 'director');
   const [tab, setTab] = useState('mine'); // mine | discover
   // el catálogo de directores en activo, plegado por defecto para no alargar
   // la pestaña; /directores (ruta vieja) llega aquí con ?add=activos y lo abre
@@ -279,11 +298,12 @@ export default function Favorites() {
   // un nombre por línea, listo para pegarlo en «añadir por nombres» de otra
   // instalación de PowaFlex — todo en el navegador, sin servidor
   const exportarTxt = () => {
-    const nombres = roleFavs.map((t) => t.name).join('\n');
+    const nombres = roleFavs.map((fav) => fav.name).join('\n');
     const blob = new Blob([nombres + '\n'], { type: 'text/plain;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `powaflex-${role === 'director' ? 'directores' : 'actores'}-${new Date().toISOString().slice(0, 10)}.txt`;
+    // la clave del oficio, nunca su etiqueta: el nombre del fichero no se traduce
+    a.download = `powaflex-${role}-${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(a.href);
     toast(t('⬇ {n} nombres exportados', { n: roleFavs.length }));
@@ -322,12 +342,12 @@ export default function Favorites() {
 
   const addTmdb = async (p) => {
     await api('/tracked/tmdb', { method: 'POST', body: { tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path, role } });
-    toast(t('⭐ {nombre} añadido como {faceta}', { nombre: p.name, faceta: role === 'director' ? t('director/a') : t('actor/actriz') }), 'success');
+    toast(t('⭐ {nombre} añadido como {faceta}', { nombre: p.name, faceta: roleSingular(role) }), 'success');
     loadTracked();
   };
   const removeTmdb = async (p) => {
     const fav = (tracked || []).find((x) => x.tmdb_id === p.tmdb_id && (x.role || 'director') === role);
-    if (fav) { await api(`/tracked/${fav.id}?role=${role}`, { method: 'DELETE' }); toast(t('{nombre} fuera de {faceta}', { nombre: p.name, faceta: roleLabel(role).toLowerCase() })); loadTracked(); }
+    if (fav) { await api(`/tracked/${fav.id}?role=${role}`, { method: 'DELETE' }); toast(t('{nombre} fuera de {faceta}', { nombre: p.name, faceta })); loadTracked(); }
   };
   const addByNames = async () => {
     if (!bulkNames.trim()) return;
@@ -337,10 +357,10 @@ export default function Favorites() {
     setBulkBusy(false);
     if (res.ok) {
       setBulkResult(res);
-      toast(t('⭐ {n} añadidos a {faceta}', { n: res.added, faceta: roleLabel(role).toLowerCase() }), 'success');
+      toast(t('⭐ {n} añadidos a {faceta}', { n: res.added, faceta }), 'success');
       setBulkNames('');
       loadTracked();
-    } else toast(`⚠️ ${res.error || 'error'}`, 'error');
+    } else toast(`⚠️ ${t(res.error || 'error')}`, 'error');
   };
   const addPack = async (pack) => {
     setPackBusy(pack.key);
@@ -350,7 +370,7 @@ export default function Favorites() {
     });
     setPackBusy(null);
     if (res.ok) { toast(t('⭐ {n} de «{pack}» añadidos', { n: res.added, pack: pack.title }), 'success'); loadTracked(); }
-    else toast(`⚠️ ${res.error || 'error'}`, 'error');
+    else toast(`⚠️ ${t(res.error || 'error')}`, 'error');
   };
   const searchPeople = async (e) => {
     e.preventDefault();
@@ -366,12 +386,12 @@ export default function Favorites() {
   const removeFav = async (p) => {
     setTracked((prev) => prev.filter((t) => !(t.id === p.id && (t.role || 'director') === role)));
     await api(`/tracked/${p.id}?role=${p.role || role}`, { method: 'DELETE' });
-    toast(t('{nombre} fuera de {faceta}', { nombre: p.name, faceta: roleLabel(role).toLowerCase() }));
+    toast(t('{nombre} fuera de {faceta}', { nombre: p.name, faceta }));
     loadTracked();
   };
   // seguirle también en la otra faceta, sin dejar esta
   const addOtherFacet = async (p) => {
-    const next = (p.role || 'director') === 'director' ? 'actor' : 'director';
+    const next = parejaDe(p.role || 'director');
     await api(`/tracked/${p.id}`, { method: 'POST', body: { role: next } });
     toast(t('⭐ {nombre} también en {faceta}', { nombre: p.name, faceta: next === 'director' ? t('directores/as') : t('actores/actrices') }), 'success');
     loadTracked();
@@ -386,7 +406,7 @@ export default function Favorites() {
     setConfirmClear(false);
     const ids = shownFavs.map((t) => t.id);
     await api('/tracked/batch', { method: 'DELETE', body: { personIds: ids, role } });
-    toast(favSearch.trim() ? t('Quitados {n} favoritos de los que se ven ahora', { n: ids.length }) : t('Quitados {n} favoritos de {faceta}', { n: ids.length, faceta: roleLabel(role).toLowerCase() }));
+    toast(favSearch.trim() ? t('Quitados {n} favoritos de los que se ven ahora', { n: ids.length }) : t('Quitados {n} favoritos de {faceta}', { n: ids.length, faceta }));
     loadTracked();
   };
 
@@ -404,7 +424,7 @@ export default function Favorites() {
       setSelected(new Set());
       setPruneMode(false);
       loadTracked();
-    } else toast(`⚠️ ${r.error || 'error'}`, 'error');
+    } else toast(`⚠️ ${t(r.error || 'error')}`, 'error');
   };
   const toggleSelected = (id) =>
     setSelected((prev) => {
@@ -418,10 +438,9 @@ export default function Favorites() {
 
   // everything below is scoped to the active role — no mixed counts, ever
   const roleFavs = tracked.filter((t) => (t.role || 'director') === role);
-  const counts = {
-    director: tracked.filter((t) => (t.role || 'director') === 'director').length,
-    actor: tracked.filter((t) => (t.role || 'director') === 'actor').length,
-  };
+  const counts = Object.fromEntries(
+    roles.map((r) => [r.key, tracked.filter((fav) => (fav.role || 'director') === r.key).length])
+  );
   const FAV_SORTS = {
     titulos: { label: t('Más {verbo} en tu Plex', { verbo: roleVerb(role) }), fn: (a, b) => (b.movies || 0) - (a.movies || 0) },
     huecos: { label: t('Más huecos'), fn: (a, b) => (b.gaps ?? -1) - (a.gaps ?? -1) },
@@ -449,29 +468,46 @@ export default function Favorites() {
         <Link to="/descubrir" className="text-gold-400 hover:underline">{t('Descubrir huecos')}</Link>.
       </p>
 
-      {/* role scope: the whole page follows this switch */}
+      {/* role scope: the whole page follows this switch. La dirección abre y
+          manda, la interpretación la sigue, y los cuatro oficios restantes van
+          agrupados detrás en formato menor: seis pestañas iguales convertirían
+          la página en un índice y le quitarían el centro a la dirección */}
       <div className="flex gap-2 mb-4 flex-wrap items-center">
-        {ROLES.map(([r, label]) => (
+        {roles.filter((r) => r.principal).map((r) => (
           <button
-            key={r}
-            onClick={() => setRole(r)}
-            className={`${role === r ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}
+            key={r.key}
+            onClick={() => setRole(r.key)}
+            className={`${role === r.key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}
           >
-            {r === 'director' ? <Clapperboard size={15} strokeWidth={1.75} /> : <Drama size={15} strokeWidth={1.75} />}
-            {t(label)} ({counts[r]})
+            {r.key === 'director' ? <Clapperboard size={15} strokeWidth={1.75} /> : <Drama size={15} strokeWidth={1.75} />}
+            {t(r.label)} ({counts[r.key] || 0})
           </button>
         ))}
-        <span className="text-xs text-zinc-600 ml-2">{t('Cada faceta se gestiona por separado')}</span>
+        {secundarios.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center border-l border-ink-700 pl-3 ml-1">
+            <span className="text-xs text-zinc-600">{t('y también')}</span>
+            {secundarios.map((r) => (
+              <button
+                key={r.key}
+                onClick={() => setRole(r.key)}
+                className={`btn-ghost !py-1 text-xs ${role === r.key ? '!border-gold-400 text-gold-400' : ''}`}
+              >
+                {t(r.label)} ({counts[r.key] || 0})
+              </button>
+            ))}
+          </div>
+        )}
+        <span className="text-xs text-zinc-600 w-full">{t('Cada faceta se gestiona por separado')}</span>
       </div>
 
       {/* flex-wrap: en móvil los dos botones no caben y, sin él, se estrujaban
           en bloques de tres líneas en vez de pasar cada uno a su fila */}
       <div className="flex gap-2 mb-6 flex-wrap">
         <button onClick={() => setTab('mine')} className={`${tab === 'mine' ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
-          <Star size={15} strokeWidth={1.75} /> {t('Mis {faceta}', { faceta: roleLabel(role).toLowerCase() })} ({counts[role]})
+          <Star size={15} strokeWidth={1.75} /> {t('Mis {faceta}', { faceta })} ({counts[role]})
         </button>
         <button onClick={() => setTab('discover')} className={`${tab === 'discover' ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
-          <Search size={15} strokeWidth={1.75} /> {t('Añadir {faceta}', { faceta: roleLabel(role).toLowerCase() })}
+          <Search size={15} strokeWidth={1.75} /> {t('Añadir {faceta}', { faceta })}
         </button>
       </div>
 
@@ -482,7 +518,7 @@ export default function Favorites() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               <div className="card p-3">
                 <div className="text-xl font-bold text-gold-400">{counts[role]}</div>
-                <div className="text-xs text-zinc-500">{t('{faceta} que sigues', { faceta: roleLabel(role).toLowerCase() })}</div>
+                <div className="text-xs text-zinc-500">{t('{faceta} que sigues', { faceta })}</div>
               </div>
               <div className="card p-3">
                 <div className="text-xl font-bold text-zinc-200">{roleFavs.reduce((n, t) => n + (t.movies || 0), 0)}</div>
@@ -501,15 +537,15 @@ export default function Favorites() {
 
           {roleFavs.length === 0 ? (
             <Empty>
-              {t('Aún no sigues a nadie como {faceta}. Usa', { faceta: role === 'director' ? t('director/a') : t('actor/actriz') })}{' '}
-              <button className="text-gold-400 hover:underline" onClick={() => setTab('discover')}>{t('Añadir {faceta}', { faceta: roleLabel(role).toLowerCase() })}</button>.
+              {t('Aún no sigues a nadie como {faceta}. Usa', { faceta: roleSingular(role) })}{' '}
+              <button className="text-gold-400 hover:underline" onClick={() => setTab('discover')}>{t('Añadir {faceta}', { faceta })}</button>.
             </Empty>
           ) : (
             <>
               <div className="flex gap-2 mb-3 flex-wrap items-center">
                 <input
                   className="input !py-1.5 text-sm !w-auto flex-1 min-w-48"
-                  placeholder={t('Filtrar {faceta}…', { faceta: roleLabel(role).toLowerCase() })}
+                  placeholder={t('Filtrar {faceta}…', { faceta })}
                   value={favSearch}
                   onChange={(e) => setFavSearch(e.target.value)}
                 />
@@ -576,7 +612,10 @@ export default function Favorites() {
                     key={p.id}
                     p={p}
                     role={role}
-                    alsoOther={tracked.some((t) => t.id === p.id && (t.role || 'director') !== role)}
+                    faceta={faceta}
+                    verbo={roleVerb(role)}
+                    crossFacet={info(role).principal}
+                    alsoOther={tracked.some((fav) => fav.id === p.id && (fav.role || 'director') === parejaDe(role))}
                     selectable={pruneMode}
                     selected={selected.has(p.id)}
                     onSelect={toggleSelected}
@@ -589,22 +628,25 @@ export default function Favorites() {
           )}
 
           {/* el ranking por títulos vivía duplicado aquí y en Personas; ahora
-              Personas tiene la ★ y el alta top-N, y aquí queda el puente */}
-          <div className="card p-4 flex items-center justify-between flex-wrap gap-2 text-sm">
-            <span className="text-zinc-400">
-              {t('¿Buscas el ranking de {faceta} por títulos en tu Plex? Vive en Personas, con la ★ para seguir y el alta de «los N primeros».', { faceta: roleLabel(role).toLowerCase() })}
-            </span>
-            <Link to={`/personas?role=${role}`} className="btn-ghost !py-1.5 text-xs shrink-0 inline-flex items-center gap-1.5">
-              <Star size={13} strokeWidth={2} /> {t('Ir a Personas')}
-            </Link>
-          </div>
+              Personas tiene la ★ y el alta top-N, y aquí queda el puente. Solo
+              para los oficios que Plex acredita: los demás no tienen ranking */}
+          {info(role).rankable && (
+            <div className="card p-4 flex items-center justify-between flex-wrap gap-2 text-sm">
+              <span className="text-zinc-400">
+                {t('¿Buscas el ranking de {faceta} por títulos en tu Plex? Vive en Personas, con la ★ para seguir y el alta de «los N primeros».', { faceta })}
+              </span>
+              <Link to={`/personas?role=${role}`} className="btn-ghost !py-1.5 text-xs shrink-0 inline-flex items-center gap-1.5">
+                <Star size={13} strokeWidth={2} /> {t('Ir a Personas')}
+              </Link>
+            </div>
+          )}
         </>
       )}
 
       {tab === 'discover' && (
         <>
           <p className="text-xs text-zinc-500 mb-4">
-            {t('Lo que añadas aquí se sigue como')} <b>{role === 'director' ? t('director/a') : t('actor/actriz')}</b>
+            {t('Lo que añadas aquí se sigue como')} <b>{roleSingular(role)}</b>
             {t('. Cambia la faceta arriba si quieres seguir a alguien por la otra.')}
           </p>
 
@@ -645,7 +687,7 @@ export default function Favorites() {
             <p className="text-xs text-zinc-500 mb-3 max-w-2xl">
               {t('Pega nombres')} <b>{t('separados por comas o uno por línea')}</b>
               {t('. PowaFlex los busca en TMDB y los añade a')}{' '}
-              {roleLabel(role).toLowerCase()}.
+              {faceta}.
             </p>
             <textarea
               className="input !h-28 font-mono text-xs leading-relaxed"
@@ -655,7 +697,7 @@ export default function Favorites() {
             />
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <button className="btn-gold shrink-0 inline-flex items-center gap-2" onClick={addByNames} disabled={bulkBusy || !bulkNames.trim()}>
-                {bulkBusy ? t('Añadiendo…') : <><Star size={13} strokeWidth={2} /> {t('Añadir a {faceta}', { faceta: roleLabel(role).toLowerCase() })}</>}
+                {bulkBusy ? t('Añadiendo…') : <><Star size={13} strokeWidth={2} /> {t('Añadir a {faceta}', { faceta })}</>}
               </button>
             </div>
             {bulkResult && (
@@ -685,9 +727,13 @@ export default function Favorites() {
             )}
           </div>
 
-          <CanonPacks role={role} onDone={loadTracked} />
+          {/* los cánones son listas de películas: sus nombres se resuelven como
+              quien las dirige o las interpreta, no como su montador/a */}
+          {info(role).principal && <CanonPacks role={role} faceta={faceta} onDone={loadTracked} />}
 
-          {(festPacks?.length > 0 || suggest?.packs) && (
+          {/* los cuadros de festivales y los curados son de gente que dirige o
+              interpreta: fuera de esas dos facetas no vienen a cuento */}
+          {info(role).principal && (festPacks?.length > 0 || suggest?.packs) && (
             <div className="mb-8 space-y-5">
               {/* primero los habituales de Cannes/Venecia/Berlín, luego los curados */}
               {[...(festPacks || []), ...(suggest?.packs || [])].map((pack) => {

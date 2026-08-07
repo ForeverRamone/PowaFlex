@@ -28,6 +28,10 @@ export const setLang = (next) => {
 export const locale = () => (lang === 'en' ? 'en-GB' : 'es-ES');
 
 export function t(text, vars) {
+  // Desde la 1.04 también pasan por aquí los mensajes que manda el SERVIDOR
+  // (`t(r.error)`), y esos pueden llegar vacíos o no ser texto: se devuelven
+  // tal cual en vez de reventar la página con un TypeError.
+  if (typeof text !== 'string') return text;
   // Homógrafos: la misma palabra castellana puede necesitar dos traducciones
   // («Género» = Genre en Biblioteca, Gender en demografía). La clave admite un
   // contexto tras «||» — t('Género||persona') — que nunca se pinta: en ES se

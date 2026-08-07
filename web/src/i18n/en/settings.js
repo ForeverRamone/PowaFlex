@@ -150,6 +150,31 @@ export default {
   '3. La cuenta gratuita da 1.000 peticiones/día; las Supporter, bastantes más. PowaFlex respeta el límite y reparte el trabajo.':
     '3. The free account gives 1,000 requests/day; Supporter accounts, quite a few more. PowaFlex respects the limit and spreads the work out.',
 
+  // ── Notas de IMDb ──────────────────────────────────────────────────────────
+  'Notas de IMDb': 'IMDb ratings',
+  '(opcional: el volcado público, sin API)': '(optional: the public dump, no API)',
+  'IMDb publica a diario un fichero con las notas y los votos de todo su catálogo. PowaFlex lo usa para el umbral de ruido de Descubrir sin gastar ni una petición de API.':
+    'IMDb publishes a daily file with the ratings and vote counts for its whole catalogue. PowaFlex uses it for the Discover noise threshold without spending a single API request.',
+  'Descargando…': 'Downloading…',
+  'Descargar ahora': 'Download now',
+  '{n} títulos guardados · {date}': '{n} titles stored · {date}',
+  'nunca descargadas': 'never downloaded',
+  '✓ {n} notas de IMDb descargadas': '✓ {n} IMDb ratings downloaded',
+  'La descarga son unos 8 MB comprimidos y tarda un par de minutos. El pase nocturno la repite sola una vez por semana, así que no hace falta que la lances a mano.':
+    'The download is about 8 MB compressed and takes a couple of minutes. The nightly run repeats it on its own once a week, so you do not need to trigger it by hand.',
+
+  // ── Bazarr ─────────────────────────────────────────────────────────────────
+  '(opcional: buscar los subtítulos que faltan)': '(optional: search for missing subtitles)',
+  'Con Bazarr configurado, desde la pestaña Subtítulos del Taller puedes pedirle que busque los subtítulos que a una película le faltan, sin salir de PowaFlex.':
+    'With Bazarr configured, from the Subtitles tab in the Workshop you can ask it to search for the subtitles a movie is missing, without leaving PowaFlex.',
+  'URL de Bazarr': 'Bazarr URL',
+  '¿Dónde está la API key de Bazarr?': 'Where is the Bazarr API key?',
+  'En Bazarr: ': 'In Bazarr: ',
+  '. La URL es la misma con la que abres Bazarr en el navegador, típicamente el puerto ':
+    '. The URL is the same one you open Bazarr with in your browser, typically port ',
+  'Bazarr localiza las películas por su id de Radarr, así que necesita Radarr configurado y sincronizado más arriba.':
+    'Bazarr finds movies by their Radarr id, so it needs Radarr configured and synced above.',
+
   // ── Aspecto ────────────────────────────────────────────────────────────────
   'Aspecto': 'Appearance',
   'Cambia el lenguaje visual de toda la app. Se aplica al instante y se guarda en el servidor, así que te sigue en cualquier navegador.':
@@ -164,6 +189,17 @@ export default {
     'The look before the redesign: blue-tinted charcoal and the system font',
   '«Clásico» recupera la paleta y la tipografía anteriores al rediseño. Los iconos y la agrupación del menú son comunes a los dos.':
     '“Classic” brings back the palette and typography from before the redesign. Icons and menu grouping are shared by both.',
+
+  // ── Criterio de subtítulos ─────────────────────────────────────────────────
+  'Criterio de subtítulos': 'Subtitle criteria',
+  'Elige qué pistas de subtítulos te sirven, en cualquier combinación. Una película cuenta como cubierta si tiene al menos una de las marcadas. Sin ninguna marcada, la auditoría de subtítulos se apaga.':
+    'Choose which subtitle tracks work for you, in any combination. A movie counts as covered if it has at least one of the ticked ones. With none ticked, the subtitle audit is switched off.',
+  'Versión original||ajustes': 'Original language',
+  'Español||ajustes': 'Spanish',
+  'Inglés||ajustes': 'English',
+  '«Versión original» es el idioma en que se rodó cada película, según TMDB: para el cine japonés vale una pista japonesa, para el francés una francesa.':
+    '“Original language” is the language each movie was shot in, according to TMDB: for Japanese cinema a Japanese track works, for French cinema a French one.',
+  'Ver el resultado en Taller → Subtítulos →': 'See the result in Workshop → Subtitles →',
 
   // ── Notas y puntuaciones ───────────────────────────────────────────────────
   'Notas y puntuaciones que mostrar': 'Ratings and scores to show',
@@ -239,4 +275,18 @@ export default {
   ' como': ' as',
   ' en la carpeta de datos del contenedor (parado) y arráncalo.':
     ' into the container data folder (while stopped) and start it up.',
+  'Hacer una copia automática de la base de datos cada noche': 'Back up the database automatically every night',
+  'guardando las últimas': 'keeping the last',
+  'copias': 'backups',
+  'Hacer una copia ahora': 'Back up now',
+  'Copiando…': 'Backing up…',
+  '✓ Copia hecha: {file} ({mb} MB)': '✓ Backup done: {file} ({mb} MB)',
+  'Se hace sola al final del pase nocturno, con la base ya al día, y va rotando: al pasar del número que pongas se borra la más vieja. Guarda ahí solo la base de datos; los ajustes se exportan aparte con el botón de arriba.':
+    'It runs on its own at the end of the nightly run, with the database already up to date, and rotates: once past the number you set, the oldest one is deleted. It only stores the database; settings are exported separately with the button above.',
+
+  // lista de vetadas al pase automático
+  '🚫 {n} fuera del pase automático': '🚫 {n} skipped by the nightly job',
+  'El automático las ignora. Se siguen viendo en Cine venidero y puedes mandarlas a Radarr a mano cuando quieras.':
+    'The nightly job ignores them. They stay visible in Upcoming cinema and you can send them to Radarr by hand whenever you want.',
+  'quitar el veto': 'undo',
 };

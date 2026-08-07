@@ -213,7 +213,7 @@ export default function Directors({ embedded = false }) {
     // del director). Aquí se comprueba contra el año de nacimiento.
     const r = await api('/directors/follow', { method: 'POST', body: { names: [d.name] } });
     setBusy(null);
-    if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    if (r.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     // `added` cuenta ALTAS: cero también significa «ya estaba», y decir
     // entonces «no se encontró en TMDB» era mentir. Quien no se resuelve viene
     // en notFound.
@@ -231,7 +231,7 @@ export default function Directors({ embedded = false }) {
       body: { names: pendientes.map((d) => d.name) },
     });
     setBulkBusy(false);
-    if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    if (r.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     const noEncontrados = new Set(r.notFound || []);
     marcar(new Set(pendientes.map((d) => d.name).filter((n) => !noEncontrados.has(n))));
     toast(

@@ -1,16 +1,18 @@
 import { lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { HardDrive, HeartPulse } from 'lucide-react';
+import { HardDrive, HeartPulse, Subtitles } from 'lucide-react';
 import { Spinner, PageHeader } from '../components.jsx';
 import { t } from '../i18n.js';
 
 // las dos mitades siguen siendo páginas completas; el Taller solo las agrupa
 const Quality = lazy(() => import('./Quality.jsx'));
 const Salud = lazy(() => import('./Salud.jsx'));
+const Subtitulos = lazy(() => import('./Subtitulos.jsx'));
 
 const TABS = [
   ['calidad', 'Calidad y disco', HardDrive],
   ['datos', 'Salud de los datos', HeartPulse],
+  ['subs', 'Subtítulos', Subtitles],
 ];
 
 /**
@@ -21,14 +23,15 @@ const TABS = [
  */
 export default function Taller() {
   const [params, setParams] = useSearchParams();
-  const tab = params.get('tab') === 'datos' ? 'datos' : 'calidad';
+  const pedida = params.get('tab');
+  const tab = TABS.some(([key]) => key === pedida) ? pedida : 'calidad';
 
   return (
     <div>
       <PageHeader
         eyebrow={t('Tu colección')}
         title={t('Taller')}
-        subtitle={t('El mantenimiento de la colección: calidad de los archivos, disco, deuda de Radarr y auditorías de los datos.')}
+        subtitle={t('El mantenimiento de la colección: calidad de los archivos, disco, deuda de Radarr, subtítulos y auditorías de los datos.')}
       />
       <div className="flex gap-2 mb-5 flex-wrap">
         {/* la clave de pestaña NO puede llamarse t: pisaría la función de
@@ -44,7 +47,7 @@ export default function Taller() {
         ))}
       </div>
       <Suspense fallback={<Spinner />}>
-        {tab === 'datos' ? <Salud embedded /> : <Quality embedded />}
+        {tab === 'subs' ? <Subtitulos embedded /> : tab === 'datos' ? <Salud embedded /> : <Quality embedded />}
       </Suspense>
     </div>
   );

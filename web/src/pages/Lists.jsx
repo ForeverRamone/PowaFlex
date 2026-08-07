@@ -68,7 +68,7 @@ function ChallengeRow({ listId, item, radarrIds, onAdded, onOpenOwned }) {
       setTmdbId(r.tmdbId);
       return r.tmdbId;
     }
-    toast(`⚠️ ${r?.error || t('No encuentro esta película en TMDB')}`, 'error');
+    toast(`⚠️ ${t(r?.error || t('No encuentro esta película en TMDB'))}`, 'error');
     return null;
   };
 
@@ -131,7 +131,7 @@ function ChallengeDetail({ listId, onChanged }) {
     const res = await api(`/letterboxd/lists/${listId}/radarr`, { method: 'POST' });
     setBulk({
       running: false,
-      msg: res.error ? `⚠️ ${res.error}` : `✓ ${t('{n} añadidas', { n: res.added })}${res.alreadyInRadarr ? ` · ${t('{n} ya estaban', { n: res.alreadyInRadarr })}` : ''}${res.failed ? ` · ${t('{n} fallaron', { n: res.failed })}` : ''}`,
+      msg: res.error ? `⚠️ ${t(res.error)}` : `✓ ${t('{n} añadidas', { n: res.added })}${res.alreadyInRadarr ? ` · ${t('{n} ya estaban', { n: res.alreadyInRadarr })}` : ''}${res.failed ? ` · ${t('{n} fallaron', { n: res.failed })}` : ''}`,
     });
   };
 

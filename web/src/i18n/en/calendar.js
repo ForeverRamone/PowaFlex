@@ -37,4 +37,13 @@ export default {
   'No hay estrenos próximos registrados en TMDB.': 'No upcoming releases recorded on TMDB.',
   'Anunciadas, sin fecha': 'Announced, undated',
   'Estrenadas recientemente (últimos 60 días)': 'Recently released (last 60 days)',
+
+  // veto al pase automático de Radarr (🚫 en cada ficha)
+  'Fuera del automático': 'Skip auto-add',
+  'El automático la ignora': 'Auto-add skips it',
+  'deshacer': 'undo',
+  'Que el pase automático de Radarr no la coja. Se sigue viendo aquí y puedes añadirla a mano.':
+    'Keep the nightly Radarr job from grabbing it. It stays visible here and you can still add it by hand.',
+  '🚫 «{title}» queda fuera del pase automático': '🚫 “{title}” is out of the nightly Radarr job',
+  '↩︎ «{title}» vuelve al pase automático': '↩︎ “{title}” is back in the nightly Radarr job',
 };

@@ -335,7 +335,7 @@ function NewCanonForm({ onSaved }) {
     setBusy(true);
     const r = await api('/discover/canons', { method: 'POST', body: { label, names } });
     setBusy(false);
-    if (r.error) return toast(`⚠️ ${r.error}`, 'error');
+    if (r.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     toast(t('✓ «{label}» guardada con {n} nombres', { label: r.label, n: r.count }), 'success');
     setLabel(''); setNames(''); setOpen(false);
     onSaved(r.key);
@@ -392,7 +392,7 @@ function AbsentName({ person }) {
     });
     setYendo(false);
     if (r.personId) navigate(`/personas/${r.personId}?role=director`);
-    else toast(`⚠️ ${r.error || t('No se ha podido abrir su ficha')}`, 'error');
+    else toast(`⚠️ ${t(r.error || t('No se ha podido abrir su ficha'))}`, 'error');
   };
   return (
     <button
@@ -451,7 +451,7 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
         people: [{ tmdbId: person.tmdb_id, name: person.name, profilePath: person.profile_path }],
       },
     });
-    if (r.error) return toast(`⚠️ ${r.error}`, 'error');
+    if (r.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     setSeguidos((prev) => new Set(prev).add(person.tmdb_id));
     toast(t('⭐ {name} añadido a tus directores/as favoritos', { name: person.name }), 'success');
   };
@@ -630,6 +630,15 @@ export default function Discover() {
     resetTypes();
     setDemo({ ...DEMO_VACIO });
   };
+  // los oficios los manda el servidor: la lista vivía aquí a mano y se quedó
+  // vieja en cuanto la 1.04 pasó de dos a seis
+  const [roles, setRoles] = useState([
+    { key: 'director', label: 'Directores/as' },
+    { key: 'actor', label: 'Actores/actrices' },
+  ]);
+  useEffect(() => {
+    api('/roles').then((r) => Array.isArray(r) && r.length && setRoles(r));
+  }, []);
   const [dismissed, setDismissed] = useState(new Set());
   useEffect(() => {
     api('/discover/dismissed').then((r) => Array.isArray(r) && setDismissed(new Set(r.map((d) => d.tmdb_id))));
@@ -638,7 +647,7 @@ export default function Discover() {
   // película descartada por error no volvía a aparecer nunca.
   const undismiss = async (f) => {
     const r = await api(`/discover/dismiss/${f.tmdb_id}`, { method: 'DELETE' });
-    if (r.error) return toast(`⚠️ ${r.error}`, 'error');
+    if (r.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     setDismissed((prev) => { const n = new Set(prev); n.delete(f.tmdb_id); return n; });
     toast(t('↩︎ «{title}» vuelve a la lista', { title: f.title }));
   };
@@ -705,13 +714,16 @@ export default function Discover() {
       {tab === 'favorites' && (
         <div className="flex gap-2 mb-4 flex-wrap items-center">
           <span className="text-xs text-zinc-500">{t('Faceta:')}</span>
-          {[['director', 'Como directores/as', Clapperboard], ['actor', 'Como actores/actrices', Drama]].map(([r, label, Icon]) => (
+          {/* los seis oficios, en el orden del servidor: el pase nocturno ya
+              calcula los huecos de todos y sin esto no había forma de verlos */}
+          {roles.map((r) => (
             <button
-              key={r}
-              onClick={() => setFavRolePref(r)}
-              className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${favRole === r ? '!border-gold-400 text-gold-400' : ''}`}
+              key={r.key}
+              onClick={() => setFavRolePref(r.key)}
+              className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${favRole === r.key ? '!border-gold-400 text-gold-400' : ''}`}
             >
-              <Icon size={13} strokeWidth={2} /> {t(label)}
+              {r.key === 'director' ? <Clapperboard size={13} strokeWidth={2} /> : r.key === 'actor' ? <Drama size={13} strokeWidth={2} /> : null}
+              {t('Como {oficio}', { oficio: t(r.label).toLowerCase() })}
             </button>
           ))}
         </div>
@@ -729,7 +741,7 @@ export default function Discover() {
           endpoint={`/discover/favorites?role=${favRole}`}
           role={favRole}
           {...gapProps}
-          intro={t('Qué te falta (ya estrenado) de tus favoritos seguidos como {role}.', { role: favRole === 'director' ? t('directores/as') : t('actores/actrices') })}
+          intro={t('Qué te falta (ya estrenado) de tus favoritos seguidos como {role}.', { role: t(roles.find((r) => r.key === favRole)?.label || 'Directores/as').toLowerCase() })}
         />
       ) : (
         <GapsView

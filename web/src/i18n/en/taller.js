@@ -3,8 +3,8 @@ export default {
   // ---- Taller.jsx (pestañas y cabecera) ----
   'Tu colección': 'Your collection',
   'Taller': 'Workshop',
-  'El mantenimiento de la colección: calidad de los archivos, disco, deuda de Radarr y auditorías de los datos.':
-    'Collection maintenance: file quality, disk space, Radarr backlog and data audits.',
+  'El mantenimiento de la colección: calidad de los archivos, disco, deuda de Radarr, subtítulos y auditorías de los datos.':
+    'Collection maintenance: file quality, disk space, Radarr backlog, subtitles and data audits.',
   'Calidad y disco': 'Quality & disk',
   'Salud de los datos': 'Data health',
 

@@ -5,6 +5,8 @@ import {
   buildRoleItems, roleStats, classifyGenres, latinizeTitles, featureRule, tmdbGet, latinizeNames,
   isCameoCredit, esParcialCaducado, personPopularPage,
 } from './tmdb.js';
+import { creditsForRole, isRole } from './roles.js';
+import { votosPorImdbId } from './imdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { matchMovie, watchedIndex, isWatched } from './letterboxd.js';
 import { TSPDT_DIRECTORS, TSPDT_21C_DIRECTORS } from './data/tspdt-directors.js';
@@ -46,12 +48,21 @@ const minVotesFor = (role) =>
   Number(getSetting(role === 'actor' ? 'gaps_min_votes_actor' : 'gaps_min_votes_director')) ||
   (role === 'actor' ? 100 : 20);
 
+/**
+ * ¿Esta película pasa el listón de ruido? Basta con llegar en UNA de las tres
+ * fuentes. `imdb` es el mapa de votos del volcado local, que solo tiene valor
+ * para los candidatos de los que conocemos su id de IMDb.
+ */
+const pasaUmbral = (votosTmdb, votosLb, votosImdb, minVotes) =>
+  (votosTmdb || 0) >= minVotes || (votosLb || 0) >= minVotes || (votosImdb || 0) >= minVotes;
+
 const dismissedIds = () =>
   new Set(db.prepare('SELECT tmdb_id FROM dismissed_movies').all().map((r) => r.tmdb_id));
 
 // Votos de Letterboxd cacheados en mdb_ratings. En TMDB apenas vota nadie, así
 // que el umbral de ruido por sí solo descartaba cine de verdad: una película
-// pasa si llega al listón en TMDB **o** en Letterboxd.
+// pasa si llega al listón en TMDB, en Letterboxd **o** en IMDb (esta última
+// desde la 1.04, del volcado local: es la más completa y no gasta API).
 const lbVotesMap = () =>
   new Map(
     db.prepare('SELECT tmdb_id, lb_votes FROM mdb_ratings WHERE lb_votes IS NOT NULL').all().map((r) => [r.tmdb_id, r.lb_votes])
@@ -294,12 +305,7 @@ export async function libraryGaps({
         const resolved = await resolvePerson(p.id);
         if (!resolved?.tmdb_id) continue;
         const credits = await personCredits(resolved.tmdb_id);
-        const raw =
-          role === 'director'
-            ? (credits.crew || []).filter((c) => c.job === 'Director')
-            : role === 'writer'
-              ? (credits.crew || []).filter((c) => c.department === 'Writing')
-              : credits.cast || [];
+        const raw = creditsForRole(credits, role);
         const seen = new Set();
         let released = 0;
         let owned = 0;
@@ -326,7 +332,7 @@ export async function libraryGaps({
             dismissedN++;
             continue;
           }
-          if ((c.vote_count || 0) < minVotes && (lbVotes.get(c.id) || 0) < minVotes) continue;
+          if (!pasaUmbral(c.vote_count, lbVotes.get(c.id), null, minVotes)) continue;
           missing.push({
             tmdb_id: c.id,
             title: c.title,
@@ -427,7 +433,10 @@ export async function favoritesGaps({ perPerson = 8, refresh = false, role: only
       if (i >= tracked.length) return;
       setBuildProgress('discover:favoritos', 'Cruzando filmografías de tus favoritos', i + 1, tracked.length);
       const p = tracked[i];
-      const role = p.role === 'actor' ? 'actor' : 'director';
+      // OJO: esto colapsaba cualquier oficio que no fuera actor a «director»,
+      // así que los huecos de un compositor se calculaban como si dirigiera.
+      // Con los oficios de la 1.04 se respeta la faceta por la que le sigues.
+      const role = isRole(p.role) ? p.role : 'director';
       try {
         const resolved = await resolvePerson(p.id);
         if (!resolved?.tmdb_id) continue;
@@ -445,12 +454,14 @@ export async function favoritesGaps({ perPerson = 8, refresh = false, role: only
         const stats = roleStats(items, role);
 
         const minVotes = minVotesFor(role);
+        // los items ya pasaron por enrichRuntimes, así que traen su id de IMDb
+        const imdbVotes = votosPorImdbId(items.map((x) => x.imdb_id));
         let dismissedN = 0;
         const missing = [];
         for (const it of items) {
           if (!it.released || it.owned) continue;
           if (dismissed.has(it.tmdb_id)) { dismissedN++; continue; }
-          if ((it.votes || 0) < minVotes && (lbVotes.get(it.tmdb_id) || 0) < minVotes) continue;
+          if (!pasaUmbral(it.votes, lbVotes.get(it.tmdb_id), imdbVotes.get(it.imdb_id)?.votes, minVotes)) continue;
           missing.push({ ...it, owned: false });
         }
         missing.sort((a, b) => (b.votes || 0) - (a.votes || 0));

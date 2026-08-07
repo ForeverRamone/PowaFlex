@@ -114,7 +114,7 @@ export default function Estrenos() {
   }, []);
   const undismiss = async (f) => {
     const r = await api(`/discover/dismiss/${f.tmdb_id}`, { method: 'DELETE' });
-    if (r.error) return toast(`⚠️ ${r.error}`, 'error');
+    if (r.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     setDismissed((prev) => { const n = new Set(prev); n.delete(f.tmdb_id); return n; });
     toast(t('↩︎ «{title}» vuelve a la lista', { title: f.title }));
   };

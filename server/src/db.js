@@ -293,6 +293,9 @@ ensureColumn('people', 'details_fetched_at', 'details_fetched_at INTEGER');
 ensureColumn('people', 'gender', 'gender INTEGER');          // TMDB: 1=female 2=male 3=non-binary
 ensureColumn('people', 'place_of_birth', 'place_of_birth TEXT');
 ensureColumn('people', 'country', 'country TEXT');
+// id de Radarr: Bazarr indexa las películas por ÉL, no por el de TMDB, así que
+// sin esto no se le puede pedir que busque subtítulos de una película concreta
+ensureColumn('radarr_movies', 'radarr_id', 'radarr_id INTEGER');
 ensureColumn('people', 'continent', 'continent TEXT');
 
 // --- people identity: Plex tag key instead of the name -----------------------
@@ -399,6 +402,10 @@ ensureColumn('movies', 'english_title', 'english_title TEXT');
 // El título de Plex tal cual, antes de normalizarlo a alfabeto latino: `title`
 // es el que se muestra y este el que dice Plex, para no perderlo nunca.
 ensureColumn('movies', 'plex_title', 'plex_title TEXT');
+// idioma original de la película (TMDB). Hace falta para el criterio «VO» de
+// la auditoría de subtítulos: sin él no se puede saber si una pista está en el
+// idioma en que se rodó.
+ensureColumn('movies', 'original_language', 'original_language TEXT');
 
 // One-time repair: the RSS import used to store rating 0 for watched-without-
 // rating entries (Letterboxd's minimum is 0.5, so 0 can only be that bug)
@@ -487,6 +494,39 @@ db.exec(`CREATE TABLE IF NOT EXISTS dismissed_movies (
   at INTEGER
 );`);
 
+// Películas vetadas al pase automático de Radarr desde Cine venidero. NO es lo
+// mismo que descartarlas: se siguen viendo en todas partes (es el próximo
+// estreno de un favorito) y se pueden mandar a Radarr a mano; lo único que pasa
+// es que el robot nocturno no las toca.
+db.exec(`CREATE TABLE IF NOT EXISTS auto_radarr_vetoed (
+  tmdb_id INTEGER PRIMARY KEY,
+  title TEXT,
+  at INTEGER
+);`);
+
+// Pistas de audio y subtítulo de cada fichero. El sync YA descargaba estos
+// datos con el detalle de cada película y los tiraba (solo miraba el vídeo);
+// aquí se guardan para poder auditar qué se puede ver de verdad y en qué
+// idioma. Se reescriben enteras en cada sync de detalle.
+db.exec(`CREATE TABLE IF NOT EXISTS movie_streams (
+  movie_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,          -- 'audio' | 'sub'
+  lang TEXT,                   -- ISO-639 de Plex, en minúsculas ('spa', 'eng'…)
+  codec TEXT,
+  forced INTEGER DEFAULT 0,
+  PRIMARY KEY (movie_id, kind, lang, codec, forced)
+);`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_movie_streams_kind ON movie_streams (kind, lang);');
+
+// Notas y votos de IMDb, del volcado diario no comercial. Es la fuente más
+// completa de las tres (TMDB, Letterboxd vía MDBList, IMDb) y la única que no
+// gasta peticiones de API.
+db.exec(`CREATE TABLE IF NOT EXISTS imdb_ratings (
+  tconst TEXT PRIMARY KEY,
+  rating REAL,
+  votes INTEGER
+);`);
+
 // --- settings helpers -------------------------------------------------------
 
 const getStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
@@ -500,7 +540,7 @@ const setStmt = db.prepare(
 /** Las credenciales: se cifran en disco y se tapan al servirlas. Una sola
  *  lista, que index.js reutiliza (estaba escrita dos veces, y bastaba añadir
  *  un servicio nuevo en una para que la otra lo dejara al descubierto). */
-export const SECRET_SETTING_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key', 'mdblist_key']);
+export const SECRET_SETTING_KEYS = new Set(['plex_token', 'tmdb_key', 'radarr_key', 'mdblist_key', 'bazarr_key']);
 const secretKey = process.env.POWAFLEX_SECRET
   ? crypto.createHash('sha256').update(process.env.POWAFLEX_SECRET).digest()
   : null;

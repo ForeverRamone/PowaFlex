@@ -601,7 +601,7 @@ export function RadarrButton({ tmdbId, resolveTmdbId, small = false, inline = fa
     } else {
       setState('error');
       setErr(res.error || 'Error');
-      toast(`⚠️ Radarr: ${res.error || 'error'}`, 'error');
+      toast(`⚠️ Radarr: ${t(res.error || 'error')}`, 'error');
     }
   };
   if (state === 'done')
@@ -1142,7 +1142,7 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
   // de ahí salen las notas, el reparto y el completismo de su gente
   const fijarPelicula = async (nuevoId) => {
     const r = await api(`/movies/${ratingKey}/match`, { method: 'POST', body: { tmdbId: nuevoId } });
-    if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    if (r.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     setCorrigiendo(false);
     toast(nuevoId ? t('✓ Emparejado corregido') : t('✓ Corrección quitada'));
     cargar();

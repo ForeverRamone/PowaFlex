@@ -1,13 +1,15 @@
 import { db, getSetting, setSetting } from './db.js';
 import { runSync, syncStatus } from './plex.js';
 import { rematchLetterboxd, resolveUnmatchedLb, importLetterboxdRss } from './letterboxd.js';
-import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames, syncPersonChanges } from './tmdb.js';
+import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames, syncPersonChanges, backfillOriginalLanguages } from './tmdb.js';
 import { syncRatings } from './mdblist.js';
 import { radarrSyncMovies, checkDigitalReleases } from './radarr.js';
 import { runAutoRadarr } from './automation.js';
 import { scanSagas } from './saga.js';
 import { favoritesGaps } from './discover.js';
 import { watchFestivalEditions } from './festivals.js';
+import { importImdbRatings, imdbNecesitaRefresco } from './imdb.js';
+import { hacerCopia, copiasActivadas } from './backup.js';
 
 /**
  * The whole "make PowaFlex current" routine, in dependency order: library first,
@@ -100,6 +102,16 @@ function buildSteps({ includeAutoRadarr }) {
       },
     },
     {
+      key: 'origlang',
+      label: 'Idioma original de las películas (para subtítulos y doblaje)',
+      // por tandas: son 12.000 fichas y el detalle no está cacheado para todas
+      enabled: () => has('tmdb_key'),
+      run: async () => {
+        const r = await backfillOriginalLanguages();
+        return r.pending ? `${r.done} resueltas · quedan ${r.pending}` : `${r.done} resueltas · al día`;
+      },
+    },
+    {
       key: 'ratings',
       label: 'Descargar notas de MDBList',
       enabled: () => has('mdblist_key'),
@@ -108,6 +120,13 @@ function buildSteps({ includeAutoRadarr }) {
         if (r?.error) throw new Error(r.error);
         return `${r?.done ?? 0} de ${r?.total ?? 0} películas con nota`;
       },
+    },
+    {
+      key: 'imdb',
+      label: 'Notas de IMDb (semanal)',
+      // 8 MB en streaming; solo cuando toca, no cada noche
+      enabled: () => imdbNecesitaRefresco(),
+      run: async () => `${(await importImdbRatings()).rows.toLocaleString('es-ES')} títulos`,
     },
     {
       key: 'radarr',
@@ -177,6 +196,16 @@ function buildSteps({ includeAutoRadarr }) {
           lookbackDays: Number(getSetting('auto_radarr_lookback_days') || 0),
         });
         return `${r.added} añadidas de ${r.considered} candidatas`;
+      },
+    },
+    {
+      key: 'backup',
+      label: 'Copia de seguridad de la base',
+      enabled: () => copiasActivadas(),
+      // va la última a propósito: copia el estado ya actualizado de la noche
+      run: async () => {
+        const r = await hacerCopia();
+        return `${r.file} · ${(r.bytes / 1048576).toFixed(0)} MB · ${r.kept} guardadas`;
       },
     },
   ];

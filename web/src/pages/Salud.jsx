@@ -55,7 +55,7 @@ export default function Salud({ embedded = false }) {
 
   const comprobarPersonas = async () => {
     const r = await api('/datahealth/verify-people', { method: 'POST' });
-    if (r.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    if (r.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     setVerif({ ...r, running: true });
   };
 
@@ -63,7 +63,7 @@ export default function Salud({ embedded = false }) {
     setResolviendo(true);
     const r = await api('/letterboxd/resolve', { method: 'POST' });
     setResolviendo(false);
-    if (r.error) toast(`⚠️ ${r.error}`, 'error');
+    if (r.error) toast(`⚠️ ${t(r.error)}`, 'error');
     else {
       toast(t('✓ {n} entradas emparejadas', { n: r.matched ?? 0 }));
       cargar();

@@ -50,7 +50,7 @@ export default function WatchStats() {
     const r = await api('/letterboxd/resolve', { method: 'POST' });
     setResolving(false);
     if (r.error) {
-      setResolveMsg(`✗ ${r.error}`);
+      setResolveMsg(`✗ ${t(r.error)}`);
     } else {
       const bits = [t('✓ {n} emparejadas', { n: r.matched })];
       if (r.library?.resolved) bits.push(t('{n} películas de Plex ganaron ficha TMDB', { n: r.library.resolved }));

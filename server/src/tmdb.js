@@ -1,5 +1,6 @@
 import { db, getSetting, setSetting, cacheRead, cacheWrite } from './db.js';
 import { today } from './dates.js';
+import { creditsForRole, ROLES, roleInfo, asRole } from './roles.js';
 import { mapPool } from './pool.js';
 import { watchedIndex, isWatched, normTitle } from './letterboxd.js';
 import { needsLatin, readableTitle } from './titles.js';
@@ -490,6 +491,10 @@ export async function enrichRuntimes(items, { concurrency = 6, withCredits = fal
       // With credits we can also count co-directors → "dirección coral" (#7).
       const det = await movieDetail(it.tmdb_id, { withCredits });
       it.runtime = det.runtime || null;
+      // el detalle ya trae estos dos y no costaban nada: el id de IMDb permite
+      // cruzar con el volcado de notas, y el idioma original es el criterio «VO»
+      if (det.imdb_id) it.imdb_id = det.imdb_id;
+      if (det.original_language) it.original_language = det.original_language;
       if (det.genres?.length) classifyGenres(it, det.genres.map((x) => x.id));
       if (withCredits) {
         const dirs = new Set((det.credits?.crew || []).filter((c) => c.job === 'Director').map((c) => c.id));
@@ -745,6 +750,41 @@ export async function normalizeLibraryTitles({ concurrency = 6 } = {}) {
   return { checked: pending.length, renamed };
 }
 
+/**
+ * Rellena el idioma original de la biblioteca. Sin esto, la columna existía y
+ * nadie la escribía: el criterio «VO» de la auditoría de subtítulos no casaba
+ * NUNCA y la auditoría de doblaje no acusaba a nadie — dos pantallas muertas.
+ *
+ * Va por tandas porque son 12.000 fichas: el detalle está cacheado para muchas,
+ * pero no para todas. Cada noche avanza un trozo y devuelve lo que queda, para
+ * poder decirlo en el histórico en vez de fingir que ya está.
+ */
+export async function backfillOriginalLanguages({ budget = 1500, concurrency = 6 } = {}) {
+  const pend = db
+    .prepare('SELECT rating_key, tmdb_id FROM movies WHERE tmdb_id IS NOT NULL AND original_language IS NULL LIMIT ?')
+    .all(budget);
+  const quedan = () =>
+    db.prepare('SELECT COUNT(*) n FROM movies WHERE tmdb_id IS NOT NULL AND original_language IS NULL').get().n;
+  if (!pend.length) return { done: 0, pending: quedan() };
+
+  const upd = db.prepare('UPDATE movies SET original_language = ? WHERE rating_key = ?');
+  let done = 0;
+  await mapPool(pend, concurrency, async (r) => {
+    try {
+      const det = await movieDetail(r.tmdb_id);
+      if (det?.original_language) {
+        upd.run(det.original_language, r.rating_key);
+        done++;
+      }
+    } catch {
+      // sin red se reintenta la noche siguiente: no se marca nada
+    }
+    setBuildProgress('origlang', 'Idioma original de tu biblioteca', done, pend.length);
+  });
+  clearBuildProgress('origlang');
+  return { done, pending: quedan() };
+}
+
 /** El título internacional (inglés) de una película, cacheado 30 días. */
 export async function englishTitle(tmdbId) {
   if (!tmdbId) return null;
@@ -878,11 +918,8 @@ export function classifyGenres(item, ids = []) {
 const CAMEO_RE = /^(self|himself|herself|uncredited|cameo|archive)/i;
 export const isCameoCredit = (c) => (c.order ?? 99) >= 15 || CAMEO_RE.test(c.character || '');
 
-const roleRaw = (credits, role) => {
-  if (role === 'director') return (credits.crew || []).filter((c) => c.job === 'Director');
-  if (role === 'writer') return (credits.crew || []).filter((c) => c.department === 'Writing');
-  return credits.cast || [];
-};
+// la selección de créditos por oficio vive en roles.js: aquí solo se usa
+const roleRaw = (credits, role) => creditsForRole(credits, role);
 
 export function buildRoleItems(credits, role, inLib, widx) {
   const now = today();
@@ -975,12 +1012,11 @@ export async function filmographyProfile(personId, wantRole = null) {
   const widx = watchedIndex();
 
   // which roles this person actually has credits in
-  const present = [];
-  if ((credits.crew || []).some((c) => c.job === 'Director')) present.push('director');
-  if ((credits.cast || []).length) present.push('actor');
-  if ((credits.crew || []).some((c) => c.department === 'Writing')) present.push('writer');
-  // build director & actor whenever present; writer only when it's what was asked
-  const build = present.filter((r) => r !== 'writer' || wantRole === 'writer');
+  const present = ROLES.map((r) => r.key).filter((k) => creditsForRole(credits, k).length > 0);
+  // dirección e interpretación se construyen siempre que existan; los demás
+  // oficios solo cuando son los que se han pedido (si no, cada ficha de persona
+  // arrastraría seis filmografías que casi nunca se miran)
+  const build = present.filter((r) => roleInfo(r)?.principal || r === wantRole);
   if (!build.length && present.length) build.push(present[0]);
 
   const roles = {};
@@ -1303,12 +1339,18 @@ const ACTOR_SPECIALITY_MIN = 8;
  * tiene 8+ interpretadas (ACTOR_SPECIALITY_MIN) entra también en actores.
  */
 export function followFacets(personId, role = 'director') {
-  const followRole = role === 'actor' ? 'actor' : 'director';
+  // Hasta la 1.04 esto colapsaba TODO a director o actor: seguir a alguien como
+  // compositor lo guardaba como director y su ficha quedaba absurda. Ahora se
+  // respeta el oficio pedido, con «director» como respaldo si llega basura.
+  const followRole = asRole(role, 'director');
   const ins = db.prepare('INSERT OR IGNORE INTO tracked_people (person_id, added_at, role) VALUES (?, ?, ?)');
   const added = !!ins.run(personId, Date.now(), followRole).changes;
   const cuenta = db.prepare('SELECT COUNT(*) n FROM movie_people WHERE person_id = ? AND role = ?');
   let directorAlso = false;
   let actorAlso = false;
+  // La regla automática de facetas sigue siendo SOLO de dirección e
+  // interpretación: extenderla a los oficios nuevos generaría ruido (un
+  // montador con cuatro películas dirigidas no es un director al que sigas).
   if (followRole === 'actor' && cuenta.get(personId, 'director').n >= SPECIALITY_MIN) {
     directorAlso = !!ins.run(personId, Date.now(), 'director').changes;
   }

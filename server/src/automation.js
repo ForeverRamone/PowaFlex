@@ -15,13 +15,33 @@ export const autoRadarrStatus = {
 };
 
 /**
+ * Lo que el pase automático NO debe tocar, por decisión explícita tuya:
+ *
+ *  - `auto_radarr_vetoed`: el 🚫 de una ficha de Cine venidero. La película se
+ *    sigue viendo y se puede mandar a Radarr a mano; solo el robot la ignora.
+ *  - `dismissed_movies`: el ✕ «no me interesa» de Descubrir y Estrenos. Antes
+ *    el automático NO lo miraba, así que algo que habías descartado a mano
+ *    podía aparecerte descargado esa misma noche.
+ *
+ * Devuelve un Map id → motivo para poder decir en el log POR QUÉ se saltó cada
+ * una: un «0 candidatas» sin explicación es indistinguible de una avería.
+ */
+export function autoRadarrExcluidas() {
+  const out = new Map();
+  for (const r of db.prepare('SELECT tmdb_id FROM dismissed_movies').all()) out.set(r.tmdb_id, 'descartada');
+  // el veto manda sobre el descarte: es el motivo más específico
+  for (const r of db.prepare('SELECT tmdb_id FROM auto_radarr_vetoed').all()) out.set(r.tmdb_id, 'vetada');
+  return out;
+}
+
+/**
  * Daily automation (#3): for every FAVORITE, LIVING director, add to Radarr the
  * films they direct that release within the next `months` months and that we
  * don't already own or have queued. Dead directors are skipped (no new work).
  */
 export async function runAutoRadarr({ months = 6, lookbackDays = 0, dryRun = false } = {}) {
   if (autoRadarrStatus.running) return autoRadarrStatus;
-  Object.assign(autoRadarrStatus, { running: true, error: null, considered: 0, added: 0, log: [] });
+  Object.assign(autoRadarrStatus, { running: true, error: null, considered: 0, added: 0, skipped: 0, log: [] });
   try {
     // Favorites who direct in the library, PLUS favorites with no library titles
     // at all (TMDB-added "emerging directors": exactly who this job exists for).
@@ -47,6 +67,8 @@ export async function runAutoRadarr({ months = 6, lookbackDays = 0, dryRun = fal
     const floor = lookbackDays > 0 ? new Date(Date.now() - lookbackDays * DAY).toISOString().slice(0, 10) : now;
     const horizon = new Date(Date.now() + months * 30 * DAY).toISOString().slice(0, 10);
     const includeDocs = getSetting('auto_radarr_include_docs') === '1';
+    const excluidas = autoRadarrExcluidas();
+    const saltadas = new Map(); // id → motivo, para contarlas y explicarlas
 
     const toAdd = new Map();
     for (const d of directors) {
@@ -62,6 +84,8 @@ export async function runAutoRadarr({ months = 6, lookbackDays = 0, dryRun = fal
           const date = c.release_date || null;
           if (!date || date < floor || date > horizon) continue; // only dated, within window
           if (inLib.has(c.id) || owned.has(c.id)) continue;
+          // vetada desde Cine venidero o descartada en Descubrir: ni tocarla
+          if (excluidas.has(c.id)) { saltadas.set(c.id, `${c.title} (${excluidas.get(c.id)})`); continue; }
           if (!toAdd.has(c.id)) toAdd.set(c.id, { tmdb_id: c.id, title: c.title, date, director: d.name });
         }
       } catch (err) {
@@ -81,6 +105,11 @@ export async function runAutoRadarr({ months = 6, lookbackDays = 0, dryRun = fal
     }
 
     autoRadarrStatus.considered = toAdd.size;
+    // que se vea por qué no están: «0 candidatas» a secas parece una avería
+    autoRadarrStatus.skipped = saltadas.size;
+    if (saltadas.size) {
+      autoRadarrStatus.log.push(`🚫 ${saltadas.size} fuera del automático: ${[...saltadas.values()].slice(0, 8).join(', ')}${saltadas.size > 8 ? '…' : ''}`);
+    }
     for (const item of toAdd.values()) {
       if (dryRun) {
         autoRadarrStatus.log.push(`(simulado) ${item.title} · ${item.date} — dir. ${item.director}`);

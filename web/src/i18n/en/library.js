@@ -61,4 +61,11 @@ export default {
   'Sin resultados con estos filtros.': 'No results with these filters.',
   'Cargando…': 'Loading…',
   'Cargar más ({shown} / {total})': 'Load more ({shown} / {total})',
+
+  // verbos del chip de persona, uno por oficio
+  'escribe': 'writes',
+  'fotografía': 'shoots',
+  'compone': 'scores',
+  'monta': 'edits',
+  'participa': 'takes part',
 };

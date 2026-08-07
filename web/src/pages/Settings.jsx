@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, UI_THEMES, applyTheme, currentTheme } from '../api.js';
 import { Spinner, ProgressBar, PageHeader, Dropzone, StatCard, LetterboxdLogo } from '../components.jsx';
 import { t, getLang, setLang, locale } from '../i18n.js';
@@ -109,7 +110,7 @@ function LetterboxdSection() {
             <div className="text-xs text-zinc-400 space-y-0.5 mt-3">
               {result.results.map((r, i) => (
                 <div key={i}>
-                  {r.file}: {r.error ? `⚠️ ${r.error}` : t('{n} importadas ({m} emparejadas con tu biblioteca) como «{list}»', { n: r.imported, m: r.matched, list: r.list })}
+                  {r.file}: {r.error ? `⚠️ ${t(r.error)}` : t('{n} importadas ({m} emparejadas con tu biblioteca) como «{list}»', { n: r.imported, m: r.matched, list: r.list })}
                 </div>
               ))}
               {result.lists?.length > 0 && (
@@ -178,6 +179,45 @@ function Guide({ title, children }) {
   );
 }
 
+/**
+ * Las películas que vetaste al pase automático desde Cine venidero (🚫). Aquí
+ * se repasan y se deshacen: una vez estrenada, la ficha desaparece del
+ * calendario y el veto se quedaría sin sitio donde tocarlo.
+ */
+function VetadasList() {
+  const [vetadas, setVetadas] = useState(null);
+  const load = () => api('/radarr/auto/veto').then((r) => Array.isArray(r) && setVetadas(r));
+  useEffect(() => { load(); }, []);
+  if (!vetadas?.length) return null;
+  return (
+    <details className="mt-3 ml-6">
+      <summary className="cursor-pointer text-xs text-zinc-400 hover:text-zinc-200">
+        {t('🚫 {n} fuera del pase automático', { n: vetadas.length })}
+      </summary>
+      <p className="text-[11px] text-zinc-500 mt-1 mb-2 max-w-2xl">
+        {t('El automático las ignora. Se siguen viendo en Cine venidero y puedes mandarlas a Radarr a mano cuando quieras.')}
+      </p>
+      <div className="space-y-1 max-h-48 overflow-y-auto">
+        {vetadas.map((v) => (
+          <div key={v.tmdb_id} className="flex items-center gap-2 text-xs text-zinc-400">
+            <span className="truncate">{v.title || `TMDB ${v.tmdb_id}`}</span>
+            <button
+              className="text-gold-400 hover:underline shrink-0"
+              onClick={async () => {
+                const r = await api(`/radarr/auto/veto/${v.tmdb_id}`, { method: 'DELETE' });
+                if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
+                load();
+              }}
+            >
+              {t('quitar el veto')}
+            </button>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function TestBadge({ result }) {
   if (!result) return null;
   return result.ok ? (
@@ -203,9 +243,16 @@ export default function Settings() {
   const [lifeMsg, setLifeMsg] = useState(null);
   const [refresh, setRefresh] = useState(null);
   const [theme, setThemeState] = useState(currentTheme);
+  const [imdb, setImdb] = useState(null);
+  const [imdbBusy, setImdbBusy] = useState(false);
+  const [copias, setCopias] = useState(null);
+  const [copiaBusy, setCopiaBusy] = useState(false);
 
   const loadSections = () =>
     api('/plex/sections').then((r) => Array.isArray(r) && setSections(r)).catch(() => {});
+
+  const cargarCopias = () =>
+    api('/backup/list').then((r) => Array.isArray(r?.copias) && setCopias(r.copias)).catch(() => {});
 
   useEffect(() => {
     api('/settings').then((st) => {
@@ -217,6 +264,8 @@ export default function Settings() {
     api('/radarr/ids').then((r) => r.tmdbIds && setRadarrSync({ count: r.tmdbIds.length, syncedAt: r.syncedAt }));
     api('/radarr/auto').then((a) => !a.error && setAuto(a));
     api('/refresh-all').then((r) => !r.error && setRefresh(r));
+    api('/imdb/status').then((r) => r && !r.error && setImdb(r));
+    cargarCopias();
   }, []);
 
   // poll sync status while running. Durante «Actualizar todo» NO: ese bucle ya
@@ -241,7 +290,7 @@ export default function Settings() {
   const startFullRefresh = async () => {
     const r = await api('/refresh-all', { method: 'POST' });
     // sin el aviso, pulsabas y no pasaba nada sin saber por qué
-    if (r.error && !r.started) { toast(`⚠️ ${r.error}`, 'error'); return; }
+    if (r.error && !r.started) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     setRefresh({ ...(refresh || {}), running: true, steps: [], step: 'Preparando…' });
   };
 
@@ -292,7 +341,7 @@ export default function Settings() {
     }
     const r = await api('/backup/settings', { method: 'POST', body });
     if (r.error) {
-      toast(`⚠️ ${r.error}`, 'error');
+      toast(`⚠️ ${t(r.error)}`, 'error');
       return;
     }
     toast(t('✓ {n} ajustes importados', { n: r.aplicadas }) + (r.ignoradas ? t(' · {n} ignorados', { n: r.ignoradas.length }) : ''));
@@ -632,6 +681,7 @@ export default function Settings() {
           <p className="text-[11px] text-zinc-500 mt-2 ml-6">
             {t('Solo directores/as ')}<b>{t('vivos')}</b>{t(' marcados como favoritos. Los fallecidos se ignoran (no tendrán estrenos).')}
           </p>
+          <VetadasList />
         </div>
 
         <Guide title={t('¿Dónde está la API key de Radarr?')}>
@@ -694,7 +744,7 @@ export default function Settings() {
               {mdbStatus.running
                 ? t('Notas {a} / {b}…', { a: mdbStatus.done, b: mdbStatus.total })
                 : mdbStatus.error
-                  ? `✗ ${mdbStatus.error}`
+                  ? `✗ ${t(mdbStatus.error)}`
                   : t('{a} de {b} películas con notas', { a: mdbStatus.withRatings?.toLocaleString(locale()), b: mdbStatus.total?.toLocaleString(locale()) })}
             </span>
           )}
@@ -703,6 +753,73 @@ export default function Settings() {
           <p>{t('1. Cuenta en ')}<b>mdblist.com</b>{t(' (puedes entrar con Trakt).')}</p>
           <p>{t('2. Ve a ')}<b>Preferences → API Access</b>{t(' y copia la key.')}</p>
           <p>{t('3. La cuenta gratuita da 1.000 peticiones/día; las Supporter, bastantes más. PowaFlex respeta el límite y reparte el trabajo.')}</p>
+        </Guide>
+      </section>
+
+      {/* NOTAS DE IMDb */}
+      <section className="card p-5 mb-5">
+        <h2 className="font-semibold text-zinc-100">
+          {t('Notas de IMDb')} <span className="text-zinc-500 text-xs font-normal">{t('(opcional: el volcado público, sin API)')}</span>
+        </h2>
+        <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-2xl">
+          {t('IMDb publica a diario un fichero con las notas y los votos de todo su catálogo. PowaFlex lo usa para el umbral de ruido de Descubrir sin gastar ni una petición de API.')}
+        </p>
+        <div className="flex gap-2 items-center flex-wrap">
+          <button
+            className="btn-gold"
+            disabled={imdbBusy || imdb?.running}
+            onClick={async () => {
+              setImdbBusy(true);
+              const r = await api('/imdb/sync', { method: 'POST' });
+              setImdbBusy(false);
+              if (r?.error) toast(`⚠️ ${t(r.error)}`, 'error');
+              else toast(t('✓ {n} notas de IMDb descargadas', { n: (r.rows || 0).toLocaleString(locale()) }));
+              api('/imdb/status').then((st) => st && !st.error && setImdb(st));
+            }}
+          >
+            {imdbBusy || imdb?.running ? t('Descargando…') : t('Descargar ahora')}
+          </button>
+          {imdb && (
+            <span className="text-xs text-zinc-400">
+              {imdb.rows > 0 && imdb.updatedAt
+                ? t('{n} títulos guardados · {date}', { n: imdb.rows.toLocaleString(locale()), date: new Date(imdb.updatedAt).toLocaleString(locale()) })
+                : t('nunca descargadas')}
+            </span>
+          )}
+          {imdb?.error && <span className="text-xs text-red-400">✗ {imdb.error}</span>}
+        </div>
+        <p className="text-[11px] text-zinc-500 mt-2">
+          {t('La descarga son unos 8 MB comprimidos y tarda un par de minutos. El pase nocturno la repite sola una vez por semana, así que no hace falta que la lances a mano.')}
+        </p>
+      </section>
+
+      {/* BAZARR */}
+      <section className="card p-5 mb-5">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-zinc-100">
+            Bazarr <span className="text-zinc-500 text-xs font-normal">{t('(opcional: buscar los subtítulos que faltan)')}</span>
+          </h2>
+          <TestBadge result={tests.bazarr} />
+        </div>
+        <p className="text-xs text-zinc-500 mt-1 max-w-2xl">
+          {t('Con Bazarr configurado, desde la pestaña Subtítulos del Taller puedes pedirle que busque los subtítulos que a una película le faltan, sin salir de PowaFlex.')}
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3 mt-3">
+          <div>
+            <label className="text-xs text-zinc-400">{t('URL de Bazarr')}</label>
+            <input className="input mt-1" placeholder="http://192.168.1.50:6767" value={s.bazarr_url || ''} onChange={set('bazarr_url')} />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-400">API key</label>
+            <input className="input mt-1" type="password" autoComplete="off" placeholder="Bazarr → Settings → General" value={s.bazarr_key || ''} onChange={set('bazarr_key')} />
+          </div>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button className="btn-ghost" onClick={() => test('bazarr')}>{t('Probar conexión')}</button>
+        </div>
+        <Guide title={t('¿Dónde está la API key de Bazarr?')}>
+          <p>{t('En Bazarr: ')}<b>Settings → General → Security → API Key</b>{t('. La URL es la misma con la que abres Bazarr en el navegador, típicamente el puerto ')}<b>6767</b>.</p>
+          <p>{t('Bazarr localiza las películas por su id de Radarr, así que necesita Radarr configurado y sincronizado más arriba.')}</p>
         </Guide>
       </section>
 
@@ -733,6 +850,45 @@ export default function Settings() {
         </p>
       </section>
 
+      {/* CRITERIO DE SUBTÍTULOS */}
+      {(() => {
+        // el sufijo «||» acota la clave a esta pantalla: las mismas etiquetas las
+        // pinta el Taller desde el servidor y no deben compartir entrada
+        const SUBS = [['vo', 'Versión original||ajustes'], ['spa', 'Español||ajustes'], ['eng', 'Inglés||ajustes']];
+        const marcados = (s.subs_ok_langs || '').split(',').map((x) => x.trim()).filter(Boolean);
+        const alternar = (k) => {
+          const next = marcados.includes(k) ? marcados.filter((x) => x !== k) : [...marcados, k];
+          // se reordena según SUBS para que el CSV guardado no dependa del orden
+          // en que hayas ido pulsando las casillas
+          setS({ ...s, subs_ok_langs: SUBS.map(([key]) => key).filter((key) => next.includes(key)).join(',') });
+        };
+        return (
+          <section className="card p-5 mb-5">
+            <h2 className="font-semibold text-zinc-100 mb-1">{t('Criterio de subtítulos')}</h2>
+            <p className="text-xs text-zinc-500 mb-3 max-w-2xl">
+              {t('Elige qué pistas de subtítulos te sirven, en cualquier combinación. Una película cuenta como cubierta si tiene al menos una de las marcadas. Sin ninguna marcada, la auditoría de subtítulos se apaga.')}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {SUBS.map(([k, label]) => (
+                <label
+                  key={k}
+                  className={`btn-ghost !py-1.5 flex items-center gap-2 select-none cursor-pointer ${marcados.includes(k) ? '!border-gold-400 text-gold-400' : 'opacity-60'}`}
+                >
+                  <input type="checkbox" className="accent-gold-500" checked={marcados.includes(k)} onChange={() => alternar(k)} />
+                  {t(label)}
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] text-zinc-500 mt-2">
+              {t('«Versión original» es el idioma en que se rodó cada película, según TMDB: para el cine japonés vale una pista japonesa, para el francés una francesa.')}
+            </p>
+            <div className="mt-3">
+              <Link to="/taller?tab=subs" className="btn-ghost !py-1 text-xs">{t('Ver el resultado en Taller → Subtítulos →')}</Link>
+            </div>
+          </section>
+        );
+      })()}
+
       {/* IDIOMA DE LA INTERFAZ */}
       <section className="card p-5 mb-5">
         <h2 className="font-semibold text-zinc-100 mb-1">{t('Idioma de la interfaz')} · Language</h2>
@@ -750,7 +906,7 @@ export default function Settings() {
                 // entero bloqueaba el cambio si había una URL a medio teclear
                 // (400 del servidor) o persistía campos a medias en silencio
                 const r = await api('/settings', { method: 'PUT', body: { ui_language: k } });
-                if (r?.error) { toast(`⚠️ ${r.error}`, 'error'); return; }
+                if (r?.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
                 setLang(k);
                 // recarga completa: t() se resuelve al pintar y así TODA la
                 // interfaz cambia de golpe, sin estados a medio traducir
@@ -826,7 +982,7 @@ export default function Settings() {
             onClick={async () => {
               setLifeMsg(t('Consultando fechas de nacimiento/fallecimiento en TMDB…'));
               const r = await api('/people/life-sync', { method: 'POST' });
-              setLifeMsg(r.error ? `✗ ${r.error}` : t('✓ {a} personas actualizadas · {b} fallecidas detectadas', { a: r.done, b: r.deceased }));
+              setLifeMsg(r.error ? `✗ ${t(r.error)}` : t('✓ {a} personas actualizadas · {b} fallecidas detectadas', { a: r.done, b: r.deceased }));
             }}
           >
             {t('Actualizar estado vital (vivos/muertos)')}
@@ -965,6 +1121,59 @@ export default function Settings() {
           <code>.db</code>{t(' como')}{' '}
           <code>powaflex.db</code>{t(' en la carpeta de datos del contenedor (parado) y arráncalo.')}
         </p>
+
+        {/* copia automática al final del pase nocturno */}
+        <div className="mt-4 pt-4 border-t border-ink-700">
+          <label className="flex items-center gap-2 text-sm text-zinc-200 cursor-pointer">
+            <input
+              type="checkbox"
+              className="accent-gold-500"
+              checked={s.backup_auto === '1'}
+              onChange={(e) => setS({ ...s, backup_auto: e.target.checked ? '1' : '0' })}
+            />
+            {t('Hacer una copia automática de la base de datos cada noche')}
+          </label>
+          <div className="flex flex-wrap items-center gap-2 mt-2 ml-6">
+            <span className="text-xs text-zinc-400">{t('guardando las últimas')}</span>
+            <input
+              type="number"
+              min="1"
+              max="60"
+              className="input !w-20 text-center"
+              value={s.backup_keep ?? '7'}
+              onChange={set('backup_keep')}
+            />
+            <span className="text-xs text-zinc-400">{t('copias')}</span>
+            <button
+              className="btn-ghost !py-1"
+              disabled={copiaBusy}
+              onClick={async () => {
+                setCopiaBusy(true);
+                const r = await api('/backup/run', { method: 'POST' });
+                setCopiaBusy(false);
+                if (r?.error) toast(`⚠️ ${t(r.error)}`, 'error');
+                else toast(t('✓ Copia hecha: {file} ({mb} MB)', { file: r.file, mb: (r.bytes / 1048576).toFixed(1) }));
+                cargarCopias();
+              }}
+            >
+              {copiaBusy ? t('Copiando…') : t('Hacer una copia ahora')}
+            </button>
+          </div>
+          <p className="text-[11px] text-zinc-500 mt-2 ml-6">
+            {t('Se hace sola al final del pase nocturno, con la base ya al día, y va rotando: al pasar del número que pongas se borra la más vieja. Guarda ahí solo la base de datos; los ajustes se exportan aparte con el botón de arriba.')}
+          </p>
+          {copias?.length > 0 && (
+            <div className="mt-3 ml-6 space-y-0.5 max-h-48 overflow-y-auto text-xs text-zinc-400">
+              {copias.map((c) => (
+                <div key={c.file} className="flex items-baseline gap-2">
+                  <span className="truncate">{c.file}</span>
+                  <span className="text-zinc-600">{new Date(c.at).toLocaleString(locale())}</span>
+                  <span className="text-zinc-600 ml-auto shrink-0">{(c.bytes / 1048576).toFixed(1)} MB</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

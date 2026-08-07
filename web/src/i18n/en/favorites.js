@@ -1,13 +1,23 @@
 // Favoritos (Favorites.jsx): pestañas Mis/Añadir, tarjetas, poda, packs y cánones.
 export default {
-  // facetas (roleLabel / roleVerb)
+  // facetas (roleLabel / roleVerb). Las etiquetas llegan de GET /roles y se
+  // pintan con t(): el castellano que devuelve el servidor es la clave.
   'Directores/as': 'Directors',
   'Actores/actrices': 'Actors',
+  'Guionistas': 'Screenwriters',
+  'Dirección de fotografía': 'Cinematography',
+  'Música': 'Music',
+  'Montaje': 'Editing',
+  'y también': 'and also',
   'dirigidas': 'movies directed',
   'interpretadas': 'movies acted in',
   'películas': 'movies',
   'director/a': 'director',
   'actor/actriz': 'actor',
+  'guionista': 'screenwriter',
+  'director/a de fotografía': 'cinematographer',
+  'compositor/a': 'composer',
+  'montador/a': 'editor',
   'directores/as': 'directors',
   'actores/actrices': 'actors',
 
