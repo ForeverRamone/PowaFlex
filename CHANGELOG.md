@@ -1,5 +1,42 @@
 # Changelog
 
+## Beta 1.06 (1.0.6-beta) — 2026-08-07
+
+**Lo que destapó la auditoría.** Cuatro revisores independientes repasaron la 1.05 entera —código,
+interfaz en los dos idiomas y la actualización sobre una base reconstruida con 13.000 películas—
+y encontraron 37 cosas. Esto arregla las que importan.
+
+- **Cine venidero ya vigila los seis oficios.** Solo miraba dirección e interpretación: si seguías
+  a una compositora o a un director de fotografía, su próxima película **no aparecía nunca** — y
+  encima costaba una consulta a TMDB cada noche para tirar el resultado.
+- **El auto-Radarr ya no se cuela por los oficios nuevos.** Su consulta no filtraba por faceta, y
+  su rama de «favoritos sin títulos en tu biblioteca» es justo la única forma de seguir a un DoP o
+  a un montador: si esa persona había dirigido algo, el pase nocturno **te lo descargaba** sin que
+  hubieras seguido a nadie como director.
+- **El corrector de emparejado de personas ya se puede deshacer.** La ficha perdía por el camino
+  el dato de «corregido a mano», así que el botón para volver al emparejado automático no se
+  pintaba nunca: una corrección equivocada era permanente.
+- **Quitar a alguien de favoritos con un oficio inválido ya no lo borra entero.** Antes caía en
+  «la persona entera» y además la metía en la lista de vetados; ahora responde con un error.
+- El **sector «resolución desconocida»** del donut de Calidad llevaba a una biblioteca vacía.
+- Los **nombres de festivales y premios** ya se traducen: la página en inglés mostraba «PREMIOS
+  GOYA» y «ÓSCAR A LA MEJOR PELÍCULA» entre texto inglés.
+- **Seguir a alguien que solo existe en TMDB** lo metía en Actores en vez de en Directores.
+- El **alta masiva de guionistas** daba de alta a gente que la parrilla no enseñaba (los que
+  también dirigen).
+- **Índice nuevo** para las consultas que filtran por oficio: recorrían la tabla de créditos
+  entera, que en una biblioteca grande son cientos de miles de filas.
+- Una **sincronización ya no puede arrancar en mitad de «Actualizar todo»**, donde los dos
+  reescribían los títulos a la vez.
+- La **copia de seguridad** ordenaba mal dos copias del mismo día y podía borrar la más fresca.
+- La **importación de IMDb** ya no bloquea la petición (daba 504 con un proxy delante) ni registra
+  un falso «0 títulos» cuando ya había una en marcha.
+- El cortafuegos contra peticiones de otras webs ya no acepta cualquier elemento de la cabecera
+  `X-Forwarded-Host`, solo el primero.
+
+Tests 148 → 153, con red nueva para la migración destructiva de la 1.05, para el calendario y
+para el auto-Radarr.
+
 ## Beta 1.05 (1.0.5-beta) — 2026-08-07
 
 **Fuera los subtítulos.** La auditoría de subtítulos que estrenó la 1.04 se retira entera: Bazarr

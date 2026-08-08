@@ -203,9 +203,9 @@ export default function Festivals() {
                     if (f.onlyWinners) setView('palmares');
                   }}
                   className={fest === f.key ? 'btn-gold' : 'btn-ghost'}
-                  title={f.award}
+                  title={t(f.award)}
                 >
-                  {f.name}
+                  {t(f.name)}
                 </button>
               ))}
               <span className="w-2" />
@@ -246,7 +246,7 @@ export default function Festivals() {
         {info && (
           <span className="text-xs text-zinc-500">
             {soloPalmares || info.group === 'canon' ? t('Canon: ') : t('Premio que clasifica: ')}
-            <b className="text-zinc-300">{info.award}</b>
+            <b className="text-zinc-300">{t(info.award)}</b>
             {view === 'seleccion' && info.sinceYear > 1990 && t(' · esta sección existe desde {y}', { y: info.sinceYear })}
           </span>
         )}

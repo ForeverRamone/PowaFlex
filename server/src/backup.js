@@ -24,8 +24,14 @@ export function copiasRetenidas() {
 }
 
 const ES_COPIA = /^powaflex-\d{4}-\d{2}-\d{2}(-\d{6})?\.db$/;
-/** La marca de tiempo que lleva el propio nombre: «2026-08-06-034012». */
-const selloDe = (f) => f.replace(/^powaflex-|\.db$/g, '').padEnd(17, '0');
+/**
+ * La marca de tiempo que lleva el propio nombre, normalizada a «AAAAMMDDHHMMSS»
+ * para que ordene bien como texto. Rellenar con ceros sin quitar los guiones
+ * ponía «2026-08-08-054407» (la de la tarde) ANTES que «2026-08-080000000» (la
+ * de la mañana), porque el guion ordena antes que el cero: la poda se llevaba
+ * la copia fresca y conservaba la vieja.
+ */
+const selloDe = (f) => f.replace(/^powaflex-|\.db$/g, '').replace(/-/g, '').padEnd(14, '0');
 
 /** Las copias que hay ahora mismo, de la más reciente a la más vieja. */
 export function listarCopias() {

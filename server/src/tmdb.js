@@ -1012,6 +1012,10 @@ export async function filmographyProfile(personId, wantRole = null) {
       biography: details?.biography || null,
       birthday: details?.birthday || null,
       deathday: details?.deathday || null,
+      // sin esto, el botón de «quitar la corrección» no se pintaba nunca y un
+      // emparejado fijado a mano se volvía permanente: la ruta de deshacer
+      // existía en el servidor pero era inalcanzable desde la ficha
+      tmdb_locked: person.tmdb_locked ?? 0,
     },
     matched: true,
     primary,
@@ -1024,6 +1028,17 @@ export async function filmographyProfile(personId, wantRole = null) {
 /**
  * Build calendar of upcoming/recent releases for the library's top + tracked people.
  */
+// Cómo se lee el crédito en la ficha de Cine venidero. Los dos primeros los
+// entiende también el cliente para decidir a qué faceta enlaza.
+const CREDITO_DE_ROL = {
+  director: 'Dirige',
+  actor: 'Actúa',
+  writer: 'Escribe',
+  dop: 'Fotografía',
+  composer: 'Compone',
+  editor: 'Monta',
+};
+
 export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays = 60 } = {}) {
   // Favorites drive the calendar, each in the ONE role you follow them for: a
   // tracked director contributes what they direct, never what they act in.
@@ -1075,17 +1090,23 @@ export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays 
         const resolved = await resolvePerson(p.id);
         if (!resolved?.tmdb_id) continue;
         const credits = await personCredits(resolved.tmdb_id);
-        const wantDirector = p.roles.has('director');
-        const wantActor = p.roles.has('actor');
+        // Se recorren TODAS las facetas por las que le sigues, no solo dos: al
+        // añadirse fotografía, música y montaje en la 1.04, a quien seguías por
+        // esos oficios no le salía nunca su próxima película en el calendario
+        // —y encima costaba una consulta a TMDB cada noche para tirarla—.
         const candidates = [];
-        if (wantDirector)
-          candidates.push(
-            ...(credits.crew || [])
-              .filter((c) => c.job === 'Director')
-              .map((c) => ({ ...c, credit: 'Dirige' }))
-          );
-        if (wantActor)
-          candidates.push(...(credits.cast || []).map((c) => ({ ...c, credit: 'Actúa' })));
+        const vistos = new Set();
+        for (const rol of p.roles) {
+          const info = roleInfo(rol);
+          if (!info) continue;
+          for (const c of creditsForRole(credits, rol)) {
+            // una misma película puede llegar por dos facetas: manda la primera
+            // en el orden de ROLES, donde la dirección va delante
+            if (vistos.has(c.id)) continue;
+            vistos.add(c.id);
+            candidates.push({ ...c, credit: CREDITO_DE_ROL[rol] || info.singular });
+          }
+        }
 
         for (const c of candidates) {
           if (c.video) continue;

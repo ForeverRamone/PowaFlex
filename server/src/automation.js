@@ -43,15 +43,21 @@ export async function runAutoRadarr({ months = 6, lookbackDays = 0, dryRun = fal
   if (autoRadarrStatus.running) return autoRadarrStatus;
   Object.assign(autoRadarrStatus, { running: true, error: null, considered: 0, added: 0, skipped: 0, log: [] });
   try {
-    // Favorites who direct in the library, PLUS favorites with no library titles
-    // at all (TMDB-added "emerging directors": exactly who this job exists for).
-    // Library-only actors keep being excluded; their credit loop below would
-    // yield no Director jobs anyway.
+    // Favoritos SEGUIDOS COMO DIRECTORES que dirigen en tu biblioteca, más los
+    // seguidos como directores sin títulos aún (los emergentes añadidos desde
+    // TMDB: exactamente para quien existe esta tarea).
+    //
+    // El filtro `t.role = 'director'` es imprescindible desde la 1.04: sin él,
+    // la segunda rama recogía a TODO favorito sin créditos en Plex, que es la
+    // única forma de seguir a un director de fotografía, un compositor o un
+    // montador. Si esa persona había dirigido algo alguna vez, el pase nocturno
+    // te lo descargaba sin que hubieras seguido a nadie como director.
     const directors = db
       .prepare(
         `SELECT DISTINCT p.id, p.name FROM tracked_people t
          JOIN people p ON p.id = t.person_id
          WHERE p.deathday IS NULL
+           AND t.role = 'director'
            AND (EXISTS (SELECT 1 FROM movie_people mp WHERE mp.person_id = p.id AND mp.role = 'director')
                 OR NOT EXISTS (SELECT 1 FROM movie_people mp WHERE mp.person_id = p.id))`
       )

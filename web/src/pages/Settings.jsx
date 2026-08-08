@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api, UI_THEMES, applyTheme, currentTheme } from '../api.js';
 import { Spinner, ProgressBar, PageHeader, Dropzone, StatCard, LetterboxdLogo } from '../components.jsx';
 import { t, getLang, setLang, locale } from '../i18n.js';

@@ -28,7 +28,11 @@ export default function Quality({ embedded = false }) {
   // the resolutions donut lives here (its natural home) and keeps the
   // click-to-filter the Dashboard copy used to have
   const openResolution = (name) => {
-    if (!name || name === 'desconocida') return navigate('/biblioteca');
+    // el hueco sin resolución llega como «?» desde qualityOverview; la guarda
+    // decía «desconocida», que es la etiqueta de OTRA consulta (la del
+    // Dashboard), así que pulsar ese sector llevaba a una biblioteca vacía
+    // filtrada por «?»
+    if (!name || name === '?') return navigate('/biblioteca');
     navigate(`/biblioteca?resolution=${encodeURIComponent(name)}`);
   };
 

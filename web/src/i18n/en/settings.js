@@ -179,8 +179,6 @@ export default {
   '«Clásico» recupera la paleta y la tipografía anteriores al rediseño. Los iconos y la agrupación del menú son comunes a los dos.':
     '“Classic” brings back the palette and typography from before the redesign. Icons and menu grouping are shared by both.',
 
-  '«Versión original» es el idioma en que se rodó cada película, según TMDB: para el cine japonés vale una pista japonesa, para el francés una francesa.':
-    '“Original language” is the language each movie was shot in, according to TMDB: for Japanese cinema a Japanese track works, for French cinema a French one.',
 
   // ── Notas y puntuaciones ───────────────────────────────────────────────────
   'Notas y puntuaciones que mostrar': 'Ratings and scores to show',

@@ -41,7 +41,10 @@ export function imdbInfo() {
  * `onProgress` se llama cada 200.000 líneas para poder pintar avance.
  */
 export async function importImdbRatings({ onProgress = null } = {}) {
-  if (imdbStatus.running) return imdbStatus;
+  // Devolver el estado a secas hacía que el paso nocturno escribiera «0 títulos»
+  // EN VERDE, como si hubiera ido bien, cuando lo que pasaba es que ya había una
+  // importación en marcha. Ahora se distingue.
+  if (imdbStatus.running) return { ok: false, running: true, rows: imdbStatus.rows };
   Object.assign(imdbStatus, { running: true, rows: 0, error: null });
   try {
     const res = await fetch(URL_RATINGS, { signal: AbortSignal.timeout(180000) });

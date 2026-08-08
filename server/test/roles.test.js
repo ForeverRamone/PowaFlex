@@ -154,3 +154,31 @@ test('creditsForRole no convierte a un técnico de sonido en compositor', () => 
   const buenos = { crew: [{ id: 9, job: 'Cinematography', department: 'Camera' }] };
   assert.deepEqual(creditsForRole(buenos, 'dop').map((c) => c.id), [9]);
 });
+
+test('el calendario mira TODAS las facetas, no solo dirección e interpretación', () => {
+  // Al añadirse fotografía, música y montaje, buildCalendar seguía preguntando
+  // `roles.has('director')` / `roles.has('actor')`: a quien seguías por esos
+  // oficios NO le salía nunca su próxima película, y encima costaba una
+  // consulta a TMDB cada noche para tirar el resultado.
+  const src = fs.readFileSync(path.join(raiz, 'server/src/tmdb.js'), 'utf8');
+  assert.equal(
+    /const wantDirector = p\.roles\.has\('director'\)/.test(src),
+    false,
+    'buildCalendar ha vuelto a mirar solo dos facetas: usa creditsForRole sobre p.roles'
+  );
+  assert.ok(
+    /for \(const rol of p\.roles\)/.test(src),
+    'buildCalendar debería recorrer las facetas seguidas'
+  );
+});
+
+test('el auto-Radarr solo mira a los favoritos SEGUIDOS COMO DIRECTORES', () => {
+  // Su consulta no filtraba por faceta, y su rama de «favoritos sin títulos en
+  // biblioteca» es justo la única forma de seguir a un DoP o un montador: el
+  // pase nocturno les descargaba las películas que hubieran dirigido alguna vez.
+  const src = fs.readFileSync(path.join(raiz, 'server/src/automation.js'), 'utf8');
+  assert.ok(
+    /t\.role = 'director'/.test(src),
+    'la consulta de directores del auto-Radarr debe filtrar por la faceta seguida'
+  );
+});

@@ -185,10 +185,13 @@ app.addHook('onRequest', async (req, reply) => {
   // llega aquí es el del contenedor, no el que escribió el usuario en la barra
   // del navegador: sin mirar X-Forwarded-Host, ese montaje se quedaría sin
   // poder sincronizar ni guardar nada.
+  // Solo el PRIMER elemento de X-Forwarded-Host: la cabecera la puede escribir
+  // quien llama, y aceptar toda la lista dejaba que «evil.example, casa.local»
+  // colara cualquier origen. El primero es el que puso el cliente original y el
+  // que un proxy que añade en cadena conserva.
+  const primero = (h) => String(h).split(',')[0].trim().toLowerCase();
   const anfitriones = new Set(
-    [req.headers['x-forwarded-host'], req.headers.host]
-      .filter(Boolean)
-      .flatMap((h) => String(h).split(',').map((x) => x.trim().toLowerCase()))
+    [req.headers['x-forwarded-host'], req.headers.host].filter(Boolean).map(primero)
   );
   let ajeno = true;
   try {
@@ -438,8 +441,16 @@ app.post('/api/backup/settings', async (req, reply) => {
 
 // --- sync ----------------------------------------------------------------------
 
-app.post('/api/sync', async (req) => {
+app.post('/api/sync', async (req, reply) => {
   const force = !!req.body?.force;
+  // «Actualizar todo» comprueba el sync UNA vez, al entrar: si se lanza una
+  // sincronización a mitad de sus diecisiete pasos, los dos reescriben
+  // `movies.title` a la vez y el calendario y los huecos se calculan sobre una
+  // biblioteca a medio normalizar (y se cachean 6-12 h).
+  if (refreshStatus?.running) {
+    reply.code(409);
+    return { error: 'Hay una actualización completa en marcha: espera a que termine' };
+  }
   if (!syncStatus.running) {
     // Plex reescribe `title` con lo que diga su agente, así que los títulos en
     // otros alfabetos se vuelven a normalizar en cuanto termina de sincronizar
@@ -627,7 +638,7 @@ app.get('/api/search', async (req) => {
 
 app.get('/api/people', async (req) => {
   return q.topPeople({
-    role: req.query.role || 'director',
+    role: asRole(req.query.role, 'director'),
     limit: Math.min(Number(req.query.limit) || 30, 500),
     offset: Number(req.query.offset) || 0,
     search: req.query.search || '',
@@ -1120,12 +1131,19 @@ app.post('/api/tracked/bulk', async (req, reply) => {
     reply.code(400);
     return { error: `Parámetros: role (${RANKABLE_ROLES.join('|')}) y top (número), o personIds` };
   }
+  // «Guionistas» lista solo a quien NO dirige, igual que la parrilla de
+  // Personas (topPeople). Sin esta línea el alta masiva daba de alta a
+  // Tarantino, Nolan o los Coen —que la página no te había enseñado— porque
+  // las dos consultas partían de poblaciones distintas.
+  const soloGuionistas =
+    role === 'writer' ? `AND p.id NOT IN (SELECT person_id FROM movie_people WHERE role = 'director')` : '';
   const candidates = db
     .prepare(
       `SELECT p.id, p.name, p.deathday, COUNT(*) n FROM movie_people mp JOIN people p ON p.id = mp.person_id
        WHERE mp.role = ? AND p.id NOT IN (SELECT person_id FROM unfollowed_people)
          -- ya seguido EN ESTA faceta: seguirle en la otra no le excluye del top
          AND p.id NOT IN (SELECT person_id FROM tracked_people WHERE role = ?)
+         ${soloGuionistas}
        GROUP BY p.id ORDER BY n DESC, p.name LIMIT ?`
     )
     .all(role, followRole, Math.min(Number(top), 1000));
@@ -1149,6 +1167,11 @@ app.delete('/api/tracked/batch', async (req, reply) => {
   if (!ids.length) {
     reply.code(400);
     return { error: 'Faltan personIds' };
+  }
+  // mismo motivo que arriba: un oficio inválido borraría TODAS las facetas
+  if (req.body?.role && !role) {
+    reply.code(400);
+    return { error: 'Ese oficio no existe' };
   }
   const delFacet = db.prepare('DELETE FROM tracked_people WHERE person_id = ? AND role = ?');
   const delAll = db.prepare('DELETE FROM tracked_people WHERE person_id = ?');
@@ -1297,12 +1320,15 @@ app.delete('/api/radarr/auto/veto/:tmdbId', async (req) => {
 // ── Notas de IMDb ─────────────────────────────────────────────────────────
 app.get('/api/imdb/status', async () => imdbInfo());
 app.post('/api/imdb/sync', async (req, reply) => {
-  try {
-    return await importImdbRatings();
-  } catch (err) {
-    reply.code(502);
-    return { error: String(err.message || err) };
+  // En segundo plano, como el sync de MDBList o el escaneo de sagas: mantener
+  // la petición abierta durante la descarga y 1,7 millones de inserciones daba
+  // un 504 del proxy inverso sobre una importación que iba a terminar bien.
+  if (imdbInfo().running) {
+    reply.code(409);
+    return { error: 'Ya hay una importación en marcha' };
   }
+  importImdbRatings().catch(() => {}); // el estado se consulta en /api/imdb/status
+  return { started: true };
 });
 
 // ── Copias de seguridad automáticas ───────────────────────────────────────
@@ -1333,8 +1359,11 @@ app.post('/api/tracked/:personId', async (req) => {
     role ||
     (db
       .prepare(
-        `SELECT CASE WHEN SUM(CASE WHEN role = 'director' THEN 1 ELSE 0 END)
-                          >= SUM(CASE WHEN role = 'actor' THEN 1 ELSE 0 END)
+        // COALESCE porque sin créditos ambas sumas son NULL, «NULL >= NULL» es
+        // NULL y el CASE caía al ELSE: dar a la ★ sobre alguien que solo existe
+        // en TMDB lo metía en Actores en vez de en Directores
+        `SELECT CASE WHEN COALESCE(SUM(CASE WHEN role = 'director' THEN 1 ELSE 0 END), 0)
+                          >= COALESCE(SUM(CASE WHEN role = 'actor' THEN 1 ELSE 0 END), 0)
                      THEN 'director' ELSE 'actor' END AS r
          FROM movie_people WHERE person_id = ?`
       )
@@ -1365,9 +1394,17 @@ app.get('/api/tracked', async (req) => {
     .all(role, role);
 });
 
-app.delete('/api/tracked/:personId', async (req) => {
+app.delete('/api/tracked/:personId', async (req, reply) => {
   const id = Number(req.params.personId);
-  // con ?role= se quita SOLO esa faceta; sin él, la persona entera
+  // con ?role= se quita SOLO esa faceta; sin él, la persona entera.
+  // OJO: un oficio que no existe NO puede caer en «la persona entera» —eso
+  // borraría las dos facetas y además la metería en unfollowed_people, el veto
+  // permanente contra altas masivas—. Un cliente desfasado desfavoritearía en
+  // silencio, así que se rechaza.
+  if (req.query.role && !asRole(req.query.role)) {
+    reply.code(400);
+    return { error: 'Ese oficio no existe' };
+  }
   const role = asRole(req.query.role);
   const r = role
     ? db.prepare('DELETE FROM tracked_people WHERE person_id = ? AND role = ?').run(id, role)
@@ -1434,10 +1471,16 @@ app.get('/api/releases', async (req, reply) => {
 
 // remove every deceased person from favorites in one go ("vivos y muertos")
 app.get('/api/discover/gaps', async (req, reply) => {
+  if (req.query.role && !isRankable(req.query.role)) {
+    reply.code(400);
+    return { error: `Ese oficio no tiene ranking de biblioteca (${RANKABLE_ROLES.join(', ')})` };
+  }
   try {
     return await libraryGaps({
-      // los huecos de biblioteca también se apoyan en el ranking de Plex
-      role: isRankable(req.query.role) ? req.query.role : 'director',
+      // los huecos de biblioteca se apoyan en el ranking de Plex, así que solo
+      // valen los oficios que Plex guarda; pedir otro es un error, no un
+      // «director» silencioso
+      role: req.query.role ? req.query.role : 'director',
       people: Math.min(Number(req.query.people) || 20, 60),
       perPerson: Math.min(Number(req.query.perPerson) || 8, 20),
       // the ranking can be walked down to the first 500 people

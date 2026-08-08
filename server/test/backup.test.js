@@ -89,3 +89,20 @@ test('la poda ordena por la fecha del NOMBRE, no por la del fichero', async () =
   assert.ok(!quedan.includes('powaflex-2026-01-01.db'), 'la más vieja se va');
   setSetting('backup_keep', '7');
 });
+
+test('dos copias del MISMO día se ordenan por la hora, no al revés', async () => {
+  // Rellenar con ceros sin quitar los guiones ponía «2026-08-08-054407» (la de
+  // la tarde) ANTES que «2026-08-080000000» (la de la mañana), porque el guion
+  // ordena antes que el cero: la poda se llevaba la copia fresca.
+  setSetting('backup_keep', '1');
+  for (const c of listarCopias()) fs.unlinkSync(path.join(BACKUP_DIR, c.file));
+
+  const manana = await hacerCopia({ fecha: new Date('2027-03-03T03:40:00Z') });
+  const tarde = await hacerCopia({ fecha: new Date('2027-03-03T19:05:30Z') });
+  assert.equal(manana.file, 'powaflex-2027-03-03.db');
+  assert.equal(tarde.file, 'powaflex-2027-03-03-190530.db');
+
+  const quedan = listarCopias().map((c) => c.file);
+  assert.deepEqual(quedan, ['powaflex-2027-03-03-190530.db'], 'debe sobrevivir la de la tarde');
+  setSetting('backup_keep', '7');
+});

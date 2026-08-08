@@ -79,6 +79,10 @@ CREATE TABLE IF NOT EXISTS movie_people (
   PRIMARY KEY (movie_id, person_id, role)
 );
 CREATE INDEX IF NOT EXISTS idx_mp_person ON movie_people(person_id, role);
+-- las parrillas de Personas, los huecos de biblioteca y los «top» filtran SOLO
+-- por oficio, y con idx_mp_person (person_id primero) eso recorría la tabla
+-- entera —cientos de miles de filas— montando dos B-trees temporales
+CREATE INDEX IF NOT EXISTS idx_mp_role ON movie_people(role, person_id);
 CREATE INDEX IF NOT EXISTS idx_mp_movie ON movie_people(movie_id);
 
 CREATE TABLE IF NOT EXISTS tags (

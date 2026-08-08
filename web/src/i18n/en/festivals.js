@@ -50,4 +50,30 @@ export default {
   ' · {n} sin resolver': ' · {n} unresolved',
   '✓ Emparejado corregido': '✓ Match fixed',
   '✓ Corrección quitada': '✓ Correction removed',
+
+  // Nombres de festivales y premios del registro del servidor. Son una lista
+  // fija y conocida, así que se traducen como cualquier otra etiqueta; los
+  // nombres propios (Cannes, Berlinale, Sundance…) se quedan igual y por eso
+  // no necesitan entrada.
+  'Cine Europeo (EFA)': 'European Film Awards',
+  'Óscar a la mejor película': 'Best Picture Oscar',
+  'Óscar internacional': 'International Oscar',
+  'Premios César': 'César Awards',
+  'Premios Goya': 'Goya Awards',
+  'Venecia': 'Venice',
+  'S.S. · Horizontes Latinos': 'S.S. · Latin Horizons',
+  'BAFTA a la mejor película': 'BAFTA for Best Film',
+  'César a la mejor película': 'César for Best Film',
+  'Goya a la mejor película': 'Goya for Best Film',
+  'Premio del Cine Europeo a la mejor película': 'European Film Award for Best Film',
+  'Óscar a la mejor película (Best Picture)': 'Academy Award for Best Picture',
+  'Óscar a la mejor película internacional': 'Academy Award for Best International Feature',
+  'Concha de Oro': 'Golden Shell',
+  'León de Oro': 'Golden Lion',
+  'Oso de Oro': 'Golden Bear',
+  'Palma de Oro': "Palme d'Or",
+  'Premio Horizontes': 'Horizontes Award',
+  'The Greatest Films of All Time (encuesta de la crítica del BFI)':
+    'The Greatest Films of All Time (BFI critics’ poll)',
+  'Top 10 anual de la crítica de Cahiers du Cinéma': 'Cahiers du Cinéma annual critics’ top 10',
 };

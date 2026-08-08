@@ -108,8 +108,6 @@ export default {
   'Limpiar': 'Clear',
   'Datos demográficos de {n} personas · amplíalos en Ajustes → «Actualizar estado vital»': 'Demographic data for {n} people · expand it in Settings → “Update life status”',
   'Faceta:': 'Facet:',
-  'Como directores/as': 'As directors',
-  'Como actores/actrices': 'As actors',
 
   // descartes
   '↩︎ «{title}» vuelve a la lista': '↩︎ “{title}” is back on the list',

@@ -116,7 +116,11 @@ function buildSteps({ includeAutoRadarr }) {
       label: 'Notas de IMDb (semanal)',
       // 8 MB en streaming; solo cuando toca, no cada noche
       enabled: () => imdbNecesitaRefresco(),
-      run: async () => `${(await importImdbRatings()).rows.toLocaleString('es-ES')} títulos`,
+      run: async () => {
+        const r = await importImdbRatings();
+        if (r.running) return 'ya había una importación en marcha';
+        return `${(r.rows || 0).toLocaleString('es-ES')} títulos`;
+      },
     },
     {
       key: 'radarr',
