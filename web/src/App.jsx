@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useId, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy,
@@ -67,21 +67,48 @@ const NAV_GROUPS = [
 ];
 
 /**
- * El monograma P+F delante del nombre. El símbolo es un PNG de una tinta sobre
- * fondo transparente, así que se tiñe con `currentColor` a través de una
- * máscara CSS: el mismo fichero vale para el rojo de cartel y para el oro, sin
- * duplicar el icono ni recolorearlo a mano en cada aspecto.
+ * EL LOGOTIPO, montado según el pliego de marca (assets/logo/c-1317.png).
+ *
+ * Tres piezas, una sola tinta:
+ *
+ *  1. El MONOGRAMA P+F, que hace de inicial. Es un PNG de una tinta sobre fondo
+ *     transparente teñido con `currentColor` a través de una máscara CSS: el
+ *     mismo fichero vale para el crema sobre rojo de Cartelera y para el oro de
+ *     los dos aspectos oscuros, sin duplicar el icono.
+ *  2. El TEXTO, que NO repite la P ni la F —el símbolo ya las pone— y por eso
+ *     dice «OWA / LEX» y no «PowaFlex».
+ *  3. La X DE PELÍCULA, dos tiras perforadas cruzadas, dibujada aquí en SVG.
+ *
+ * OJO con la tipografía: va fijada a Archivo Black y NO usa la clase
+ * `font-display`, porque `--font-display` cambia con el aspecto —en Cinemateca
+ * es una Bodoni con serifas— y el logotipo tiene que ser el mismo dibujo en los
+ * tres. Lo único que cambia entre aspectos es la tinta, como manda el pliego.
  */
-const Simbolo = ({ className = '' }) => (
+const TIPO_LOGO = {
+  fontFamily: "'Archivo Black', 'Archivo Variable', Impact, sans-serif",
+  letterSpacing: '-0.02em',
+  lineHeight: 0.82,
+  fontWeight: 400,
+};
+
+/**
+ * El símbolo del logotipo usa `logo-simbolo.png`, que es `icon.png` RECORTADO a
+ * su dibujo. No es duplicar por duplicar: el icono de la app lleva un 16,6 % de
+ * aire transparente a los lados y un 11,9 % arriba y abajo —lo necesita para
+ * respirar como favicon—, y dentro del logotipo ese aire se convertía en un
+ * hueco entre la P y la «OWA» que rompía la palabra. Con el dibujo a sangre, el
+ * alto y la separación que se piden aquí son los que se ven.
+ */
+const Simbolo = ({ className = '', alto = '1.05em' }) => (
   <span
     aria-hidden="true"
     className={`inline-block shrink-0 bg-current ${className}`}
     style={{
       // el tamaño va en línea: sin contenido, el elemento no tiene alto propio
-      width: '0.95em',
-      height: '1.05em',
-      WebkitMaskImage: 'url(/icon.png)',
-      maskImage: 'url(/icon.png)',
+      width: `calc(${alto} * 0.877)`, // la proporción real del dibujo recortado
+      height: alto,
+      WebkitMaskImage: 'url(/logo-simbolo.png)',
+      maskImage: 'url(/logo-simbolo.png)',
       WebkitMaskSize: 'contain',
       maskSize: 'contain',
       WebkitMaskRepeat: 'no-repeat',
@@ -92,12 +119,84 @@ const Simbolo = ({ className = '' }) => (
   />
 );
 
-const Wordmark = ({ className = '' }) => (
-  <span className={`font-display tracking-wide inline-flex items-baseline gap-2 ${className}`}>
-    <Simbolo className="self-center" />
-    <span>Powa<span className="text-gold-400">Flex</span></span>
-  </span>
-);
+/**
+ * La X de LEX: dos tiras de película cruzadas. Va en SVG y no como imagen para
+ * que las perforaciones sigan siendo cuadrados limpios a cualquier tamaño.
+ *
+ * El `useId` no es adorno: el logotipo se pinta DOS veces a la vez (la barra
+ * lateral y la superior de móvil) y dos máscaras con el mismo id hacen que la
+ * segunda use la del primero.
+ */
+function CruzDePelicula({ className = '' }) {
+  const uid = useId().replace(/:/g, '');
+  const mask = `perf-${uid}`;
+  // Una tira: barra de 100 de largo por 34 de ancho con cinco perforaciones.
+  // El grosor no es libre — tiene que aguantar la comparación con el trazo de
+  // la Archivo Black, que es pesadísimo, o la X parece de otra familia.
+  const perforaciones = [];
+  // la tira se sale de la caja por los dos lados y el viewBox la corta a
+  // escuadra: así las perforaciones llegan hasta la punta de cada brazo, como
+  // en el pliego, en vez de dejar los extremos macizos
+  for (let i = 0; i < 9; i++) {
+    perforaciones.push(<rect key={i} x={-25 + i * 19} y={-5.5} width="11" height="11" rx="1.8" />);
+  }
+  const tira = (giro) => (
+    <g transform={`rotate(${giro} 50 50)`}>
+      <rect x="-30" y="33" width="160" height="34" />
+      <g transform="translate(0 50)" fill="#000">{perforaciones}</g>
+    </g>
+  );
+  return (
+    <svg viewBox="0 0 100 100" className={className} aria-hidden="true" style={{ display: 'block' }}>
+      <mask id={mask} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+        <rect width="100" height="100" fill="#000" />
+        <g fill="#fff">{tira(45)}</g>
+        <g fill="#fff">{tira(-45)}</g>
+      </mask>
+      <rect width="100" height="100" fill="currentColor" mask={`url(#${mask})`} />
+    </svg>
+  );
+}
+
+/**
+ * `variante`: «apilado» es el logotipo principal a dos líneas (A1 del pliego) y
+ * «linea» el horizontal (A2), que es el que aguanta una barra de 56 px de alto.
+ */
+function Logotipo({ variante = 'apilado', className = '' }) {
+  // La X es una LETRA más: va a la altura de las mayúsculas (0,73 em en Archivo
+  // Black) y apoyada en la línea base, no centrada en la caja de línea — ahí es
+  // donde caía antes, colgando por debajo del resto.
+  // en una fila con `items-baseline`, la línea base de un SVG es su borde
+  // INFERIOR: así la X se apoya exactamente donde apoyan la L y la E
+  const equis = <CruzDePelicula className="w-[0.73em] h-[0.73em] shrink-0" />;
+  if (variante === 'linea') {
+    return (
+      <span className={`inline-flex items-center gap-[0.06em] ${className}`} style={TIPO_LOGO}>
+        <Simbolo alto="1.02em" />
+        <span className="inline-flex items-baseline leading-none">
+          <span>OWAFLE</span>
+          {equis}
+        </span>
+        <span className="sr-only">PowaFlex</span>
+      </span>
+    );
+  }
+  return (
+    <span className={`inline-flex items-center gap-[0.07em] ${className}`} style={TIPO_LOGO}>
+      {/* el símbolo pisa el alto de las DOS líneas: la P abre «OWA» y la F abre
+          «LEX», así que tiene que leerse POWA / FLEX sin hueco en medio */}
+      <Simbolo alto="1.74em" />
+      <span className="inline-flex flex-col">
+        <span>OWA</span>
+        <span className="inline-flex items-baseline leading-none">
+          <span>LE</span>
+          {equis}
+        </span>
+      </span>
+      <span className="sr-only">PowaFlex</span>
+    </span>
+  );
+}
 
 function Shell() {
   const navigate = useNavigate();
@@ -145,7 +244,8 @@ function Shell() {
         <button onClick={() => setOpen(true)} className="text-zinc-300 hover:text-zinc-100" aria-label={t('Menú')}>
           <Menu size={20} strokeWidth={1.75} />
         </button>
-        <Wordmark className="text-lg text-zinc-100" />
+        {/* la barra de móvil mide 56 px: ahí va el horizontal, no el apilado */}
+        <Logotipo variante="linea" className="text-[19px] text-zinc-100" />
         <button
           onClick={() => window.dispatchEvent(new Event('powaflex-search'))}
           className="ml-auto text-zinc-300 hover:text-zinc-100"
@@ -165,7 +265,7 @@ function Shell() {
         } md:translate-x-0`}
       >
         <div className="mb-4 px-5 flex items-center justify-between">
-          <Wordmark className="text-2xl text-zinc-100" />
+          <Logotipo className="text-[27px] text-zinc-100" />
           <button onClick={() => setOpen(false)} className="md:hidden text-zinc-500" aria-label={t('Cerrar')}>
             <X size={18} />
           </button>

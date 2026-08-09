@@ -1,5 +1,30 @@
 # Changelog
 
+## Beta 1.09 (1.0.9-beta) — 2026-08-09
+
+**El logotipo entero, y la razón de fondo por la que faltaban carteles.**
+
+### El emparejado buscaba en el idioma equivocado
+
+Ramón mandó una captura del canon de Sight & Sound con ocho fichas sin cartel. El diagnóstico partió el fallo en dos, y ninguna de las dos mitades era lo que parecía.
+
+- **Cinco fallaban por el IDIOMA DE LA BÚSQUEDA, y esto afectaba a todo, no solo al canon.** `tmdbGet` manda `language` en todas las llamadas, y TMDB compara la consulta contra el título original y contra el traducido al idioma que pidas, **pero no contra el inglés**. Con la interfaz en español, buscar «The Leopard» devolvía «El hombre leopardo», «The Leopard Lady» y «The Leopard Son» —las que de verdad se llaman así en español— y nunca «Il gattopardo». Como todos los cánones y todas las tablas de Wikipedia están escritos en inglés, **ninguna película con título original en otra lengua podía encontrarse jamás**. Ahora hay una vuelta extra en inglés: en festivales y cánones entra cuando la lista se queda corta (allí la verificación de dirección sigue filtrando), y en la resolución de Letterboxd solo cuando no se ha encontrado nada, porque ahí no hay verificación detrás y lo único que puede hacer es sumar.
+- **Tres fallaban por el NOMBRE DE QUIEN DIRIGE.** «The Wachowskis» contra «Lana / Lilly Wachowski», «Larissa» contra «Larisa», «Forough Farokhzad» contra «Forugh Farrokhzad». La comparación tolera ahora el artículo suelto, el plural de un colectivo, las letras dobles que cada fuente transcribe a su manera desde el ruso o el persa, y como último recurso una letra de diferencia en palabras largas. No relaja la regla de «mejor sin ficha que la ficha de otra»: esa comparación no elige película, solo confirma una que ya coincidió en título y año.
+- Al reescribir la comparación hice la abreviatura bidireccional y **«Carla Theron» empezó a colar como «Carl Th. Dreyer»**. Lo cazó su propio test. Solo el token largo puede empezar por el corto («Theodor» por «Th.»), nunca al revés.
+
+Cachés `movie_cands2` → `movie_cands3` y `festival` v7 → v8, para que se reintente todo lo que quedó guardado como «sin ficha en TMDB».
+
+### El logotipo
+
+Se cambia el nombre suelto por el logotipo del pliego de marca: el símbolo hace de inicial y el texto no repite la P ni la F, así que se lee **POWA / FLEX**. En la barra lateral va la versión apilada y en la de móvil la de una línea, que es para lo que existe.
+
+- No es una imagen sino tres piezas montadas —el monograma, el texto y una **X de película en SVG**, dos tiras perforadas cruzadas—, así que queda nítido a cualquier tamaño.
+- La tipografía va **fijada a Archivo Black** y no usa la clase `font-display`, porque esa variable cambia con el aspecto: en Cinemateca es una Bodoni con serifas, y el logotipo tiene que ser el mismo dibujo en los tres. Lo único que cambia es la tinta.
+- El símbolo usa una copia de `icon.png` **recortada a sangre**. El icono lleva un 16,6 % de aire transparente a los lados —lo necesita como favicon— y dentro del logotipo ese aire abría un hueco entre la P y «OWA» que rompía la palabra.
+- El logotipo es de una sola tinta, como manda el pliego: se va el «Flex» en dorado.
+
+Tests 226 → 228.
+
 ## Beta 1.08 (1.0.8-beta) — 2026-08-09
 
 **Detector de directores emergentes, y la cuarentena pre-Radarr terminada.**

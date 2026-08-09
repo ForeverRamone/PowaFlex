@@ -94,3 +94,75 @@ test('un fallo de red en la segunda vuelta NO deja emparejar a ciegas', async ()
   assert.equal(r.tmdbId, null);
   assert.equal(r.fallosRed, true);
 });
+
+/**
+ * EL CANON ESTÁ EN INGLÉS Y LA APP PREGUNTA EN ESPAÑOL.
+ *
+ * Visto en producción sobre la Beta 1.08: el corrector manual de «The Leopard»
+ * devolvía «El hombre leopardo», «The Leopard Lady», «The Leopard Woman» y
+ * «The Leopard Son», pero NUNCA «Il gattopardo». TMDB compara la consulta con
+ * el título original y con el traducido al idioma que pides, no con el inglés,
+ * así que ningún canon escrito en inglés podía encontrar una película italiana.
+ *
+ * El stub de `fetch` vale aquí porque lo que se comprueba es la PREGUNTA que se
+ * hace, no la respuesta de TMDB: que se repita la búsqueda con language=en-US.
+ */
+test('searchMovieCandidates repregunta en inglés cuando la lista se queda corta', async () => {
+  const { searchMovieCandidates } = await import('../src/tmdb.js');
+  const { setSetting } = await import('../src/db.js');
+  setSetting('tmdb_key', 'clave-de-prueba');
+
+  const idiomas = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = new URL(String(url));
+    idiomas.push(u.searchParams.get('language'));
+    const enIngles = u.searchParams.get('language') === 'en-US';
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        results: enIngles
+          ? [{ id: 1, title: 'The Leopard', original_title: 'Il gattopardo', release_date: '1963-03-27' }]
+          : [{ id: 9, title: 'El hombre leopardo', original_title: 'The Leopard Man', release_date: '1943-05-08' }],
+      }),
+    };
+  };
+  try {
+    const cands = await searchMovieCandidates('The Leopard', 1963);
+    assert.ok(idiomas.includes('en-US'), `nunca se preguntó en inglés: ${idiomas.join(', ')}`);
+    assert.ok(cands.some((c) => c.original_title === 'Il gattopardo'), 'Il gattopardo no está entre los candidatos');
+    // y la vuelta en español sigue haciéndose primero
+    assert.equal(idiomas[0], 'es-ES');
+  } finally {
+    globalThis.fetch = real;
+    setSetting('tmdb_key', '');
+  }
+});
+
+test('searchMovieId prueba en inglés SOLO cuando no ha encontrado nada', async () => {
+  // aquí no hay verificación de dirección detrás, así que la vuelta en inglés
+  // no puede cambiar un acierto por otra película: solo entra donde hoy se
+  // devuelve null
+  const { searchMovieId } = await import('../src/tmdb.js');
+  const { setSetting } = await import('../src/db.js');
+  setSetting('tmdb_key', 'clave-de-prueba');
+
+  const real = globalThis.fetch;
+  const idiomasCuandoAcierta = [];
+  globalThis.fetch = async (url) => {
+    const u = new URL(String(url));
+    idiomasCuandoAcierta.push(u.searchParams.get('language'));
+    return {
+      ok: true, status: 200,
+      json: async () => ({ results: [{ id: 7, title: 'Amanece', original_title: 'Amanece', release_date: '1990-01-01' }] }),
+    };
+  };
+  try {
+    assert.equal(await searchMovieId('Amanece', 1990), 7);
+    assert.ok(!idiomasCuandoAcierta.includes('en-US'), 'con acierto NO debe repreguntar en inglés');
+  } finally {
+    globalThis.fetch = real;
+    setSetting('tmdb_key', '');
+  }
+});

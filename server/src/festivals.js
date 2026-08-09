@@ -661,7 +661,62 @@ const nameTokens = (s) =>
     .replace(/[̀-ͯ]/g, '')
     .replace(/-/g, '')
     .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 2);
+    // «The Wachowskis»: el artículo no es parte del nombre de nadie y estorba
+    // al comparar un colectivo con una persona
+    .filter((t) => t.length >= 2 && t !== 'the');
+
+/**
+ * Letras dobles colapsadas: «Larissa» → «larisa», «Farrokhzad» → «farokhzad».
+ *
+ * No es un capricho ortográfico: al transliterar del ruso, del persa o del
+ * árabe, cada fuente dobla las consonantes donde le parece, y Wikipedia y TMDB
+ * no se ponen de acuerdo. Colapsar es CONSERVADOR —no acerca dos apellidos
+ * distintos, solo dos grafías del mismo.
+ */
+const sinDobles = (t) => t.replace(/(.)\1+/g, '$1');
+
+/** Distancia de edición, cortada en 2: solo hace falta saber si es 0, 1 o más. */
+function distancia(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return 2;
+  let fila = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const nueva = [i];
+    for (let j = 1; j <= b.length; j++) {
+      nueva[j] = Math.min(
+        fila[j] + 1,
+        nueva[j - 1] + 1,
+        fila[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    fila = nueva;
+    if (Math.min(...fila) > 1) return 2; // ya no puede bajar de 2
+  }
+  return Math.min(fila[b.length], 2);
+}
+
+/**
+ * ¿Dos tokens son el mismo, tolerando cómo se transcriba? Por orden de
+ * exigencia: iguales, abreviatura («Th.» de «Theodor»), plural de colectivo
+ * («Wachowskis» de «Wachowski»), la misma palabra con dobles colapsadas, y como
+ * último recurso una sola letra de diferencia en palabras largas
+ * («Forough»/«Forugh»).
+ *
+ * Lo de la letra suelta suena arriesgado y no lo es tanto: esta comparación NO
+ * elige película, solo CONFIRMA una que ya coincidió en título y año. Para que
+ * colara la persona equivocada haría falta que otra película del mismo título y
+ * del mismo año estuviera dirigida por alguien que se escribe casi igual.
+ */
+const mismoToken = (a, b) => {
+  // OJO con la dirección de la abreviatura: solo el token LARGO puede empezar
+  // por el corto («Theodor» por «Th.»), nunca al revés. Al hacerlo simétrico,
+  // «Carla Theron» pasaba por «Carl Th. Dreyer» — lo cazó su test.
+  if (a === b || b.startsWith(a)) return true;
+  if (a === `${b}s` || b === `${a}s`) return true;
+  const da = sinDobles(a);
+  const dbb = sinDobles(b);
+  if (da === dbb) return true;
+  return Math.min(a.length, b.length) >= 5 && distancia(da, dbb) <= 1;
+};
 
 // ¿Mismo nombre? Insensible al ORDEN de las palabras: las tablas de Wikipedia
 // usan a veces el orden japonés («Imamura Shōhei») donde TMDB dice «Shohei
@@ -672,9 +727,7 @@ const sameName = (a, b) => {
   const tb = nameTokens(b);
   if (!ta.length || !tb.length) return false;
   const [corto, largo] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
-  // cada token del nombre corto debe estar en el largo, o ser su abreviatura:
-  // «Carl Th. Dreyer» ≡ «Carl Theodor Dreyer» (el S&S y las tablas abrevian)
-  return corto.every((t) => largo.some((l) => l === t || l.startsWith(t)));
+  return corto.every((t) => largo.some((l) => mismoToken(t, l)));
 };
 
 /**

@@ -22,6 +22,17 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.09',
+    fecha: '2026-08-09',
+    titular: 'Buscábamos las películas en el idioma equivocado',
+    puntos: [
+      'Las fichas de los cánones y los festivales que salían sin cartel no era que TMDB no las tuviera: es que se le preguntaba en español y TMDB no relaciona «The Leopard» con «Il gattopardo». Como esas listas están escritas en inglés, ninguna película con título original en otra lengua podía encontrarse. Ahora se pregunta también en inglés.',
+      'Tres fichas más fallaban por cómo se escribe el nombre de quien dirige: «The Wachowskis» frente a «Lana y Lilly Wachowski», «Larissa» frente a «Larisa», «Forough Farokhzad» frente a «Forugh Farrokhzad». Ya se reconocen, sin abrir la mano con los que de verdad son otra persona.',
+      'Todo lo que quedó guardado como «sin ficha» se vuelve a intentar solo.',
+      'Logotipo nuevo: el símbolo hace de inicial y se lee POWA / FLEX de corrido, en las tres paletas. En el móvil, la versión de una línea.',
+    ],
+  },
+  {
     label: 'Beta 1.08',
     fecha: '2026-08-09',
     titular: 'Quién va a ser un grande dentro de diez años',

@@ -562,6 +562,18 @@ export async function searchMovieId(title, year = null) {
       data = await tmdbGet('/search/movie', { query: title }, { cacheKey: null });
       hit = pickSearchResult(data.results, title, year);
     }
+    // Última vuelta, en inglés: TMDB no compara la consulta con el título
+    // inglés cuando le pides español, y las listas de Letterboxd y los cánones
+    // vienen en inglés («The Leopard» no encontraba «Il gattopardo»).
+    //
+    // Solo cuando NO se ha encontrado nada, a diferencia de
+    // `searchMovieCandidates`: aquí no hay verificación de dirección detrás, así
+    // que ampliar la lista podría cambiar un acierto por un fallo. Entrando solo
+    // donde hoy se devuelve null, lo único que puede hacer es sumar.
+    if (!hit && !/^en/i.test(lang())) {
+      data = await tmdbGet('/search/movie', { query: title, language: 'en-US' }, { cacheKey: null });
+      hit = pickSearchResult(data.results, title, year);
+    }
     cacheWrite(key, hit ? { id: hit.id } : {});
     return hit?.id ?? null;
   } catch {
@@ -575,10 +587,23 @@ export async function searchMovieId(title, year = null) {
  * llama pueda comprobar el director/a antes de quedarse con ninguno. Con
  * títulos genéricos («Bunker», «Company») quedarse con el primero del año, como
  * hace pickSearchResult, engancha la película equivocada.
+ *
+ * TAMBIÉN SE BUSCA EN INGLÉS, y no es un detalle: `tmdbGet` manda `language` en
+ * todas las llamadas, y buscando en español TMDB compara contra el título
+ * original y el traducido al español, pero NO contra el inglés. Los cánones y
+ * las tablas de Wikipedia están escritos en inglés, así que «The Leopard»
+ * devolvía «El hombre leopardo», «The Leopard Lady» y «The Leopard Son» — pero
+ * nunca «Il gattopardo», que es la que se buscaba. Lo mismo con «Black Girl»
+ * («La noire de…») o «Pandora's Box» («Die Büchse der Pandora»).
+ *
+ * Es una petición más por título sin resolver y solo cuando la primera vuelta
+ * se queda corta. Nada de esto relaja la verificación: los candidatos nuevos
+ * pasan por la misma comprobación de dirección que los demás.
  */
 export async function searchMovieCandidates(title, year = null) {
   if (!title) return [];
-  const key = `movie_cands2:${title.toLowerCase()}:${year || ''}`;
+  // v3: se añade la vuelta en inglés; lo cacheado antes no la tiene
+  const key = `movie_cands3:${title.toLowerCase()}:${year || ''}`;
   const cached = cacheRead(key, 30 * DAY);
   if (cached) return cached.list || [];
   try {
@@ -593,7 +618,14 @@ export async function searchMovieCandidates(title, year = null) {
     };
     if (year) add((await tmdbGet('/search/movie', { query: title, primary_release_year: year }, { cacheKey: null })).results);
     add((await tmdbGet('/search/movie', { query: title }, { cacheKey: null })).results);
-    const out = list.slice(0, 10);
+    // la vuelta en inglés solo si hace falta: con la lista ya llena, la película
+    // buena casi siempre está dentro y sería una petición tirada
+    if (list.length < 10 && !/^en/i.test(lang())) {
+      const en = { language: 'en-US' };
+      if (year) add((await tmdbGet('/search/movie', { query: title, primary_release_year: year, ...en }, { cacheKey: null })).results);
+      add((await tmdbGet('/search/movie', { query: title, ...en }, { cacheKey: null })).results);
+    }
+    const out = list.slice(0, 12);
     cacheWrite(key, { list: out });
     return out;
   } catch {

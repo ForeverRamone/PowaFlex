@@ -136,6 +136,35 @@ test('directorsMatch: insensible al orden de las palabras del nombre', () => {
   assert.equal(directorsMatch('Carl Th. Dreyer', ['Carla Theron']), false);
 });
 
+/**
+ * Los tres casos REALES que en producción dejaban sin cartel a tres películas
+ * del canon de Sight & Sound (captura de Ramón sobre la Beta 1.08). Ninguno es
+ * un fallo de título: los tres fallaban al comparar el nombre de quien dirige.
+ */
+test('directorsMatch: colectivos y transliteraciones (los tres del canon)', () => {
+  // un colectivo en plural contra las dos personas que lo forman
+  assert.ok(directorsMatch('The Wachowskis', ['Lana Wachowski', 'Lilly Wachowski']));
+  // dobles que cada fuente transcribe a su manera desde el ruso y el persa
+  assert.ok(directorsMatch('Larissa Shepitko', ['Larisa Shepitko']));
+  assert.ok(directorsMatch('Forough Farokhzad', ['Forugh Farrokhzad']));
+  // y el artículo no vuelve buena a otra persona
+  assert.equal(directorsMatch('The Wachowskis', ['Lana Kowalski']), false);
+});
+
+test('directorsMatch: la tolerancia NO llega a otro apellido', () => {
+  // el límite de lo que se acepta: una letra en palabras largas, no una sílaba
+  for (const [wiki, tmdb] of [
+    ['Claire Denis', ['Claire Simon']],
+    ['Jean Renoir', ['Jean Rouch']],
+    ['Michael Bay', ['Michael Mann']],
+    ['Wang Bing', ['Wang Xiaoshuai']],
+    ['Kelly Reichardt', ['Kelly Richards']],
+    ['Lars von Trier', ['Lars Ohlson']],
+  ]) {
+    assert.equal(directorsMatch(wiki, tmdb), false, `${wiki} NO es ${tmdb[0]}`);
+  }
+});
+
 test('directorsMatch: rechaza a otro director/a aunque el título y el año casen', () => {
   assert.equal(directorsMatch('Florian Zeller', ['Otra Persona']), false);
   assert.equal(directorsMatch('Casey Affleck', ['Jason Laurits']), false);

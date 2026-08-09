@@ -36,7 +36,11 @@ export const CACHE_VERSIONS = {
   // verificada — lo cacheado antes tiene como «sin ficha» los clásicos que el
   // BFI fecha por producción y TMDB por estreno comercial (Beau travail,
   // Partie de campagne…)
-  festival: 7,
+  // v8: la comparación de nombres tolera colectivos en plural («The Wachowskis»
+  // por «Lana Wachowski») y las transliteraciones que cada fuente escribe a su
+  // manera («Larissa»/«Larisa», «Forough Farokhzad»/«Forugh Farrokhzad»). Lo
+  // cacheado antes tiene esas tres como «sin ficha en TMDB».
+  festival: 8,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)
