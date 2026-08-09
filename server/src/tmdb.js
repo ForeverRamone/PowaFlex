@@ -140,6 +140,36 @@ export async function findPersonId(name, knownForHint = null) {
 }
 
 /**
+ * VARIOS candidatos de persona, no solo el mejor.
+ *
+ * `findPersonInfo` devuelve uno y decide por popularidad, y con nombres muy
+ * repetidos eso falla: buscando «Wang Bing» devuelve a un director chino de los
+ * años sesenta, no al de «West of the Tracks». Quien llama aquí tiene con qué
+ * desambiguar —el título de la película que busca— y necesita la lista entera
+ * para poder probar.
+ *
+ * Los que dirigen van primero, que es lo que se busca en el 99 % de los casos.
+ * Comparte caché con `resolveCatalogDirector`: es la misma consulta.
+ */
+export async function searchPersonCandidates(name, { limit = 5 } = {}) {
+  if (!name) return [];
+  try {
+    const data = await tmdbGet(
+      '/search/person',
+      { query: name },
+      { cacheKey: `person_search_all:${String(name).toLowerCase()}`, cacheMs: 30 * DAY }
+    );
+    return (data.results || [])
+      .slice()
+      .sort((a, b) => (b.known_for_department === 'Directing') - (a.known_for_department === 'Directing'))
+      .slice(0, limit)
+      .map((r) => ({ id: r.id, name: r.name, profile_path: r.profile_path || null }));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Emparejar un director/a del catálogo con su ficha de TMDB, VERIFICANDO que es
  * la persona correcta.
  *
@@ -582,28 +612,59 @@ export async function searchMovieId(title, year = null) {
 }
 
 /**
- * Candidatos de /search/movie para el emparejado VERIFICADO de festivales: la
- * búsqueda acotada al año y la abierta, juntas y sin duplicados, para que quien
- * llama pueda comprobar el director/a antes de quedarse con ninguno. Con
- * títulos genéricos («Bunker», «Company») quedarse con el primero del año, como
- * hace pickSearchResult, engancha la película equivocada.
+ * Ordena los candidatos ANTES de cortar la lista. Pura y exportada para poder
+ * probarla, porque aquí estaba el fallo que costó tres intentos.
  *
- * TAMBIÉN SE BUSCA EN INGLÉS, y no es un detalle: `tmdbGet` manda `language` en
- * todas las llamadas, y buscando en español TMDB compara contra el título
- * original y el traducido al español, pero NO contra el inglés. Los cánones y
- * las tablas de Wikipedia están escritos en inglés, así que «The Leopard»
- * devolvía «El hombre leopardo», «The Leopard Lady» y «The Leopard Son» — pero
- * nunca «Il gattopardo», que es la que se buscaba. Lo mismo con «Black Girl»
- * («La noire de…») o «Pandora's Box» («Die Büchse der Pandora»).
+ * TMDB devuelve por POPULARIDAD, y quedarse con los diez primeros es tirar el
+ * dato que sí tenemos: el año. Buscando «The Leopard» de 1962, la lista llegaba
+ * encabezada por «El hombre leopardo» (1943), «The Leopard Lady» (1928), «The
+ * Leopard Woman» (1920) y «The Leopard Son» (1996) —todas más populares— y «Il
+ * gattopardo» se caía por el corte sin que nadie llegara a comprobar su
+ * dirección. Aquí pasa delante quien cuadra en año y quien clava el título.
+ */
+export function ordenarCandidatos(list, title, year = null) {
+  const wanted = normTitle(title);
+  const anyo = (c) => (c.date ? Number(String(c.date).slice(0, 4)) : null);
+  const cercaDelAño = (c) => {
+    const a = anyo(c);
+    if (!Number.isFinite(year) || a == null) return 9; // sin año con que comparar, ni premia ni castiga
+    return Math.abs(a - year);
+  };
+  const clavado = (c) => (normTitle(c.title) === wanted || normTitle(c.original_title) === wanted ? 0 : 1);
+  return list
+    .map((c, i) => ({ c, i })) // el orden de TMDB desempata al final
+    .sort((x, y) => {
+      // dentro de la ventana de ±1 primero, y ahí el título clavado manda
+      const vx = cercaDelAño(x.c) <= 1 ? 0 : 1;
+      const vy = cercaDelAño(y.c) <= 1 ? 0 : 1;
+      return vx - vy || clavado(x.c) - clavado(y.c) || cercaDelAño(x.c) - cercaDelAño(y.c) || x.i - y.i;
+    })
+    .map((x) => x.c);
+}
+
+/**
+ * Candidatos de /search/movie para el emparejado VERIFICADO de festivales, para
+ * que quien llama pueda comprobar la dirección antes de quedarse con ninguno.
  *
- * Es una petición más por título sin resolver y solo cuando la primera vuelta
- * se queda corta. Nada de esto relaja la verificación: los candidatos nuevos
- * pasan por la misma comprobación de dirección que los demás.
+ * TRES COSAS QUE HAY QUE HACER A LA VEZ, y hasta ahora se hacía una:
+ *
+ *  1. **Preguntar también en inglés.** `tmdbGet` manda `language` en todas las
+ *     llamadas y buscando en español TMDB no compara contra el título inglés.
+ *     Los cánones y las tablas de Wikipedia están en inglés, así que sin esto
+ *     ninguna película con título original en otra lengua se encontraba.
+ *  2. **Probar el año y sus vecinos.** El BFI y los festivales fechan por
+ *     producción o por estreno en festival y TMDB por estreno comercial: «The
+ *     Leopard» es 1962 en Sight & Sound y 1963 en TMDB, así que la búsqueda
+ *     acotada al año exacto no devolvía NADA y todo el peso caía en la abierta.
+ *  3. **Ordenar antes de cortar.** Ver `ordenarCandidatos`.
+ *
+ * Nada de esto relaja la verificación: los candidatos nuevos pasan por la misma
+ * comprobación de dirección que los demás, y sin ella ninguno se acepta.
  */
 export async function searchMovieCandidates(title, year = null) {
   if (!title) return [];
-  // v3: se añade la vuelta en inglés; lo cacheado antes no la tiene
-  const key = `movie_cands3:${title.toLowerCase()}:${year || ''}`;
+  // v4: vuelta en inglés siempre, años vecinos y orden por año antes de cortar
+  const key = `movie_cands4:${title.toLowerCase()}:${year || ''}`;
   const cached = cacheRead(key, 30 * DAY);
   if (cached) return cached.list || [];
   try {
@@ -616,16 +677,41 @@ export async function searchMovieCandidates(title, year = null) {
         list.push({ id: r.id, title: r.title, original_title: r.original_title, date: r.release_date || null, poster_path: r.poster_path || null });
       }
     };
-    if (year) add((await tmdbGet('/search/movie', { query: title, primary_release_year: year }, { cacheKey: null })).results);
-    add((await tmdbGet('/search/movie', { query: title }, { cacheKey: null })).results);
-    // la vuelta en inglés solo si hace falta: con la lista ya llena, la película
-    // buena casi siempre está dentro y sería una petición tirada
-    if (list.length < 10 && !/^en/i.test(lang())) {
-      const en = { language: 'en-US' };
-      if (year) add((await tmdbGet('/search/movie', { query: title, primary_release_year: year, ...en }, { cacheKey: null })).results);
-      add((await tmdbGet('/search/movie', { query: title, ...en }, { cacheKey: null })).results);
+    const buscar = async (params) => add((await tmdbGet('/search/movie', { query: title, ...params }, { cacheKey: null })).results);
+    // ¿Tenemos ya un candidato CREÍBLE, o hay que seguir insistiendo?
+    //
+    // Creíble = del año que buscamos Y con el título clavado. Pedir solo el año
+    // no basta: buscando «The Leopard» de 1962 puede aparecer cualquier otra
+    // película de 1962 y, si nos parásemos ahí, «Il gattopardo» no se buscaría
+    // nunca. Y pedir solo el título tampoco: los títulos genéricos se repiten
+    // cada década.
+    const buscado = normTitle(title);
+    const hayCandidatoCreible = () =>
+      list.some((c) => {
+        const enAño =
+          !Number.isFinite(year) ||
+          (c.date && Math.abs(Number(String(c.date).slice(0, 4)) - year) <= 1);
+        return enAño && (normTitle(c.title) === buscado || normTitle(c.original_title) === buscado);
+      });
+
+    // El orden es de más barato a más caro, y cada escalón solo se sube si el
+    // anterior se quedó sin nada del año. Un canon de 264 fichas no puede
+    // pagar tres búsquedas por título cuando la primera casi siempre acierta.
+    const idiomas = /^en/i.test(lang()) ? [{}] : [{}, { language: 'en-US' }];
+    for (const idioma of idiomas) {
+      if (Number.isFinite(year)) await buscar({ primary_release_year: year, ...idioma });
+      if (!hayCandidatoCreible()) await buscar(idioma);
+      // los años vecinos: el BFI y los festivales fechan por producción o por
+      // estreno en festival, y TMDB por estreno comercial
+      for (const y of [year + 1, year - 1]) {
+        if (hayCandidatoCreible()) break;
+        await buscar({ primary_release_year: y, ...idioma });
+      }
+      if (hayCandidatoCreible()) break; // ya está: no hace falta la vuelta en inglés
     }
-    const out = list.slice(0, 12);
+    // sin año no hay escalones que valgan: una sola búsqueda abierta
+    if (!Number.isFinite(year) && !list.length) await buscar({});
+    const out = ordenarCandidatos(list, title, year).slice(0, 12);
     cacheWrite(key, { list: out });
     return out;
   } catch {
@@ -683,9 +769,21 @@ export async function enrichReleasePhases(items, { maxFetch = 60, concurrency = 
 }
 
 /** Directores/as de una película, con la misma caché movie_cr que enrichRuntimes. */
+/**
+ * Quién dirige, con los nombres EN ALFABETO LATINO.
+ *
+ * TMDB acredita a mucha gente en su alfabeto: el director de «West of the
+ * Tracks» figura como «王兵», no como «Wang Bing». Al verificar el emparejado
+ * contra las tablas de Wikipedia —que están en inglés— no había nada que
+ * comparar y la película se quedaba sin ficha, aunque estuviera encontrada.
+ *
+ * La transcripción sale de `also_known_as`, que es de donde ya la saca el resto
+ * de la app (`latinPersonName`), y solo se pide para quien la necesita.
+ */
 export async function movieDirectors(tmdbId) {
   const det = await movieDetail(tmdbId, { withCredits: true });
-  return (det.credits?.crew || []).filter((c) => c.job === 'Director').map((c) => c.name);
+  const crew = (det.credits?.crew || []).filter((c) => c.job === 'Director');
+  return Promise.all(crew.map((c) => (needsLatin(c.name) ? latinPersonName(c.id, c.name) : c.name)));
 }
 
 /** Ficha mínima de una película (cartel, fecha, títulos), con la misma caché
@@ -1032,13 +1130,18 @@ export function roleStats(items, role) {
  * its own completeness bar, so a person who both directs and acts shows two bars
  * and you can switch between them (#8). `wantRole` decides which one opens first.
  */
-export async function filmographyProfile(personId, wantRole = null) {
-  const person = await resolvePerson(personId);
-  if (!person?.tmdb_id) return { person, matched: false, roles: {} };
-
+/**
+ * El cuerpo de la ficha, a partir de alguien que YA tiene id de TMDB.
+ *
+ * `persona.id` puede ser null: es el caso de quien no está en tu biblioteca ni
+ * en tus favoritos —el director de una película de Cannes que aún no tienes—,
+ * y su ficha se construye igual. Lo único que no se puede hacer sin fila local
+ * es guardarle el estado vital.
+ */
+async function perfilDesde(person, wantRole = null) {
   const credits = await personCredits(person.tmdb_id);
   const details = await personDetails(person.tmdb_id);
-  persistLife(person.id, details);
+  if (person.id) persistLife(person.id, details);
   const inLib = libraryTmdbIds();
   const widx = watchedIndex();
 
@@ -1072,8 +1175,8 @@ export async function filmographyProfile(personId, wantRole = null) {
 
   return {
     person: {
-      id: person.id,
-      name: person.name,
+      id: person.id ?? null,
+      name: person.name || details?.name || '',
       tmdb_id: person.tmdb_id,
       profile_path: details?.profile_path || null,
       biography: details?.biography || null,
@@ -1083,11 +1186,42 @@ export async function filmographyProfile(personId, wantRole = null) {
       // emparejado fijado a mano se volvía permanente: la ruta de deshacer
       // existía en el servidor pero era inalcanzable desde la ficha
       tmdb_locked: person.tmdb_locked ?? 0,
+      // false = no está en tu biblioteca ni en tus favoritos. La ficha se pinta
+      // igual, pero la interfaz sabe que seguirle es un alta, no un cambio.
+      enBiblioteca: !!person.id,
     },
     matched: true,
     primary,
     roles,
   };
+}
+
+export async function filmographyProfile(personId, wantRole = null) {
+  const person = await resolvePerson(personId);
+  if (!person?.tmdb_id) return { person, matched: false, roles: {} };
+  return perfilDesde(person, wantRole);
+}
+
+/**
+ * La ficha de cualquier persona de TMDB, esté o no en tu biblioteca.
+ *
+ * Si resulta que SÍ está, se sirve su ficha local: así siguen funcionando el
+ * botón de seguir por faceta, el corrector de emparejado y el enlace a sus
+ * películas en Plex, que cuelgan del id local.
+ */
+export async function filmographyProfileByTmdb(tmdbId, wantRole = null) {
+  const id = Number(tmdbId);
+  if (!id) return { person: null, matched: false, roles: {} };
+  const local = db.prepare('SELECT * FROM people WHERE tmdb_id = ? LIMIT 1').get(id);
+  if (local) return perfilDesde(local, wantRole);
+  let det = null;
+  try {
+    det = await personDetails(id);
+  } catch {
+    return { person: null, matched: false, roles: {} };
+  }
+  if (!det?.id) return { person: null, matched: false, roles: {} };
+  return perfilDesde({ id: null, name: det.name, tmdb_id: id, tmdb_locked: 0 }, wantRole);
 }
 
 // --- upcoming calendar -------------------------------------------------------

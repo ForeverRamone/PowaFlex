@@ -166,3 +166,68 @@ test('searchMovieId prueba en inglés SOLO cuando no ha encontrado nada', async 
     setSetting('tmdb_key', '');
   }
 });
+
+/**
+ * EL FALLO QUE COSTÓ TRES INTENTOS, reproducido entero.
+ *
+ * «The Leopard» está en Sight & Sound como 1962 y en TMDB como 1963, y el
+ * título es tan genérico que la búsqueda abierta devuelve veinte películas más
+ * populares antes que la buena. Con la lista cortada a diez POR POPULARIDAD,
+ * «Il gattopardo» se caía por el corte y nadie llegaba a comprobar su
+ * dirección: la ficha se quedaba sin cartel para siempre.
+ *
+ * Aquí se comprueban las tres cosas que hacen falta a la vez: que se pregunte
+ * por los años vecinos, que se pregunte en inglés, y que el corte respete el
+ * año en vez de la popularidad.
+ */
+test('el candidato bueno sobrevive al corte aunque TMDB lo entierre', async () => {
+  const { searchMovieCandidates } = await import('../src/tmdb.js');
+  const { setSetting } = await import('../src/db.js');
+  setSetting('tmdb_key', 'clave-de-prueba');
+
+  // veinte señuelos más populares, ninguno del año que buscamos
+  const senuelos = Array.from({ length: 20 }, (_, i) => ({
+    id: 500 + i,
+    title: `The Leopard ${i}`,
+    original_title: `The Leopard ${i}`,
+    release_date: `${1920 + i * 3}-01-01`,
+  }));
+  const buena = { id: 1, title: 'The Leopard', original_title: 'Il gattopardo', release_date: '1963-03-27' };
+
+  const años = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = new URL(String(url));
+    const anyo = u.searchParams.get('primary_release_year');
+    años.push(anyo);
+    // TMDB solo la devuelve al acotar por 1963, que NO es el año del canon
+    const results = anyo === '1963' ? [buena] : anyo ? [] : senuelos;
+    return { ok: true, status: 200, json: async () => ({ results }) };
+  };
+  try {
+    const cands = await searchMovieCandidates('The Leopard', 1962);
+    assert.ok(años.includes('1963'), `no se probó el año vecino: ${años.join(', ')}`);
+    const puesto = cands.findIndex((c) => c.original_title === 'Il gattopardo');
+    assert.notEqual(puesto, -1, 'Il gattopardo se cayó por el corte');
+    assert.equal(puesto, 0, 'y además tiene que ir la primera: es la única del año');
+  } finally {
+    globalThis.fetch = real;
+    setSetting('tmdb_key', '');
+  }
+});
+
+test('ordenarCandidatos: el año manda sobre la popularidad, y el título clavado desempata', async () => {
+  const { ordenarCandidatos } = await import('../src/tmdb.js');
+  const lista = [
+    { id: 1, title: 'The Leopard Man', original_title: 'The Leopard Man', date: '1943-05-08' },
+    { id: 2, title: 'The Leopard Son', original_title: 'The Leopard Son', date: '1996-01-01' },
+    { id: 3, title: 'Otra del 63', original_title: 'Otra del 63', date: '1963-06-01' },
+    { id: 4, title: 'The Leopard', original_title: 'Il gattopardo', date: '1963-03-27' },
+  ];
+  const orden = ordenarCandidatos(lista, 'The Leopard', 1962).map((c) => c.id);
+  // las dos del 63 delante; entre ellas, la que clava el título
+  assert.deepEqual(orden.slice(0, 2), [4, 3]);
+  // sin año con el que comparar, el título clavado sigue mandando y el resto
+  // conserva el orden de TMDB: no se inventa un criterio que no tenemos
+  assert.deepEqual(ordenarCandidatos(lista, 'The Leopard', null).map((c) => c.id), [4, 1, 2, 3]);
+});

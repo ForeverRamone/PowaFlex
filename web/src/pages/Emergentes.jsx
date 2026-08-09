@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Spinner, Empty, PageHeader, ErrorBox, Select } from '../components.jsx';
+import { Spinner, Empty, PageHeader, ErrorBox, Select, EnlacePersona } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t, locale } from '../i18n.js';
 
@@ -34,9 +34,11 @@ const NOMBRE_FESTIVAL = {
   berlinale: 'Berlinale',
   sansebastian: 'San Sebastián',
   sundance: 'Sundance',
+  sundanceus: 'Sundance · Competición de EE UU',
   tiff: 'Toronto (TIFF)',
   busan: 'Busan (BIFF)',
   horizontes: 'S.S. · Horizontes Latinos',
+  uncertainregard: 'Cannes · Un Certain Regard',
   semaine: 'Cannes · Semana de la Crítica',
   quinzaine: 'Cannes · Quincena',
   orizzonti: 'Venecia · Orizzonti',
@@ -116,7 +118,8 @@ function Ficha({ d, onFollow, onDescartar, busy }) {
 
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-sm font-medium text-zinc-100">{d.name}</span>
+            {/* el detector ya verificó su ficha de TMDB: se enlaza por id */}
+            <EnlacePersona nombre={d.name} tmdbId={d.tmdb_id} className="text-sm font-medium text-zinc-100" />
             <span className="text-sm text-gold-400 tabular" title={t('Puntuación del detector (0–100)')}>
               {d.score}
             </span>

@@ -22,6 +22,20 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.10',
+    fecha: '2026-08-09',
+    titular: 'Cuatro agentes repasando el emparejado, ficha a ficha',
+    puntos: [
+      'Se revisaron todas las secciones de Festivales y premios contra TMDB: 1.240 fichas. El canon de Sight & Sound pasa a tener 263 carteles de 264 (la que falta es Twin Peaks, que es una serie, y ahora lo dice en vez de dejar un hueco).',
+      'El fallo de fondo: cuando a una fila de Wikipedia le faltaba una celda, el título original acababa metido en el campo del director, y con el director mal ninguna película podía verificarse. Afectaba a decenas de fichas de los palmareses.',
+      'Otro que no se veía: un director acreditado en japonés o cirílico casaba con cualquier nombre, así que podía colarse la ficha de otra película. Cerrado.',
+      'Cannes · Un Certain Regard, que es la segunda competición oficial y donde más nombres nuevos aparecen.',
+      'Sundance · Competición de EE UU: faltaba medio Sundance. El premio que ganó CODA no estaba en ninguna parte, y de paso se recuperaron tres años del otro palmarés que se perdían en silencio.',
+      'Al abrir la edición de un festival, la ganadora de ese año sale la primera y con su 🏆. Antes había que irse al palmarés histórico a mirarlo.',
+      'El nombre de cualquier director es clicable en toda la web y lleva a su ficha, aunque no le sigas ni tengas nada suyo.',
+    ],
+  },
+  {
     label: 'Beta 1.09',
     fecha: '2026-08-09',
     titular: 'Buscábamos las películas en el idioma equivocado',

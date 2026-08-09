@@ -1,5 +1,8 @@
 // Traducciones EN de Festivals.jsx (Festivales y premios). Clave = texto castellano.
 export default {
+  'serie de televisión': 'TV series',
+  'Es una serie de televisión: no tiene ficha de película en TMDB':
+    'It is a TV series: it has no movie entry on TMDB',
   'Las secciones oficiales de los grandes festivales (los seis de la vía Óscar más San Sebastián), el palmarés y las nominadas de los premios de cada año, y los cánones de la crítica.':
     "The official selections of the major festivals (the six on the Oscar route plus San Sebastián), each year's winners and award nominees, and the critics' canons.",
   'Festivales': 'Festivals',

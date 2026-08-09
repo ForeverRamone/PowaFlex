@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   REGISTRY, parseSelectionTable, parseSundanceWinners, parseWinnersTables, stripTags, directorsMatch, cleanTableTitle,
-  parseCahiersTables, splitDirectors, elegirCandidato,
+  parseCahiersTables, splitDirectors, elegirCandidato, faltaElTituloOriginal,
 } from '../src/festivals.js';
 import { SIGHT_AND_SOUND_2022 } from '../src/data/sight-and-sound-2022.js';
 
@@ -43,6 +43,11 @@ test('cada festival casa el nombre real de su sección oficial', () => {
 // la Berlinale cambió Encounters por Perspectives en 2025 y Venecia titula su
 // sección «Horizons (Orizzonti)» en los artículos viejos y «Orizzonti» ahora.
 test('cada sección de debut casa el nombre real que usa Wikipedia', () => {
+  // Un Certain Regard es la SEGUNDA competición oficial de Cannes, no una
+  // sección paralela, y el artículo la titula así en las tres apariciones
+  // (jurado, selección y premios): el ^…$ evita que cace la del palmarés antes
+  assert.ok(REGISTRY.uncertainregard.section.test('Un Certain Regard'));
+  assert.equal(REGISTRY.uncertainregard.section.test('Un Certain Regard Award'), false);
   assert.ok(REGISTRY.semaine.section.test("Critics' Week (Semaine de la critique)"));
   assert.ok(REGISTRY.semaine.section.test('Critics’ Week'));
   assert.ok(REGISTRY.quinzaine.section.test("Directors' Fortnight (Quinzaine des cinéastes)"));
@@ -60,7 +65,7 @@ test('cada sección de debut casa el nombre real que usa Wikipedia', () => {
 // las secciones de debut no tienen artículo de premio: solo ofrecen edición por
 // año, como Busan. Ofrecer «palmarés» sería ofrecer una opción que revienta.
 test('las secciones de debut solo ofrecen sección oficial por año', () => {
-  for (const key of ['semaine', 'quinzaine', 'orizzonti', 'perspectives', 'ssnuevos']) {
+  for (const key of ['uncertainregard', 'semaine', 'quinzaine', 'orizzonti', 'perspectives', 'ssnuevos']) {
     const f = REGISTRY[key];
     assert.equal(f.group, 'debut', key);
     assert.ok(!f.awardPage && !f.staticList && !f.staticAward, key);
@@ -428,4 +433,46 @@ test('un año roto no deja fuera a todos los candidatos con fecha', async () => 
   const cands = [{ id: 60, title: 'Algo', original_title: 'Algo', date: '1999-01-01' }];
   const { tmdbId } = await elegirCandidato(row, NaN, cands, SIN_LIB, dirsFijos({ 60: ['Alguien'] }));
   assert.equal(tmdbId, 60);
+});
+
+/**
+ * LA FILA CORTA: ¿le falta el título original o le falta el país?
+ *
+ * Por número de celdas no se distingue, y suponer siempre lo primero corría las
+ * columnas y metía el TÍTULO ORIGINAL en el campo del director. Con eso ninguna
+ * verificación de dirección podía salir bien, así que se quedaron sin cartel
+ * «What Max Said» (Berlinale), «Red Desert» y «Last Year at Marienbad»
+ * (Venecia), «The Tree of Wooden Clogs» (Cannes) y «The Railroad Man» (San
+ * Sebastián). Lo decide la CURSIVA: los títulos van en <i> y las personas no.
+ */
+const CABECERAS = ['english title', 'original title', 'director(s)', 'production country'];
+
+test('fila corta: sin título original (Cannes 2025) se recoloca', () => {
+  // «Alpha» de Julia Ducournau: el original coincide con el inglés y Wikipedia
+  // omite esa celda, así que la segunda celda es una PERSONA, sin cursiva
+  const raw = ['<td><i>Alpha</i> (QP)</td>', '<td><a>Julia Ducournau</a></td>', '<td>France, Belgium</td>'];
+  assert.equal(faltaElTituloOriginal(raw, CABECERAS, 1), true);
+});
+
+test('fila corta: sin país (palmarés con rowspan) NO se recoloca', () => {
+  // «What Max Said»: el país lo absorbió el rowspan de la fila de arriba, así
+  // que la segunda celda es el TÍTULO ORIGINAL y va en cursiva
+  const raw = ['<td><i>What Max Said</i></td>', '<td><i>Las palabras de Max</i></td>', '<td><a>Emilio Martínez-Lázaro</a></td>'];
+  assert.equal(faltaElTituloOriginal(raw, CABECERAS, 1), false);
+});
+
+test('fila completa: no se recoloca nada', () => {
+  const raw = ['<td><i>A</i></td>', '<td><i>B</i></td>', '<td>C</td>', '<td>D</td>'];
+  assert.equal(faltaElTituloOriginal(raw, CABECERAS, 1), false);
+});
+
+test('un director acreditado en su alfabeto NO casa con cualquiera', () => {
+  // `normName` borra todo lo que no sea a-z0-9, así que un nombre en japonés o
+  // en cirílico quedaba en cadena VACÍA — y `incluye('')` es siempre cierto:
+  // cualquier película dirigida por alguien acreditado en su alfabeto casaba
+  // con cualquier fila de Wikipedia y podía colar la ficha de otra.
+  assert.equal(directorsMatch('Michelangelo Antonioni', ['藤田敏八']), false);
+  assert.equal(directorsMatch('Claire Denis', ['Андрей Тарковский']), false);
+  // y el caso legítimo sigue funcionando por la transcripción de TMDB
+  assert.ok(directorsMatch('Wang Bing', ['Wáng Bīng']));
 });

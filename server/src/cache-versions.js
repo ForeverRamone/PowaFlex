@@ -40,7 +40,9 @@ export const CACHE_VERSIONS = {
   // por «Lana Wachowski») y las transliteraciones que cada fuente escribe a su
   // manera («Larissa»/«Larisa», «Forough Farokhzad»/«Forugh Farrokhzad»). Lo
   // cacheado antes tiene esas tres como «sin ficha en TMDB».
-  festival: 8,
+  // v9: la fila corta de Wikipedia ya no mete el título original en el campo
+  // del director (lo decide la cursiva), y las ediciones marcan su ganadora
+  festival: 9,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

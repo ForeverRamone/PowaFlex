@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Spinner, Empty, PageHeader, ErrorBox, Select } from '../components.jsx';
+import { Spinner, Empty, PageHeader, ErrorBox, Select, EnlacePersona } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t } from '../i18n.js';
 
@@ -82,7 +82,7 @@ function Ficha({ d, foto, onFollow, busy }) {
       </button>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="text-sm font-medium text-zinc-100">{d.name}</span>
+          <EnlacePersona nombre={d.name} tmdbId={foto?.tmdbId} className="text-sm font-medium text-zinc-100" />
           {d.importance != null && (
             <span className="text-[11px] text-gold-400 tabular" title={t('Índice de importancia (0–100)')}>
               {d.importance}

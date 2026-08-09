@@ -86,22 +86,42 @@ export default function PersonDetail() {
     });
   };
 
+  // El id LOCAL, que puede no existir: a esta ficha se llega también por
+  // `tmdb:123` o por `nombre:Fulano` desde cualquier lista de la app, y a esa
+  // gente todavía no la tienes fichada. Todo lo que cuelga de la biblioteca
+  // —seguir por faceta, el corrector, el enlace a Plex— usa ESTE, no el de la URL.
+  const idLocal = data?.person?.id ?? null;
+  const enBiblioteca = !!idLocal;
+
   useEffect(() => {
     cargarFilmografia();
+  }, [id, wantRole]);
+
+  useEffect(() => {
+    if (!idLocal) return setTrackedRoles(new Set());
     api('/tracked').then(
       (list) =>
         Array.isArray(list) &&
-        setTrackedRoles(new Set(list.filter((t) => t.id === Number(id)).map((t) => t.role || 'director')))
+        setTrackedRoles(new Set(list.filter((t) => t.id === idLocal).map((t) => t.role || 'director')))
     );
-  }, [id, wantRole]);
+  }, [idLocal]);
 
   // follow/unfollow THE FACET you're looking at: the other one is untouched,
   // so someone can be a favorite director AND actor at once
   const toggleTrack = async (facet) => {
+    // a quien no está en la biblioteca hay que darle de alta primero, y eso va
+    // por su id de TMDB: es lo único que tiene quien llegó aquí por su nombre
+    if (!enBiblioteca) {
+      const alta = await api(`/people/by-tmdb/${data?.person?.tmdb_id}/follow`, { method: 'POST', body: { role: facet } });
+      if (alta?.error) return toast(`⚠️ ${t(alta.error)}`, 'error');
+      toast(t('⭐ {nombre} en favoritos', { nombre: data?.person?.name || '' }), 'success');
+      // se recarga la ficha para que pase a ser la local, con su id y su historia
+      return cargarFilmografia();
+    }
     const siguiendo = trackedRoles.has(facet);
     const r = siguiendo
-      ? await api(`/tracked/${id}?role=${facet}`, { method: 'DELETE' })
-      : await api(`/tracked/${id}`, { method: 'POST', body: { role: facet } });
+      ? await api(`/tracked/${idLocal}?role=${facet}`, { method: 'DELETE' })
+      : await api(`/tracked/${idLocal}`, { method: 'POST', body: { role: facet } });
     setTrackedRoles((prev) => {
       const next = new Set(prev);
       if (siguiendo) next.delete(facet);
@@ -121,7 +141,7 @@ export default function PersonDetail() {
   // porque el caso típico («10 dirigidas y ningún dato») cae justo en medio.
   const nombre = data?.person?.name || '';
   const fijarPersona = async (tmdbId) => {
-    const r = await api(`/people/${id}/match`, { method: 'POST', body: { tmdbId } });
+    const r = await api(`/people/${idLocal}/match`, { method: 'POST', body: { tmdbId } });
     if (r.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     setCorrigiendo(false);
     toast(tmdbId ? t('✓ {name} emparejado a mano', { name: nombre }) : t('✓ Corrección quitada'));
@@ -245,10 +265,14 @@ export default function PersonDetail() {
                 ? t('★ Siguiendo como {role}', { role: roleSingular(active) })
                 : t('☆ Seguir como {role}', { role: roleSingular(active) })}
             </button>
-            <Link to={`/biblioteca?personId=${person.id}&personRole=${active}&personName=${encodeURIComponent(person.name)}`} className="btn-ghost">
-              {t('Ver en tu biblioteca')}
-            </Link>
-            {botonCorregir}
+            {/* sin fila local no hay nada suyo en tu Plex que enseñar, y el
+                corrector de emparejado tampoco tiene qué corregir */}
+            {enBiblioteca && (
+              <Link to={`/biblioteca?personId=${person.id}&personRole=${active}&personName=${encodeURIComponent(person.name)}`} className="btn-ghost">
+                {t('Ver en tu biblioteca')}
+              </Link>
+            )}
+            {enBiblioteca && botonCorregir}
           </div>
           {person.birthday && (
             <div className="text-sm text-zinc-500 mt-1">

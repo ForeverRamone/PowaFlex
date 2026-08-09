@@ -652,6 +652,39 @@ export function JustWatchCheck({ tmdbId, result = null }) {
 }
 
 /**
+ * La referencia de una persona para la URL de su ficha, con lo que haya:
+ * el id local si está en tu biblioteca, el de TMDB si lo conocemos, y si no
+ * el nombre a secas, que es todo lo que dan las tablas de Wikipedia.
+ *
+ * Del `nombre:` se encarga el servidor AL ABRIR la ficha, no al pintar la
+ * lista: enlazar los doscientos nombres de un canon no cuesta ni una petición
+ * hasta que se pulsa uno.
+ */
+export const refPersona = ({ personId = null, tmdbId = null, nombre = '' }) =>
+  personId ? String(personId) : tmdbId ? `tmdb:${tmdbId}` : `nombre:${encodeURIComponent(nombre)}`;
+
+/**
+ * EL NOMBRE DE CUALQUIER PERSONA, SIEMPRE CLICABLE.
+ *
+ * Da igual que esté en tus favoritos, en tu biblioteca o en ninguna parte: el
+ * nombre de quien dirige una película de Cannes lleva a su ficha igual que el
+ * de quien tienes fichado, con su filmografía y su botón de seguir.
+ */
+export function EnlacePersona({ nombre, personId = null, tmdbId = null, role = 'director', className = '', children = null }) {
+  if (!nombre && !personId && !tmdbId) return null;
+  return (
+    <Link
+      to={`/personas/${refPersona({ personId, tmdbId, nombre })}?role=${role}`}
+      className={`hover:text-gold-400 hover:underline transition-colors ${className}`}
+      title={t('Ver la ficha de {nombre}', { nombre })}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children ?? nombre}
+    </Link>
+  );
+}
+
+/**
  * `follow` (opcional) pinta la estrella de seguir dentro de la tarjeta:
  * { state: 'here' | 'elsewhere' | 'no', title, onToggle }. El clic en la
  * estrella NO navega (preventDefault): la tarjeta entera sigue siendo el

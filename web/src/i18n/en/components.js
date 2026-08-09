@@ -1,5 +1,8 @@
 // EN dictionary for src/components.jsx — keys are the exact Spanish source strings.
 export default {
+  // el nombre de cualquier persona lleva a su ficha, esté fichada o no
+  'Ver la ficha de {nombre}': 'Open {nombre}’s page',
+  '⭐ {nombre} en favoritos': '⭐ {nombre} added to favorites',
   // StatusLegend / WatchedStar
   'En Plex': 'In Plex',
   'Te falta': 'Missing',

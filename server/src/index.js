@@ -14,6 +14,8 @@ import { plexTest, plexConfig, runSync, syncStatus, movieSections } from './plex
 import {
   tmdbTest,
   filmographyProfile,
+  filmographyProfileByTmdb,
+  personDetails,
   getCalendarCached,
   enrichPeopleLife,
   enrichReleasePhases,
@@ -997,10 +999,60 @@ app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
 
 // --- tmdb-powered ------------------------------------------------------------------
 
+/**
+ * La ficha de una persona. El `:id` admite TRES formas, y esa es la gracia:
+ *
+ *  - `123`            — alguien de tu biblioteca o de tus favoritos.
+ *  - `tmdb:456`       — cualquiera de TMDB, la tengas o no.
+ *  - `nombre:Fulano`  — solo un nombre, que es todo lo que dan las tablas de
+ *                       Wikipedia y los cánones.
+ *
+ * Con las dos últimas, el nombre de un director deja de ser texto muerto en
+ * cualquier pantalla: se resuelve AL PULSAR, no al pintar la lista, así que
+ * enlazar doscientos nombres no cuesta ni una petición hasta que se usa uno.
+ */
 app.get('/api/people/:id/filmography', async (req, reply) => {
   try {
     const wantRole = asRole(req.query.role);
-    return await filmographyProfile(Number(req.params.id), wantRole);
+    const ref = String(req.params.id || '');
+    if (/^tmdb:/i.test(ref)) return await filmographyProfileByTmdb(ref.slice(5), wantRole);
+    if (/^nombre:/i.test(ref)) {
+      const nombre = decodeURIComponent(ref.slice(7)).trim();
+      if (!nombre) {
+        reply.code(400);
+        return { error: 'Falta el nombre' };
+      }
+      // el emparejado VERIFICADO, no la búsqueda por popularidad: si no, al
+      // pulsar «Steve McQueen» saldría la ficha del actor de Bullitt
+      const info = await resolveCatalogDirector(fichaDeCatalogo(nombre));
+      if (!info?.id) return { person: { id: null, name: nombre, tmdb_id: null }, matched: false, roles: {} };
+      return await filmographyProfileByTmdb(info.id, wantRole);
+    }
+    return await filmographyProfile(Number(ref), wantRole);
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+/**
+ * Seguir a alguien que aún no está en tu biblioteca, desde su propia ficha.
+ * Va por id de TMDB porque es lo único que tiene quien llegó ahí por su nombre.
+ */
+app.post('/api/people/by-tmdb/:tmdbId/follow', async (req, reply) => {
+  const tmdbId = Number(req.params.tmdbId);
+  const role = asRole(req.body?.role, 'director');
+  if (!tmdbId) {
+    reply.code(400);
+    return { error: 'Falta el id de TMDB' };
+  }
+  try {
+    const det = await personDetails(tmdbId);
+    const r = trackByTmdb({ tmdbId, name: det?.name || '', profilePath: det?.profile_path || null, role });
+    // añadirlo a mano levanta el veto de la ✕, como en el resto de altas
+    if (r.personId) db.prepare('DELETE FROM unfollowed_people WHERE person_id = ?').run(r.personId);
+    invalidateFavoritesCaches();
+    return { ok: true, personId: r.personId || null };
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };

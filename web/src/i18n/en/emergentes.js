@@ -62,6 +62,8 @@ export default {
 
   // secciones de debut, con los mismos nombres que la página de Festivales
   'Secciones de debut': 'Debut sections',
+  'Cannes · Un Certain Regard': 'Cannes · Un Certain Regard',
+  'Sundance · Competición de EE UU': 'Sundance · U.S. Competition',
   'Cannes · Semana de la Crítica': 'Cannes · Critics’ Week',
   'Cannes · Quincena': 'Cannes · Directors’ Fortnight',
   'Venecia · Orizzonti': 'Venice · Orizzonti',

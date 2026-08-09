@@ -17,7 +17,10 @@ import { db, cacheRead, cacheWrite } from './db.js';
 import { mapPool } from './pool.js';
 import { cachePrefix } from './cache-versions.js';
 import { foldName, normName } from './names.js';
-import { searchMovieCandidates, movieDirectors, movieSummary, findPersonInfo, latinizeNames } from './tmdb.js';
+import {
+  searchMovieCandidates, movieDirectors, movieSummary, findPersonInfo, latinizeNames,
+  personCredits, englishTitle, searchPersonCandidates,
+} from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { watchedIndex, isWatched } from './letterboxd.js';
 import { SIGHT_AND_SOUND_2022 } from './data/sight-and-sound-2022.js';
@@ -77,6 +80,20 @@ export const REGISTRY = {
     awardPage: 'List of Sundance Film Festival award winners',
     awardParse: 'sundanceList',
   },
+  // El OTRO premio gordo de Sundance. La entrada `sundance` sigue el World
+  // Cinema Dramatic porque es el que clasifica para el Óscar internacional,
+  // pero la competición estadounidense es igual de grande —es la que ganó CODA
+  // en 2021— y sin ella faltaba media Sundance.
+  sundanceus: {
+    name: 'Sundance · Competición de EE UU',
+    award: 'U.S. Grand Jury Prize: Dramatic',
+    article: (y) => `${y} Sundance Film Festival`,
+    section: /u\.?s\.? dramatic competition/i,
+    sinceYear: 2005,
+    awardPage: 'List of Sundance Film Festival award winners',
+    awardParse: 'sundanceList',
+    sundanceAmbito: 'us',
+  },
   tiff: {
     name: 'Toronto (TIFF)',
     award: 'Platform Prize',
@@ -131,6 +148,19 @@ export const REGISTRY = {
   // existe desde 1962 y la Quinzaine desde 1969, pero sus tablas no están en
   // los artículos viejos, y prometer ediciones que solo saben devolver «no se
   // encontró la sección» es peor que no ofrecerlas.
+  // Un Certain Regard NO es una sección paralela: es la SEGUNDA competición
+  // oficial de Cannes, y es donde más nombres nuevos con recorrido aparecen —
+  // por delante de la Semana de la Crítica y de la Quincena. Va en este grupo
+  // porque para lo que aquí interesa (dónde asoma quien todavía no es nadie)
+  // hace exactamente ese papel, aunque también seleccione a consagrados.
+  uncertainregard: {
+    name: 'Cannes · Un Certain Regard',
+    award: 'Un Certain Regard: la segunda competición oficial de Cannes',
+    group: 'debut',
+    article: (y) => `${y} Cannes Film Festival`,
+    section: /^un certain regard$/i,
+    sinceYear: 2010,
+  },
   semaine: {
     name: 'Cannes · Semana de la Crítica',
     award: 'Semaine de la critique: primeras y segundas películas',
@@ -355,6 +385,31 @@ export function cleanTableTitle(s) {
  * Production country» y varían poco entre festivales; se localiza cada columna
  * por su cabecera en vez de por posición para aguantar los cambios de orden.
  */
+/**
+ * A una fila corta, ¿QUÉ celda le falta? Es la pregunta que rompía el
+ * emparejado, y por número de celdas no tiene respuesta.
+ *
+ * Las tablas de cine de Wikipedia omiten dos columnas indistintamente: el
+ * título original (cuando coincide con el inglés) y el país (cuando lo absorbe
+ * el `rowspan` de la fila de arriba). Las dos dejan la fila con una celda
+ * menos, pero suponer siempre que falta el título original CORRE las columnas
+ * y mete el título original en el campo del director/a — con lo que ninguna
+ * verificación de dirección puede salir bien y la ficha se descarta. Así se
+ * quedaron sin cartel «What Max Said», «Red Desert», «Last Year at Marienbad»
+ * o «The Tree of Wooden Clogs».
+ *
+ * EL DISCRIMINADOR ES LA CURSIVA: en estas tablas los títulos van en <i> y las
+ * personas no. Si lo que cae en la columna del título original viene en
+ * cursiva, es un título y la que falta es otra columna; si no, es el nombre de
+ * quien dirige y hay que recolocar.
+ */
+export function faltaElTituloOriginal(rawCells, headers, idxOrig) {
+  if (idxOrig < 0 || rawCells.length >= headers.length) return false;
+  const enOrig = rawCells[idxOrig];
+  if (enOrig == null) return true; // no llega ni ahí: falta por la izquierda
+  return !/<i[\s>]/i.test(enOrig);
+}
+
 export function parseSelectionTable(html, { all = false } = {}) {
   const acumulado = [];
   const tables = String(html || '').match(/<table[^>]*wikitable[\s\S]*?<\/table>/gi) || [];
@@ -370,7 +425,8 @@ export function parseSelectionTable(html, { all = false } = {}) {
 
     const out = [];
     for (const row of rows.slice(1)) {
-      const cells = (row.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || []).map(stripTags);
+      const rawCells = row.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || [];
+      const cells = rawCells.map(stripTags);
       if (!cells.length) continue;
       // Fila-cabecera DENTRO de la tabla: una sola celda que abarca el ancho
       // («In Competition», «Feature films», «Special Screenings»), que es como
@@ -380,9 +436,10 @@ export function parseSelectionTable(html, { all = false } = {}) {
       if (cells.length < 2) continue;
       // Cuando el título original coincide con el inglés, la fila viene SIN esa
       // celda y todas las columnas posteriores se corren una a la izquierda
-      // (pasaba en Cannes 2025: el país acababa de director/a). Se detecta por
-      // el número de celdas y se recoloca.
-      const sinOriginal = idxOrig >= 0 && cells.length === headers.length - 1;
+      // (pasaba en Cannes 2025: el país acababa de director/a). Pero la que
+      // falta puede ser otra —el país—, así que la decide la cursiva y no el
+      // recuento: ver `faltaElTituloOriginal`.
+      const sinOriginal = faltaElTituloOriginal(rawCells, headers, idxOrig);
       const cell = (i) => {
         if (i < 0) return null;
         const j = sinOriginal && i > idxOrig ? i - 1 : i;
@@ -446,14 +503,22 @@ export function parseWinnersTables(html, { keepAll = false } = {}) {
           /rowspan/i.test(rawCells[0]) ||
           /^(?:19|20)\d{2}\s*[([]/.test(cells[0]) ||
           (/^(?:19|20)\d{2}$/.test(cells[0]) && cells.length === headers.length));
+      // el HTML alineado con las columnas, para poder mirar la cursiva de la
+      // celda que caería en el título original
+      let rawAlineado = rawCells;
       if (esFilaDeAño) {
         lastYear = Number(y0[1]);
         cells = [String(lastYear), ...cells.slice(1)];
       } else {
         cells = [String(lastYear ?? ''), ...cells];
+        rawAlineado = [null, ...rawCells]; // la del año no viene en el HTML
       }
-      // sin celda de título original (coincide con el inglés): recolocar
-      const sinOriginal = idxOrig >= 0 && cells.length === headers.length - 1;
+      // ¿Sin celda de título original, o sin celda de PAÍS? En las tablas de
+      // premio el país va con `rowspan` a menudo, así que la fila corta es lo
+      // normal y suponer que falta el título original corría las columnas: el
+      // director acababa con el título original dentro y la película se quedaba
+      // sin ficha. Lo decide la cursiva.
+      const sinOriginal = faltaElTituloOriginal(rawAlineado, headers, idxOrig);
       const cell = (i) => {
         if (i < 0) return null;
         const j = sinOriginal && i > idxOrig ? i - 1 : i;
@@ -498,7 +563,33 @@ export function parseWinnersTables(html, { keepAll = false } = {}) {
  * ese patrón (las siguientes apariciones de «World Cinema Dramatic» son el
  * premio del público y el de dirección, que además usa «for» en vez de «by»).
  */
-export function parseSundanceWinners(html) {
+/**
+ * Los dos premios gordos de Sundance, que son DOS competiciones distintas: la
+ * internacional (World Cinema Dramatic, la que clasifica para el Óscar) y la
+ * estadounidense (U.S. Dramatic), que es la que ganó CODA en 2021 y que faltaba
+ * entera. Cada una tiene su entrada en el REGISTRY.
+ */
+const PREMIOS_SUNDANCE = {
+  world: {
+    // la etiqueta ha cambiado tres veces: «World Cinema Jury Prize Dramatic»
+    // (2005-2012), «World Cinema Grand Jury Prize: Dramatic [Competition]»
+    // (2013-2022) y «World Cinema Dramatic» a secas
+    explicito: (l) => /world cinema/.test(l) && /dramatic/.test(l) && /jury prize/.test(l),
+    corto: (l) => /^world cinema dramatic$/.test(l),
+  },
+  us: {
+    // «U.S. Grand Jury Prize: Dramatic Competition», «US Dramatic Grand Jury
+    // Prize», «U.S. Dramatic Grand Jury Prize Award»… con y sin puntos
+    // antes de ~2010 no llevaba el «U.S.» delante: era «Grand Jury Prize:
+    // Dramatic» a secas, y el «World Cinema» es lo que distingue a la otra
+    explicito: (l) =>
+      /dramatic/.test(l) && /(grand )?jury prize/.test(l) && !/world/.test(l) &&
+      (/^u\.?s\.?\b/.test(l) || /^grand jury prize/.test(l)),
+    corto: (l) => /^u\.?s\.? dramatic$/.test(l),
+  },
+};
+
+export function parseSundanceWinners(html, { ambito = 'world' } = {}) {
   const out = [];
   const src = String(html || '');
   const headings = [...src.matchAll(/<h[23][^>]*>[\s\S]*?<\/h[23]>/gi)];
@@ -508,12 +599,11 @@ export function parseSundanceWinners(html) {
   // La forma explícita manda (el premio del público a veces se lista ANTES);
   // la corta solo vale como respaldo, fiándose de que el bloque del jurado va
   // primero. Fuera dirección/guion/montaje y documentales.
-  const esGranPremio = (label) =>
-    /world cinema/.test(label) &&
-    /dramatic/.test(label) &&
-    !/documentary|directing|special|cinematography|editing|screenwriting|audience/.test(label) &&
-    /jury prize/.test(label);
-  const esFormaCorta = (label) => /^world cinema dramatic$/.test(label);
+  const premio = PREMIOS_SUNDANCE[ambito] || PREMIOS_SUNDANCE.world;
+  const otroPremio = (label) =>
+    /documentary|directing|special|cinematography|editing|screenwriting|audience|acting|ensemble|innovat/.test(label);
+  const esGranPremio = (label) => premio.explicito(label) && !otroPremio(label);
+  const esFormaCorta = (label) => premio.corto(label) && !otroPremio(label);
 
   for (let h = 0; h < headings.length; h++) {
     const year = Number((stripTags(headings[h][0]).match(/^((?:19|20)\d{2})/) || [])[1]);
@@ -525,19 +615,35 @@ export function parseSundanceWinners(html) {
     let ganadora = null;
     for (const li of chunk.match(/<li[\s\S]*?<\/li>/gi) || []) {
       const texto = stripTags(li);
-      const m = /^(.+?)\s*[–—-]\s*(.+)$/.exec(texto);
+      // El separador entre el premio y la película NO es siempre un guion: en
+      // 2018, 2019 y 2020 la lista usa DOS PUNTOS, y esos tres años se caían
+      // enteros sin hacer ruido —ni siquiera aparecían como «sin emparejar»—.
+      // El guion manda cuando existe, porque la etiqueta de 2021 ya lleva dos
+      // puntos dentro («U.S. Grand Jury Prize: Dramatic Competition – CODA»).
+      const m = /^(.+?)\s*[–—-]\s*(.+)$/.exec(texto) || /^([^:]+):\s*(.+)$/.exec(texto);
       if (!m) continue;
       const label = m[1].trim().toLowerCase();
       if (!esGranPremio(label) && !esFormaCorta(label)) continue;
       // el crédito de dirección ha ido variando: «Título by Director»,
       // «Título (Director)» o, en los primeros años, solo el título
-      const resto = m[2].trim();
+      const resto = m[2].trim().replace(/,\s*$/, '');
       let title = resto;
       let director = null;
-      const porBy = /^(.+?)\s+by\s+(.+)$/.exec(resto);
+      // «Título, directed by Fulano» · «Título by Fulano» · «Título (Fulano)»
+      const porBy = /^(.+?),?\s+(?:directed\s+)?by\s+(.+)$/.exec(resto);
       const porParens = /^(.+?)\s*\(([^)]+)\)$/.exec(resto);
       if (porBy) [, title, director] = porBy;
-      else if (porParens && /[a-z]\s+[a-z]/i.test(porParens[2])) [, title, director] = porParens;
+      else if (porParens && /[a-z]\s+[a-z]/i.test(porParens[2]) && !/^(the |a |an )/i.test(porParens[2])) {
+        // OJO: el paréntesis puede traer el TÍTULO ORIGINAL en vez del
+        // director/a («Violeta Went to Heaven (Violeta se Fue a Los Cielos)»),
+        // y así se colaba un título en el campo de la dirección. Si lo de
+        // dentro no parece un nombre de persona —dos o tres palabras, sin
+        // artículos ni preposiciones sueltas— se deja como parte del título.
+        const dentro = porParens[2].trim();
+        const palabras = dentro.split(/\s+/);
+        const pareceNombre = palabras.length <= 4 && !/\b(de|del|la|el|los|las|se|a|of|the)\b/i.test(dentro);
+        if (pareceNombre) [, title, director] = porParens;
+      }
       const fila = { year, title: title.trim(), original_title: title.trim(), director: director?.trim() || null, country: null };
       if (esGranPremio(label)) {
         ganadora = fila;
@@ -748,6 +854,13 @@ export function directorsMatch(wikiDirector, tmdbDirectors) {
       // respaldo pegado: cubre grafías fusionadas en cualquiera de los lados
       const nw = normName(w);
       const nt = normName(t);
+      // AGUJERO QUE ESTUVO ABIERTO: `normName` borra todo lo que no sea a-z0-9,
+      // así que un nombre en japonés, cirílico, árabe o griego se normaliza a
+      // cadena VACÍA — y `nw.includes('')` es siempre cierto. Con eso, un
+      // director acreditado en su alfabeto casaba con CUALQUIER nombre de
+      // Wikipedia y podía colar la ficha de otra película. Sin letras que
+      // comparar no hay verificación: se dice que no, no que sí.
+      if (!nw || !nt) return false;
       return nt === nw || nt.includes(nw) || nw.includes(nt);
     })
   );
@@ -792,7 +905,7 @@ export function festivalOverrideKey(title, year, director) {
  *
  * `dirsDe` devuelve los directores de un candidato, o null si la red falló.
  */
-export async function elegirCandidato(row, year, candidatos, inLib, dirsDe) {
+export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, tituloEnDe = null) {
   // el estreno puede bailar un año respecto al festival; sin fecha aún
   // (película recién anunciada) también vale como candidata.
   // Si el año de la fila viniera roto, filtrar por ventana descartaría a TODOS
@@ -843,9 +956,28 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe) {
   // contrario, aquí se EXIGEN las dos pruebas a la vez —título clavado Y
   // dirección verificada—, que es más de lo que se pide dentro de la ventana.
   // Con las dos, el año deja de aportar nada.
+  //
+  // El título clavado puede estar en el INTERNACIONAL y no en los dos que trae
+  // la búsqueda: «West of the Tracks» es «铁西区» tanto de título como de título
+  // original en TMDB, y su nombre inglés solo aparece en la traducción. Por eso
+  // `tituloEnDe` —cuando quien llama lo da— se consulta solo de los candidatos
+  // que no clavan por los otros dos, y solo en esta segunda vuelta.
   if (!tmdbId && !fallosRed && row.director) {
     const dentro = new Set(enVentana.map((c) => c.id));
-    for (const c of candidatos.filter((x) => !dentro.has(x.id) && tituloClavado(x))) {
+    const fuera = candidatos.filter((x) => !dentro.has(x.id));
+    const porTitulo = fuera.filter(tituloClavado);
+    const porRevisar = [...porTitulo, ...fuera.filter((x) => !porTitulo.includes(x))];
+    for (const c of porRevisar) {
+      let clavaAqui = tituloClavado(c);
+      if (!clavaAqui && tituloEnDe) {
+        const en = normName(await tituloEnDe(c.id));
+        // El título internacional puede llevar delante el original transcrito:
+        // «Tie Xi Qu: West of the Tracks». Se acepta que lo CONTENGA, pero solo
+        // en títulos largos — dejar que «M» o «Vertigo» casen por estar dentro
+        // de otro título sería colar cualquier cosa.
+        clavaAqui = en === wanted || (wanted.length >= 8 && en.includes(wanted));
+      }
+      if (!clavaAqui) continue;
       const dirs = await dirsDe(c.id);
       if (dirs === null) {
         fallosRed = true;
@@ -865,6 +997,74 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe) {
     if (c) tmdbId = c.id;
   }
   return { tmdbId, fallosRed };
+}
+
+/**
+ * ÚLTIMO RECURSO: buscar la película DENTRO DE LA FILMOGRAFÍA DE SU DIRECTOR.
+ *
+ * Idea de Ramón, y resuelve los dos casos que la búsqueda por título no puede:
+ *
+ *  - **«West of the Tracks»**: TMDB tiene la película, pero acredita a su
+ *    director como «王兵» y no como «Wang Bing», así que la verificación por
+ *    nombre no tenía con qué comparar y la descartaba. Llegando por su
+ *    filmografía, la dirección está demostrada por construcción: no hay ningún
+ *    nombre que comparar.
+ *  - **«The Intruder»**: hay una docena de películas que se llaman así y
+ *    «L'Intrus» de Claire Denis no está entre las que devuelve el buscador.
+ *    Su filmografía sí la tiene.
+ *
+ * Solo se llama cuando el emparejado por título ya ha fracasado, así que su
+ * coste —una búsqueda de persona y una filmografía, ambas cacheadas— lo paga
+ * únicamente lo que de otro modo se quedaría sin ficha.
+ */
+export async function peliculaPorDirector({ title, year, director }, { personasPosibles, creditosDe, tituloIngles }) {
+  if (!director || !Number.isFinite(year)) return null;
+  const buscado = normName(title);
+  const nombres = splitDirectors(director);
+  // Se prueban VARIAS personas por nombre, no solo la más popular: hay cuatro
+  // «Wang Bing» en TMDB y el de «West of the Tracks» no es el más conocido.
+  // Aquí el título desambigua a la persona y la persona desambigua la
+  // película, que es más fuerte que cualquiera de las dos por separado.
+  const personas = [];
+  for (const nombre of nombres) personas.push(...(await personasPosibles(nombre)));
+  for (const persona of personas) {
+    let credits = null;
+    try {
+      credits = await creditosDe(persona.id);
+    } catch {
+      continue; // un fallo con una persona no puede tumbar la fila entera
+    }
+    const dirigidas = (credits?.crew || []).filter((c) => c.job === 'Director' && !c.video && c.release_date);
+    if (!dirigidas.length) continue;
+    const distancia = (c) => Math.abs(Number(String(c.release_date).slice(0, 4)) - year);
+
+    // 1) El título, en TODA su filmografía y SIN ventana de año. Aquí la
+    //    dirección ya está demostrada por construcción —estamos dentro de su
+    //    filmografía—, así que el año deja de ser necesario: «West of the
+    //    Tracks» es 2002 para el BFI y 2004 para TMDB, dos años de diferencia
+    //    que dejaban fuera a la única película que podía ser.
+    const porTitulo = dirigidas.filter(
+      (c) => normName(c.title) === buscado || normName(c.original_title) === buscado
+    );
+    if (porTitulo.length) return porTitulo.sort((a, b) => distancia(a) - distancia(b))[0].id;
+
+    // 2) El título internacional en inglés, que es como está escrito el canon.
+    //    Se pide solo de las suyas más cercanas en el tiempo: pedirlo de la
+    //    filmografía entera de alguien prolífico son decenas de llamadas.
+    const cercanas = dirigidas.filter((c) => distancia(c) <= 4).sort((a, b) => distancia(a) - distancia(b)).slice(0, 12);
+    for (const c of cercanas) {
+      const en = await tituloIngles(c.id);
+      if (en && (normName(en) === buscado || normName(en).includes(buscado))) return c.id;
+    }
+
+    // Y NO hay regla 3. La tentación era aceptar «la única película suya de ese
+    // año», y es exactamente como «Twin Peaks: The Return» —que es una SERIE y
+    // no tiene ficha de película— acabó emparejada con «Trial», otro trabajo de
+    // Lynch. Que alguien dirigiera una sola cosa ese año no dice nada sobre el
+    // título que buscamos: sigue mandando «mejor sin ficha que la ficha de
+    // otra», que es la regla que costó tres versiones aprender.
+  }
+  return null;
 }
 
 async function resolveFilms(rows, yearOf) {
@@ -943,9 +1143,22 @@ async function resolveFilms(rows, yearOf) {
           if (!vistos.has(c.id)) cands.push(c);
         }
       }
-      const { tmdbId, fallosRed } = await elegirCandidato(r, y, cands, inLib, (id) =>
-        movieDirectors(id).catch(() => null)
+      let { tmdbId, fallosRed } = await elegirCandidato(
+        r, y, cands, inLib,
+        (id) => movieDirectors(id).catch(() => null),
+        (id) => englishTitle(id).catch(() => null)
       );
+      // por título no ha salido: se prueba por la filmografía de su director
+      if (!tmdbId && !fallosRed && r.director) {
+        tmdbId = await peliculaPorDirector(
+          { title: r.title, year: y, director: r.director },
+          {
+            personasPosibles: (n) => searchPersonCandidates(n),
+            creditosDe: (id) => personCredits(id),
+            tituloIngles: (id) => englishTitle(id),
+          }
+        );
+      }
       // el emparejado limpio se guarda por película: los reintentos tras un
       // corte de red solo tocan lo que falló
       if (tmdbId && !fallosRed) cacheWrite(matchKey, { id: tmdbId });
@@ -1042,6 +1255,25 @@ async function buildEdition(key, f, year) {
 
   // resolver cada título contra TMDB, verificando la dirección
   const { films, errors } = await resolveFilms(rows, () => year);
+
+  // LA GANADORA, marcada y la primera. Es lo primero que se busca al abrir una
+  // edición, y hasta ahora había que irse al palmarés a mirarla. Sale de las
+  // filas del premio, que ya están cacheadas; las secciones sin palmarés
+  // (Busan, Horizontes, las de debut) simplemente no marcan ninguna.
+  try {
+    const delAño = (await winnersRowsLight(key)).filter((w) => Math.abs(Number(w.year) - year) <= 1);
+    for (const f of films) {
+      const t = normName(f.title);
+      const o = normName(f.original_title || '');
+      if (delAño.some((w) => (t && normName(w.title) === t) || (o && normName(w.original_title || '') === o))) {
+        f.winner = true;
+      }
+    }
+    // estable: solo sube la ganadora, el resto conserva el orden de la tabla
+    films.sort((a, b) => (b.winner ? 1 : 0) - (a.winner ? 1 : 0));
+  } catch {
+    // sin palmarés utilizable la edición se sirve igual, sin marcar a nadie
+  }
 
   return {
     festival: key,
@@ -1269,6 +1501,7 @@ export async function festivalWinners(key, { refresh = false } = {}) {
       // dataset fijo empaquetado con la app (Sight & Sound se renueva en 2032)
       rows = f.staticList.map((r) => ({
         year: r.year, title: r.title, original_title: r.title, director: r.director, country: null, rank: r.rank,
+        tv: !!r.tv, // una serie no tiene ficha de película: la interfaz lo dice
       }));
       source = 'https://www.bfi.org.uk/sight-and-sound/greatest-films-all-time';
       note = `La lista extendida de la encuesta de la crítica (${rows.length} películas, empates incluidos), ordenada por puesto. Se renueva cada década: la próxima, en 2032.`;
@@ -1283,7 +1516,7 @@ export async function festivalWinners(key, { refresh = false } = {}) {
     } else if (f.awardParse === 'sundanceList') {
       // la lista de Sundance va por años con viñetas: página entera de una vez
       const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
-      rows = parseSundanceWinners(parsed.text).filter((r) => r.year >= f.sinceYear);
+      rows = parseSundanceWinners(parsed.text, { ambito: f.sundanceAmbito || 'world' }).filter((r) => r.year >= f.sinceYear);
     } else {
       rows = await getAwardRows(f);
     }
@@ -1350,7 +1583,7 @@ export async function winnersRowsLight(key) {
   if (f.awardParse === 'cahiers') return (await getCahiersRows(f)).filter((r) => r.rank === 1);
   if (f.awardParse === 'sundanceList') {
     const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
-    return parseSundanceWinners(parsed.text);
+    return parseSundanceWinners(parsed.text, { ambito: f.sundanceAmbito || 'world' });
   }
   return getAwardRows(f);
 }

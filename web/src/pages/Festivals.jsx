@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, Empty, StatusLegend, PageHeader, useRadarrIds,
-  MatchCorrector, MinScoreBar, passesScore,
+  MatchCorrector, MinScoreBar, passesScore, EnlacePersona,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
@@ -363,20 +363,32 @@ export default function Festivals() {
                         #{f.rank}
                       </span>
                     )}
+                    {/* no todo lo que está en un canon es cine: Sight & Sound
+                        metió «Twin Peaks: The Return» en 2022 y es una serie.
+                        Decirlo evita que su hueco parezca un emparejado roto. */}
+                    {f.tv && (
+                      <span className="badge-quiet text-zinc-500 mt-1" title={t('Es una serie de televisión: no tiene ficha de película en TMDB')}>
+                        {t('serie de televisión')}
+                      </span>
+                    )}
                     {f.director && (
                       /* una estrella POR persona: una película con dos
                          directores tiene dos perfiles que seguir por separado */
                       <div className="flex flex-col items-start">
                         {splitDirectors(f.director).map((d) => (
-                          <button
-                            key={d}
-                            onClick={() => followDirector(d)}
-                            disabled={dirBusy === d || followedDirs.has(d)}
-                            className="mt-1 text-[11px] text-zinc-400 hover:text-gold-400 text-left leading-tight cursor-pointer disabled:cursor-default"
-                            title={followedDirs.has(d) ? t('Ya en favoritos') : t('Seguir a {name} como director/a', { name: d })}
-                          >
-                            {followedDirs.has(d) ? '⭐' : dirBusy === d ? '…' : '☆'} {d}
-                          </button>
+                          /* la estrella sigue siendo el botón de seguir; el
+                             NOMBRE lleva a su ficha, la tengas fichada o no */
+                          <span key={d} className="mt-1 text-[11px] leading-tight flex items-baseline gap-1">
+                            <button
+                              onClick={() => followDirector(d)}
+                              disabled={dirBusy === d || followedDirs.has(d)}
+                              className="text-zinc-400 hover:text-gold-400 cursor-pointer disabled:cursor-default shrink-0"
+                              title={followedDirs.has(d) ? t('Ya en favoritos') : t('Seguir a {name} como director/a', { name: d })}
+                            >
+                              {followedDirs.has(d) ? '⭐' : dirBusy === d ? '…' : '☆'}
+                            </button>
+                            <EnlacePersona nombre={d} className="text-zinc-400 text-left" />
+                          </span>
                         ))}
                       </div>
                     )}

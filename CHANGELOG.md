@@ -1,5 +1,46 @@
 # Changelog
 
+## Beta 1.10 (1.0.10-beta) — 2026-08-09
+
+**La auditoría de cuatro agentes sobre el emparejado, y los nombres clicables.**
+
+Cuatro agentes recorrieron TODAS las secciones de Festivales y premios contra TMDB real —1.240 fichas entre competiciones, secciones de debut, premios y cánones—. Encontraron un fallo de parseo que llevaba ahí desde el principio y un agujero de verificación. Todos los hallazgos se comprobaron a mano antes de tocar nada.
+
+### El fallo que dejaba fichas sin cartel
+
+Cuando a una fila de Wikipedia le falta una celda, el parser suponía SIEMPRE que la que faltaba era el título original, y corría las columnas. Pero muy a menudo la que falta es el **país**, absorbido por el `rowspan` de la fila de arriba. Resultado: el campo del director acababa conteniendo el título original —`director: "Las palabras de Max"`— y, como el emparejado exige verificar la dirección, la película se descartaba. Invisible salvo por la ficha ausente.
+
+Por número de celdas los dos casos no se distinguen. **Lo decide la cursiva**: en estas tablas los títulos van en `<i>` y las personas no. Con eso quedan a cero los directores corruptos en los cuatro palmareses grandes, y aparecen filas que antes se caían enteras (Berlinale 85 → 88, Cannes 100 → 103). Afectaba a *What Max Said*, *Red Desert*, *Last Year at Marienbad*, *The Tree of Wooden Clogs*, *The Railroad Man* y una docena más.
+
+### Un agujero de verificación
+
+`normName` borra todo lo que no sea `a-z0-9`, así que un nombre en japonés, cirílico, árabe o griego se normalizaba a **cadena vacía** — y «contiene la cadena vacía» es siempre cierto. Cualquier película acreditada a alguien en su alfabeto **casaba con cualquier fila de Wikipedia** y podía colar la ficha de otra. Sin letras que comparar no hay verificación: ahora se dice que no.
+
+### El emparejado, cerrado: 263 de 264 en el canon
+
+Comprobado contra TMDB real por el endpoint, no simulado. Cuatro causas distintas, todas arregladas:
+
+- **El corte de candidatos tiraba el año.** Se pedía «The Leopard» con año 1962 y luego se cortaba la lista a diez **por popularidad**, así que *Il gattopardo* se caía por el corte y nadie llegaba a comprobar su dirección. Ahora se ordena por año y título antes de cortar, y se prueban los años vecinos (el BFI fecha por producción y TMDB por estreno comercial).
+- **El nombre de quien dirige.** «Charles Chaplin» contra «Charlie Chaplin» tiraba todas las de Chaplin. También «The Wachowskis», «Larissa/Larisa» y «Forough/Forugh». Y TMDB acredita a Wang Bing como **王兵**: ahora se transcribe con el mismo mecanismo que ya usaba la app para los títulos.
+- **Buscar dentro de la filmografía del director**, cuando por título no sale. Así aparecen *L'Intrus* (entre doce «The Intruder») y *Tie Xi Qu*. Se prueban VARIAS personas por nombre: hay cuatro «Wang Bing» en TMDB y el bueno no es el más popular.
+- **Lo que NO se acepta:** «la única película suya de ese año». Con esa regla *Twin Peaks: The Return* —que es una serie— se emparejó con *Trial*, otro trabajo de Lynch. Fuera: sigue mandando «mejor sin ficha que la ficha de otra». Las series del canon ahora se marcan como tales en vez de dejar un hueco que parece avería.
+
+### Secciones nuevas
+
+- **Cannes · Un Certain Regard**: la segunda competición oficial, y donde más nombres nuevos con recorrido aparecen. Comprobada contra Wikipedia de 2010 a 2026.
+- **Sundance · Competición de EE UU**: faltaba medio Sundance. La entrada anterior seguía solo el World Cinema Dramatic —el que clasifica para el Óscar—, así que el premio que ganó CODA no estaba en ninguna parte. 42 ganadoras de 1984 a 2026.
+- De paso, dos fallos del parser de Sundance: **2018, 2019 y 2020 se perdían enteros** (esos años la lista usa dos puntos en vez de guion y las filas se caían en silencio, sin contar siquiera como «sin emparejar»), y el paréntesis del título original se leía como director. El palmarés internacional pasa de 19 a 22 ganadoras.
+
+### La ganadora, marcada y la primera
+
+Al abrir una edición de un festival, su ganadora sale arriba del todo con su 🏆, como ya pasaba con las nominadas de los premios. Antes había que irse al palmarés histórico a mirar quién ganó ese año. Sale de las filas del premio, que ya están cacheadas; las secciones sin palmarés propio —Busan, Horizontes, las de debut— no marcan a nadie.
+
+### El nombre de cualquier director, clicable
+
+Da igual que esté en tus favoritos, en tu biblioteca o en ninguna parte: el nombre de quien dirige una película de Cannes lleva a su ficha, con su filmografía y su botón de seguir. La ruta admite el id local, el de TMDB o **solo el nombre**, que es todo lo que dan las tablas de Wikipedia, y se resuelve AL PULSAR: enlazar los doscientos nombres de un canon no cuesta ni una petición hasta que se usa uno.
+
+Tests 230 → 234.
+
 ## Beta 1.09 (1.0.9-beta) — 2026-08-09
 
 **El logotipo entero, y la razón de fondo por la que faltaban carteles.**

@@ -1089,7 +1089,9 @@ export const SIGHT_AND_SOUND_2022 = [
     "tied": true,
     "title": "Twin Peaks: The Return",
     "year": 2017,
-    "director": "David Lynch"
+    "director": "David Lynch",
+    "_comentario": "Serie de televisión. TMDB no la tiene como película y nunca va a tener ficha aquí, así que se marca para poder DECIRLO en la interfaz en vez de dejar un hueco que parece una avería del emparejado.",
+    "tv": true
   },
   {
     "rank": 152,

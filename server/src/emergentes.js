@@ -67,11 +67,13 @@ export const PESO_FESTIVAL = {
   cannes: 40,
   venecia: 38,
   berlinale: 34,
+  uncertainregard: 34, // la segunda competición oficial de Cannes
   semaine: 32,
   quinzaine: 30,
   sansebastian: 28,
   orizzonti: 28,
   sundance: 26,
+  sundanceus: 26, // la competición estadounidense, la que ganó CODA
   tiff: 26,
   perspectives: 26,
   busan: 20,
