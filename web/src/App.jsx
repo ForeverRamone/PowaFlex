@@ -1,8 +1,8 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy,
-  Eye, Wrench, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award, Ticket,
+  Eye, Wrench, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award, Ticket, Sparkles,
 } from 'lucide-react';
 import { Spinner, Toaster, GlobalSearch, ErrorBoundary } from './components.jsx';
 import { api, applyTheme } from './api.js';
@@ -26,6 +26,7 @@ const Festivals = lazy(() => import('./pages/Festivals.jsx'));
 const Estrenos = lazy(() => import('./pages/Estrenos.jsx'));
 const About = lazy(() => import('./pages/About.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
+const Novedades = lazy(() => import('./pages/Novedades.jsx'));
 
 // grouped so the eye finds things: what you have, what you hunt, everything else
 // t() en tiempo de módulo vale: el idioma queda fijado antes del primer render
@@ -56,6 +57,7 @@ const NAV_GROUPS = [
     label: t('Cuenta'),
     items: [
       { to: '/ajustes', label: t('Ajustes'), Icon: SettingsIcon },
+      { to: '/novedades', label: t('Últimas novedades'), Icon: Sparkles },
       { to: '/acerca', label: t('¿Qué es PowaFlex?'), Icon: HelpCircle },
     ],
   },
@@ -195,11 +197,9 @@ function Shell() {
         )}
       </aside>
       {version && (
-        <a
-          href={`${version.repo}/releases`}
-          target="_blank"
-          rel="noreferrer"
-          title={t('PowaFlex {v} — ver novedades en GitHub', { v: version.version })}
+        <Link
+          to="/novedades"
+          title={t('PowaFlex {v} — ver qué trae esta versión', { v: version.version })}
           /* sobre el papel de «Cartelera» un texto suelto en zinc-600 no se
              leía: va sellado en su propia tarjeta, como el resto de la app.
              En móvil se oculta: flotando sobre una columna tapaba contenido. */
@@ -207,7 +207,7 @@ function Shell() {
                      text-zinc-400 hover:text-gold-400 transition-colors hidden md:block"
         >
           {version.label}
-        </a>
+        </Link>
       )}
       <main className="flex-1 p-4 pt-20 md:p-6 max-w-[1600px] min-w-0">
         <Suspense fallback={<Spinner />}>
@@ -229,13 +229,14 @@ function Shell() {
           <Route path="/taller" element={<Taller />} />
           <Route path="/acerca" element={<About />} />
           <Route path="/ajustes" element={<Settings />} />
+          <Route path="/novedades" element={<Novedades />} />
           {/* rutas de antes de la reorganización: los marcadores viejos siguen
               llegando a su contenido, ahora pestañas de otras páginas */}
           <Route path="/colecciones" element={<Navigate to="/descubrir?tab=sagas" replace />} />
           <Route path="/calidad" element={<Navigate to="/taller?tab=calidad" replace />} />
           <Route path="/salud" element={<Navigate to="/taller?tab=datos" replace />} />
           <Route path="/directores" element={<Navigate to="/favoritos?add=activos" replace />} />
-          <Route path="/letterboxd" element={<Navigate to="/ajustes" replace />} />
+          <Route path="/letterboxd" element={<Navigate to="/ajustes?tab=fuentes" replace />} />
         </Routes>
         </ErrorBoundary>
         </Suspense>

@@ -501,6 +501,57 @@ db.exec(`CREATE TABLE IF NOT EXISTS auto_radarr_vetoed (
   at INTEGER
 );`);
 
+// Las REGLAS automáticas a Radarr (1.07). Cada fila es una regla independiente
+// —«el palmarés de Cannes con Σ ≥ 70», «los estrenos en cines de España con
+// Σ ≥ 65 en la quincena de su estreno», «lo que dirijan mis favoritos»— y se
+// activa, se afina y se apaga por separado.
+//
+//  - `kind` + `source` + `scope` identifican QUÉ mira: festival:cannes:palmares,
+//    estrenos:cine-es, favoritos:director. El índice único evita duplicarla.
+//  - `min_score` es el umbral Σ de 0 a 100. CERO significa «sin filtro»: entra
+//    todo, tenga nota o no. Con umbral, lo que aún no tiene nota ESPERA a la
+//    siguiente pasada en vez de irse a ciegas — salvo que `allow_unrated` diga
+//    lo contrario.
+//  - `cap` es el tope por pasada (0 = sin tope). Un palmarés entero son cientos
+//    de películas: sin tope, la primera noche te vacía el disco.
+db.exec(`CREATE TABLE IF NOT EXISTS radarr_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  source TEXT NOT NULL,
+  scope TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  min_score INTEGER NOT NULL DEFAULT 0,
+  allow_unrated INTEGER NOT NULL DEFAULT 0,
+  cap INTEGER NOT NULL DEFAULT 20,
+  window_days INTEGER,
+  editions INTEGER,
+  months INTEGER,
+  lookback_days INTEGER,
+  include_docs INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER,
+  last_run_at INTEGER,
+  last_considered INTEGER,
+  last_added INTEGER,
+  last_error TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_radarr_rules_uniq ON radarr_rules(kind, source, scope);`);
+
+// Qué hizo cada regla y POR QUÉ. Sin esto, «0 añadidas» es indistinguible de
+// una avería: aquí queda escrito si fue el umbral, el veto, el tope o que ya la
+// tenías. Se poda a 30 días en cada pasada.
+db.exec(`CREATE TABLE IF NOT EXISTS radarr_rule_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rule_id INTEGER NOT NULL,
+  at INTEGER NOT NULL,
+  tmdb_id INTEGER,
+  title TEXT,
+  score INTEGER,
+  action TEXT NOT NULL,
+  detail TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_rrl_at ON radarr_rule_log(at);
+CREATE INDEX IF NOT EXISTS idx_rrl_rule ON radarr_rule_log(rule_id, at);`);
+
 // La 1.04 guardó aquí las pistas de audio y subtítulo para auditar subtítulos.
 // La 1.05 retira esa función —Bazarr ya se encarga— y con ella la tabla, que
 // en una biblioteca grande eran más de cien mil filas de dato muerto.
@@ -620,4 +671,47 @@ export function cacheRead(key, maxAgeMs) {
 
 export function cacheWrite(key, value) {
   cacheSet.run(key, JSON.stringify(value), Date.now());
+}
+
+// --- migración: el auto-Radarr de siempre pasa a ser una REGLA ---------------
+//
+// Hasta la 1.06 el pase automático era un único interruptor con sus ajustes
+// sueltos (`auto_radarr_*`) y solo sabía hacer una cosa: los estrenos de tus
+// directores/as favoritos. La 1.07 lo convierte en una regla más de la tabla,
+// para que conviva con las de festivales y estrenos y para que también ella
+// pueda llevar umbral de nota.
+//
+// La migración corre UNA vez y conserva el comportamiento exacto: mismo horizonte,
+// mismo lookback, mismos documentales, SIN umbral (Σ 0 = todo) y SIN tope
+// (cap 0), porque el pase viejo no tenía ninguno de los dos. Si estaba apagado,
+// la regla nace apagada. Los ajustes viejos se dejan en su sitio: son el
+// respaldo si alguien restaura una copia anterior.
+{
+  const yaMigrado = getStmt.get('radarr_rules_migrated');
+  const hayReglas = db.prepare('SELECT COUNT(*) n FROM radarr_rules').get().n;
+  // La bandera sola no basta: en una instalación NUEVA se quemaba en el primer
+  // arranque creando una regla fantasma, y si después restaurabas una copia de
+  // ajustes con el auto-Radarr encendido, esa configuración ya no se migraba
+  // nunca. La condición de verdad es que HAYA algo que migrar.
+  const hayAjustesViejos = db
+    .prepare("SELECT COUNT(*) n FROM settings WHERE key LIKE 'auto\\_radarr\\_%' ESCAPE '\\'")
+    .get().n;
+  if (!yaMigrado && !hayReglas && hayAjustesViejos) {
+    const num = (k, d) => {
+      const v = Number(getStmt.get(k)?.value);
+      return Number.isFinite(v) ? v : d;
+    };
+    db.prepare(
+      `INSERT INTO radarr_rules
+         (kind, source, scope, enabled, min_score, allow_unrated, cap, months, lookback_days, include_docs, created_at)
+       VALUES ('favoritos', 'director', '', ?, 0, 0, 0, ?, ?, ?, ?)`
+    ).run(
+      getStmt.get('auto_radarr_enabled')?.value === '1' ? 1 : 0,
+      num('auto_radarr_months', 6),
+      num('auto_radarr_lookback_days', 0),
+      getStmt.get('auto_radarr_include_docs')?.value === '1' ? 1 : 0,
+      Date.now()
+    );
+    setStmt.run('radarr_rules_migrated', '1');
+  }
 }

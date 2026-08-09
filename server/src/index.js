@@ -76,7 +76,10 @@ import {
   resolveUnmatchedLb,
   letterboxdSummary,
 } from './letterboxd.js';
-import { runAutoRadarr, autoRadarrStatus, autoRadarrConfig } from './automation.js';
+import {
+  runAutoRadarr, runRadarrRules, rulesStatus, rulesOverview, rulesLog,
+  createRule, updateRule, deleteRule, getRule,
+} from './rules.js';
 import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
 import { ROLES } from './roles.js';
 import { importImdbRatings, imdbInfo } from './imdb.js';
@@ -1694,14 +1697,81 @@ app.post('/api/radarr/sync', async (req, reply) => {
   }
 });
 
-// daily auto-add of upcoming films from favorite LIVING directors (#3)
-app.get('/api/radarr/auto', async () => ({ ...autoRadarrConfig(), status: autoRadarrStatus }));
-app.post('/api/radarr/auto/run', async (req) => {
-  const cfg = autoRadarrConfig();
-  const months = Number(req.body?.months) || cfg.months;
-  const lookbackDays = req.body?.lookbackDays != null ? Number(req.body.lookbackDays) || 0 : cfg.lookbackDays;
-  const dryRun = !!req.body?.dryRun;
-  return await runAutoRadarr({ months, lookbackDays, dryRun });
+// --- reglas automáticas a Radarr ---------------------------------------------
+// Festivales, premios, estrenos y favoritos, cada uno con su umbral Σ y su
+// tope. El pase de siempre (los estrenos de tus favoritos) es ahora una regla
+// más: /api/radarr/auto se conserva como atajo a las de ese tipo.
+
+app.get('/api/radarr/rules', async () => ({ ...rulesOverview(), log: rulesLog({ limit: 200 }) }));
+
+app.post('/api/radarr/rules', async (req, reply) => {
+  try {
+    return createRule(req.body || {});
+  } catch (err) {
+    reply.code(400);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.put('/api/radarr/rules/:id', async (req, reply) => {
+  if (!getRule(req.params.id)) {
+    reply.code(404); // 404 y no 400: la regla no existe, no es que el cuerpo esté mal
+    return { error: 'Regla desconocida' };
+  }
+  try {
+    return updateRule(req.params.id, req.body || {});
+  } catch (err) {
+    reply.code(400);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.delete('/api/radarr/rules/:id', async (req, reply) => {
+  if (!getRule(req.params.id)) {
+    reply.code(404);
+    return { error: 'Regla desconocida' };
+  }
+  // borrarla a media pasada dejaba la pasada mandando películas de una regla
+  // que ya no existe, y su historial huérfano
+  if (rulesStatus.running) {
+    reply.code(409);
+    return { error: 'Hay una pasada de reglas en marcha: espera a que termine' };
+  }
+  return deleteRule(req.params.id);
+});
+
+/**
+ * La pasada NO se sirve dentro de la petición: un palmarés entero son minutos
+ * y cualquier proxy inverso corta con un 504 mientras Radarr sigue recibiendo
+ * altas. Se arranca y se devuelve el estado; la interfaz sondea /rules.
+ */
+app.post('/api/radarr/rules/run', async (req, reply) => {
+  if (rulesStatus.running) {
+    reply.code(409);
+    return { error: 'Ya hay una pasada de reglas en marcha' };
+  }
+  const ruleId = req.body?.ruleId != null ? Number(req.body.ruleId) : null;
+  if (ruleId != null && !getRule(ruleId)) {
+    reply.code(404);
+    return { error: 'Regla desconocida' };
+  }
+  runRadarrRules({ dryRun: !!req.body?.dryRun, ruleId }).catch(() => {});
+  return { started: true, status: rulesStatus };
+});
+
+app.get('/api/radarr/rules/log', async (req) =>
+  rulesLog({ ruleId: req.query?.ruleId ?? null, limit: Number(req.query?.limit) || 200 })
+);
+
+// atajo histórico: solo las reglas de «mis favoritos»
+app.get('/api/radarr/auto', async () => ({ status: rulesStatus, rules: rulesOverview().rules.filter((r) => r.kind === 'favoritos') }));
+app.post('/api/radarr/auto/run', async (req, reply) => {
+  if (rulesStatus.running) {
+    reply.code(409);
+    return { error: 'Ya hay una pasada de reglas en marcha' };
+  }
+  runAutoRadarr({ dryRun: !!req.body?.dryRun }).catch(() => {});
+  return { started: true, status: rulesStatus };
 });
 
 app.post('/api/radarr/add', async (req, reply) => {

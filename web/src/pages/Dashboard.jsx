@@ -171,7 +171,7 @@ export default function Dashboard() {
               <Empty>{t('Sin visionados de Plex ni de Letterboxd todavía. Configura tu RSS en «Letterboxd».')}</Empty>
             )}
           </Section>
-          <Section title={t('Últimas peticiones a Radarr')} action={<Link to="/ajustes" className="text-xs text-gold-400 hover:underline">{t('Ajustes →')}</Link>}>
+          <Section title={t('Últimas peticiones a Radarr')} action={<Link to="/ajustes?tab=automatismos" className="text-xs text-gold-400 hover:underline">{t('Ajustes →')}</Link>}>
             {recent.radarrRecent?.length ? (
               <div className="card divide-y divide-ink-800 max-h-[420px] overflow-y-auto">
                 {recent.radarrRecent.map((m, i) => (

@@ -4,7 +4,7 @@ import { rematchLetterboxd, resolveUnmatchedLb, importLetterboxdRss } from './le
 import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames, syncPersonChanges } from './tmdb.js';
 import { syncRatings } from './mdblist.js';
 import { radarrSyncMovies, checkDigitalReleases } from './radarr.js';
-import { runAutoRadarr } from './automation.js';
+import { runRadarrRules, hayReglasActivas } from './rules.js';
 import { scanSagas } from './saga.js';
 import { favoritesGaps } from './discover.js';
 import { watchFestivalEditions } from './festivals.js';
@@ -181,15 +181,25 @@ function buildSteps({ includeAutoRadarr }) {
       run: async () => `${(await scanSagas({ budget: 800 }))?.scanned ?? 0} analizadas`,
     },
     {
+      // Va detrás de festivalWatch, del calendario y de los huecos a propósito:
+      // las reglas de festival leen las mismas páginas ya cacheadas por esos
+      // pasos, así que a esta altura de la noche no cuestan casi nada.
       key: 'autoradarr',
-      label: 'Auto-añadir estrenos de favoritos a Radarr',
-      enabled: () => includeAutoRadarr && getSetting('auto_radarr_enabled') === '1' && has('radarr_url', 'radarr_key'),
+      label: 'Aplicar las reglas automáticas de Radarr',
+      enabled: () => includeAutoRadarr && has('radarr_url', 'radarr_key') && hayReglasActivas(),
       run: async () => {
-        const r = await runAutoRadarr({
-          months: Number(getSetting('auto_radarr_months') || 6),
-          lookbackDays: Number(getSetting('auto_radarr_lookback_days') || 0),
-        });
-        return `${r.added} añadidas de ${r.considered} candidatas`;
+        const r = await runRadarrRules();
+        // una pasada que revienta entera NO puede quedar registrada como paso
+        // correcto con un «0 añadidas de 0 candidatas»: eso se lee como «no
+        // había nada nuevo» y es justo lo contrario
+        if (r.error) throw new Error(r.error);
+        const conError = r.rules.filter((x) => x.error);
+        const resumen = `${r.added} añadidas de ${r.considered} candidatas · ${r.rules.length} regla(s)`;
+        const bits = [resumen];
+        if (conError.length) bits.push(`${conError.length} con error`);
+        if (r.aviso) bits.push(r.aviso);
+        if (conError.length) throw new Error(bits.join(' · '));
+        return bits.join(' · ');
       },
     },
     {

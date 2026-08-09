@@ -1,6 +1,6 @@
 {
   "name": "powaflex-web",
-  "version": "1.0.6-beta",
+  "version": "1.0.7-beta",
   "private": true,
   "type": "module",
   "scripts": {

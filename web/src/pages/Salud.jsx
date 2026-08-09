@@ -125,7 +125,7 @@ export default function Salud({ embedded = false }) {
           <button className="btn-gold !py-1 text-xs" disabled={resolviendo} onClick={resolverLb}>
             {resolviendo ? t('Resolviendo…') : t('🔎 Intentar resolverlas contra TMDB')}
           </button>
-          <Link to="/ajustes" className="btn-ghost !py-1 text-xs">{t('Ir a Ajustes → Letterboxd')}</Link>
+          <Link to="/ajustes?tab=fuentes" className="btn-ghost !py-1 text-xs">{t('Ir a Ajustes → Letterboxd')}</Link>
         </div>
         <Lista>
           {data.lbSinEmparejar.sample.map((m, i) => (
@@ -215,7 +215,7 @@ export default function Salud({ embedded = false }) {
             <b className="text-zinc-200">{data.notas.total.toLocaleString(locale())}</b>{t(' películas con notas')}
             {data.notas.total > data.notas.withRatings &&
               t(' · el resto se descarga solo cada noche dentro del cupo diario (te quedan {n} peticiones hoy)', { n: data.notas.remainingBudget.toLocaleString(locale()) })}
-            . <Link to="/ajustes" className="text-gold-400 hover:underline">{t('Ajustes →')}</Link>
+            . <Link to="/ajustes?tab=fuentes" className="text-gold-400 hover:underline">{t('Ajustes →')}</Link>
           </p>
         </Section>
       )}

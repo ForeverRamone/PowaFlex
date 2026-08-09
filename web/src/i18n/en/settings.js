@@ -193,7 +193,7 @@ export default {
     'This is the rating shown in the small poster view. If a movie lacks that rating, the first available one is used. Needs MDBList synced.',
 
   // ── Calendario ─────────────────────────────────────────────────────────────
-  '5 · Calendario de cine venidero': '5 · Upcoming cinema calendar',
+  'Calendario de cine venidero': 'Upcoming cinema calendar',
   'El calendario lo mandan ': 'The calendar is driven by ',
   'tus favoritos': 'your favorites',
   ', cada uno en la faceta por la que le sigues: de un director/a se vigila lo que dirige, de un actor/actriz lo que interpreta. Si además quieres vigilar a los más presentes en tu biblioteca aunque no les sigas, sube estos números (0 = solo tus favoritos).':
@@ -207,7 +207,7 @@ export default {
     'Marks who has died so their releases are no longer watched or included in auto-Radarr. In Favorites you can remove all deceased people at once.',
 
   // ── Umbral de ruido ────────────────────────────────────────────────────────
-  '6 · Descubrir huecos: umbral de ruido': '6 · Discover gaps: noise threshold',
+  'Descubrir huecos: umbral de ruido': 'Discover gaps: noise threshold',
   'Una película cuenta como hueco si llega al umbral de votos en TMDB ':
     'A movie counts as a gap if it reaches the vote threshold on TMDB ',
   'o': 'or',
@@ -218,9 +218,25 @@ export default {
   'La nota mínima Σ y los filtros de cortos/documentales/TV/cameos se ajustan directamente en la página de Descubrir.':
     'The minimum Σ rating and the shorts/documentaries/TV/cameo filters are set directly on the Discover page.',
 
-  // ── Guardar ────────────────────────────────────────────────────────────────
+  // ── Pestañas y barra de guardar ────────────────────────────────────────────
+  'Conexiones': 'Connections',
+  'Fuentes y notas': 'Sources & ratings',
+  'Automatismos': 'Automation',
+  'Interfaz': 'Interface',
+  'Mantenimiento': 'Maintenance',
+  'Los tres servicios que gobiernas. Plex y TMDB son imprescindibles; Radarr es lo que convierte «me falta» en «pedida».':
+    'The three services you run. Plex and TMDB are essential; Radarr is what turns “I’m missing it” into “requested”.',
+  'De dónde salen las notas y qué has visto. Todo esto es opcional: sin ello PowaFlex funciona, pero se queda ciego para ordenar y para saber qué has visto fuera de Plex.':
+    'Where the ratings come from and what you have watched. All of it is optional: PowaFlex works without it, but it goes blind for sorting and for knowing what you watched outside Plex.',
+  'Lo que PowaFlex hace solo cada noche: qué manda a Radarr, a quién vigila el calendario y qué cuenta como hueco.':
+    'What PowaFlex does on its own every night: what it sends to Radarr, who the calendar watches and what counts as a gap.',
+  'Las reglas de qué se manda solo a Radarr están en Automatismos →':
+    'The rules for what gets sent to Radarr on its own live in Automation →',
+  '¿Radarr sin configurar? Ve a Conexiones →': 'Radarr not set up? Go to Connections →',
   'Guardar ajustes': 'Save settings',
   '✓ Guardado': '✓ Saved',
+  'Hay cambios sin guardar': 'Unsaved changes',
+  'Todo guardado': 'All saved',
 
   // ── Sincronización con Plex ────────────────────────────────────────────────
   'Sincronización con Plex': 'Plex sync',

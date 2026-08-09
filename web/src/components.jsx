@@ -106,8 +106,9 @@ const PALETTE_SECTIONS = [
   [t('Estrenos en cines de EE UU'), '/estrenos?tab=cine-us'],
   [t('Estrenos en plataformas'), '/estrenos?tab=plataformas-es'],
   [t('Listas y retos'), '/listas'],
-  [t('Letterboxd (importar)'), '/ajustes'],
+  [t('Letterboxd (importar)'), '/ajustes?tab=fuentes'],
   [t('Ajustes'), '/ajustes'],
+  [t('Últimas novedades'), '/novedades'],
   [t('¿Qué es PowaFlex?'), '/acerca'],
 ];
 

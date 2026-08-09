@@ -1,5 +1,40 @@
 # Changelog
 
+## Beta 1.07 (1.0.7-beta) — 2026-08-09
+
+**Reglas automáticas a Radarr.** El pase automático dejaba de ser un interruptor único —«los estrenos de mis directores favoritos»— y pasa a ser un motor de reglas: cada una vigila una cosa, se activa y se afina por separado, y se pueden tener todas las que se quieran.
+
+- **Tres clases de regla.** *Festivales, premios y cánones*: los 16 del registro, cada uno con las vistas que de verdad tiene (Busan y Horizontes Latinos no ofrecen palmarés porque no lo tienen; Sight & Sound no ofrece edición por año; los premios ofrecen nominadas por año y ganadoras). *Estrenos*: las cuatro pestañas de cines y plataformas de España y EE UU. *Mis favoritos*: los seis oficios por separado, así que se puede seguir lo que dirige uno y lo que compone otro sin mezclarlos.
+- **Un umbral Σ de 0 a 100 por regla, con barrita.** En 0 no filtra: entra todo, tenga nota o no —hay a quien le interesa el palmarés entero y punto—. Con umbral, lo que aún no tiene nota **espera** a la siguiente pasada en vez de irse a ciegas, y hay una casilla para quien prefiera lo contrario.
+- **Los estrenos se vigilan una quincena antes y después de su fecha** (configurable). Mientras dura esa ventana, cada noche se vuelve a mirar su nota: entran el día que cruzan el umbral, no el día que se anuncian.
+- **Tope por pasada**, 20 por defecto. Un palmarés histórico son cientos de películas: sin tope, la primera noche te llena el disco.
+- **El auto-Radarr de siempre se migra a una regla** conservando tu horizonte, tu retrovisor y tus documentales, sin umbral y sin tope, que es como estaba. Si lo tenías apagado, nace apagada.
+- **Cada pasada explica lo que NO hizo**: ya la tienes, vetada, descartada, corto, documental, telefilme, papel testimonial, fuera de la ventana, esperando nota, bajo el umbral, aplazada por el tope. Un «0 añadidas» a secas es indistinguible de una avería.
+- **Historial de 30 días con un 🚫 por película.** Como las reglas se reevalúan cada noche, borrar algo de Radarr a mano no basta: volvería. El 🚫 del historial es lo que hace que no vuelva por ninguna regla.
+
+**Ajustes, por pestañas.** La página había llegado a quince bloques y once pantallas de scroll, con la numeración «1 · Plex … 6 · Descubrir huecos» rota por en medio y el botón de guardar enterrado a dos tercios. Ahora son cinco pestañas —Conexiones, Fuentes y notas, Automatismos, Interfaz y Mantenimiento— con «Actualizar todo» fuera de ellas y la barra de guardar fija abajo, que dice si hay cambios pendientes. Ninguna pestaña pasa de tres pantallas salvo Automatismos.
+
+- **Arreglado de paso: los ajustes de la copia automática no se podían guardar.** Vivían por debajo del único botón de guardar de la página, así que marcabas la casilla de la copia nocturna y no pasaba nada.
+- Los enlaces de otras páginas aterrizan en su pestaña: el ⌘K y la vieja ruta `/letterboxd` van a Fuentes, los pasos de puesta en marcha de «¿Qué es PowaFlex?» a Conexiones, y «Últimas peticiones a Radarr» del Dashboard a Automatismos.
+
+**Últimas novedades.** Página nueva en el menú (y detrás de la placa de versión de abajo a la derecha) con lo que trae cada versión, en cristiano. No confundir con las «🔔 Novedades» del Dashboard, que son cosas que pasan en tu colección.
+
+**Lo que encontró la revisión adversarial.** Antes de dar el lote por bueno, dos rondas de agentes atacando el código con cinco ángulos distintos y dos escépticos verificando cada hallazgo. De los 40 confirmados, los que importaban:
+
+- **El 🚫 no existía donde hacía falta.** El veto solo se podía poner desde Cine venidero, así que una película que entraba por una regla de festival volvía cada noche para siempre — y el propio aviso de la interfaz decía lo contrario. Ahora está en el historial de reglas.
+- **La reevaluación nocturna del umbral era una promesa falsa.** Las notas solo se pedían de lo que no tenía fila en la caché, y eso incluye la caché negativa: una película vista sin Σ la primera noche se quedaba sin nota para siempre. Ahora se vuelven a pedir las que siguen sin Σ y llevan más de tres días sin comprobarse, y si no se puede —sin clave de MDBList, cupo agotado— se dice en vez de callar.
+- **Vaciar «Tope por pasada» dejaba la regla sin tope.** La cadena vacía se convertía en 0, y 0 significa ilimitado: borrar la casilla para reteclearla te dejaba una regla capaz de vaciarte el disco.
+- **El guardado de las tarjetas perdía cambios**: tocar dos ajustes seguidos guardaba solo el segundo, y salir de Ajustes en el medio segundo siguiente tiraba el cambio. Ahora se acumulan y se vuelcan al salir.
+- **En las reglas de festival los filtros de tipo eran decorativos.** Las fichas de Wikipedia no traen duración ni géneros, así que «Incluir documentales» no hacía nada y entraban cortos y telefilmes.
+- **Con Radarr a medias** (URL y clave pero sin perfil de calidad) las reglas corrían enteras cada noche sin añadir nada y el resumen decía «0 añadidas de 20 candidatas». Ahora se comprueba antes de gastar la pasada.
+- **Una pasada que reventaba se registraba como paso nocturno correcto.** Y si fallaban todas las altas, el error de la vez anterior se borraba.
+- **La pasada ya no se sirve dentro de la petición HTTP**: un palmarés entero se comía el tiempo de espera de cualquier proxy inverso con un 504 mientras Radarr seguía recibiendo altas.
+- **Seguir a un actor te descargaba sus cameos**, incluido cada documental donde sale tres segundos.
+- **La migración se quemaba en el primer arranque** aunque no hubiera nada que migrar, así que restaurar después una copia de ajustes con el auto-Radarr encendido ya no la aplicaba nunca.
+- Una regla de «Mis favoritos» con umbral no habría añadido nada jamás: la película salía de candidatas justo el día en que podía tener nota.
+
+Tests 153 → 177.
+
 ## Beta 1.06 (1.0.6-beta) — 2026-08-07
 
 **Lo que destapó la auditoría.** Cuatro revisores independientes repasaron la 1.05 entera —código,

@@ -19,23 +19,23 @@ function Block({ icon, title, to, children }) {
 const FIRST_STEPS = [
   {
     title: t('Conecta tu Plex'),
-    to: '/ajustes',
+    to: '/ajustes?tab=conexiones',
     body: t('En Ajustes, pega la dirección del servidor y tu X-Plex-Token (la propia página explica cómo sacarlo) y elige la biblioteca de películas. Lanza la sincronización: la primera tarda unos minutos y trae fichas, reparto, géneros, visionados y datos técnicos.'),
   },
   {
     title: t('Añade la clave de TMDB'),
-    to: '/ajustes',
+    to: '/ajustes?tab=conexiones',
     body: t('Es gratuita y es lo que convierte tu lista de archivos en filmografías: sin ella no hay completismo, ni calendario de estrenos, ni sagas, ni huecos que rellenar. Es el paso que más rendimiento da.'),
   },
   {
     title: t('Conecta Radarr'),
-    to: '/ajustes',
+    to: '/ajustes?tab=conexiones',
     optional: true,
     body: t('Sin Radarr, PowaFlex te enseña lo que te falta; con Radarr, además lo pide. Necesita la URL y la API key, y le dices con qué perfil de calidad y en qué carpeta debe añadir.'),
   },
   {
     title: t('Trae tu Letterboxd y las notas'),
-    to: '/ajustes',
+    to: '/ajustes?tab=fuentes',
     optional: true,
     body: t('En Ajustes, importa el zip de tu export para que PowaFlex sepa qué has visto aunque no lo reprodujeras en Plex, y pon tu RSS para que se mantenga solo. Con la clave de MDBList (también en Ajustes) cada película gana las notas de IMDb, Rotten Tomatoes, Metacritic y Letterboxd.'),
   },

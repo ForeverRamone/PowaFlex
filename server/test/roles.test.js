@@ -172,13 +172,38 @@ test('el calendario mira TODAS las facetas, no solo dirección e interpretación
   );
 });
 
-test('el auto-Radarr solo mira a los favoritos SEGUIDOS COMO DIRECTORES', () => {
+test('el auto-Radarr solo mira a los favoritos SEGUIDOS EN ESE OFICIO', async () => {
   // Su consulta no filtraba por faceta, y su rama de «favoritos sin títulos en
   // biblioteca» es justo la única forma de seguir a un DoP o un montador: el
   // pase nocturno les descargaba las películas que hubieran dirigido alguna vez.
+  //
+  // Desde la 1.07 el oficio es un parámetro (hay una regla por oficio), así que
+  // lo que hay que fijar es que TODAS las consultas de favoritosDeOficio filtren
+  // por él: un `SELECT … FROM tracked_people` sin `t.role = ?` es el fallo.
   const src = fs.readFileSync(path.join(raiz, 'server/src/automation.js'), 'utf8');
-  assert.ok(
-    /t\.role = 'director'/.test(src),
-    'la consulta de directores del auto-Radarr debe filtrar por la faceta seguida'
-  );
+  const consultas = src.match(/SELECT DISTINCT p\.id[\s\S]*?`/g) || [];
+  assert.ok(consultas.length >= 1, 'automation.js debería consultar a los favoritos');
+  for (const q of consultas) {
+    assert.ok(/t\.role = \?/.test(q), `una consulta de favoritos no filtra por oficio: ${q.slice(0, 120)}`);
+  }
+
+  // y de verdad: seguir a alguien como montador NO lo mete en la lista de dirección
+  const os = await import('node:os');
+  const fsp = await import('node:fs');
+  const pathp = await import('node:path');
+  process.env.DATA_DIR = fsp.mkdtempSync(pathp.join(os.tmpdir(), 'powaflex-test-'));
+  const { db } = await import('../src/db.js');
+  const { favoritosDeOficio } = await import('../src/automation.js');
+  const id = db.prepare("INSERT INTO people (name) VALUES ('Montadora viva')").run().lastInsertRowid;
+  db.prepare("INSERT INTO tracked_people (person_id, role, added_at) VALUES (?, 'editor', 0)").run(id);
+  const tiene = (rol) => favoritosDeOficio(rol).some((p) => p.id === id);
+  assert.equal(tiene('director'), false, 'una montadora no puede salir en la lista de dirección');
+  assert.equal(tiene('editor'), true);
+
+  // y un favorito de un oficio que Plex NO guarda cuenta aunque tenga créditos
+  // de OTRO oficio en tu biblioteca (antes la rama «sin créditos» lo excluía)
+  db.prepare("INSERT INTO movies (rating_key, title) VALUES (9001, 'Algo')").run();
+  db.prepare("INSERT INTO movie_people (movie_id, person_id, role) VALUES (9001, ?, 'actor')").run(id);
+  assert.equal(tiene('editor'), true, 'un montador con créditos de actor en tu Plex seguía contando');
+  assert.equal(tiene('director'), false);
 });

@@ -71,6 +71,51 @@ export function remainingBudget() {
   return Math.max(0, dailyBudget() - usage().count);
 }
 
+/** ¿Hay clave de MDBList? Sin ella no hay Σ, y las reglas con umbral no pueden
+ *  decidir nada: tienen que poder decirlo en vez de callar. */
+export const hayClaveMdblist = () => !!getSetting('mdblist_key');
+
+/**
+ * Notas para las REGLAS automáticas, que es un caso distinto al de las páginas.
+ *
+ * `enrichWithScores` solo pide lo que NO tiene fila en `mdb_ratings`, y eso
+ * incluye la caché negativa: una película que el día que se miró aún no tenía
+ * Σ se queda con su fila vacía PARA SIEMPRE. Para una pantalla da igual —hoy no
+ * tiene nota y punto—, pero para una regla con umbral era letal: la promesa de
+ * «cada noche se vuelve a mirar» no se cumplía nunca, porque la nota no se
+ * volvía a pedir jamás. Aquí se vuelven a pedir las que siguen sin Σ y llevan
+ * más de `caducaMs` sin comprobarse.
+ *
+ * Devuelve por qué no se pudo mirar, si no se pudo: un «esperando nota» eterno
+ * sin explicación es indistinguible de una avería.
+ */
+export async function refrescarNotasDeReglas(items, { maxFetch = 200, caducaMs = 3 * 24 * 3600 * 1000 } = {}) {
+  const ids = [...new Set(items.map((i) => i.tmdb_id).filter(Boolean))];
+  if (!ids.length) return { pedidas: 0, motivo: null };
+  if (!hayClaveMdblist()) return { pedidas: 0, motivo: 'sin_api_key' };
+
+  const marcador = ids.map(() => '?').join(',');
+  const frescas = new Set(
+    db
+      .prepare(`SELECT tmdb_id FROM mdb_ratings WHERE tmdb_id IN (${marcador})
+                AND (score IS NOT NULL OR fetched_at >= ?)`)
+      .all(...ids, Date.now() - caducaMs)
+      .map((r) => r.tmdb_id)
+  );
+  const pendientes = ids.filter((id) => !frescas.has(id));
+  if (!pendientes.length) return { pedidas: 0, motivo: null };
+  const presupuesto = remainingBudget();
+  if (presupuesto <= 0) return { pedidas: 0, motivo: 'sin_presupuesto' };
+
+  const aPedir = pendientes.slice(0, Math.min(maxFetch, presupuesto));
+  try {
+    for (let i = 0; i < aPedir.length; i += 100) await fetchRatingsBatch(aPedir.slice(i, i + 100));
+  } catch (err) {
+    return { pedidas: 0, motivo: err.rateLimited ? 'sin_presupuesto' : String(err.message || err) };
+  }
+  return { pedidas: aPedir.length, motivo: pendientes.length > aPedir.length ? 'quedan_para_manana' : null };
+}
+
 // --- ratings ------------------------------------------------------------------
 
 const upsertRating = db.prepare(`
