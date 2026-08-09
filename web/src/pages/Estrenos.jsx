@@ -181,11 +181,17 @@ export default function Estrenos() {
 
   const counts = (() => {
     const all = [...(data?.recent || []), ...(data?.upcoming || [])];
+    // Los recuentos van CONTADOS, no a cero. Estaban a cero «porque el servidor
+    // ya echó a los cortos», pero TypeFilterBar esconde el chip cuyo recuento es
+    // 0: el resultado era que en Estrenos NO había forma de filtrar cortos ni
+    // películas de TV, y las que el servidor no puede descartar —las que aún no
+    // tienen duración en TMDB— se quedaban a la vista sin remedio.
     return {
-      shorts: 0, // el servidor ya echó a los cortos: el chip no pinta nada
+      shorts: all.filter((f) => f.isShort).length,
       docs: all.filter((f) => f.isDocumentary).length,
       music: all.filter((f) => f.isMusic).length,
-      tv: 0,
+      tv: all.filter((f) => f.isTvMovie).length,
+      eventos: all.filter((f) => f.isEvento).length,
       coral: 0,
       cameos: 0,
     };

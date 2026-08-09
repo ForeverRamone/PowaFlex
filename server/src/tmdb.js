@@ -309,6 +309,18 @@ function placeToGeo(place) {
   return { country, continent: country ? CONTINENTS[country] || null : null };
 }
 
+/**
+ * El continente de un país, con el MISMO mapa que usa la demografía de tu
+ * biblioteca. Lo pide el detector de emergentes: su señal de afinidad compara
+ * la procedencia de un debutante con la de los directores que ya tienes, y las
+ * dos partes de esa comparación tienen que salir del mismo diccionario o no
+ * casan nunca.
+ */
+export const continenteDe = (country) => (country ? CONTINENTS[country] || null : null);
+
+/** El lugar de nacimiento de TMDB, partido en país y continente. */
+export const geoDeLugar = (place) => placeToGeo(place);
+
 // Persist life status + demographics for a library person, so the people filters
 // and "vivos y muertos" logic work without re-hitting TMDB.
 export function persistLife(dbPersonId, details) {
@@ -495,6 +507,12 @@ export async function enrichRuntimes(items, { concurrency = 6, withCredits = fal
       // con el volcado local de notas para el umbral de ruido
       if (det.imdb_id) it.imdb_id = det.imdb_id;
       if (det.genres?.length) classifyGenres(it, det.genres.map((x) => x.id));
+      // la gala de lucha libre no tiene género que la delate: la delata quién la produce
+      if (esEvento(det)) it.isEvento = true;
+      // idioma original y países de producción: los usa la CUARENTENA de las
+      // reglas y vienen en la misma ficha, así que no cuestan una petición más
+      if (det.original_language) it.original_language = det.original_language;
+      if (det.production_countries?.length) it.countries = det.production_countries.map((c) => c.iso_3166_1);
       if (withCredits) {
         const dirs = new Set((det.credits?.crew || []).filter((c) => c.job === 'Director').map((c) => c.id));
         it.directorCount = dirs.size || 1;
@@ -868,6 +886,23 @@ export async function tmdbPoster(tmdbId) {
  * films leave the documentary bucket so they don't inflate the documentarian
  * count either — the categories are mutually exclusive.
  */
+/**
+ * Lo que NO es cine aunque TMDB lo tenga fichado como película: galas de lucha
+ * libre (WWE, NJPW, AEW, AAA), eventos deportivos y conciertos grabados. En la
+ * página de Estrenos son la mitad del ruido —un G1 Climax son DOCE «películas»,
+ * una por jornada— y no hay género que los distinga: vienen sin géneros o como
+ * acción. Lo que sí los delata es la PRODUCTORA, que ya viene en la ficha que
+ * `enrichRuntimes` pide de todas formas: coste cero en peticiones.
+ */
+const PRODUCTORAS_DE_EVENTO =
+  /\b(wwe|world wrestling|new japan pro[- ]?wrestling|njpw|all elite wrestling|aew|lucha libre aaa|aaa worldwide|impact wrestling|ring of honor|ufc|zuffa|dwts|major league)\b/i;
+
+/** ¿Esta ficha de TMDB es un evento y no una película? Pura y exportada. */
+export function esEvento(det = {}) {
+  const companias = (det.production_companies || []).map((c) => c.name || '').join(' · ');
+  return PRODUCTORAS_DE_EVENTO.test(companias);
+}
+
 export function classifyGenres(item, ids = []) {
   item.genre_ids = ids;
   item.isMusic = ids.includes(10402) && ids.includes(99);

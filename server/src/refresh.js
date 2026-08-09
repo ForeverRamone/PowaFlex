@@ -8,6 +8,7 @@ import { runRadarrRules, hayReglasActivas } from './rules.js';
 import { scanSagas } from './saga.js';
 import { favoritesGaps } from './discover.js';
 import { watchFestivalEditions } from './festivals.js';
+import { detectarEmergentes, emergentesNecesitaRefresco } from './emergentes.js';
 import { importImdbRatings, imdbNecesitaRefresco } from './imdb.js';
 import { hacerCopia, copiasActivadas } from './backup.js';
 
@@ -148,6 +149,24 @@ function buildSteps({ includeAutoRadarr }) {
       },
     },
     {
+      // Justo detrás de la vigía: las ediciones que acaba de mirar son
+      // exactamente las que lee el detector, y a esta altura de la noche están
+      // en caché. Semanal, no cada noche: un festival no descubre a nadie
+      // nuevo entre el martes y el miércoles, y la pasada resuelve decenas de
+      // personas contra TMDB.
+      key: 'emergentes',
+      label: 'Detectar directores emergentes (semanal)',
+      enabled: () => has('tmdb_key') && emergentesNecesitaRefresco(),
+      run: async () => {
+        const r = await detectarEmergentes();
+        if (r.error) throw new Error(r.error);
+        const bits = [`${r.elegidos} emergentes de ${r.candidatos} nombres`];
+        // un tope silencioso se lee como «no había nadie más»
+        if (r.saltados) bits.push(`${r.saltados} sin mirar por el tope de la pasada`);
+        return bits.join(' · ');
+      },
+    },
+    {
       // antes del calendario y los huecos: invalida las filmografías de quien
       // cambió en TMDB para que esos pasos re-pidan SOLO lo que toca
       key: 'personChanges',
@@ -196,6 +215,9 @@ function buildSteps({ includeAutoRadarr }) {
         const conError = r.rules.filter((x) => x.error);
         const resumen = `${r.added} añadidas de ${r.considered} candidatas · ${r.rules.length} regla(s)`;
         const bits = [resumen];
+        // sin esto la cuarentena era invisible desde el histórico: una noche
+        // que aparta diez películas se leía igual que una noche sin novedad
+        if (r.cuarentena) bits.push(`${r.cuarentena} en cuarentena, esperan tu ✓`);
         if (conError.length) bits.push(`${conError.length} con error`);
         if (r.aviso) bits.push(r.aviso);
         if (conError.length) throw new Error(bits.join(' · '));

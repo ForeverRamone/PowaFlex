@@ -187,6 +187,10 @@ export default function Festivals() {
       <div className="flex gap-2 mb-3 flex-wrap items-center">
         {[
           ['festival', 'Festivales'],
+          // donde estrena quien empieza, y de donde sale el detector de
+          // emergentes: van en su propia fila para no mezclarlas con la
+          // competición principal, que es otra cosa
+          ['debut', 'Secciones de debut'],
           ['premio', 'Premios'],
           ['canon', 'Cánones'],
         ].map(([g, label]) => {

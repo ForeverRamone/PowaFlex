@@ -49,6 +49,10 @@ import {
   radarrSearchAgain,
 } from './radarr.js';
 import { libraryGaps, favoritesGaps, absentGreats, listCanons, saveCanon, deleteCanon, canonNames } from './discover.js';
+import {
+  detectarEmergentes, emergentesStatus, listaEmergentes,
+  descartarEmergente, recuperarEmergente, CLAVES_PESO,
+} from './emergentes.js';
 import { releases } from './releases.js';
 import {
   mdbTest,
@@ -79,6 +83,7 @@ import {
 import {
   runAutoRadarr, runRadarrRules, rulesStatus, rulesOverview, rulesLog,
   createRule, updateRule, deleteRule, getRule,
+  aprobarPendiente, rechazarPendiente, resolverTodasLasPendientes, cuantasPendientes,
 } from './rules.js';
 import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
 import { ROLES } from './roles.js';
@@ -223,6 +228,9 @@ const WRITABLE_SETTINGS = new Set([
   'mdblist_key', 'mdblist_tier',
   'letterboxd_rss',
   'auto_radarr_enabled', 'auto_radarr_months', 'auto_radarr_lookback_days', 'auto_radarr_include_docs',
+  'quarantine_enabled', 'quarantine_langs', 'quarantine_countries',
+  // los pesos de las cinco señales del detector de emergentes
+  ...CLAVES_PESO,
   'cal_top_directors', 'cal_top_actors',
   'gaps_min_votes_director', 'gaps_min_votes_actor',
   'ratings_sources', 'primary_rating', 'ui_theme', 'ui_language', 'jw_country',
@@ -322,6 +330,8 @@ app.get('/api/setup-state', async () => {
     lastSyncAt: Number(s.last_sync_at || 0) || null,
     // para el aviso de la barra lateral: última pasada con errores o caducada
     nightly: nightlyHealth(),
+    // y el otro aviso de Ajustes: películas en cuarentena esperando tu ✓
+    pendientes: cuantasPendientes(),
   };
 });
 
@@ -779,6 +789,51 @@ app.post('/api/directors/follow', async (req, reply) => {
   }
   if (added) invalidateFavoritesCaches();
   return { ok: true, added, total: nombres.length, notFound };
+});
+
+// --- directores emergentes -----------------------------------------------------
+//
+// La detección es un trabajo largo (lee ediciones de una década y resuelve
+// decenas de personas contra TMDB): se ARRANCA y se sondea, nunca se sirve
+// dentro de la petición. Un trabajo así dentro del HTTP acaba en un 504 del
+// proxy inverso mientras el servidor sigue trabajando por detrás.
+
+app.get('/api/emergentes', async () => listaEmergentes());
+
+app.post('/api/emergentes/run', async (req, reply) => {
+  if (emergentesStatus.running) {
+    reply.code(409);
+    return { error: 'Ya hay una detección en marcha' };
+  }
+  if (!getSetting('tmdb_key')) {
+    reply.code(400);
+    return { error: 'Sin clave de TMDB no se pueden identificar los directores' };
+  }
+  detectarEmergentes().catch(() => {});
+  return { started: true, status: emergentesStatus };
+});
+
+app.get('/api/emergentes/status', async () => emergentesStatus);
+
+// la ✕: fuera de la parrilla y que la próxima reconstrucción no lo resucite
+app.delete('/api/emergentes/:nameKey', async (req) => descartarEmergente(req.params.nameKey));
+app.post('/api/emergentes/:nameKey/restore', async (req) => recuperarEmergente(req.params.nameKey));
+
+/**
+ * Seguir a un emergente. Va por su id de TMDB —que el detector ya verificó
+ * contra la fecha de nacimiento— y NO por el nombre: volver a resolverlo por
+ * nombre sería tirar la verificación y arriesgarse al homónimo.
+ */
+app.post('/api/emergentes/:nameKey/follow', async (req, reply) => {
+  const fila = db.prepare('SELECT * FROM emerging_directors WHERE name_key = ?').get(String(req.params.nameKey));
+  if (!fila?.tmdb_id) {
+    reply.code(404);
+    return { error: 'No está en la lista de emergentes' };
+  }
+  const r = trackByTmdb({ tmdbId: fila.tmdb_id, name: fila.name, profilePath: fila.profile_path, role: 'director' });
+  if (r.personId) db.prepare('DELETE FROM unfollowed_people WHERE person_id = ?').run(r.personId);
+  invalidateFavoritesCaches();
+  return { ok: true, personId: r.personId || null };
 });
 
 app.get('/api/people/search-tmdb', async (req, reply) => {
@@ -1757,6 +1812,32 @@ app.post('/api/radarr/rules/run', async (req, reply) => {
   }
   runRadarrRules({ dryRun: !!req.body?.dryRun, ruleId }).catch(() => {});
   return { started: true, status: rulesStatus };
+});
+
+// --- cuarentena pre-Radarr ----------------------------------------------------
+// Aprobar manda a Radarr AHORA; rechazar veta, porque sin el veto volvería a
+// caer en cuarentena la noche siguiente y la bandeja sería una noria.
+
+app.post('/api/radarr/pending/:tmdbId/approve', async (req, reply) => {
+  try {
+    return await aprobarPendiente(req.params.tmdbId);
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.delete('/api/radarr/pending/:tmdbId', async (req) => rechazarPendiente(req.params.tmdbId));
+
+// vaciar la bandeja de una vez: `accion` = aprobar | rechazar
+app.post('/api/radarr/pending/all', async (req, reply) => {
+  const accion = req.body?.accion === 'aprobar' ? 'aprobar' : 'rechazar';
+  try {
+    return await resolverTodasLasPendientes(accion);
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
 });
 
 app.get('/api/radarr/rules/log', async (req) =>

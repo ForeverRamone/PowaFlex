@@ -70,3 +70,21 @@ test('providersDeRegion: solo alquiler ya trae dónde, y una región vacía no r
   assert.deepEqual(providersDeRegion({}), { providers: [], vod: [] });
   assert.deepEqual(providersDeRegion(undefined), { providers: [], vod: [] });
 });
+
+/**
+ * Galas de lucha libre y eventos: TMDB los ficha como PELÍCULAS y en Estrenos
+ * eran la mitad del ruido (un G1 Climax son doce «películas», una por jornada).
+ * No hay género que los delate —vienen sin géneros o como acción—; lo que sí
+ * los delata es la productora, que ya viene en la ficha que se pide igualmente.
+ */
+test('esEvento reconoce las galas por su productora, no por el género', async () => {
+  const { esEvento } = await import('../src/tmdb.js');
+  assert.equal(esEvento({ production_companies: [{ name: 'WWE' }] }), true);
+  assert.equal(esEvento({ production_companies: [{ name: 'New Japan Pro-Wrestling' }] }), true);
+  assert.equal(esEvento({ production_companies: [{ name: 'All Elite Wrestling' }] }), true);
+  assert.equal(esEvento({ production_companies: [{ name: 'Lucha Libre AAA Worldwide' }] }), true);
+  // y NO se lleva por delante al cine de verdad
+  assert.equal(esEvento({ production_companies: [{ name: 'A24' }, { name: 'Plan B Entertainment' }] }), false);
+  assert.equal(esEvento({ production_companies: [{ name: 'Wild Bunch' }] }), false);
+  assert.equal(esEvento({}), false);
+});

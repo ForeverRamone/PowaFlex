@@ -1,5 +1,39 @@
 # Changelog
 
+## Beta 1.08 (1.0.8-beta) — 2026-08-09
+
+**Detector de directores emergentes, y la cuarentena pre-Radarr terminada.**
+
+### Directores emergentes
+
+Quién puede ser un grande dentro de diez años. La ventaja injusta es que PowaFlex ya tiene parseadas y cacheadas las tablas de selección oficial de los festivales: ahí es donde aparecen los grandes antes de serlo, así que el detector se apoya en eso y no en notas agregadas.
+
+- **Cinco secciones de DEBUT nuevas en el registro** (`festivals.js`), que es el mayor salto de calidad de la señal: Semana de la Crítica y Quincena de Cannes, Orizzonti de Venecia, Perspectives/Encounters de la Berlinale y Nuevos Directores de San Sebastián. Hasta ahora solo se parseaba la competición principal, que es justo donde los emergentes **todavía no están**. Los nombres de sección se comprobaron uno a uno contra los artículos de 2010 a 2026: la Berlinale cambió Encounters por Perspectives en 2025 y Venecia titula la suya «Horizons (Orizzonti)» en los artículos viejos. Salen también en la página de Festivales, en su propia fila, y como fuente de regla.
+- **Módulo `emergentes.js`** con cinco señales: consagración institucional (la que más pesa; la **segunda** selección vale más que la primera y ganar dobla la plaza), consenso crítico, tracción real de Letterboxd con los votos de IMDb como umbral de ruido, aceleración (¿la segunda película sube en nota, volumen y nivel de festival?) y afinidad con lo que tú puntúas alto según la procedencia del director.
+- **«Sin dato no es cero».** La señal que no tiene datos sale del reparto y las demás se reparten su peso, para que un debut sin Metacritic no quede por detrás de una película mediana solo porque de la mediana haya más datos. Sin esto el detector premiaría lo más documentado, que es lo anglosajón.
+- **La ficha enseña el desglose**: cuántos puntos pone cada señal y con qué datos («Cannes · Semana de la Crítica 2025 🏆 · Busan 2021», «Metacritic 79 de media», «Letterboxd 3,9 con 18.400 marcas»). Sin desglose es un oráculo y de un oráculo no te fías. El servidor manda las piezas y las frases se componen en el cliente, así que la página se lee igual de bien en inglés.
+- **Página `/emergentes`** con parrilla, ★ de seguir (por id de TMDB ya verificado, no por nombre: resolverlo otra vez sería arriesgarse al homónimo), ✕ con deshacer, filtros de continente, país y sexo, y cuatro ordenaciones.
+- **Elegibilidad**: de uno a tres largometrajes estrenados, primer largo en los últimos ocho años, vivo, y ni seguido ni descartado. Los cortos, telefilmes y documentales no propios se descuentan con `enrichRuntimes`, que es lo que impide que un debutante parezca prolífico.
+- **Paso nocturno semanal** detrás de la vigía de festivales, que es cuando las ediciones ya están en caché. Tope de 90 personas resueltas contra TMDB por pasada, y **lo que el tope deja fuera se dice en el informe**: un tope silencioso se lee como «no había nadie más».
+- **Tipo de regla `emergentes`** en el motor de Radarr: «mándame la ópera prima de todo emergente con 70 o más». Su umbral es el del detector —la persona— y no la Σ de la película, y la interfaz lo dice para que no se confundan.
+- Las dos tablas (`emerging_directors`, `emerging_signals`) son **reconstruibles enteras**; la ✕ vive aparte, en `emerging_dismissed`, para que una reconstrucción no resucite a quien ya dijiste que no.
+
+### Cuarentena pre-Radarr, terminada
+
+- **El aviso.** Lo que cae en cuarentena se anuncia en las novedades del Dashboard y pone un contador ámbar en Ajustes. Una bandeja metida en una pestaña de Ajustes que nadie mira no sirve de nada.
+- **El recuento sale en el pase nocturno**: una noche que aparta diez películas ya no se lee igual que una noche sin novedad.
+- **Cartel, y el motivo traducible.** El motivo viaja partido (`idioma` + `hi`) en vez de como frase hecha en castellano, así que la bandeja se lee en inglés. Y decidir «esta sí, esta no» sobre un título que no conoces necesita ver el cartel.
+- **Aprobar y vetar en bloque**, porque una regla sobre un país entero deja veinte esperando en una noche y de una en una la bandeja se abandona. Aprobar en bloque no se detiene en el primer fallo, y lo que Radarr rechazó se queda en la bandeja y se dice cuántas.
+- **La bandeja se purga sola** de lo que acabaste teniendo en Plex o en Radarr por tu cuenta y de lo que vetaste o descartaste en otra pantalla. Pedirte permiso para bajar algo que ya bajaste se lee como una avería.
+- Las casillas de criterios devuelven **lo que escribiste** («IN»), no la lista normalizada («in»).
+
+### De paso
+
+- **Una fila-cabecera dentro de una tabla de Wikipedia ya no se cuela como película fantasma.** Las secciones paralelas de Cannes parten su tabla con filas de una sola celda («In Competition», «Feature films») y esas se estaban buscando en TMDB como si fueran títulos.
+- Los continentes (`Europa`, `Sudamérica`, `África`) ya se traducen: afecta también a los filtros de Personas, que comparten diccionario.
+
+Tests 187 → 222.
+
 ## Beta 1.07 (1.0.7-beta) — 2026-08-09
 
 **Reglas automáticas a Radarr.** El pase automático dejaba de ser un interruptor único —«los estrenos de mis directores favoritos»— y pasa a ser un motor de reglas: cada una vigila una cosa, se activa y se afina por separado, y se pueden tener todas las que se quieran.

@@ -947,7 +947,7 @@ export function useRadarrIds() {
 // Shorts / documentaries / TV-movie / cameo visibility toggles, persisted.
 // Defaults to hidden (the completist wants features first). All pages share the
 // default 'type_filters' key so a preference set once applies everywhere.
-const TYPE_DEFAULTS = { shorts: false, docs: false, music: false, tv: false, coral: false, cameos: false };
+const TYPE_DEFAULTS = { shorts: false, docs: false, music: false, tv: false, eventos: false, coral: false, cameos: false };
 
 export function useTypeFilters(key = 'type_filters') {
   const [show, setShow] = useState(() => {
@@ -973,8 +973,8 @@ export function useTypeFilters(key = 'type_filters') {
 export const matchesTypeFilters = (item, show) =>
   (show.shorts || !item.isShort) && (show.docs || !item.isDocumentary) &&
   (show.music || !item.isMusic) &&
-  (show.tv || !item.isTvMovie) && (show.coral || !item.isCoral) &&
-  (show.cameos || !item.isCameo);
+  (show.tv || !item.isTvMovie) && (show.eventos || !item.isEvento) &&
+  (show.coral || !item.isCoral) && (show.cameos || !item.isCameo);
 
 // Toggle chips, not struck-through buttons: strikethrough reads as
 // "unavailable", and this bar sits above the gaps grid all day long.
@@ -984,6 +984,7 @@ export function TypeFilterBar({ show, toggle, counts }) {
     ['docs', t('Documentales'), counts?.docs],
     ['music', t('Conciertos'), counts?.music],
     ['tv', t('Películas de TV'), counts?.tv],
+    ['eventos', t('Lucha libre y eventos'), counts?.eventos],
     ['coral', t('Dirección coral'), counts?.coral],
     ['cameos', t('Cameos'), counts?.cameos],
   ].filter(([, , n]) => n == null || n > 0);

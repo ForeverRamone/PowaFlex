@@ -54,7 +54,17 @@ const DAY = 24 * 3600 * 1000;
  * Sight & Sound no tiene ediciones por año — enumerarlos a mano garantizaba
  * ofrecer opciones que revientan al ejecutarse.
  */
-export const RULE_KINDS = ['festival', 'estrenos', 'favoritos'];
+export const RULE_KINDS = ['festival', 'estrenos', 'favoritos', 'emergentes'];
+
+/**
+ * Las dos formas de seguir a un emergente: quedarte con toda su obra —son uno,
+ * dos o tres largos, no hay riesgo de avalancha— o solo con la ópera prima, que
+ * es la que nunca se distribuye y la que de verdad cuesta encontrar después.
+ */
+const AMBITOS_EMERGENTES = [
+  { key: 'todas', name: 'Todas sus películas' },
+  { key: 'debut', name: 'Solo la ópera prima' },
+];
 
 /** ¿Qué vistas ofrece este festival/premio/canon? Sale de su ficha del REGISTRY. */
 export function scopesDeFestival(f) {
@@ -95,6 +105,7 @@ export function rulesCatalog() {
       region: RELEASE_KINDS[key].region,
     })),
     favoritos: ROLES.map((r) => ({ key: r.key, name: r.label, singular: r.singular })),
+    emergentes: AMBITOS_EMERGENTES,
   };
 }
 
@@ -119,6 +130,10 @@ export function ruleLabel(rule) {
     const r = ROLES.find((x) => x.key === rule.source);
     return `Mis favoritos · ${r?.label || rule.source}`;
   }
+  if (rule.kind === 'emergentes') {
+    const a = AMBITOS_EMERGENTES.find((x) => x.key === rule.source);
+    return `Emergentes · ${a?.name || rule.source}`;
+  }
   return `${rule.kind}:${rule.source}`;
 }
 
@@ -136,6 +151,9 @@ export function reglaValida({ kind, source, scope }) {
   }
   if (kind === 'estrenos') return RELEASE_KINDS[source] ? null : 'Pestaña de estrenos desconocida';
   if (kind === 'favoritos') return asRole(source) ? null : 'Oficio desconocido';
+  if (kind === 'emergentes') {
+    return AMBITOS_EMERGENTES.some((a) => a.key === source) ? null : 'Ámbito de emergentes desconocido';
+  }
   return 'Tipo de regla desconocido';
 }
 
@@ -143,7 +161,7 @@ export function reglaValida({ kind, source, scope }) {
 
 const COLUMNAS = [
   'enabled', 'min_score', 'allow_unrated', 'cap', 'window_days',
-  'editions', 'months', 'lookback_days', 'include_docs',
+  'editions', 'months', 'lookback_days', 'include_docs', 'min_emerging',
 ];
 
 const entero = (v, min, max, def) => {
@@ -176,6 +194,7 @@ export function normalizarCampos(body = {}, previo = {}) {
   if (dado(body.months)) v.months = entero(body.months, 1, 24, 6);
   if (dado(body.lookback_days)) v.lookback_days = entero(body.lookback_days, 0, 365, 0);
   if (body.include_docs != null) v.include_docs = body.include_docs ? 1 : 0;
+  if (dado(body.min_emerging)) v.min_emerging = entero(body.min_emerging, 0, 100, 70);
   return v;
 }
 
@@ -184,6 +203,9 @@ export function valoresPorDefecto(kind) {
   const base = { enabled: 1, min_score: 0, allow_unrated: 0, cap: 20, include_docs: 0 };
   if (kind === 'estrenos') return { ...base, window_days: 15 };
   if (kind === 'festival') return { ...base, editions: 1 };
+  // el umbral de esta regla es el del DETECTOR (la persona), no la Σ de la
+  // película: 70 es «promesa con dos señales fuertes detrás»
+  if (kind === 'emergentes') return { ...base, min_emerging: 70, cap: 10 };
   if (kind === 'favoritos') {
     const d = autoRadarrDefaults();
     return { ...base, months: d.months, lookback_days: d.lookbackDays, include_docs: d.includeDocs ? 1 : 0 };
@@ -246,6 +268,63 @@ export function rulesLog({ ruleId = null, limit = 200 } = {}) {
 
 // --- el evaluador PURO -------------------------------------------------------
 
+/**
+ * LA CUARENTENA PRE-RADARR.
+ *
+ * Hay cine que cumple el umbral y aun así no quieres que entre solo: en tus
+ * palabras, «muchas pelis ruido muy hiperhinchadas en notas». Las notas
+ * agregadas no distinguen entre una película buena y una con una comunidad muy
+ * entregada votándola, y eso se concentra en idiomas y países concretos.
+ *
+ * Los criterios son GLOBALES, no por regla: son un juicio tuyo sobre qué
+ * procedencias te merecen una segunda mirada, no una propiedad de la fuente. Lo
+ * que los cumple NO se descarta —eso sería el ✕— sino que espera tu ✓ en la
+ * cuarentena. Aprobarla la manda a Radarr; rechazarla la veta.
+ */
+export function criteriosCuarentena() {
+  const lista = (k) =>
+    (getSetting(k) || '')
+      .split(',')
+      .map((x) => x.trim().toLowerCase())
+      .filter(Boolean);
+  return {
+    enabled: getSetting('quarantine_enabled') === '1',
+    langs: lista('quarantine_langs'),
+    countries: lista('quarantine_countries'),
+    // lo que escribiste, TAL CUAL, para que la casilla no te devuelva «in»
+    // donde tú tecleaste «IN»: la lista de arriba va en minúsculas porque es
+    // con la que se compara, no la que se enseña
+    texto: {
+      langs: getSetting('quarantine_langs') || '',
+      countries: getSetting('quarantine_countries') || '',
+    },
+  };
+}
+
+/**
+ * ¿Este item cae en cuarentena? PURA. Devuelve `{ kind, value }` o null.
+ * El idioma y los países salen de la ficha que `enrichRuntimes` ya pide.
+ *
+ * El motivo va PARTIDO y no como frase hecha porque la bandeja se pinta en el
+ * idioma de la interfaz: un `«idioma hi»` compuesto aquí es exactamente lo que
+ * deja a los avisos del servidor sin traducir. La frase se compone al final,
+ * con `textoCuarentena` para el historial (castellano) y con t() en el cliente.
+ */
+export function motivoCuarentena(item, criterios) {
+  if (!criterios?.enabled) return null;
+  const lang = String(item.original_language || '').toLowerCase();
+  if (lang && criterios.langs.includes(lang)) return { kind: 'idioma', value: lang };
+  const pais = (item.countries || [])
+    .map((c) => String(c).toUpperCase())
+    .find((c) => criterios.countries.includes(c.toLowerCase()));
+  if (pais) return { kind: 'pais', value: pais };
+  return null;
+}
+
+/** El motivo en castellano, para el historial de reglas y el log de la pasada. */
+export const textoCuarentena = (m) =>
+  m ? (m.kind === 'idioma' ? `idioma ${m.value}` : `país ${m.value}`) : '';
+
 /** Los motivos de descarte, con su texto. Un sitio, para que log e interfaz coincidan. */
 export const MOTIVOS = {
   sin_ficha: 'sin ficha en TMDB',
@@ -255,11 +334,13 @@ export const MOTIVOS = {
   corto: 'cortometraje',
   documental: 'documental',
   telefilme: 'telefilme',
+  evento: 'gala o evento, no es cine',
   cameo: 'papel testimonial',
   fuera_de_ventana: 'fuera de la ventana del estreno',
   esperando_nota: 'aún sin nota Σ: espera',
   bajo_umbral: 'por debajo del umbral',
   tope: 'aplazada por el tope de la pasada',
+  cuarentena: 'en cuarentena: espera tu aprobación',
 };
 
 const scoreDe = (i) => (i?.mdb?.score == null ? null : Number(i.mdb.score));
@@ -290,6 +371,8 @@ export function evaluarRegla(items = [], rule = {}, ctx = {}) {
   const ventana = rule.window_days == null ? null : Number(rule.window_days);
   const cap = Number(rule.cap) || 0;
 
+  const criterios = ctx.criterios || null;
+  const cuarentena = [];
   const descartadas = [];
   const fuera = (item, motivo, detalle = null) =>
     descartadas.push({ tmdb_id: item.tmdb_id ?? null, title: item.title, score: scoreDe(item), motivo, detalle });
@@ -305,6 +388,9 @@ export function evaluarRegla(items = [], rule = {}, ctx = {}) {
     if (excluidas.has(item.tmdb_id)) { fuera(item, excluidas.get(item.tmdb_id)); continue; }
     if (item.isShort) { fuera(item, 'corto'); continue; }
     if (item.isTvMovie) { fuera(item, 'telefilme'); continue; }
+    // una gala de lucha libre o un evento deportivo no es una película, aunque
+    // TMDB la tenga fichada como tal, y NUNCA se manda a Radarr por una regla
+    if (item.isEvento) { fuera(item, 'evento'); continue; }
     // un puesto muy abajo en el reparto o un «Self» es un cameo, no una
     // película que seguir a alguien signifique querer: mismo criterio que los
     // huecos y las filmografías de toda la app
@@ -324,6 +410,9 @@ export function evaluarRegla(items = [], rule = {}, ctx = {}) {
       }
     }
 
+    // La cuarentena va DESPUÉS de los filtros de tipo y de lo que ya tienes
+    // —no tiene sentido pedirte que apruebes un corto— y ANTES del umbral: si
+    // no llega al umbral, ni siquiera es candidata y no hay nada que aprobar.
     const score = scoreDe(item);
     if (minScore > 0) {
       if (score == null) {
@@ -332,6 +421,11 @@ export function evaluarRegla(items = [], rule = {}, ctx = {}) {
         fuera(item, 'bajo_umbral', `Σ ${score} < ${minScore}`);
         continue;
       }
+    }
+    const motivoQ = motivoCuarentena(item, criterios);
+    if (motivoQ) {
+      cuarentena.push({ ...item, motivoCuarentena: motivoQ });
+      continue;
     }
     pasan.push(item);
   }
@@ -350,7 +444,8 @@ export function evaluarRegla(items = [], rule = {}, ctx = {}) {
 
   const porMotivo = {};
   for (const d of descartadas) porMotivo[d.motivo] = (porMotivo[d.motivo] || 0) + 1;
-  return { elegidas, descartadas, porMotivo };
+  if (cuarentena.length) porMotivo.cuarentena = cuarentena.length;
+  return { elegidas, descartadas, cuarentena, porMotivo };
 }
 
 // --- la mitad que trae los datos ---------------------------------------------
@@ -421,6 +516,41 @@ export async function candidatasDeRegla(rule) {
     return { items: [...(r.recent || []), ...(r.upcoming || [])], errors: r.errors || [] };
   }
 
+  if (rule.kind === 'emergentes') {
+    // Las candidatas salen de la tabla que ya construyó el detector: la regla
+    // NO relanza la detección. Si el detector aún no ha corrido, la regla lo
+    // dice en vez de quedarse muda con «0 candidatas», que es indistinguible
+    // de «no hay nadie que llegue al umbral».
+    const umbral = Number(rule.min_emerging) || 0;
+    const filas = db.prepare('SELECT * FROM emerging_directors WHERE score >= ? ORDER BY score DESC').all(umbral);
+    if (!db.prepare('SELECT COUNT(*) n FROM emerging_directors').get().n) {
+      return { items: [], errors: ['el detector de emergentes aún no ha corrido: se reconstruye en el pase nocturno'] };
+    }
+    const items = [];
+    for (const f of filas) {
+      let pelis = [];
+      try {
+        pelis = JSON.parse(f.breakdown || '{}').pelis || [];
+      } catch {
+        pelis = [];
+      }
+      // ordenadas de la más antigua a la más nueva por el detector: la ópera
+      // prima es la primera
+      for (const p of rule.source === 'debut' ? pelis.slice(0, 1) : pelis) {
+        if (!p.tmdb_id) continue;
+        items.push({
+          tmdb_id: p.tmdb_id,
+          title: p.title,
+          year: p.year || null,
+          poster_path: p.poster_path || null,
+          person: f.name,
+          emergingScore: f.score,
+        });
+      }
+    }
+    return { items: await conTipo(items), errors: [] };
+  }
+
   // favoritos
   const d = autoRadarrDefaults();
   // Con umbral, el retrovisor mínimo NO puede ser cero. Una película estrenada
@@ -447,6 +577,7 @@ export const rulesStatus = {
   considered: 0,
   added: 0,
   skipped: 0,
+  cuarentena: 0,
   error: null,
   aviso: null, // lo que impide que la pasada sirva de algo (Radarr a medias, sin MDBList…)
   rules: [], // { id, label, considered, added, skipped, failed, error, porMotivo, log: [] }
@@ -488,7 +619,7 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
   if (rulesStatus.running) return rulesStatus;
   Object.assign(rulesStatus, {
     running: true, startedAt: Date.now(), finishedAt: null, dryRun: !!dryRun,
-    considered: 0, added: 0, skipped: 0, error: null, aviso: null, rules: [],
+    considered: 0, added: 0, skipped: 0, cuarentena: 0, error: null, aviso: null, rules: [],
   });
 
   try {
@@ -511,11 +642,17 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
     const inLib = new Set(db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((r) => r.tmdb_id));
     const owned = new Set(radarrOwnedIds().tmdbIds);
     const excluidas = autoRadarrExcluidas();
+    const criterios = criteriosCuarentena();
+    // la bandeja se limpia ANTES de mirarla: lo que ya tienes o ya decidiste no
+    // puede seguir pidiéndote permiso, ni bloquear a la regla que lo propuso
+    if (!dryRun) purgarPendientes();
+    // lo que ya espera tu ✓ no se vuelve a proponer ni se cuenta dos veces
+    for (const r of db.prepare('SELECT tmdb_id FROM radarr_pending').all()) excluidas.set(r.tmdb_id, 'cuarentena');
     const hoy = today();
     const log = dryRun ? null : insLog();
 
     for (const rule of reglas) {
-      const parte = { id: rule.id, label: rule.label, considered: 0, added: 0, skipped: 0, failed: 0, error: null, porMotivo: {}, log: [] };
+      const parte = { id: rule.id, label: rule.label, considered: 0, added: 0, skipped: 0, failed: 0, cuarentena: 0, error: null, porMotivo: {}, log: [] };
       rulesStatus.rules.push(parte);
       try {
         const { items, errors } = await candidatasDeRegla(rule);
@@ -534,7 +671,27 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
           await enrichWithScores(items, { fetchMissing: false });
         }
 
-        const { elegidas, descartadas, porMotivo } = evaluarRegla(items, rule, { inLib, owned, excluidas, hoy });
+        const { elegidas, descartadas, cuarentena, porMotivo } = evaluarRegla(items, rule, { inLib, owned, excluidas, hoy, criterios });
+        // a la bandeja, no a Radarr: esperan tu ✓
+        for (const q of cuarentena) {
+          const texto = textoCuarentena(q.motivoCuarentena);
+          if (dryRun) {
+            parte.log.push(`(simulado) ⏸ ${q.title} — iría a cuarentena (${texto})`);
+            continue;
+          }
+          const r = insPendiente.run(
+            q.tmdb_id, q.title, q.year || null, scoreDe(q), q.poster_path || null,
+            rule.id, rule.label, texto, q.motivoCuarentena.kind, q.motivoCuarentena.value, Date.now()
+          );
+          if (!r.changes) continue; // ya estaba en la bandeja: ni log ni aviso repetido
+          parte.log.push(`⏸ ${q.title} — en cuarentena (${texto})`);
+          // Una bandeja que nadie mira no sirve de nada, y esta vive dentro de
+          // una pestaña de Ajustes: el aviso del Dashboard es lo que hace que
+          // te enteres de que hay algo esperándote.
+          avisarDeCuarentena(q, texto);
+        }
+        parte.cuarentena = cuarentena.length;
+        rulesStatus.cuarentena += cuarentena.length;
         parte.considered = elegidas.length;
         parte.skipped = descartadas.length;
         parte.porMotivo = porMotivo;
@@ -600,6 +757,125 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
   return rulesStatus;
 }
 
+// --- la bandeja de cuarentena -------------------------------------------------
+
+const insPendiente = db.prepare(
+  `INSERT OR IGNORE INTO radarr_pending
+     (tmdb_id, title, year, score, poster_path, rule_id, rule_label, reason, reason_kind, reason_value, at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+);
+
+/**
+ * El aviso del Dashboard. Va por `app_events` como el resto de novedades del
+ * pase nocturno, con `ref` = el id de TMDB: cada película se anuncia UNA vez
+ * aunque vuelva a caer en la bandeja después de aprobarla y borrarla.
+ */
+function avisarDeCuarentena(item, texto) {
+  db.prepare(
+    `INSERT OR IGNORE INTO app_events (type, ref, title, body, url, created_at)
+     VALUES ('radarr_pending', ?, ?, ?, ?, ?)`
+  ).run(
+    String(item.tmdb_id),
+    `⏸ «${item.title}» espera tu visto bueno`,
+    `Pasó el filtro de una regla pero cumple un criterio de cuarentena (${texto}). En Ajustes → Automatismos la apruebas o la vetas.`,
+    '/ajustes?tab=automatismos',
+    Date.now()
+  );
+}
+
+/** Lo que espera tu ✓, lo último detectado primero. */
+export function pendientes() {
+  return db.prepare('SELECT * FROM radarr_pending ORDER BY at DESC, tmdb_id DESC').all();
+}
+
+/** Cuántas esperan tu ✓. Lo pide /api/setup-state para el punto de la barra lateral. */
+export const cuantasPendientes = () =>
+  db.prepare('SELECT COUNT(*) n FROM radarr_pending').get().n;
+
+/**
+ * Fuera de la bandeja lo que ya no hay que decidir: lo que has acabado teniendo
+ * en Plex o en Radarr por tu cuenta, y lo que has vetado o descartado desde
+ * otra pantalla. Sin esto la bandeja envejece: te pide permiso para bajar algo
+ * que ya bajaste, y una decisión que ya tomaste en otro sitio sigue esperando.
+ */
+export function purgarPendientes() {
+  const n = db.prepare(
+    `DELETE FROM radarr_pending WHERE tmdb_id IN (
+       SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL
+       UNION SELECT tmdb_id FROM radarr_movies
+       UNION SELECT tmdb_id FROM auto_radarr_vetoed
+       UNION SELECT tmdb_id FROM dismissed_movies)`
+  ).run().changes;
+  return n;
+}
+
+/**
+ * Aprobar: va a Radarr AHORA. Solo se borra de la bandeja si el alta funciona
+ * —si Radarr está caído y la quitáramos igual, la película se perdería entre
+ * dos sillas: ni pedida ni pendiente.
+ */
+export async function aprobarPendiente(tmdbId) {
+  const id = Number(tmdbId);
+  const fila = db.prepare('SELECT * FROM radarr_pending WHERE tmdb_id = ?').get(id);
+  if (!fila) throw new Error('Esa película no está en cuarentena');
+  const falta = radarrListoParaAñadir();
+  if (falta) throw new Error(falta);
+  await radarrAdd(id);
+  db.prepare('DELETE FROM radarr_pending WHERE tmdb_id = ?').run(id);
+  // la regla que la propuso puede haberse borrado mientras esperaba: el
+  // historial es por regla, y una fila colgando de un id que ya no existe no
+  // se ve desde ninguna parte
+  const existeRegla = fila.rule_id && db.prepare('SELECT 1 FROM radarr_rules WHERE id = ?').get(fila.rule_id);
+  if (existeRegla) {
+    db.prepare(
+      'INSERT INTO radarr_rule_log (rule_id, at, tmdb_id, title, score, action, detail) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(fila.rule_id, Date.now(), id, fila.title, fila.score, 'added', `aprobada desde la cuarentena (${fila.reason})`);
+  }
+  return { ok: true, title: fila.title };
+}
+
+/**
+ * Rechazar: fuera de la bandeja Y vetada. Sin el veto volvería a caer en
+ * cuarentena la noche siguiente, y la bandeja se convertiría en una noria.
+ */
+export function rechazarPendiente(tmdbId) {
+  const id = Number(tmdbId);
+  const fila = db.prepare('SELECT * FROM radarr_pending WHERE tmdb_id = ?').get(id);
+  db.prepare('INSERT OR REPLACE INTO auto_radarr_vetoed (tmdb_id, title, at) VALUES (?, ?, ?)')
+    .run(id, fila?.title || null, Date.now());
+  db.prepare('DELETE FROM radarr_pending WHERE tmdb_id = ?').run(id);
+  return { ok: true };
+}
+
+/**
+ * Vaciar la bandeja de una vez. Una regla sobre un país entero puede dejar
+ * veinte películas esperando en una sola noche, y decidirlas de una en una es
+ * lo que hace que la bandeja se abandone.
+ *
+ * Aprobar en bloque NO se detiene en el primer fallo: si Radarr rechaza una,
+ * las demás siguen, y lo que no entró se queda en la bandeja con su motivo.
+ */
+export async function resolverTodasLasPendientes(accion) {
+  const filas = pendientes();
+  if (accion === 'rechazar') {
+    for (const f of filas) rechazarPendiente(f.tmdb_id);
+    return { ok: true, rechazadas: filas.length };
+  }
+  const falta = radarrListoParaAñadir();
+  if (falta) throw new Error(falta);
+  let aprobadas = 0;
+  const errores = [];
+  for (const f of filas) {
+    try {
+      await aprobarPendiente(f.tmdb_id);
+      aprobadas++;
+    } catch (err) {
+      errores.push(`${f.title}: ${String(err.message || err)}`);
+    }
+  }
+  return { ok: true, aprobadas, errores };
+}
+
 /** ¿Hay algo que ejecutar? Lo consulta el pase nocturno para saltarse el paso. */
 export const hayReglasActivas = () => listRules().some((r) => r.enabled && !r.invalid);
 
@@ -612,10 +888,15 @@ export const runAutoRadarr = (opts = {}) => runRadarrRules({ ...opts, kinds: ['f
 
 /** Resumen para la interfaz: reglas, catálogo y estado de la última pasada. */
 export function rulesOverview() {
+  // se purga también al abrir la página, no solo de noche: si acabas de meter
+  // una a mano en Radarr, pedirte permiso para bajarla se lee como una avería
+  purgarPendientes();
   return {
     rules: listRules(),
     catalog: rulesCatalog(),
     status: rulesStatus,
+    criterios: criteriosCuarentena(),
+    pendientes: pendientes(),
     radarrConfigurado: !!(getSetting('radarr_url') && getSetting('radarr_key')),
   };
 }

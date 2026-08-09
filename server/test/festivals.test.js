@@ -38,6 +38,36 @@ test('cada festival casa el nombre real de su sección oficial', () => {
   assert.ok(REGISTRY.horizontes.section.test('Latin Horizons (Horizontes latinos)'));
 });
 
+// Las secciones de DEBUT son donde estrena quien empieza, y sus nombres reales
+// se comprobaron uno a uno contra los artículos de Wikipedia de 2010 a 2025:
+// la Berlinale cambió Encounters por Perspectives en 2025 y Venecia titula su
+// sección «Horizons (Orizzonti)» en los artículos viejos y «Orizzonti» ahora.
+test('cada sección de debut casa el nombre real que usa Wikipedia', () => {
+  assert.ok(REGISTRY.semaine.section.test("Critics' Week (Semaine de la critique)"));
+  assert.ok(REGISTRY.semaine.section.test('Critics’ Week'));
+  assert.ok(REGISTRY.quinzaine.section.test("Directors' Fortnight (Quinzaine des cinéastes)"));
+  assert.ok(REGISTRY.orizzonti.section.test('Orizzonti'));
+  assert.ok(REGISTRY.orizzonti.section.test('Horizons (Orizzonti)'));
+  assert.ok(REGISTRY.perspectives.section.test('Encounters'));
+  assert.ok(REGISTRY.perspectives.section.test('Perspectives'));
+  assert.ok(REGISTRY.ssnuevos.section.test('New Directors'));
+  // y comparten artículo con su festival madre
+  assert.equal(REGISTRY.semaine.article(2025), '2025 Cannes Film Festival');
+  assert.equal(REGISTRY.orizzonti.article(2025), '82nd Venice International Film Festival');
+  assert.equal(REGISTRY.ssnuevos.article(2025), '73rd San Sebastián International Film Festival');
+});
+
+// las secciones de debut no tienen artículo de premio: solo ofrecen edición por
+// año, como Busan. Ofrecer «palmarés» sería ofrecer una opción que revienta.
+test('las secciones de debut solo ofrecen sección oficial por año', () => {
+  for (const key of ['semaine', 'quinzaine', 'orizzonti', 'perspectives', 'ssnuevos']) {
+    const f = REGISTRY[key];
+    assert.equal(f.group, 'debut', key);
+    assert.ok(!f.awardPage && !f.staticList && !f.staticAward, key);
+    assert.ok(!f.onlyWinners && !f.awardNominees, key);
+  }
+});
+
 // una tabla como las reales: cursivas, enlaces, notas [1], celdas con <br>
 const TABLA = `
 <table class="wikitable sortable">
@@ -50,7 +80,11 @@ const TABLA = `
 
 test('parseSelectionTable saca título, original, director y país', () => {
   const rows = parseSelectionTable(TABLA);
-  assert.equal(rows.length, 4); // la fila de relleno cae en la celda de título
+  // tres películas: la fila de una sola celda que abarca la tabla es una
+  // cabecera interna («In Competition», «Feature films»), no una película. Así
+  // parten su tabla las secciones paralelas de Cannes, y antes se colaba como
+  // ficha fantasma que además salía a buscarse a TMDB.
+  assert.equal(rows.length, 3);
   assert.deepEqual(rows[0], {
     title: 'It Was Just an Accident',
     original_title: 'Yek tasadof-e sadeh',

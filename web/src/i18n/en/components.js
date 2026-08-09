@@ -148,4 +148,5 @@ export default {
   'Elige su ficha de TMDB. De ahí salen las notas, el reparto y el completismo de su gente. La corrección se recuerda y sobrevive a las sincronizaciones de Plex.':
     'Pick its TMDB entry. That\'s where the ratings, the cast and its people\'s completism come from. The correction is remembered and survives Plex syncs.',
   'Quitar la corrección y volver a lo que diga Plex': 'Remove the correction and go back to whatever Plex says',
+  'Lucha libre y eventos': 'Wrestling and live events',
 };

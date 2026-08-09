@@ -535,6 +535,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS radarr_rules (
   last_error TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_radarr_rules_uniq ON radarr_rules(kind, source, scope);`);
+// La 1.07 ya está desplegada, así que esta columna sí necesita migración de
+// verdad. Es el umbral de la regla de EMERGENTES (0-100 del detector), que no
+// es el mismo número que `min_score`: aquel es la Σ de MDBList de la película y
+// este es la puntuación de la persona que la dirige.
+ensureColumn('radarr_rules', 'min_emerging', 'min_emerging INTEGER');
 
 // Qué hizo cada regla y POR QUÉ. Sin esto, «0 añadidas» es indistinguible de
 // una avería: aquí queda escrito si fue el umbral, el veto, el tope o que ya la
@@ -551,6 +556,76 @@ db.exec(`CREATE TABLE IF NOT EXISTS radarr_rule_log (
 );
 CREATE INDEX IF NOT EXISTS idx_rrl_at ON radarr_rule_log(at);
 CREATE INDEX IF NOT EXISTS idx_rrl_rule ON radarr_rule_log(rule_id, at);`);
+
+// CUARENTENA PRE-RADARR: lo que una regla habría mandado a Radarr pero cumple
+// alguno de los criterios sospechosos (idioma, país), y por tanto espera tu ✓.
+// No es un veto: es un «esto decídelo tú». Aprobarla la manda a Radarr;
+// rechazarla la veta para que ninguna regla vuelva a proponerla.
+// El motivo va PARTIDO en `reason_kind` (idioma|pais) y `reason_value` (hi, IN)
+// además del texto: una bandeja que se lee en inglés no puede enseñar «idioma
+// hi» en castellano, y componer la frase en el servidor es justo lo que deja
+// sin traducir a los avisos viejos. El texto de `reason` se queda para el
+// historial de reglas, que sí es castellano por diseño.
+db.exec(`CREATE TABLE IF NOT EXISTS radarr_pending (
+  tmdb_id INTEGER PRIMARY KEY,
+  title TEXT,
+  year INTEGER,
+  score INTEGER,
+  poster_path TEXT,
+  rule_id INTEGER,
+  rule_label TEXT,
+  reason TEXT,
+  reason_kind TEXT,
+  reason_value TEXT,
+  at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pending_at ON radarr_pending(at);`);
+// la tabla nació en esta misma versión sin publicar, así que no hay bases en
+// producción con la forma vieja — pero sí bases de desarrollo, y un CREATE IF
+// NOT EXISTS no añade columnas a una tabla que ya existe
+ensureColumn('radarr_pending', 'poster_path', 'poster_path TEXT');
+ensureColumn('radarr_pending', 'reason_kind', 'reason_kind TEXT');
+ensureColumn('radarr_pending', 'reason_value', 'reason_value TEXT');
+
+// DIRECTORES EMERGENTES. Las dos primeras tablas son un CACHÉ: se borran y se
+// reconstruyen enteras en cada pasada del detector, y nada que hayas decidido
+// tú vive en ellas. Lo tuyo —a quién sigues— está en tracked_people, y la ✕
+// tiene su propia tabla justo por eso: una reconstrucción no puede resucitar a
+// quien ya dijiste que no.
+db.exec(`CREATE TABLE IF NOT EXISTS emerging_directors (
+  name_key TEXT PRIMARY KEY,        -- normName(nombre): la misma clave que usa el resto de la app
+  name TEXT,
+  tmdb_id INTEGER,
+  profile_path TEXT,
+  birthday TEXT,
+  gender INTEGER,
+  country TEXT,
+  continent TEXT,
+  features INTEGER,                 -- largometrajes dirigidos y estrenados
+  first_year INTEGER,               -- año de su primer largo
+  last_title TEXT,
+  last_year INTEGER,
+  last_tmdb_id INTEGER,
+  last_poster TEXT,
+  score INTEGER,                    -- 0-100
+  breakdown TEXT,                   -- JSON: el desglose que la ficha ENSEÑA
+  computed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_emerg_score ON emerging_directors(score DESC);
+
+CREATE TABLE IF NOT EXISTS emerging_signals (
+  name_key TEXT NOT NULL,
+  festival TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  winner INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (name_key, festival, year, title)
+);
+
+CREATE TABLE IF NOT EXISTS emerging_dismissed (
+  name_key TEXT PRIMARY KEY,
+  at INTEGER
+);`);
 
 // La 1.04 guardó aquí las pistas de audio y subtítulo para auditar subtítulos.
 // La 1.05 retira esa función —Bazarr ya se encarga— y con ella la tabla, que

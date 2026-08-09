@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../api.js';
+import { api, tmdbImg } from '../api.js';
 import { Select, Spinner } from '../components.jsx';
 import { t, locale } from '../i18n.js';
 import { toast } from '../toast.js';
@@ -15,7 +15,7 @@ import { toast } from '../toast.js';
  * de Radarr a mano NO basta: vuelve mañana. Para decir «esta no» está el 🚫.
  */
 
-const GRUPOS = { festival: 'Festivales', premio: 'Premios', canon: 'Cánones' };
+const GRUPOS = { festival: 'Festivales', debut: 'Secciones de debut', premio: 'Premios', canon: 'Cánones' };
 
 function Titulo({ children, extra = null }) {
   return (
@@ -46,6 +46,31 @@ function UmbralBar({ value, onChange, onCommit }) {
       <span className={`text-xs tabular-nums ${value > 0 ? 'text-gold-400' : 'text-zinc-500'}`}>
         {value > 0 ? `Σ ≥ ${value}` : t('sin filtro: entra todo')}
       </span>
+    </div>
+  );
+}
+
+/** La misma barrita, pero midiendo a la PERSONA: la puntuación del detector. */
+function UmbralEmergentes({ value, onCommit }) {
+  const [v, setV] = useState(value);
+  useEffect(() => { setV(value); }, [value]);
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <span className="text-xs text-zinc-400 shrink-0">{t('Puntuación mínima de emergente')}</span>
+      <input
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value={v}
+        className="accent-gold-500 w-48 max-sm:w-full"
+        onChange={(e) => setV(Number(e.target.value))}
+        onPointerUp={() => v !== value && onCommit(v)}
+        onKeyUp={() => v !== value && onCommit(v)}
+        onBlur={() => v !== value && onCommit(v)}
+      />
+      <span className="text-xs tabular-nums text-gold-400">≥ {v}</span>
+      <span className="text-[11px] text-zinc-500">{t('la puntuación del detector, no la nota de la película')}</span>
     </div>
   );
 }
@@ -100,6 +125,10 @@ function etiqueta(regla, catalog) {
     const r = catalog?.favoritos?.find((x) => x.key === regla.source);
     if (r) return `${t('Mis favoritos')} · ${t(r.name)}`;
   }
+  if (regla.kind === 'emergentes') {
+    const a = catalog?.emergentes?.find((x) => x.key === regla.source);
+    if (a) return `${t('Emergentes')} · ${t(a.name)}`;
+  }
   return regla.label;
 }
 
@@ -146,9 +175,19 @@ function ReglaCard({ regla, catalog, onPatch, onDelete, onRun, corriendo, parte 
       )}
 
       <div className="mt-3 space-y-2">
-        <UmbralBar value={umbral} onChange={setUmbral} onCommit={() => {
-          if (umbral !== regla.min_score) onPatch(regla.id, { min_score: umbral });
-        }} />
+        {/* El umbral de una regla de emergentes es el del DETECTOR —la persona,
+            de 0 a 100— y no la Σ de la película: son dos números distintos y
+            enseñar los dos a la vez sería garantizar que se confunden. */}
+        {regla.kind === 'emergentes' ? (
+          <UmbralEmergentes
+            value={regla.min_emerging ?? 70}
+            onCommit={(v) => onPatch(regla.id, { min_emerging: v })}
+          />
+        ) : (
+          <UmbralBar value={umbral} onChange={setUmbral} onCommit={() => {
+            if (umbral !== regla.min_score) onPatch(regla.id, { min_score: umbral });
+          }} />
+        )}
 
         {conUmbral && (
           <label className="flex items-center gap-2 text-[11px] text-zinc-500 cursor-pointer">
@@ -277,11 +316,13 @@ const MOTIVO_TEXTO = {
   corto: 'cortometraje',
   documental: 'documental',
   telefilme: 'telefilme',
+  evento: 'gala o evento',
   cameo: 'papel testimonial',
   fuera_de_ventana: 'fuera de la ventana',
   esperando_nota: 'esperando nota',
   bajo_umbral: 'bajo el umbral',
   tope: 'aplazadas por el tope',
+  cuarentena: 'en cuarentena, esperan tu ✓',
 };
 
 /** El formulario de alta: tipo → fuente → (vista, solo festivales). */
@@ -302,7 +343,9 @@ function NuevaRegla({ catalog, existentes, onCreate }) {
       ? catalog.festival.map((f) => [f.key, `${t(GRUPOS[f.group] || f.group)} · ${t(f.name)}`])
       : kind === 'estrenos'
         ? catalog.estrenos.map((e) => [e.key, t(e.name)])
-        : catalog.favoritos.map((r) => [r.key, t(r.name)]);
+        : kind === 'emergentes'
+          ? (catalog.emergentes || []).map((a) => [a.key, t(a.name)])
+          : catalog.favoritos.map((r) => [r.key, t(r.name)]);
 
   const elegirKind = (k) => {
     setKind(k);
@@ -337,6 +380,7 @@ function NuevaRegla({ catalog, existentes, onCreate }) {
             ['festival', t('Festival, premio o canon')],
             ['estrenos', t('Estrenos')],
             ['favoritos', t('Mis favoritos')],
+            ['emergentes', t('Directores emergentes')],
           ]}
         />
         <Select value={source} onChange={elegirSource} options={opcionesFuente} placeholder={t('— elige —')} />
@@ -361,8 +405,152 @@ function NuevaRegla({ catalog, existentes, onCreate }) {
       </div>
       {duplicada && <p className="text-[11px] text-amber-400">{t('Esa regla ya existe: afínala en su tarjeta.')}</p>}
       <p className="text-[11px] text-zinc-500">
-        {t('Nace sin umbral (entra todo) y con tope de 20 por pasada. Ajusta la barrita después.')}
+        {kind === 'emergentes'
+          ? t('Nace pidiendo 70 de puntuación de emergente y con tope de 10 por pasada. Se apoya en el detector, que se reconstruye una vez por semana.')
+          : t('Nace sin umbral (entra todo) y con tope de 20 por pasada. Ajusta la barrita después.')}
       </p>
+    </div>
+  );
+}
+
+/**
+ * CUARENTENA PRE-RADARR: los criterios y la bandeja de lo que espera tu ✓.
+ *
+ * Los criterios son GLOBALES a todas las reglas a propósito: son un juicio tuyo
+ * sobre qué procedencias merecen una segunda mirada —«pelis ruido muy
+ * hiperhinchadas en notas»—, no una propiedad de la fuente de cada regla.
+ */
+/**
+ * El motivo, compuesto AQUÍ y no en el servidor: la bandeja se pinta en el
+ * idioma de la interfaz, y una frase ya redactada en castellano es justo lo
+ * que deja sin traducir a los avisos viejos. El servidor manda las piezas
+ * (`reason_kind` + `reason_value`) y guarda su propia frase para el historial.
+ */
+const motivoLegible = (p) => {
+  if (p.reason_kind === 'idioma') return t('idioma {x}', { x: p.reason_value });
+  if (p.reason_kind === 'pais') return t('país {x}', { x: p.reason_value });
+  return p.reason || '';
+};
+
+/** Una película esperando tu ✓: cartel pequeño, el porqué, y las dos salidas. */
+function FilaPendiente({ p, onAprobar, onRechazar }) {
+  const cartel = tmdbImg(p.poster_path, 'w92');
+  return (
+    <div className="flex items-center gap-3 text-xs bg-ink-800/40 rounded-lg px-3 py-2">
+      {/* el cartel no es adorno: decidir «esta sí, esta no» a ciegas sobre un
+          título que no conoces es lo que hace que la bandeja se abandone */}
+      {cartel ? (
+        <img src={cartel} alt="" loading="lazy" className="w-8 h-12 object-cover rounded shrink-0 bg-ink-700" />
+      ) : (
+        <div className="w-8 h-12 rounded shrink-0 bg-ink-700" />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-zinc-200 truncate">{p.title || `TMDB ${p.tmdb_id}`}</span>
+          {p.year && <span className="text-zinc-500">{p.year}</span>}
+          {p.score != null && <span className="text-gold-400 tabular">Σ {p.score}</span>}
+        </div>
+        <div className="text-zinc-500 truncate">
+          {motivoLegible(p)}
+          {p.rule_label ? ` · ${p.rule_label}` : ''}
+        </div>
+      </div>
+      <span className="flex items-center gap-2 shrink-0">
+        <button className="btn-gold !py-0.5 !px-2" onClick={() => onAprobar(p)}>{t('✓ A Radarr')}</button>
+        <button
+          className="btn-ghost !py-0.5 !px-2"
+          title={t('La veta: ninguna regla la volverá a proponer')}
+          onClick={() => onRechazar(p)}
+        >
+          🚫
+        </button>
+      </span>
+    </div>
+  );
+}
+
+function Cuarentena({ criterios, pendientes, onGuardar, onAprobar, onRechazar, onTodas }) {
+  // el TEXTO tal cual lo escribiste, no la lista normalizada: la lista va en
+  // minúsculas porque es con la que se compara, y devolverte «in» donde
+  // tecleaste «IN» parece que la casilla te corrige
+  const [langs, setLangs] = useState(criterios?.texto?.langs ?? '');
+  const [paises, setPaises] = useState(criterios?.texto?.countries ?? '');
+  useEffect(() => {
+    setLangs(criterios?.texto?.langs ?? '');
+    setPaises(criterios?.texto?.countries ?? '');
+  }, [criterios]);
+
+  return (
+    <div className="mt-5 pt-4 border-t border-ink-700">
+      <Titulo
+        extra={
+          pendientes.length > 0 ? (
+            <span className="badge-quiet">{t('{n} esperando tu ✓', { n: pendientes.length })}</span>
+          ) : null
+        }
+      >
+        {t('Cuarentena antes de Radarr')}
+      </Titulo>
+      <p className="text-[11px] text-zinc-500 mt-1 max-w-3xl">
+        {t('Lo que cumpla estos criterios NO se manda solo: pasa por aquí y espera tu aprobación. Es para lo que pasa el umbral pero merece una segunda mirada — notas infladas por una comunidad muy entregada, por ejemplo. Vale para TODAS las reglas.')}
+      </p>
+
+      <label className="flex items-center gap-2 text-sm text-zinc-200 cursor-pointer mt-3">
+        <input
+          type="checkbox"
+          className="accent-gold-500"
+          checked={!!criterios?.enabled}
+          onChange={(e) => onGuardar({ quarantine_enabled: e.target.checked ? '1' : '0' })}
+        />
+        {t('Poner en cuarentena lo que cumpla alguno de estos criterios')}
+      </label>
+
+      {criterios?.enabled && (
+        <div className="grid sm:grid-cols-2 gap-3 mt-3 ml-6 max-w-2xl">
+          <div>
+            <label className="text-xs text-zinc-400">{t('Idiomas originales')}</label>
+            <input
+              className="input mt-1"
+              placeholder="hi, ta, te, ml"
+              value={langs}
+              onChange={(e) => setLangs(e.target.value)}
+              onBlur={() => onGuardar({ quarantine_langs: langs })}
+            />
+            <p className="text-[11px] text-zinc-500 mt-1">{t('Códigos de dos letras separados por comas (hi = hindi, ta = tamil).')}</p>
+          </div>
+          <div>
+            <label className="text-xs text-zinc-400">{t('Países de producción')}</label>
+            <input
+              className="input mt-1"
+              placeholder="IN, NG"
+              value={paises}
+              onChange={(e) => setPaises(e.target.value)}
+              onBlur={() => onGuardar({ quarantine_countries: paises })}
+            />
+            <p className="text-[11px] text-zinc-500 mt-1">{t('Códigos de dos letras separados por comas (IN = India).')}</p>
+          </div>
+        </div>
+      )}
+
+      {pendientes.length > 0 && (
+        <div className="mt-4 space-y-1.5">
+          {pendientes.map((p) => (
+            <FilaPendiente key={p.tmdb_id} p={p} onAprobar={onAprobar} onRechazar={onRechazar} />
+          ))}
+          {/* con una regla sobre un país entero, veinte de una en una es lo que
+              hace que la bandeja se abandone */}
+          {pendientes.length > 1 && (
+            <div className="flex items-center gap-2 pt-1">
+              <button className="btn-ghost !py-0.5 !px-2 text-xs" onClick={() => onTodas('aprobar')}>
+                {t('✓ Aprobar las {n}', { n: pendientes.length })}
+              </button>
+              <button className="btn-ghost !py-0.5 !px-2 text-xs" onClick={() => onTodas('rechazar')}>
+                {t('🚫 Vetar las {n}', { n: pendientes.length })}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -536,6 +724,44 @@ export default function RadarrRulesSection() {
     }, 1500);
   };
 
+  const guardarCriterios = async (campos) => {
+    const r = await api('/settings', { method: 'PUT', body: campos });
+    if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
+    load();
+  };
+
+  const aprobar = async (p) => {
+    const r = await api(`/radarr/pending/${p.tmdb_id}/approve`, { method: 'POST' });
+    if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
+    toast(t('✓ «{p}» mandada a Radarr', { p: p.title || p.tmdb_id }));
+    load();
+  };
+
+  const rechazar = async (p) => {
+    const r = await api(`/radarr/pending/${p.tmdb_id}`, { method: 'DELETE' });
+    if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
+    load();
+  };
+
+  /** Vaciar la bandeja de una vez. Vetar en bloque es irreversible: se pregunta. */
+  const todas = async (accion) => {
+    const n = data?.pendientes?.length || 0;
+    if (accion === 'rechazar' && !window.confirm(t('¿Vetar las {n} en cuarentena? Ninguna regla las volverá a proponer.', { n }))) return;
+    const r = await api('/radarr/pending/all', { method: 'POST', body: { accion } });
+    if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
+    if (accion === 'aprobar') {
+      // lo que Radarr rechazó se queda en la bandeja: hay que decirlo, o el
+      // recuento que baja «casi del todo» parece un fallo de la pantalla
+      toast(
+        r.errores?.length
+          ? t('✓ {n} mandadas a Radarr · {e} no se pudieron añadir', { n: r.aprobadas, e: r.errores.length })
+          : t('✓ {n} mandadas a Radarr', { n: r.aprobadas }),
+        r.errores?.length ? 'error' : 'info'
+      );
+    }
+    load();
+  };
+
   /** 🚫 sobre una película que una regla ya mandó: la única forma de que no vuelva. */
   const vetar = async (tmdbId, title) => {
     const r = await api('/radarr/auto/veto', { method: 'POST', body: { tmdbId, title } });
@@ -610,10 +836,14 @@ export default function RadarrRulesSection() {
         </div>
       )}
 
+      {/* Un tipo de regla que falte AQUÍ se puede crear y no se ve nunca: la
+          tarjeta no existe, así que no hay forma de afinarla ni de borrarla.
+          Hay un test que compara esta lista con RULE_KINDS del servidor. */}
       {[
         ['festival', t('Festivales, premios y cánones')],
         ['estrenos', t('Estrenos')],
         ['favoritos', t('Mis favoritos')],
+        ['emergentes', t('Directores emergentes')],
       ].map(([kind, titulo]) => (
         <div key={kind} className="mt-4">
           <div className="text-xs uppercase tracking-wide text-zinc-500 mb-2">{titulo}</div>
@@ -641,6 +871,15 @@ export default function RadarrRulesSection() {
       <div className="mt-4">
         <NuevaRegla catalog={data.catalog} existentes={data.rules} onCreate={crear} />
       </div>
+
+      <Cuarentena
+        criterios={data.criterios}
+        pendientes={data.pendientes || []}
+        onGuardar={guardarCriterios}
+        onAprobar={aprobar}
+        onRechazar={rechazar}
+        onTodas={todas}
+      />
 
       {data.log?.length > 0 && (
         <details className="mt-4">

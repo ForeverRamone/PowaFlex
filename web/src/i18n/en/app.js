@@ -23,6 +23,8 @@ export default {
     'The last full refresh is more than 26 hours old: the nightly run may not be running',
   'La última pasada terminó con {n} error(es): mira el histórico en Ajustes':
     'The last run finished with {n} error(s): check the history in Settings',
+  '{n} película(s) en cuarentena esperan tu ✓ en Ajustes → Automatismos':
+    '{n} movie(s) in quarantine are waiting for your ✓ in Settings → Automation',
   'películas sincronizadas': 'movies synced',
   'Añadidas en la última sincronización': 'Added in the last sync',
   'PowaFlex {v} — ver qué trae esta versión': 'PowaFlex {v} — see what this version brings',

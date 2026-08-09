@@ -115,6 +115,69 @@ export const REGISTRY = {
     section: /latin horizons|horizontes latinos/i,
     sinceYear: 2002, // la sección nació en 2002
   },
+  // --- LAS SECCIONES DE DEBUT -------------------------------------------------
+  //
+  // Aquí es donde aparecen los grandes ANTES de serlo. La competición principal
+  // de Cannes o Venecia la pisa quien ya llegó; el primer largo de quien va a
+  // llegar se estrena en la Semana de la Crítica, en la Quincena, en Orizzonti,
+  // en Perspectives o en Nuevos Directores. Sin estas cinco, un detector de
+  // emergentes mira justo el sitio donde los emergentes todavía no están.
+  //
+  // Ninguna tiene artículo de premio propio utilizable, así que solo ofrecen
+  // «sección oficial por año», como Busan y Horizontes.
+  //
+  // OJO con `sinceYear`: NO es el año de fundación de la sección sino aquel
+  // desde el que el artículo INGLÉS de cada edición la tabula. La Semaine
+  // existe desde 1962 y la Quinzaine desde 1969, pero sus tablas no están en
+  // los artículos viejos, y prometer ediciones que solo saben devolver «no se
+  // encontró la sección» es peor que no ofrecerlas.
+  semaine: {
+    name: 'Cannes · Semana de la Crítica',
+    award: 'Semaine de la critique: primeras y segundas películas',
+    group: 'debut',
+    article: (y) => `${y} Cannes Film Festival`,
+    section: /critics.? week/i,
+    sinceYear: 2010,
+  },
+  quinzaine: {
+    name: 'Cannes · Quincena',
+    award: 'Quinzaine des cinéastes (Directors’ Fortnight)',
+    group: 'debut',
+    article: (y) => `${y} Cannes Film Festival`,
+    section: /directors.? fortnight|quinzaine/i,
+    sinceYear: 2010,
+  },
+  orizzonti: {
+    name: 'Venecia · Orizzonti',
+    award: 'Orizzonti: nuevas tendencias del cine mundial',
+    group: 'debut',
+    // los artículos de 2015 la titulan «Horizons (Orizzonti)» y los de ahora
+    // «Orizzonti» a secas
+    article: (y) => `${nth(y - 1943)} Venice International Film Festival`,
+    section: /orizzonti|^horizons/i,
+    sinceYear: 2010,
+  },
+  // La Berlinale cambió de sección para lo nuevo a mitad de camino: Encounters
+  // (2020-2024) y Perspectives (desde 2025, y esta ya es explícitamente de
+  // ópera prima). Van bajo la misma entrada porque para lo que aquí interesa
+  // —dónde estrena quien empieza— son la misma cosa en dos épocas.
+  perspectives: {
+    name: 'Berlinale · Perspectives',
+    award: 'Perspectives / Encounters: óperas primas y voces nuevas',
+    group: 'debut',
+    article: (y) => `${nth(y - 1950)} Berlin International Film Festival`,
+    section: /^(encounters|perspectives)$/i,
+    sinceYear: 2020,
+  },
+  ssnuevos: {
+    name: 'S.S. · Nuevos Directores',
+    award: 'Premio Kutxabank-Nuev@s Director@s',
+    group: 'debut',
+    article: (y) => `${nth(y - 1952)} San Sebastián International Film Festival`,
+    section: /new directors/i,
+    sinceYear: 2010,
+  },
+
   // No es un festival: es EL canon de la crítica, fijo hasta 2032. Vive aquí
   // porque la vista de palmarés le da gratis todo lo que necesita (tengo/vista,
   // notas, Radarr en bloque, seguir directores/as).
@@ -309,6 +372,12 @@ export function parseSelectionTable(html, { all = false } = {}) {
     for (const row of rows.slice(1)) {
       const cells = (row.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || []).map(stripTags);
       if (!cells.length) continue;
+      // Fila-cabecera DENTRO de la tabla: una sola celda que abarca el ancho
+      // («In Competition», «Feature films», «Special Screenings»), que es como
+      // parten su tabla las secciones paralelas de Cannes. Sin este corte se
+      // colaba como película, salía a buscarla a TMDB y aparecía en la lista
+      // como una ficha sin emparejar que no existe.
+      if (cells.length < 2) continue;
       // Cuando el título original coincide con el inglés, la fila viene SIN esa
       // celda y todas las columnas posteriores se corren una a la izquierda
       // (pasaba en Cannes 2025: el país acababa de director/a). Se detecta por
@@ -710,6 +779,32 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe) {
       sinCreditos.push(c);
     }
   }
+  // SEGUNDA VUELTA, sin ventana de año. Los cánones y los palmareses fechan por
+  // producción o por estreno en festival, y TMDB por estreno comercial: «Beau
+  // travail» es 1998 para Sight & Sound y 2000 para TMDB, y «Partie de
+  // campagne» se rodó en 1936 y se estrenó en 1946. Con la ventana de ±1 esos
+  // candidatos ni se llegaban a mirar, y la película se quedaba sin ficha aunque
+  // el buscador manual la encontrara a la primera.
+  //
+  // Esto NO relaja la regla de «mejor sin ficha que la ficha de otra»: al
+  // contrario, aquí se EXIGEN las dos pruebas a la vez —título clavado Y
+  // dirección verificada—, que es más de lo que se pide dentro de la ventana.
+  // Con las dos, el año deja de aportar nada.
+  if (!tmdbId && !fallosRed && row.director) {
+    const dentro = new Set(enVentana.map((c) => c.id));
+    for (const c of candidatos.filter((x) => !dentro.has(x.id) && tituloClavado(x))) {
+      const dirs = await dirsDe(c.id);
+      if (dirs === null) {
+        fallosRed = true;
+        break;
+      }
+      if (dirs.length && directorsMatch(row.director, dirs)) {
+        tmdbId = c.id;
+        break;
+      }
+    }
+  }
+
   // Solo si NADIE con créditos lo demostró (y sin cortes de red a medias),
   // valen las fichas sin equipo por título clavado — las recién anunciadas.
   if (!tmdbId && !fallosRed) {
@@ -1170,7 +1265,7 @@ const DECADE_FESTIVALS = ['cannes', 'venecia', 'berlinale'];
  * de Wikipedia y se guarda cruda 180 días. El agregado de una década no puede
  * permitirse resolver ~600 fichas contra TMDB solo para contar nombres.
  */
-async function editionRowsLight(key, f, year) {
+export async function editionRowsLight(key, f, year) {
   const full = cacheRead(`${cachePrefix('festival')}:${key}:${year}`, 180 * DAY);
   if (full?.films?.length) return full.films;
   const rawKey = `${cachePrefix('festival')}:raw:${key}:${year}`;
@@ -1179,6 +1274,32 @@ async function editionRowsLight(key, f, year) {
   const { rows } = await fetchSelectionRows(key, f, year);
   cacheWrite(rawKey, { rows });
   return rows;
+}
+
+/**
+ * El palmarés SIN tocar TMDB: solo las filas del artículo (o del dataset), que
+ * es todo lo que hace falta para saber QUIÉN ganó QUÉ y en qué año.
+ *
+ * Existe por lo mismo que `editionRowsLight`: el detector de emergentes cruza
+ * doce palmareses para marcar las ganadoras y no puede permitirse resolver
+ * cientos de fichas contra TMDB para comparar nombres. Si el palmarés completo
+ * ya está cacheado se aprovecha; si no, las filas crudas cuestan una llamada a
+ * Wikipedia que además queda cacheada un día para todo el mundo.
+ */
+export async function winnersRowsLight(key) {
+  const f = REGISTRY[key];
+  if (!f) return [];
+  const full = cacheRead(`${cachePrefix('festival')}:${key}:palmares`, 30 * DAY);
+  if (full?.films?.length) return full.films;
+  if (f.staticAward) return f.staticAward.filter((r) => r.winner);
+  if (f.staticList) return [];
+  if (!f.awardPage) return []; // Busan, Horizontes y las secciones de debut
+  if (f.awardParse === 'cahiers') return (await getCahiersRows(f)).filter((r) => r.rank === 1);
+  if (f.awardParse === 'sundanceList') {
+    const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
+    return parseSundanceWinners(parsed.text);
+  }
+  return getAwardRows(f);
 }
 
 /**

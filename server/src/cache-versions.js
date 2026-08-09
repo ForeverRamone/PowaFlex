@@ -32,7 +32,11 @@ export const CACHE_VERSIONS = {
   // ajena se colaba por delante de la de Echevarría por orden de búsqueda)
   // v6: títulos con «(ex-æquo)» y título original inline limpiados, y premios
   // con vista de nominadas por año
-  festival: 6,
+  // v7: segunda vuelta sin ventana de año exigiendo título clavado Y dirección
+  // verificada — lo cacheado antes tiene como «sin ficha» los clásicos que el
+  // BFI fecha por producción y TMDB por estreno comercial (Beau travail,
+  // Partie de campagne…)
+  festival: 7,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

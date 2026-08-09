@@ -22,6 +22,20 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.08',
+    fecha: '2026-08-09',
+    titular: 'Quién va a ser un grande dentro de diez años',
+    puntos: [
+      'Página nueva de directores emergentes: quién está estrenando con éxito de crítica y público hoy y todavía no le sigue nadie. Sale de las tablas de festivales que PowaFlex ya tiene guardadas, no de notas sueltas.',
+      'Cinco secciones de debut nuevas —la Semana de la Crítica y la Quincena de Cannes, Orizzonti, Perspectives de la Berlinale y Nuevos Directores de San Sebastián—, que es donde de verdad estrena quien empieza. También están en Festivales y se pueden vigilar con una regla.',
+      'Cada ficha explica su puntuación: qué festival, qué nota de la crítica, cuánta gente la ha marcado en Letterboxd y si su segunda película sube respecto a la primera. Un número sin explicación es un oráculo.',
+      'Lo que no tiene datos no puntúa cero: sale del reparto. Un debut sin Metacritic no puede quedar por detrás de una película mediana solo porque de la mediana haya más información.',
+      'Regla nueva de Radarr: «mándame la ópera prima de todo emergente que llegue a 70».',
+      'La cuarentena avisa. Lo que se queda esperando tu visto bueno aparece en las novedades del panel y con un contador en Ajustes, y ya no se decide de una en una: se puede aprobar o vetar todo de golpe.',
+      'La bandeja de cuarentena se limpia sola de lo que acabaste teniendo por tu cuenta, y enseña el cartel de cada película para poder decidir.',
+    ],
+  },
+  {
     label: 'Beta 1.07',
     fecha: '2026-08-09',
     titular: 'Reglas automáticas a Radarr, y unos Ajustes que se pueden leer',

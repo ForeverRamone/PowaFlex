@@ -20,6 +20,8 @@ export default {
   'Hay una pasada en curso': 'A run is in progress',
   reintentar: 'retry',
   'papel testimonial': 'walk-on part',
+  'gala o evento': 'live event',
+  'gala o evento, no es cine': 'live event, not a movie',
   'sin clave de MDBList no hay nota Σ: las reglas con umbral no pueden decidir':
     'without an MDBList key there is no Σ score: rules with a threshold cannot decide',
   'agotado el cupo diario de MDBList: las notas que falten se piden mañana':
@@ -90,4 +92,29 @@ export default {
   'esperando nota': 'waiting for a score',
   'bajo el umbral': 'below the threshold',
   'aplazadas por el tope': 'held back by the cap',
+  // ── cuarentena pre-Radarr ─────────────────────────────────────────────────
+  'Cuarentena antes de Radarr': 'Quarantine before Radarr',
+  '{n} esperando tu ✓': '{n} waiting for your ✓',
+  'Lo que cumpla estos criterios NO se manda solo: pasa por aquí y espera tu aprobación. Es para lo que pasa el umbral pero merece una segunda mirada — notas infladas por una comunidad muy entregada, por ejemplo. Vale para TODAS las reglas.':
+    'Whatever meets these criteria is NOT sent on its own: it lands here and waits for your approval. It is for what clears the threshold but deserves a second look — scores inflated by a very dedicated community, for instance. It applies to ALL rules.',
+  'Poner en cuarentena lo que cumpla alguno de estos criterios': 'Quarantine anything meeting any of these criteria',
+  'Idiomas originales': 'Original languages',
+  'Códigos de dos letras separados por comas (hi = hindi, ta = tamil).': 'Two-letter codes separated by commas (hi = Hindi, ta = Tamil).',
+  'Países de producción': 'Production countries',
+  'Códigos de dos letras separados por comas (IN = India).': 'Two-letter codes separated by commas (IN = India).',
+  '✓ A Radarr': '✓ To Radarr',
+  'La veta: ninguna regla la volverá a proponer': 'Vetoes it: no rule will propose it again',
+  '✓ «{p}» mandada a Radarr': '✓ “{p}” sent to Radarr',
+  'en cuarentena, esperan tu ✓': 'in quarantine, waiting for your ✓',
+  'en cuarentena: espera tu aprobación': 'in quarantine: waiting for your approval',
+  // el motivo se compone en el cliente: el servidor manda las piezas
+  'idioma {x}': 'language {x}',
+  'país {x}': 'country {x}',
+  '✓ Aprobar las {n}': '✓ Approve all {n}',
+  '🚫 Vetar las {n}': '🚫 Veto all {n}',
+  '¿Vetar las {n} en cuarentena? Ninguna regla las volverá a proponer.':
+    'Veto all {n} in quarantine? No rule will propose them again.',
+  '✓ {n} mandadas a Radarr': '✓ {n} sent to Radarr',
+  '✓ {n} mandadas a Radarr · {e} no se pudieron añadir': '✓ {n} sent to Radarr · {e} could not be added',
+  'Esa película no está en cuarentena': 'That movie is not in quarantine',
 };

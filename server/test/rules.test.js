@@ -63,13 +63,14 @@ test('el veto 🚫 y el descarte ✕ mandan sobre cualquier regla', () => {
   assert.equal(r.descartadas.find((d) => d.tmdb_id === 2).motivo, 'descartada');
 });
 
-test('cortos, telefilmes y documentales fuera; los documentales solo si los pides', () => {
+test('cortos, telefilmes, galas y documentales fuera; los documentales solo si los pides', () => {
   const items = [
     peli(1, { isShort: true }),
     peli(2, { isTvMovie: true }),
     peli(3, { isDocumentary: true }),
     peli(4, { isMusic: true }),
     peli(5),
+    peli(6, { isEvento: true }), // un WWE SummerSlam: TMDB lo ficha como película
   ];
   const sin = evaluarRegla(items, { min_score: 0 }, ctx());
   assert.deepEqual(sin.elegidas.map((x) => x.tmdb_id), [5]);
@@ -77,8 +78,10 @@ test('cortos, telefilmes y documentales fuera; los documentales solo si los pide
 
   const con = evaluarRegla(items, { min_score: 0, include_docs: 1 }, ctx());
   assert.deepEqual(con.elegidas.map((x) => x.tmdb_id).sort(), [3, 4, 5]);
-  // un corto sigue siendo un corto aunque pidas documentales
+  // un corto sigue siendo un corto aunque pidas documentales, y una gala de
+  // lucha libre no entra NUNCA: no es cine con o sin documentales
   assert.equal(con.porMotivo.corto, 1);
+  assert.equal(con.porMotivo.evento, 1);
 });
 
 test('la ventana del estreno son N días ANTES y N después', () => {
@@ -137,13 +140,18 @@ test('todo motivo que emite el evaluador tiene texto en MOTIVOS', () => {
     [[peli(1, { isTvMovie: true })], { min_score: 0 }, ctx()],
     [[peli(1, { isDocumentary: true })], { min_score: 0 }, ctx()],
     [[peli(1, { isCameo: true })], { min_score: 0 }, ctx()],
+    [[peli(1, { isEvento: true })], { min_score: 0 }, ctx()],
     [[peli(1, { date: '2000-01-01' })], { min_score: 0, window_days: 5 }, ctx()],
     [[peli(1)], { min_score: 50 }, ctx()],
     [[conNota(1, 10)], { min_score: 50 }, ctx()],
     [[peli(1), peli(2)], { min_score: 0, cap: 1 }, ctx()],
+    // la cuarentena NO es un descarte —va en su propio cubo— pero sí sale en el
+    // resumen `porMotivo`, así que también necesita texto
+    [[peli(1, { original_language: 'hi' })], { min_score: 0 },
+      ctx({ criterios: { enabled: true, langs: ['hi'], countries: [] } })],
   ];
   for (const [items, regla, c] of casos) {
-    for (const d of evaluarRegla(items, regla, c).descartadas) emitidos.add(d.motivo);
+    for (const m of Object.keys(evaluarRegla(items, regla, c).porMotivo)) emitidos.add(m);
   }
   assert.equal(emitidos.size, Object.keys(MOTIVOS).length, `motivos emitidos: ${[...emitidos].join(', ')}`);
   for (const m of emitidos) assert.ok(MOTIVOS[m], `el motivo «${m}» no tiene texto en MOTIVOS`);
@@ -313,4 +321,128 @@ test('borrar una regla se lleva su historial por delante', () => {
     .run(r.id, Date.now(), 'added', 'prueba');
   deleteRule(r.id);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM radarr_rule_log WHERE rule_id = ?').get(r.id).n, 0);
+});
+
+// --- cuarentena pre-Radarr ----------------------------------------------------
+
+test('la cuarentena aparta por idioma y por país, sin descartar', async () => {
+  const { motivoCuarentena, textoCuarentena } = await import('../src/rules.js');
+  const criterios = { enabled: true, langs: ['hi', 'ta'], countries: ['in'] };
+  assert.deepEqual(motivoCuarentena({ original_language: 'hi' }, criterios), { kind: 'idioma', value: 'hi' });
+  assert.deepEqual(motivoCuarentena({ original_language: 'HI' }, criterios), { kind: 'idioma', value: 'hi' });
+  assert.deepEqual(motivoCuarentena({ countries: ['IN', 'US'] }, criterios), { kind: 'pais', value: 'IN' });
+  // el cine que no cumple nada pasa de largo
+  assert.equal(motivoCuarentena({ original_language: 'fr', countries: ['FR'] }, criterios), null);
+  // y apagada, no aparta a nadie
+  assert.equal(motivoCuarentena({ original_language: 'hi' }, { ...criterios, enabled: false }), null);
+  assert.equal(motivoCuarentena({ original_language: 'hi' }, null), null);
+  // el texto en castellano es para el HISTORIAL; la interfaz compone el suyo
+  assert.equal(textoCuarentena({ kind: 'idioma', value: 'hi' }), 'idioma hi');
+  assert.equal(textoCuarentena({ kind: 'pais', value: 'IN' }), 'país IN');
+});
+
+test('el motivo va PARTIDO, para que la bandeja se pueda leer en inglés', async () => {
+  // una frase compuesta en el servidor es lo que dejó sin traducir a los avisos
+  // viejos: aquí el cliente recibe las piezas y arma la suya
+  const { motivoCuarentena } = await import('../src/rules.js');
+  const m = motivoCuarentena({ original_language: 'ta' }, { enabled: true, langs: ['ta'], countries: [] });
+  assert.equal(typeof m.kind, 'string');
+  assert.equal(typeof m.value, 'string');
+});
+
+test('lo apartado NO se descarta: sale en su propio cubo para que lo apruebes', () => {
+  const criterios = { enabled: true, langs: ['hi'], countries: [] };
+  const items = [conNota(1, 90, { original_language: 'hi' }), conNota(2, 90, { original_language: 'fr' })];
+  const r = evaluarRegla(items, { min_score: 70, cap: 0 }, ctx({ criterios }));
+  assert.deepEqual(r.elegidas.map((x) => x.tmdb_id), [2]);
+  assert.deepEqual(r.cuarentena.map((x) => x.tmdb_id), [1]);
+  assert.deepEqual(r.cuarentena[0].motivoCuarentena, { kind: 'idioma', value: 'hi' });
+  assert.equal(r.porMotivo.cuarentena, 1);
+  // NO está entre las descartadas: no es un «no», es un «decídelo tú»
+  assert.equal(r.descartadas.some((d) => d.tmdb_id === 1), false);
+});
+
+test('lo que no llega al umbral ni entra en cuarentena: no hay nada que aprobar', () => {
+  const criterios = { enabled: true, langs: ['hi'], countries: [] };
+  const r = evaluarRegla([conNota(1, 40, { original_language: 'hi' })], { min_score: 70 }, ctx({ criterios }));
+  assert.equal(r.cuarentena.length, 0);
+  assert.equal(r.descartadas[0].motivo, 'bajo_umbral');
+});
+
+test('un corto en hindi es un corto, no una decisión tuya', () => {
+  // la cuarentena va DESPUÉS de los filtros de tipo: no tiene sentido pedir
+  // aprobación para algo que no es cine
+  const criterios = { enabled: true, langs: ['hi'], countries: [] };
+  const r = evaluarRegla([peli(1, { original_language: 'hi', isShort: true })], { min_score: 0 }, ctx({ criterios }));
+  assert.equal(r.cuarentena.length, 0);
+  assert.equal(r.descartadas[0].motivo, 'corto');
+});
+
+test('rechazar de la cuarentena VETA, para que la bandeja no sea una noria', async () => {
+  const { rechazarPendiente } = await import('../src/rules.js');
+  db.prepare('INSERT OR REPLACE INTO radarr_pending (tmdb_id, title, at) VALUES (?, ?, ?)').run(5551, 'Ruido', 1);
+  rechazarPendiente(5551);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM radarr_pending WHERE tmdb_id = 5551').get().n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM auto_radarr_vetoed WHERE tmdb_id = 5551').get().n, 1);
+});
+
+test('la bandeja se purga de lo que ya tienes o ya decidiste', async () => {
+  // una bandeja que te pide permiso para bajar algo que ya bajaste se lee como
+  // una avería, y una decisión tomada en otra pantalla no puede seguir esperando
+  const { purgarPendientes } = await import('../src/rules.js');
+  const meter = (id, title) =>
+    db.prepare('INSERT OR REPLACE INTO radarr_pending (tmdb_id, title, at) VALUES (?, ?, ?)').run(id, title, 1);
+  meter(5561, 'Ya en Plex');
+  meter(5562, 'Ya en Radarr');
+  meter(5563, 'Vetada aparte');
+  meter(5564, 'Sigue esperando');
+  db.prepare('INSERT OR REPLACE INTO movies (rating_key, title, tmdb_id) VALUES (?, ?, ?)').run(99561, 'Ya en Plex', 5561);
+  db.prepare('INSERT OR REPLACE INTO radarr_movies (tmdb_id, title) VALUES (?, ?)').run(5562, 'Ya en Radarr');
+  db.prepare('INSERT OR REPLACE INTO auto_radarr_vetoed (tmdb_id, title, at) VALUES (?, ?, ?)').run(5563, 'Vetada aparte', 1);
+
+  purgarPendientes();
+  const quedan = db.prepare('SELECT tmdb_id FROM radarr_pending WHERE tmdb_id BETWEEN 5561 AND 5564').all();
+  assert.deepEqual(quedan.map((r) => r.tmdb_id), [5564]);
+});
+
+test('vetar en bloque vacía la bandeja y veta todas', async () => {
+  const { resolverTodasLasPendientes } = await import('../src/rules.js');
+  db.prepare('DELETE FROM radarr_pending').run();
+  for (const id of [5571, 5572, 5573]) {
+    db.prepare('INSERT OR REPLACE INTO radarr_pending (tmdb_id, title, at) VALUES (?, ?, ?)').run(id, `R${id}`, 1);
+  }
+  const r = await resolverTodasLasPendientes('rechazar');
+  assert.equal(r.rechazadas, 3);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM radarr_pending').get().n, 0);
+  assert.equal(
+    db.prepare('SELECT COUNT(*) n FROM auto_radarr_vetoed WHERE tmdb_id IN (5571, 5572, 5573)').get().n,
+    3
+  );
+});
+
+test('aprobar con Radarr caído NO la borra de la bandeja', async () => {
+  // si la quitáramos igual, la película se perdería entre dos sillas: ni
+  // pedida en Radarr ni pendiente de que la apruebes
+  const { aprobarPendiente } = await import('../src/rules.js');
+  db.prepare('INSERT OR REPLACE INTO radarr_pending (tmdb_id, title, at) VALUES (?, ?, ?)').run(5552, 'Otra', 1);
+  await assert.rejects(() => aprobarPendiente(5552));
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM radarr_pending WHERE tmdb_id = 5552').get().n, 1);
+});
+
+// --- el eje nuevo, en TODOS los sitios que enumeran los viejos -----------------
+
+test('todo tipo de regla tiene su sección en la interfaz y su entrada en el catálogo', async () => {
+  // Pasó de verdad: la regla de emergentes se podía crear por la API y no se
+  // pintaba ninguna tarjeta, porque el listado de secciones de RadarrRules.jsx
+  // estaba escrito a mano con los tres tipos de antes. Sin tarjeta no hay forma
+  // de afinarla ni de borrarla, y desde fuera parece que no se creó.
+  const { RULE_KINDS } = await import('../src/rules.js');
+  const catalogo = rulesCatalog();
+  const jsx = fs.readFileSync(path.join(raiz, 'web/src/pages/RadarrRules.jsx'), 'utf8');
+  // el bloque que pinta una sección por tipo: ['festival', t('…')], …
+  const secciones = new Set([...jsx.matchAll(/\[\s*'([a-z]+)'\s*,\s*t\(/g)].map((m) => m[1]));
+  for (const kind of RULE_KINDS) {
+    assert.ok(catalogo[kind]?.length, `«${kind}» no tiene entradas en el catálogo`);
+    assert.ok(secciones.has(kind), `«${kind}» no tiene sección en RadarrRules.jsx: se crearía y no se vería`);
+  }
 });

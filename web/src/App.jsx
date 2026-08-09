@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useNavigate, use
 import {
   LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy,
   Eye, Wrench, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award, Ticket, Sparkles,
+  TrendingUp,
 } from 'lucide-react';
 import { Spinner, Toaster, GlobalSearch, ErrorBoundary } from './components.jsx';
 import { api, applyTheme } from './api.js';
@@ -23,6 +24,7 @@ const Discover = lazy(() => import('./pages/Discover.jsx'));
 const Favorites = lazy(() => import('./pages/Favorites.jsx'));
 const Lists = lazy(() => import('./pages/Lists.jsx'));
 const Festivals = lazy(() => import('./pages/Festivals.jsx'));
+const Emergentes = lazy(() => import('./pages/Emergentes.jsx'));
 const Estrenos = lazy(() => import('./pages/Estrenos.jsx'));
 const About = lazy(() => import('./pages/About.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
@@ -49,6 +51,7 @@ const NAV_GROUPS = [
       { to: '/descubrir', label: t('Descubrir huecos'), Icon: Compass },
       { to: '/calendario', label: t('Cine venidero'), Icon: CalendarDays },
       { to: '/festivales', label: t('Festivales y premios'), Icon: Award },
+      { to: '/emergentes', label: t('Directores emergentes'), Icon: TrendingUp },
       { to: '/estrenos', label: t('Estrenos'), Icon: Ticket },
       { to: '/listas', label: t('Listas y retos'), Icon: Trophy },
     ],
@@ -63,9 +66,36 @@ const NAV_GROUPS = [
   },
 ];
 
+/**
+ * El monograma P+F delante del nombre. El símbolo es un PNG de una tinta sobre
+ * fondo transparente, así que se tiñe con `currentColor` a través de una
+ * máscara CSS: el mismo fichero vale para el rojo de cartel y para el oro, sin
+ * duplicar el icono ni recolorearlo a mano en cada aspecto.
+ */
+const Simbolo = ({ className = '' }) => (
+  <span
+    aria-hidden="true"
+    className={`inline-block shrink-0 bg-current ${className}`}
+    style={{
+      // el tamaño va en línea: sin contenido, el elemento no tiene alto propio
+      width: '0.95em',
+      height: '1.05em',
+      WebkitMaskImage: 'url(/icon.png)',
+      maskImage: 'url(/icon.png)',
+      WebkitMaskSize: 'contain',
+      maskSize: 'contain',
+      WebkitMaskRepeat: 'no-repeat',
+      maskRepeat: 'no-repeat',
+      WebkitMaskPosition: 'center',
+      maskPosition: 'center',
+    }}
+  />
+);
+
 const Wordmark = ({ className = '' }) => (
-  <span className={`font-display tracking-wide ${className}`}>
-    Powa<span className="text-gold-400">Flex</span>
+  <span className={`font-display tracking-wide inline-flex items-baseline gap-2 ${className}`}>
+    <Simbolo className="self-center" />
+    <span>Powa<span className="text-gold-400">Flex</span></span>
   </span>
 );
 
@@ -180,6 +210,17 @@ function Shell() {
                     }
                   />
                 )}
+                {/* la cuarentena vive dentro de una pestaña de Ajustes: sin este
+                    punto, lo que espera tu ✓ no se ve desde ninguna parte. Ámbar
+                    y no rojo: no es una avería, es algo que decidir. */}
+                {to === '/ajustes' && setup?.pendientes > 0 && (
+                  <span
+                    className="ml-auto text-[10px] leading-none tabular text-ink-900 bg-amber-400 rounded-full px-1.5 py-0.5 shrink-0"
+                    title={t('{n} película(s) en cuarentena esperan tu ✓ en Ajustes → Automatismos', { n: setup.pendientes })}
+                  >
+                    {setup.pendientes}
+                  </span>
+                )}
               </NavLink>
             ))}
           </div>
@@ -225,6 +266,7 @@ function Shell() {
           <Route path="/favoritos" element={<Favorites />} />
           <Route path="/listas" element={<Lists />} />
           <Route path="/festivales" element={<Festivals />} />
+          <Route path="/emergentes" element={<Emergentes />} />
           <Route path="/estrenos" element={<Estrenos />} />
           <Route path="/taller" element={<Taller />} />
           <Route path="/acerca" element={<About />} />
