@@ -24,6 +24,7 @@ import {
 import { enrichWithScores } from './mdblist.js';
 import { watchedIndex, isWatched } from './letterboxd.js';
 import { SIGHT_AND_SOUND_2022 } from './data/sight-and-sound-2022.js';
+import { MIL_UNA_2021 } from './data/1001-movies-2021.js';
 import { OSCAR_BEST_PICTURE } from './data/oscar-best-picture.js';
 
 const DAY = 24 * 3600 * 1000;
@@ -93,6 +94,10 @@ export const REGISTRY = {
     awardPage: 'List of Sundance Film Festival award winners',
     awardParse: 'sundanceList',
     sundanceAmbito: 'us',
+    // el premio estadounidense es MUY anterior a que Wikipedia tabule la
+    // sección por ediciones: Blood Simple lo ganó en 1985. `sinceYear` acota
+    // las ediciones (tablas desde 2005); el palmarés llega hasta 1984.
+    awardSinceYear: 1984,
   },
   tiff: {
     name: 'Toronto (TIFF)',
@@ -140,8 +145,10 @@ export const REGISTRY = {
   // en Perspectives o en Nuevos Directores. Sin estas cinco, un detector de
   // emergentes mira justo el sitio donde los emergentes todavía no están.
   //
-  // Ninguna tiene artículo de premio propio utilizable, así que solo ofrecen
-  // «sección oficial por año», como Busan y Horizontes.
+  // Tres tienen palmarés con artículo utilizable en Wikipedia: Un Certain
+  // Regard (su premio, desde 1998), la Semana de la Crítica (el Gran Premio) y
+  // la Cámara de Oro (mejor ópera prima de TODO Cannes, con entrada propia).
+  // El resto solo ofrece «sección oficial por año», como Busan y Horizontes.
   //
   // OJO con `sinceYear`: NO es el año de fundación de la sección sino aquel
   // desde el que el artículo INGLÉS de cada edición la tabula. La Semaine
@@ -160,6 +167,9 @@ export const REGISTRY = {
     article: (y) => `${y} Cannes Film Festival`,
     section: /^un certain regard$/i,
     sinceYear: 2010,
+    // el premio existe desde 1998 y su artículo lista las ganadoras por década
+    awardPage: 'Un Certain Regard',
+    awardSection: /^winners$/i,
   },
   semaine: {
     name: 'Cannes · Semana de la Crítica',
@@ -168,6 +178,21 @@ export const REGISTRY = {
     article: (y) => `${y} Cannes Film Festival`,
     section: /critics.? week/i,
     sinceYear: 2010,
+    // el Gran Premio de la Semana tiene su lista en el artículo de la sección
+    awardPage: "Critics' Week",
+    awardSection: /^grand prize winners$/i,
+  },
+  // La Cámara de Oro premia la mejor ÓPERA PRIMA de todo Cannes (sección
+  // oficial, Semana y Quincena a la vez): no es el palmarés de ninguna sección
+  // concreta, así que va como entrada propia de solo-palmarés — el radar de
+  // debuts por excelencia, con historia desde 1978.
+  camaradeoro: {
+    name: 'Cannes · Cámara de Oro',
+    award: "Caméra d'Or: la mejor ópera prima de todo Cannes (oficial, Semana y Quincena)",
+    group: 'debut',
+    onlyWinners: true,
+    awardPage: "Caméra d'Or",
+    awardSection: /^winners$/i,
   },
   quinzaine: {
     name: 'Cannes · Quincena',
@@ -217,6 +242,22 @@ export const REGISTRY = {
     group: 'canon',
     onlyWinners: true,
     staticList: SIGHT_AND_SOUND_2022,
+    staticSource: 'https://www.bfi.org.uk/sight-and-sound/greatest-films-all-time',
+    staticNote: `La lista extendida de la encuesta de la crítica (${SIGHT_AND_SOUND_2022.length} películas, empates incluidos), ordenada por puesto. Se renueva cada década: la próxima, en 2032.`,
+  },
+  // El canon populista que complementa al de la crítica: el libro de Schneider,
+  // en su 15.ª edición (2021), la última con registro bibliográfico — la
+  // «edición 2024» que circula por listas no existe como libro. Dataset fijo,
+  // como Sight & Sound.
+  mil1: {
+    name: '1001 películas',
+    award: '«1001 Movies You Must See Before You Die» (Steven Jay Schneider, ed.; 15.ª edición, 2021)',
+    group: 'canon',
+    onlyWinners: true,
+    staticList: MIL_UNA_2021,
+    staticSource: 'https://en.wikipedia.org/wiki/1001_Movies_You_Must_See_Before_You_Die',
+    staticNote:
+      'Las 1001 del libro (15.ª edición, 2021), en su orden cronológico. Cuatro bloques que el libro trata como una sola entrada (Toy Story, El Señor de los Anillos, Iván el Terrible y Olympia) aparecen con su primera película.',
   },
   // El otro canon de la crítica: el top 10 que Cahiers du Cinéma publica cada
   // año desde 1951 (con el paréntesis de 1969-1980, cuando la revista dejó de
@@ -338,6 +379,9 @@ async function wikiParse(params) {
   return j.parse;
 }
 
+// una entidad numérica rota («&#99999999;») no puede tumbar el parseo entero
+const codePoint = (n) => (Number.isFinite(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '');
+
 export function stripTags(html) {
   return String(html || '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -350,11 +394,19 @@ export function stripTags(html) {
     .replace(/&nbsp;|&#160;/g, ' ')
     .replace(/&#91;/g, '[')
     .replace(/&#93;/g, ']')
+    // el resto de entidades numéricas, decodificadas de verdad: el «Veni Vidi
+    // Vici» de Sundance 2024 llegaba con &#8202; (espacio fino) entre palabra
+    // y palabra, y como texto literal no casaba con nada. Va DESPUÉS de las
+    // específicas de arriba (que normalizan a tipográficas) y antes del
+    // colapso de espacios, que pliega los espacios raros decodificados.
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => codePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => codePoint(Number(n)))
     // enlaces sin renderizar que se cuelan en algunos artículos (Sundance):
     // «[[Fulano|Fulano]] [wd]» debe quedar en «Fulano»
     .replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1')
-    // marcadores tipo [wd] (wikidata) o [ja] (interwiki) junto a los nombres
-    .replace(/\[\s*[a-z]{2,3}\s*\]/gi, '')
+    // marcadores tipo [wd] (wikidata) o [ja] (interwiki) junto a los nombres,
+    // también en lista («[de; fr]», que es como los deja la plantilla {{ill}})
+    .replace(/\[\s*[a-z]{2,3}(?:\s*;\s*[a-z]{2,3})*\s*\]/gi, '')
     .replace(/\s+/g, ' ')
     .replace(/\s*,\s*$/, '')
     .trim();
@@ -424,6 +476,12 @@ export function parseSelectionTable(html, { all = false } = {}) {
     if (idxDir === -1 || (idxTitle === -1 && idxOrig === -1)) continue;
 
     const out = [];
+    // Orizzonti 2026 mete cortos y largos en la MISMA tabla, separados solo
+    // por filas-cabecera internas («In Competition», «Short Films Competition»,
+    // «Short Films — Out of Competition»). Un corto no es una película que
+    // mandar a Radarr: al entrar en un bloque de cortos se salta todo hasta la
+    // siguiente cabecera interna que no lo sea.
+    let enBloqueDeCortos = false;
     for (const row of rows.slice(1)) {
       const rawCells = row.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || [];
       const cells = rawCells.map(stripTags);
@@ -433,7 +491,16 @@ export function parseSelectionTable(html, { all = false } = {}) {
       // parten su tabla las secciones paralelas de Cannes. Sin este corte se
       // colaba como película, salía a buscarla a TMDB y aparecía en la lista
       // como una ficha sin emparejar que no existe.
-      if (cells.length < 2) continue;
+      if (cells.length < 2) {
+        // solo una cabecera que HABLE de películas cambia el estado: dentro de
+        // un bloque de cortos puede haber subcabeceras de país («France») que
+        // no cierran el bloque — sin esto, los cortos se colaban tras ellas
+        const h = cells[0] || '';
+        if (/short film|cortometraje/i.test(h)) enBloqueDeCortos = true;
+        else if (/film|competition|feature|screening|documentar/i.test(h)) enBloqueDeCortos = false;
+        continue;
+      }
+      if (enBloqueDeCortos) continue;
       // Cuando el título original coincide con el inglés, la fila viene SIN esa
       // celda y todas las columnas posteriores se corren una a la izquierda
       // (pasaba en Cannes 2025: el país acababa de director/a). Pero la que
@@ -579,15 +646,57 @@ const PREMIOS_SUNDANCE = {
   },
   us: {
     // «U.S. Grand Jury Prize: Dramatic Competition», «US Dramatic Grand Jury
-    // Prize», «U.S. Dramatic Grand Jury Prize Award»… con y sin puntos
+    // Prize», «U.S. Dramatic Grand Jury Prize Award»… con y sin puntos, y
+    // hasta con espacio dentro («U. S. Grand Jury Prize», 2013): sin tolerarlo
+    // Fruitvale Station desaparecía del palmarés en silencio.
     // antes de ~2010 no llevaba el «U.S.» delante: era «Grand Jury Prize:
     // Dramatic» a secas, y el «World Cinema» es lo que distingue a la otra
     explicito: (l) =>
       /dramatic/.test(l) && /(grand )?jury prize/.test(l) && !/world/.test(l) &&
-      (/^u\.?s\.?\b/.test(l) || /^grand jury prize/.test(l)),
-    corto: (l) => /^u\.?s\.? dramatic$/.test(l),
+      (/^u\.?\s?s\.?\b/.test(l) || /^grand jury prize/.test(l)),
+    corto: (l) => /^u\.?\s?s\.? dramatic$/.test(l),
   },
 };
+
+/**
+ * ¿Lo de dentro del paréntesis es un NOMBRE DE PERSONA o un título original?
+ * Un nombre: de dos a cinco palabras, cada una o inicial («A.V.»), o partícula
+ * de apellido («de», «van»), o conector de colectivo («and»), o palabra con
+ * mayúscula inicial — y la primera no puede ser un artículo, que es como
+ * empiezan los títulos («La Nana», «The Maid»). Los títulos largos («Violeta
+ * se Fue a Los Cielos») caen por longitud o por sus palabras en minúscula.
+ */
+export function pareceNombreDePersona(s) {
+  const palabras = String(s || '').trim().split(/\s+/);
+  if (palabras.length < 2 || palabras.length > 5) return false;
+  if (/^(the|a|an|la|el|los|las|le|les|un|una|il|lo|der|die|das)$/i.test(palabras[0])) return false;
+  const inicial = /^\p{Lu}(\.\p{Lu})*\.?$/u; // A. · A.V. · J.R.R.
+  const particula = /^(de|del|da|dos|das|van|von|der|den|di|do|le|la|bin|al|ter|ten)$/;
+  const conector = /^(and|y|&)$/i;
+  return palabras.every(
+    (p) => inicial.test(p) || particula.test(p) || conector.test(p) || /^\p{Lu}/u.test(p)
+  );
+}
+
+/**
+ * ¿Lo del paréntesis REPITE palabras del título? Entonces es el título
+ * original, no una persona: «King of Ping Pong (Ping Pongkingen)» pasaba el
+ * filtro de nombre (dos palabras capitalizadas) y ponía al título sueco de
+ * director. Ningún director comparte raíces de cuatro letras con el título de
+ * su película en la misma línea; un título original traducido casi siempre sí.
+ */
+export function ecoDelTitulo(titulo, dentro) {
+  const toks = (x) =>
+    String(x || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 4);
+  const tt = toks(titulo);
+  const dd = toks(dentro);
+  return dd.some((d) => tt.some((t) => d.startsWith(t) || t.startsWith(d)));
+}
 
 export function parseSundanceWinners(html, { ambito = 'world' } = {}) {
   const out = [];
@@ -613,6 +722,7 @@ export function parseSundanceWinners(html, { ambito = 'world' } = {}) {
       h + 1 < headings.length ? headings[h + 1].index : src.length
     );
     let ganadora = null;
+    const explicitas = []; // los empates viejos van en dos líneas: caben varias
     for (const li of chunk.match(/<li[\s\S]*?<\/li>/gi) || []) {
       const texto = stripTags(li);
       // El separador entre el premio y la película NO es siempre un guion: en
@@ -627,31 +737,75 @@ export function parseSundanceWinners(html, { ambito = 'world' } = {}) {
       // el crédito de dirección ha ido variando: «Título by Director»,
       // «Título (Director)» o, en los primeros años, solo el título
       const resto = m[2].trim().replace(/,\s*$/, '');
-      let title = resto;
-      let director = null;
-      // «Título, directed by Fulano» · «Título by Fulano» · «Título (Fulano)»
-      const porBy = /^(.+?),?\s+(?:directed\s+)?by\s+(.+)$/.exec(resto);
-      const porParens = /^(.+?)\s*\(([^)]+)\)$/.exec(resto);
-      if (porBy) [, title, director] = porBy;
-      else if (porParens && /[a-z]\s+[a-z]/i.test(porParens[2]) && !/^(the |a |an )/i.test(porParens[2])) {
-        // OJO: el paréntesis puede traer el TÍTULO ORIGINAL en vez del
-        // director/a («Violeta Went to Heaven (Violeta se Fue a Los Cielos)»),
-        // y así se colaba un título en el campo de la dirección. Si lo de
-        // dentro no parece un nombre de persona —dos o tres palabras, sin
-        // artículos ni preposiciones sueltas— se deja como parte del título.
-        const dentro = porParens[2].trim();
-        const palabras = dentro.split(/\s+/);
-        const pareceNombre = palabras.length <= 4 && !/\b(de|del|la|el|los|las|se|a|of|the)\b/i.test(dentro);
-        if (pareceNombre) [, title, director] = porParens;
-      }
-      const fila = { year, title: title.trim(), original_title: title.trim(), director: director?.trim() || null, country: null };
+      // el empate del 2000 viene como «Girlfight & You Can Count on Me (tie)»:
+      // son DOS ganadoras, y sin partirlas ninguna encontraba ficha. El «&»
+      // solo parte cuando el marcador (tie) está presente — hay títulos con
+      // «&» legítimo.
+      const esEmpate = /\(tie\)\s*$/i.test(resto);
+      const cuerpos = esEmpate
+        ? resto.replace(/\s*\(tie\)\s*$/i, '').split(/\s*&\s*/).filter(Boolean)
+        : [resto];
+      const filas = cuerpos.map((cuerpo) => {
+        let title = cuerpo;
+        let director = null;
+        let original = null;
+        // «Título, directed by Fulano» · «Título by Fulano» · «Título (Fulano)»
+        // OJO: el «by» puede ser PARTE del título — «Precious: Based on the
+        // Novel "Push" by Sapphire» lleva a su novelista dentro, y partirlo
+        // ahí ponía a Sapphire de directora y la verificación no podía salir
+        // bien. Solo parte si lo que sigue parece un nombre de persona.
+        const porBy = /^(.+?),?\s+(?:directed\s+)?by\s+(.+)$/.exec(cuerpo);
+        const porParens = /^(.+?)\s*\(([^)]+)\)$/.exec(cuerpo);
+        // «Fruitvale (retitled Fruitvale Station)»: el paréntesis trae el
+        // título DEFINITIVO, que es el que TMDB conoce — se intercambian
+        const retitulada = porParens && /^(?:later\s+)?(?:retitled|renamed)\s+(.+)$/i.exec(porParens[2].trim());
+        if (porBy && pareceNombreDePersona(porBy[2])) [, title, director] = porBy;
+        else if (retitulada) {
+          title = retitulada[1].trim();
+          original = porParens[1].trim();
+        } else if (porParens && ecoDelTitulo(porParens[1], porParens[2])) {
+          // repite palabras del título: es el título original, no una persona
+          // («King of Ping Pong (Ping Pongkingen)»)
+          title = porParens[1];
+          original = porParens[2].trim();
+        } else if (porParens) {
+          // El paréntesis trae o el DIRECTOR o el TÍTULO ORIGINAL, y había que
+          // distinguirlos mejor: la heurística vieja vetaba los nombres con
+          // partícula («Beth de Araújo»), las iniciales («A.V. Rockwell», el
+          // \b casaba la A suelta) y los colectivos de cinco palabras («Astrid
+          // Rondero and Fernanda Valadez») — y esas tres ganadoras se quedaban
+          // con el director incrustado en el título, sin ficha posible.
+          const dentro = porParens[2].trim();
+          if (pareceNombreDePersona(dentro)) {
+            title = porParens[1];
+            director = dentro;
+          } else {
+            // no es un nombre: es el título original («The Maid (La Nana)»).
+            // Pegado al título tampoco encontraba ficha: va a su campo.
+            title = porParens[1];
+            original = dentro;
+          }
+        }
+        return {
+          year,
+          title: title.trim(),
+          original_title: (original || title).trim(),
+          director: director?.trim() || null,
+          country: null,
+        };
+      });
       if (esGranPremio(label)) {
-        ganadora = fila;
-        break; // la etiqueta explícita es inequívoca
+        // la etiqueta explícita es inequívoca — pero NO se corta aquí: los
+        // empates viejos van en DOS líneas separadas («Public Access» en 1993,
+        // «The Trouble with Dick» en 1987) y el break se quedaba solo con la
+        // primera ganadora del año
+        explicitas.push(...filas);
+        continue;
       }
-      if (!ganadora) ganadora = fila; // forma corta: la primera aparición
+      if (!ganadora) ganadora = filas; // forma corta: la primera aparición
     }
-    if (ganadora) out.push(ganadora);
+    const delAño = explicitas.length ? explicitas : ganadora || [];
+    out.push(...delAño);
   }
   return out.sort((a, b) => b.year - a.year);
 }
@@ -781,6 +935,16 @@ const nameTokens = (s) =>
  */
 const sinDobles = (t) => t.replace(/(.)\1+/g, '$1');
 
+/**
+ * Dígrafos de transliteración plegados: la MISMA persona sale «Chukhrai» en la
+ * Wikipedia inglesa y «Tchoukhrai» en fuentes que copian la grafía francesa
+ * (pasaba en el palmarés de BAFTA con «Ballad of a Soldier»). El francés
+ * escribe «tch» donde el inglés «ch» y «ou» donde el inglés «u»: se pliegan
+ * las dos ANTES de comparar. Como el colapso de dobles, es conservador — no
+ * acerca dos apellidos distintos, solo dos grafías del mismo.
+ */
+const sinTranslit = (t) => t.replace(/tch/g, 'ch').replace(/ou/g, 'u');
+
 /** Distancia de edición, cortada en 2: solo hace falta saber si es 0, 1 o más. */
 function distancia(a, b) {
   if (Math.abs(a.length - b.length) > 1) return 2;
@@ -821,7 +985,21 @@ const mismoToken = (a, b) => {
   const da = sinDobles(a);
   const dbb = sinDobles(b);
   if (da === dbb) return true;
-  return Math.min(a.length, b.length) >= 5 && distancia(da, dbb) <= 1;
+  // «chukhrai» (inglés) y «tchoukhrai» (francés) son la misma palabra con los
+  // dígrafos de otra lengua: plegados quedan idénticos. PERO el plegado solo
+  // vale cuando UNO de los lados es la grafía extranjera del otro: si pliegan
+  // LOS DOS, son dos palabras distintas que convergen — «Boucher» (ou) y
+  // «Butcher» (tch) acababan iguales, y son dos apellidos reales distintos.
+  // Con cuerpo mínimo de 4, que «Lou» y «Lu» no son la misma persona por esto.
+  const ta = sinTranslit(da);
+  const tb = sinTranslit(dbb);
+  const plegoUnoSolo = (ta !== da) !== (tb !== dbb);
+  if (plegoUnoSolo && Math.min(da.length, dbb.length) >= 4 && ta === tb) return true;
+  // la letra suelta de tolerancia se mide sobre las formas plegadas SOLO si
+  // plegó un lado («Tchoukhrai»/«Chukhray»: dígrafo Y vocal final a la vez);
+  // si no, sobre las crudas, como siempre
+  const [fa, fb] = plegoUnoSolo ? [ta, tb] : [da, dbb];
+  return Math.min(a.length, b.length) >= 5 && distancia(fa, fb) <= 1;
 };
 
 // ¿Mismo nombre? Insensible al ORDEN de las palabras: las tablas de Wikipedia
@@ -915,7 +1093,32 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
     : [...candidatos];
 
   const wanted = normName(row.title);
-  const tituloClavado = (c) => normName(c.title) === wanted || normName(c.original_title) === wanted;
+  // «Clavado» tolera UNA cosa: letras dobladas de más o de menos. «Angelo
+  // azzuro» es una errata de Wikipedia (Orizzonti 2026) que TMDB escribe
+  // «Angelo Azzurro», y sin esto la búsqueda ni siquiera la consideraba título
+  // exacto. Solo se colapsan LETRAS: colapsar dígitos convertiría «Apollo 11»
+  // en «apolo1» y lo casaría con otra película.
+  const plegado = (s) => String(s || '').replace(/([a-z])\1+/g, '$1');
+  const clava = (s) => {
+    const n = normName(s);
+    // el plegado de dobles solo con cuerpo: «Anna» y «Ana» son DOS películas
+    // distintas y con cuatro letras no hay errata que valga
+    return n === wanted || (wanted.length >= 5 && plegado(n) === plegado(wanted));
+  };
+  const tituloClavado = (c) => clava(c.title) || clava(c.original_title);
+  // Para filas SIN director, el título es la única prueba y se pide clavado —
+  // pero con una tolerancia: que uno contenga al otro si el SOBRANTE es un
+  // subtítulo de verdad (≥8 letras). Las listas viejas de Sundance escriben
+  // «Personal Velocity: Three Portraits» donde TMDB dice «Personal Velocity».
+  // El sobrante mínimo evita que «Halloween» case con «Halloween II» o «The
+  // Godfather» con «The Godfather Part II»: un ordinal no es un subtítulo.
+  const contiene = (a, b) => {
+    if (a.length < 8 || b.length < 8) return false;
+    const [corto, largo] = a.length <= b.length ? [a, b] : [b, a];
+    return largo.includes(corto) && largo.length - corto.length >= 8;
+  };
+  const tituloBastaSinDirector = (c) =>
+    tituloClavado(c) || contiene(normName(c.title), wanted) || contiene(normName(c.original_title || ''), wanted);
   const distAño = (c) => (c.date && Number.isFinite(year) ? Math.abs(Number(c.date.slice(0, 4)) - year) : 0.5);
   enVentana.sort(
     (a, b) =>
@@ -937,7 +1140,21 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
       break;
     }
     if (dirs.length) {
-      if (directorsMatch(row.director, dirs)) {
+      // Sin director en la fila no hay contra qué verificar (directorsMatch
+      // pasa por diseño), así que la ÚNICA prueba que queda es el título: se
+      // exige clavado. Antes, una fila de dos celdas que dejaba el director en
+      // null se emparejaba con el primer candidato con créditos de la ventana
+      // — un falso positivo esperando su momento.
+      let vale = directorsMatch(row.director, dirs) && (row.director || tituloBastaSinDirector(c));
+      // El título clavado puede vivir SOLO en la traducción inglesa: «Three
+      // Seasons» (Sundance 1999) es «Tres estaciones» de título y «Ba mùa» de
+      // original en TMDB. Para una fila sin director, el título internacional
+      // EXACTO es la misma prueba que el clavado — y se consulta solo cuando
+      // los otros dos ya fallaron, que es cuando merece la llamada (cacheada).
+      if (!vale && !row.director && tituloEnDe) {
+        vale = clava(await tituloEnDe(c.id));
+      }
+      if (vale) {
         tmdbId = c.id;
         break;
       }
@@ -992,8 +1209,10 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
 
   // Solo si NADIE con créditos lo demostró (y sin cortes de red a medias),
   // valen las fichas sin equipo por título clavado — las recién anunciadas.
+  // El título clavado se exige SIEMPRE: en las filas sin director era la única
+  // prueba disponible y ni esa se pedía.
   if (!tmdbId && !fallosRed) {
-    const c = sinCreditos.find((x) => !row.director || tituloClavado(x));
+    const c = sinCreditos.find((x) => (row.director ? tituloClavado(x) : tituloBastaSinDirector(x)));
     if (c) tmdbId = c.id;
   }
   return { tmdbId, fallosRed };
@@ -1043,9 +1262,13 @@ export async function peliculaPorDirector({ title, year, director }, { personasP
     //    filmografía—, así que el año deja de ser necesario: «West of the
     //    Tracks» es 2002 para el BFI y 2004 para TMDB, dos años de diferencia
     //    que dejaban fuera a la única película que podía ser.
-    const porTitulo = dirigidas.filter(
-      (c) => normName(c.title) === buscado || normName(c.original_title) === buscado
-    );
+    // misma tolerancia de letras dobladas que el título clavado del emparejado
+    // general (y con el mismo cuerpo mínimo: «Anna» ≠ «Ana»): la errata de una
+    // fuente no puede esconder la película
+    const plegado = (s) => String(s || '').replace(/([a-z])\1+/g, '$1');
+    const clava = (s) =>
+      normName(s) === buscado || (buscado.length >= 5 && plegado(normName(s)) === plegado(buscado));
+    const porTitulo = dirigidas.filter((c) => clava(c.title) || clava(c.original_title));
     if (porTitulo.length) return porTitulo.sort((a, b) => distancia(a) - distancia(b))[0].id;
 
     // 2) El título internacional en inglés, que es como está escrito el canon.
@@ -1498,13 +1721,14 @@ export async function festivalWinners(key, { refresh = false } = {}) {
       source = 'https://www.wikidata.org/wiki/Q102427';
       note = `Las ${rows.length} ganadoras de la historia; en «Nominadas por año» están las ${f.staticAward.length} candidatas completas.`;
     } else if (f.staticList) {
-      // dataset fijo empaquetado con la app (Sight & Sound se renueva en 2032)
+      // dataset fijo empaquetado con la app (Sight & Sound, las 1001): cada
+      // entrada trae su fuente y su nota en el REGISTRY
       rows = f.staticList.map((r) => ({
         year: r.year, title: r.title, original_title: r.title, director: r.director, country: null, rank: r.rank,
         tv: !!r.tv, // una serie no tiene ficha de película: la interfaz lo dice
       }));
-      source = 'https://www.bfi.org.uk/sight-and-sound/greatest-films-all-time';
-      note = `La lista extendida de la encuesta de la crítica (${rows.length} películas, empates incluidos), ordenada por puesto. Se renueva cada década: la próxima, en 2032.`;
+      source = f.staticSource || source;
+      note = f.staticNote || null;
     } else if (f.awardParse === 'cahiers') {
       // el «palmarés» de Cahiers: la número 1 de cada año, reciente primero
       // como el resto de palmareses
@@ -1514,9 +1738,12 @@ export async function festivalWinners(key, { refresh = false } = {}) {
         .sort((a, b) => b.year - a.year);
       note = 'La número 1 de cada año para la crítica de Cahiers; en «Top 10 por año» está la lista completa de cada año.';
     } else if (f.awardParse === 'sundanceList') {
-      // la lista de Sundance va por años con viñetas: página entera de una vez
+      // la lista de Sundance va por años con viñetas: página entera de una vez.
+      // El corte del palmarés es `awardSinceYear` si existe: el premio de EE UU
+      // es de 1984 aunque su sección no se tabule por ediciones hasta 2005.
       const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
-      rows = parseSundanceWinners(parsed.text, { ambito: f.sundanceAmbito || 'world' }).filter((r) => r.year >= f.sinceYear);
+      rows = parseSundanceWinners(parsed.text, { ambito: f.sundanceAmbito || 'world' })
+        .filter((r) => r.year >= (f.awardSinceYear ?? f.sinceYear));
     } else {
       rows = await getAwardRows(f);
     }

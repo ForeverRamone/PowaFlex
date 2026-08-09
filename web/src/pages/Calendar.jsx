@@ -5,7 +5,7 @@ import { api, tmdbImg, fmtDate } from '../api.js';
 import { Plus, RotateCw, Ban } from 'lucide-react';
 import {
   ErrorBox, RadarrButton, Empty, useRadarrIds, MediaModal, BuildProgress,
-  useTypeFilters, matchesTypeFilters, TypeFilterBar, Select,
+  useTypeFilters, matchesTypeFilters, TypeFilterBar, Select, EnlacePersona,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t, locale } from '../i18n.js';
@@ -61,13 +61,14 @@ function EventCard({ ev, radarrIds, onAdded, vetada, onToggleVeto }) {
             <span key={`${p.id ?? p.name}-${p.credit}`}>
               {i > 0 && ' · '}
               {t(p.credit)}{' '}
-              {p.id ? (
-                <Link to={`/personas/${p.id}?role=${p.credit === 'Dirige' ? 'director' : 'actor'}`} className="text-zinc-200 hover:text-gold-400">
-                  {p.name}
-                </Link>
-              ) : (
-                <span className="text-zinc-300">{p.name}</span>
-              )}
+              {/* clicable aunque no tenga id local: /personas/:ref resuelve
+                  por nombre AL PULSAR, como en Festivales */}
+              <EnlacePersona
+                nombre={p.name}
+                personId={p.id}
+                role={p.credit === 'Dirige' ? 'director' : 'actor'}
+                className="text-zinc-200"
+              />
             </span>
           ))}
         </div>

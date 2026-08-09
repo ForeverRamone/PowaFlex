@@ -1,9 +1,20 @@
 /**
  * Óscar a la mejor película: todas las nominadas de la historia con su
- * ganadora marcada, extraídas de Wikidata (P1411/P166 sobre Q102427) el
- * 2026-08-03, con el TMDB id (P4947) resuelto de origen donde existe. El
- * artículo de Wikipedia perdió sus tablas en la reestructuración de 2026;
- * para ESTE premio Wikidata tiene cobertura total. Regenerar tras cada gala.
+ * ganadora marcada. Base extraída de Wikidata (P1411/P166 sobre Q102427) el
+ * 2026-08-03, con el TMDB id (P4947) resuelto de origen donde existe, y
+ * COMPLETADA el 2026-08-09 contra los artículos de las 98 ceremonias de la
+ * Wikipedia inglesa: la cobertura de P1411 en Wikidata es floja en las
+ * películas (las declaraciones viven en sus productores) y faltaban 21
+ * nominadas — entre ellas una GANADORA, Forrest Gump, y las ocho nominadas
+ * nuevas de la 98.ª gala. También se corrigió el año de My Left Foot (1989,
+ * Wikidata decía 1979) y el de Dune: Part Two (2024: lo de 2023 era el
+ * estreno planificado que la huelga retrasó). El año es el de ESTRENO de la
+ * película, no el de su gala. Regenerar tras cada gala.
+ * Verificado el 2026-08-09 contra 15 ceremonias por un agente con fuentes
+ * externas: se corrigieron All the King's Men y Battleground (1949, no 1950:
+ * Wikidata da el estreno amplio y la premiere fue en noviembre del 49) y The
+ * Pied Piper (Percy Stow era del corto de 1907; la de 1942 es de Irving
+ * Pichel solo).
  */
 export const OSCAR_BEST_PICTURE = [
  {
@@ -14,10 +25,66 @@ export const OSCAR_BEST_PICTURE = [
   "winner": true
  },
  {
+  "title": "Bugonia",
+  "year": 2025,
+  "director": "Yorgos Lanthimos",
+  "tmdb_id": 701387,
+  "winner": false
+ },
+ {
+  "title": "F1",
+  "year": 2025,
+  "director": "Joseph Kosinski",
+  "tmdb_id": 911430,
+  "winner": false
+ },
+ {
+  "title": "Frankenstein",
+  "year": 2025,
+  "director": "Guillermo del Toro",
+  "tmdb_id": 1062722,
+  "winner": false
+ },
+ {
+  "title": "Hamnet",
+  "year": 2025,
+  "director": "Chloé Zhao",
+  "tmdb_id": 858024,
+  "winner": false
+ },
+ {
+  "title": "Marty Supreme",
+  "year": 2025,
+  "director": "Josh Safdie",
+  "tmdb_id": 1317288,
+  "winner": false
+ },
+ {
+  "title": "Sentimental Value",
+  "year": 2025,
+  "director": "Joachim Trier",
+  "tmdb_id": 1124566,
+  "winner": false
+ },
+ {
+  "title": "Sinners",
+  "year": 2025,
+  "director": "Ryan Coogler",
+  "tmdb_id": 1233413,
+  "winner": false
+ },
+ {
   "title": "The Secret Agent",
   "year": 2025,
   "director": "Kleber Mendonça Filho",
   "tmdb_id": 1220564,
+  "winner": false
+ },
+ {
+  "title": "Train Dreams",
+  "year": 2025,
+  "director": "Clint Bentley",
+  "tmdb_id": 1241983,
   "winner": false
  },
  {
@@ -26,6 +93,27 @@ export const OSCAR_BEST_PICTURE = [
   "director": "Sean Baker",
   "tmdb_id": 1064213,
   "winner": true
+ },
+ {
+  "title": "A Complete Unknown",
+  "year": 2024,
+  "director": "James Mangold",
+  "tmdb_id": 661539,
+  "winner": false
+ },
+ {
+  "title": "Conclave",
+  "year": 2024,
+  "director": "Edward Berger",
+  "tmdb_id": 974576,
+  "winner": false
+ },
+ {
+  "title": "Dune: Part Two",
+  "year": 2024,
+  "director": "Denis Villeneuve",
+  "tmdb_id": 693134,
+  "winner": false
  },
  {
   "title": "Emilia Pérez",
@@ -63,11 +151,25 @@ export const OSCAR_BEST_PICTURE = [
   "winner": false
  },
  {
+  "title": "Wicked",
+  "year": 2024,
+  "director": "Jon M. Chu",
+  "tmdb_id": 402431,
+  "winner": false
+ },
+ {
   "title": "Oppenheimer",
   "year": 2023,
   "director": "Christopher Nolan",
   "tmdb_id": 872585,
   "winner": true
+ },
+ {
+  "title": "American Fiction",
+  "year": 2023,
+  "director": "Cord Jefferson",
+  "tmdb_id": 1056360,
+  "winner": false
  },
  {
   "title": "Anatomy of a Fall",
@@ -84,6 +186,20 @@ export const OSCAR_BEST_PICTURE = [
   "winner": false
  },
  {
+  "title": "Killers of the Flower Moon",
+  "year": 2023,
+  "director": "Martin Scorsese",
+  "tmdb_id": 466420,
+  "winner": false
+ },
+ {
+  "title": "Maestro",
+  "year": 2023,
+  "director": "Bradley Cooper",
+  "tmdb_id": 523607,
+  "winner": false
+ },
+ {
   "title": "Past Lives",
   "year": 2023,
   "director": "Celine Song",
@@ -95,6 +211,13 @@ export const OSCAR_BEST_PICTURE = [
   "year": 2023,
   "director": "Yorgos Lanthimos",
   "tmdb_id": 792307,
+  "winner": false
+ },
+ {
+  "title": "The Holdovers",
+  "year": 2023,
+  "director": "Alexander Payne",
+  "tmdb_id": 840430,
   "winner": false
  },
  {
@@ -151,6 +274,13 @@ export const OSCAR_BEST_PICTURE = [
   "year": 2022,
   "director": "Steven Spielberg",
   "tmdb_id": 804095,
+  "winner": false
+ },
+ {
+  "title": "Top Gun: Maverick",
+  "year": 2022,
+  "director": "Joseph Kosinski",
+  "tmdb_id": 361743,
   "winner": false
  },
  {
@@ -515,6 +645,13 @@ export const OSCAR_BEST_PICTURE = [
   "year": 2016,
   "director": "Theodore Melfi",
   "tmdb_id": 381284,
+  "winner": false
+ },
+ {
+  "title": "La La Land",
+  "year": 2016,
+  "director": "Damien Chazelle",
+  "tmdb_id": 313369,
   "winner": false
  },
  {
@@ -1064,6 +1201,13 @@ export const OSCAR_BEST_PICTURE = [
   "winner": false
  },
  {
+  "title": "Little Miss Sunshine",
+  "year": 2006,
+  "director": "Valerie Faris, Jonathan Dayton",
+  "tmdb_id": 773,
+  "winner": false
+ },
+ {
   "title": "The Queen",
   "year": 2006,
   "director": "Stephen Frears",
@@ -1449,6 +1593,13 @@ export const OSCAR_BEST_PICTURE = [
   "winner": false
  },
  {
+  "title": "Forrest Gump",
+  "year": 1994,
+  "director": "Robert Zemeckis",
+  "tmdb_id": 13,
+  "winner": true
+ },
+ {
   "title": "Four Weddings and a Funeral",
   "year": 1994,
   "director": "Mike Newell",
@@ -1649,6 +1800,13 @@ export const OSCAR_BEST_PICTURE = [
   "year": 1989,
   "director": "Phil Alden Robinson",
   "tmdb_id": 2323,
+  "winner": false
+ },
+ {
+  "title": "My Left Foot",
+  "year": 1989,
+  "director": "Jim Sheridan",
+  "tmdb_id": 10161,
   "winner": false
  },
  {
@@ -1985,13 +2143,6 @@ export const OSCAR_BEST_PICTURE = [
   "year": 1979,
   "director": "Peter Yates",
   "tmdb_id": 20283,
-  "winner": false
- },
- {
-  "title": "My Left Foot",
-  "year": 1979,
-  "director": "Jim Sheridan",
-  "tmdb_id": 10161,
   "winner": false
  },
  {
@@ -2475,6 +2626,13 @@ export const OSCAR_BEST_PICTURE = [
   "year": 1965,
   "director": "Fred Coe",
   "tmdb_id": 42731,
+  "winner": false
+ },
+ {
+  "title": "Darling",
+  "year": 1965,
+  "director": "John Schlesinger",
+  "tmdb_id": 24134,
   "winner": false
  },
  {
@@ -2989,20 +3147,6 @@ export const OSCAR_BEST_PICTURE = [
   "winner": true
  },
  {
-  "title": "All the King's Men",
-  "year": 1950,
-  "director": "Robert Rossen",
-  "tmdb_id": 25430,
-  "winner": true
- },
- {
-  "title": "Battleground",
-  "year": 1950,
-  "director": "William A. Wellman",
-  "tmdb_id": 31623,
-  "winner": false
- },
- {
   "title": "Born Yesterday",
   "year": 1950,
   "director": "George Cukor",
@@ -3031,10 +3175,24 @@ export const OSCAR_BEST_PICTURE = [
   "winner": false
  },
  {
+  "title": "All the King's Men",
+  "year": 1949,
+  "director": "Robert Rossen",
+  "tmdb_id": 25430,
+  "winner": true
+ },
+ {
   "title": "A Letter to Three Wives",
   "year": 1949,
   "director": "Joseph L. Mankiewicz",
   "tmdb_id": 45578,
+  "winner": false
+ },
+ {
+  "title": "Battleground",
+  "year": 1949,
+  "director": "William A. Wellman",
+  "tmdb_id": 31623,
   "winner": false
  },
  {
@@ -3327,7 +3485,7 @@ export const OSCAR_BEST_PICTURE = [
  {
   "title": "The Pied Piper",
   "year": 1942,
-  "director": "Percy Stow, Irving Pichel",
+  "director": "Irving Pichel",
   "tmdb_id": 84085,
   "winner": false
  },

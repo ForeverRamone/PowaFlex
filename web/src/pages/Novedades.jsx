@@ -22,6 +22,22 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.11',
+    fecha: '2026-08-10',
+    titular: 'Las 1001 películas, los palmareses que faltaban y la cuarentena sin códigos',
+    puntos: [
+      'Las 1001 películas del libro (15.ª edición, 2021) entran en Cánones junto a Sight & Sound y Cahiers: 997 de 1001 con su ficha a la primera. De las cuatro sin casar, una está bien así: Lovers Rock es un episodio de Small Axe, no una película.',
+      'La Cámara de Oro —la mejor ópera prima de todo Cannes— tiene entrada propia con sus 50 ganadoras desde 1978; y Un Certain Regard y la Semana de la Crítica ganan palmarés histórico. Las reglas de Radarr los ofrecen solos.',
+      'El palmarés de Sundance · Competición de EE UU estaba a medias y con fichas rotas: el parser fallaba con las iniciales (A.V. Rockwell), los apellidos con partícula (Beth de Araújo), un «by» que era de la novelista y los empates. Ahora: 47 ganadoras desde 1984 (Blood Simple incluida), todas con ficha.',
+      'Al Óscar le faltaba hasta Forrest Gump como ganadora — en Wikidata las nominaciones las tienen los productores, no las películas. Regenerado contra las 98 ceremonias de Wikipedia y verificado contra fuentes: 621 nominadas, 98 ganadoras, las galas recientes completas.',
+      'La cuarentena se configura por nombre: escribes «hindi» o «Taiwán» y pulsas el chip — se acabó saberse los códigos ISO. Y la bandeja dice «idioma hindi», no «idioma hi».',
+      'Los pesos de las cinco señales del detector de emergentes se editan en Ajustes → Automatismos (vacío = de fábrica).',
+      'En la ficha de cualquier película, dirección y reparto son clicables aunque no estén en tu biblioteca; en Cine venidero, igual.',
+      '«Actualizar todo» ya no dice «sin configurar» cuando un paso semanal simplemente no toca: dice «al día» y cuándo corrió.',
+      'Cuatro agentes repasaron el conjunto (dos probadores en bucle, un revisor adversarial y un verificador de datos): sus once hallazgos están arreglados y fijados con tests. La suite pasa de 234 a 253.',
+    ],
+  },
+  {
     label: 'Beta 1.10',
     fecha: '2026-08-09',
     titular: 'Cuatro agentes repasando el emparejado, ficha a ficha',

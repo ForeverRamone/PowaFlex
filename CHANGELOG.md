@@ -1,5 +1,42 @@
 # Changelog
 
+## Beta 1.11 (1.0.11-beta) — 2026-08-10
+
+**Las 1001 películas, los palmareses que faltaban de Cannes y Sundance, el Óscar completo de verdad, y la cuarentena sin códigos.**
+
+### Las 1001 películas, como canon
+
+El libro de Schneider (15.ª edición, 2021 — la «edición 2024» que circula no existe como libro) entra en Cánones junto a Sight & Sound y Cahiers: 1001 fichas en el orden cronológico del libro, con 997 casadas contra TMDB a la primera. De las cuatro restantes, una está *bien* sin ficha: Lovers Rock es un episodio de Small Axe, no una película.
+
+### Los palmareses de las paralelas de Cannes
+
+La **Cámara de Oro** —la mejor ópera prima de todo Cannes, el radar de debuts por excelencia— tiene entrada propia con sus 50 ganadoras desde 1978. Y Un Certain Regard (29 ganadoras desde 1998) y la Semana de la Crítica (26 del Gran Premio) ganan el botón de palmarés histórico. El motor de reglas los ofrece solo: todo sale del registro, sin listas a mano.
+
+### Sundance EE UU: de 21 fichas con 3 rotas a 47 con ninguna
+
+Lo destapó una captura de producción. El parser de la lista de Sundance fallaba de cuatro maneras distintas: las iniciales («A.V. Rockwell» — el veto casaba la A suelta), las partículas («Beth de Araújo»), un «by» que era parte del título («Precious: Based on the Novel "Push" **by Sapphire**» ponía a la novelista de directora) y el empate del 2000 sin partir en dos. Y encima el palmarés empezaba en 2005 porque copió el corte de la competición internacional, cuando el premio estadounidense es de 1984: Blood Simple, The Brothers McMullen y veintitrés más estaban fuera. La revisión adversarial cazó dos pérdidas más: el «U. S.» con espacio de 2013 borraba a **Fruitvale Station** en silencio, y los empates en dos líneas (Public Access, el debut de Bryan Singer) perdían la segunda ganadora. Resultado: 47 ganadoras desde 1984, las 47 con ficha.
+
+### El Óscar, completo de verdad
+
+El dataset no solo perdía nominadas recientes: le faltaba hasta **Forrest Gump como ganadora**, y La La Land, Top Gun: Maverick, The Holdovers, Killers of the Flower Moon… La causa es fina: en Wikidata, la nominación al Óscar la tienen los *productores*, no las películas. Regenerado contra los artículos de las 98 ceremonias de Wikipedia: 621 filas, 98 ganadoras, las cuatro galas recientes con sus 10 nominadas, y un agente verificándolo después contra fuentes (que además cazó dos años mal y un director espurio, heredados de Wikidata).
+
+### La cuarentena, sin códigos
+
+Los criterios se eligen por **nombre**: escribes «hindi» o «Taiwán», pulsas el chip, y listo — con buscador, sugerencias y los nombres en el idioma de la interfaz (los saca el navegador, sin datasets que mantener). Por debajo se guardan los mismos códigos de siempre: el motor y las copias no se enteran. Y la bandeja de pendientes dice «idioma hindi», no «idioma hi».
+
+### Más emparejado fino
+
+- Para filas sin director (las listas viejas de Sundance), el título es la única prueba y ahora se exige clavado — con tres tolerancias medidas: las erratas de letras dobladas («Angelo azzuro»), los subtítulos de verdad («Personal Velocity: Three Portraits», y un ordinal NO es un subtítulo: Halloween II no cuela), y el título internacional en inglés exacto («Three Seasons», que en TMDB es «Ba mùa»).
+- Los apellidos transliterados del francés pliegan sus dígrafos («Chukhrai»/«Tchoukhrai», el del palmarés de BAFTA) — pero solo cuando pliega un lado: Boucher y Butcher siguen siendo dos personas.
+- Los espacios finos y los marcadores de idioma de Wikipedia ya no rompen títulos («Veni Vidi Vici»), y los bloques de cortos de Orizzonti 2026 ya no se cuelan como películas.
+
+### Y además
+
+- Los pesos de las cinco señales del detector de emergentes tienen interfaz en Ajustes → Automatismos (vacío = de fábrica).
+- En la ficha de cualquier película, todos los nombres de dirección y reparto son clicables aunque no estén en tu biblioteca; en Cine venidero, igual.
+- «Actualizar todo» ya no dice «sin configurar» cuando un paso semanal simplemente no toca esta semana: dice «al día» y cuándo fue la última vez.
+- Cuatro agentes (dos probadores en bucle, un revisor adversarial y un verificador de datos) repasaron el conjunto: todas las rutas pintan en los dos idiomas, y sus once hallazgos están arreglados y fijados con tests. La suite pasa de 234 a 253.
+
 ## Beta 1.10 (1.0.10-beta) — 2026-08-09
 
 **La auditoría de cuatro agentes sobre el emparejado, y los nombres clicables.**

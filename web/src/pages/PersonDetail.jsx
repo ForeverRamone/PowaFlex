@@ -313,7 +313,11 @@ export default function PersonDetail() {
               </div>
             )}
             {stats.upcoming > 0 && (
-              <div className="text-xs text-sky-300 mt-2">{t('🗓️ {n} proyectos anunciados o por estrenar', { n: stats.upcoming })}</div>
+              <div className="text-xs text-sky-300 mt-2">
+                {stats.upcoming === 1
+                  ? t('🗓️ 1 proyecto anunciado o por estrenar')
+                  : t('🗓️ {n} proyectos anunciados o por estrenar', { n: stats.upcoming })}
+              </div>
             )}
           </div>
           {person.biography && (

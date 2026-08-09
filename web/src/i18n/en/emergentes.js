@@ -69,6 +69,7 @@ export default {
   'Venecia · Orizzonti': 'Venice · Orizzonti',
   'Berlinale · Perspectives': 'Berlinale · Perspectives',
   'S.S. · Nuevos Directores': 'S.S. · New Directors',
+  'Cannes · Cámara de Oro': 'Cannes · Caméra d’Or',
 
   // regla de Radarr sobre emergentes
   'Emergentes': 'Emerging',

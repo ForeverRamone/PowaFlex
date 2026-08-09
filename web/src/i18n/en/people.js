@@ -103,6 +103,7 @@ export default {
   ' · {n} fuera del cómputo (cortos, TV, docs, conciertos o dirección coral)':
     ' · {n} outside the count (shorts, TV, docs, concerts or co-directions)',
   '🗓️ {n} proyectos anunciados o por estrenar': '🗓️ {n} projects announced or upcoming',
+  '🗓️ 1 proyecto anunciado o por estrenar': '🗓️ 1 project announced or upcoming',
 
   // vistas, orden y Radarr
   'Todas': 'All',

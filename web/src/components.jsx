@@ -1124,8 +1124,8 @@ function toViewModel({ ratingKey, movie, media }) {
       runtimeMin: movie.duration_ms ? Math.round(movie.duration_ms / 60000) : null,
       genres: (movie.tags || []).filter((t) => t.type === 'genre').map((t) => t.name),
       countries: (movie.tags || []).filter((t) => t.type === 'country').map((t) => t.name),
-      directors: (movie.people || []).filter((p) => p.role === 'director').map((p) => ({ id: p.id, name: p.name })),
-      cast: (movie.people || []).filter((p) => p.role === 'actor').slice(0, 14).map((p) => ({ id: p.id, name: p.name })),
+      directors: (movie.people || []).filter((p) => p.role === 'director').map((p) => ({ id: p.id, tmdb_id: p.tmdb_id ?? null, name: p.name })),
+      cast: (movie.people || []).filter((p) => p.role === 'actor').slice(0, 14).map((p) => ({ id: p.id, tmdb_id: p.tmdb_id ?? null, name: p.name })),
       ratings: movie.ratings,
       tmdb_id: movie.tmdb_id,
       imdb_id: movie.imdb_id,
@@ -1147,8 +1147,8 @@ function toViewModel({ ratingKey, movie, media }) {
     runtimeMin: m.runtime || null,
     genres: m.genres || [],
     countries: [],
-    directors: (m.directors || []).map((d) => ({ id: d.id, name: d.name })),
-    cast: (m.cast || []).map((a) => ({ id: a.id, name: a.name })),
+    directors: (m.directors || []).map((d) => ({ id: d.id, tmdb_id: d.tmdb_id ?? null, name: d.name })),
+    cast: (m.cast || []).map((a) => ({ id: a.id, tmdb_id: a.tmdb_id ?? null, name: a.name })),
     ratings: m.ratings,
     tmdb_id: m.tmdb_id,
     imdb_id: m.imdb_id,
@@ -1184,16 +1184,21 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
   };
 
   const owned = vm?.owned;
+  // TODO nombre clicable, esté o no en tu biblioteca: con id local va directo,
+  // y si no, la ruta /personas/:ref resuelve `tmdb:123` o `nombre:Fulano` AL
+  // PULSAR. Antes, quien no estaba en tu Plex se quedaba en texto plano.
   const PersonLinks = ({ people, role, cls }) => (
     <>
       {people.map((p, i) => (
-        <span key={`${p.id ?? p.name}-${i}`}>
+        <span key={`${p.id ?? p.tmdb_id ?? p.name}-${i}`}>
           {i > 0 && ', '}
-          {p.id ? (
-            <Link className={cls} to={`/personas/${p.id}?role=${role}`} onClick={onClose}>{p.name}</Link>
-          ) : (
-            <span className="text-zinc-300">{p.name}</span>
-          )}
+          <Link
+            className={cls}
+            to={`/personas/${refPersona({ personId: p.id, tmdbId: p.tmdb_id, nombre: p.name })}?role=${role}`}
+            onClick={onClose}
+          >
+            {p.name}
+          </Link>
         </span>
       ))}
     </>

@@ -231,3 +231,107 @@ test('ordenarCandidatos: el año manda sobre la popularidad, y el título clavad
   // conserva el orden de TMDB: no se inventa un criterio que no tenemos
   assert.deepEqual(ordenarCandidatos(lista, 'The Leopard', null).map((c) => c.id), [4, 1, 2, 3]);
 });
+
+// Los flecos que la auditoría de la 1.10 dejó diagnosticados y sin arreglar,
+// ahora fijados: (a) una fila SIN director no tiene contra qué verificar, así
+// que la única prueba que queda —el título clavado— se exige siempre; antes
+// se emparejaba con el primer candidato con créditos de la ventana.
+test('sin director en la fila, solo el título clavado empareja', async () => {
+  const { elegirCandidato } = await import('../src/festivals.js');
+  const dirsDe = async () => ['Cualquier Persona'];
+  // título distinto: NO vale aunque el candidato tenga créditos y esté en año
+  const distinto = await elegirCandidato(
+    { title: 'Company', director: null }, 2024,
+    [{ id: 51, title: 'The Company Men', original_title: 'The Company Men', date: '2024-05-01' }],
+    new Set(), dirsDe
+  );
+  assert.equal(distinto.tmdbId, null);
+  // título clavado: sí
+  const clavado = await elegirCandidato(
+    { title: 'Company', director: null }, 2024,
+    [{ id: 52, title: 'Company', original_title: 'Company', date: '2024-05-01' }],
+    new Set(), dirsDe
+  );
+  assert.equal(clavado.tmdbId, 52);
+  // y las fichas sin créditos tampoco entran ya sin clavar el título
+  const sinCreditos = await elegirCandidato(
+    { title: 'Company', director: null }, 2024,
+    [{ id: 53, title: 'Companía y media', original_title: 'Companía y media', date: '2024-05-01' }],
+    new Set(), async () => []
+  );
+  assert.equal(sinCreditos.tmdbId, null);
+});
+
+// (b) la errata de Wikipedia con una letra doblada de menos: «Angelo azzuro»
+// (Orizzonti 2026) es «Angelo Azzurro» en TMDB. El título clavado tolera SOLO
+// letras dobladas — los dígitos no se colapsan, que «Apollo 11» no es «Apollo 1».
+test('el título clavado tolera letras dobladas de erratas, no dígitos', async () => {
+  const { elegirCandidato } = await import('../src/festivals.js');
+  const conErrata = await elegirCandidato(
+    { title: 'Angelo azzuro', director: 'Fulano Director' }, 2026,
+    [{ id: 61, title: 'Angelo Azzurro', original_title: 'Angelo Azzurro', date: '2026-09-01' }],
+    new Set(), async () => ['Fulano Director']
+  );
+  assert.equal(conErrata.tmdbId, 61);
+  // un dígito repetido NO se pliega: «Apollo 11» no debe clavar con «Apollo 1»
+  const apolo = await elegirCandidato(
+    { title: 'Apollo 11', director: null }, 2019,
+    [{ id: 62, title: 'Apollo 1', original_title: 'Apollo 1', date: '2019-03-01' }],
+    new Set(), async () => ['Alguien']
+  );
+  assert.equal(apolo.tmdbId, null);
+});
+
+// «Three Seasons» (Sundance 1999, fila sin director): en TMDB es «Tres
+// estaciones» de título y «Ba mùa» de original — el inglés solo vive en la
+// traducción. Para filas sin director, ese título internacional EXACTO vale
+// como título clavado; sin él, sigue mandando «mejor sin ficha».
+test('sin director, el título internacional exacto también clava', async () => {
+  const { elegirCandidato } = await import('../src/festivals.js');
+  const candidato = { id: 71, title: 'Tres estaciones', original_title: 'Ba mùa', date: '1999-04-30' };
+  const conIngles = await elegirCandidato(
+    { title: 'Three Seasons', director: null }, 1999, [candidato],
+    new Set(), async () => ['Tony Bui'], async () => 'Three Seasons'
+  );
+  assert.equal(conIngles.tmdbId, 71);
+  // sin la traducción disponible, no hay prueba: sin ficha
+  const sinIngles = await elegirCandidato(
+    { title: 'Three Seasons', director: null }, 1999, [candidato],
+    new Set(), async () => ['Tony Bui']
+  );
+  assert.equal(sinIngles.tmdbId, null);
+  // y un título internacional que NO clava tampoco cuela
+  const otro = await elegirCandidato(
+    { title: 'Three Seasons', director: null }, 1999, [candidato],
+    new Set(), async () => ['Tony Bui'], async () => 'Four Seasons'
+  );
+  assert.equal(otro.tmdbId, null);
+});
+
+// Más hallazgos del revisor adversarial, sobre las tolerancias de título:
+test('«Anna» no es «Ana»: el plegado de dobles exige cuerpo', async () => {
+  const { elegirCandidato } = await import('../src/festivals.js');
+  const r = await elegirCandidato(
+    { title: 'Anna', director: null }, 2020,
+    [{ id: 81, title: 'Ana', original_title: 'Ana', date: '2020-03-01' }],
+    new Set([81]), async () => ['Otra Persona']
+  );
+  assert.equal(r.tmdbId, null);
+});
+
+test('la contención exige un subtítulo de verdad: Halloween II no es Halloween', async () => {
+  const { elegirCandidato } = await import('../src/festivals.js');
+  const secuela = await elegirCandidato(
+    { title: 'Halloween', director: null }, 1981,
+    [{ id: 91, title: 'Halloween II', original_title: 'Halloween II', date: '1981-10-30' }],
+    new Set(), async () => ['Rick Rosenthal']
+  );
+  assert.equal(secuela.tmdbId, null);
+  // y el subtítulo largo de verdad sigue valiendo
+  const subtitulo = await elegirCandidato(
+    { title: 'Personal Velocity: Three Portraits', director: null }, 2002,
+    [{ id: 92, title: 'Personal Velocity', original_title: 'Personal Velocity', date: '2002-11-01' }],
+    new Set(), async () => ['Rebecca Miller']
+  );
+  assert.equal(subtitulo.tmdbId, 92);
+});

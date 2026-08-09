@@ -99,9 +99,7 @@ export default {
     'Whatever meets these criteria is NOT sent on its own: it lands here and waits for your approval. It is for what clears the threshold but deserves a second look — scores inflated by a very dedicated community, for instance. It applies to ALL rules.',
   'Poner en cuarentena lo que cumpla alguno de estos criterios': 'Quarantine anything meeting any of these criteria',
   'Idiomas originales': 'Original languages',
-  'Códigos de dos letras separados por comas (hi = hindi, ta = tamil).': 'Two-letter codes separated by commas (hi = Hindi, ta = Tamil).',
   'Países de producción': 'Production countries',
-  'Códigos de dos letras separados por comas (IN = India).': 'Two-letter codes separated by commas (IN = India).',
   '✓ A Radarr': '✓ To Radarr',
   'La veta: ninguna regla la volverá a proponer': 'Vetoes it: no rule will propose it again',
   '✓ «{p}» mandada a Radarr': '✓ “{p}” sent to Radarr',
@@ -117,4 +115,11 @@ export default {
   '✓ {n} mandadas a Radarr': '✓ {n} sent to Radarr',
   '✓ {n} mandadas a Radarr · {e} no se pudieron añadir': '✓ {n} sent to Radarr · {e} could not be added',
   'Esa película no está en cuarentena': 'That movie is not in quarantine',
+
+  // selector de criterios de cuarentena por nombre (adiós a los códigos ISO)
+  'Escribe un idioma (hindi, tamil…)': 'Type a language (Hindi, Tamil…)',
+  'Escribe un país (India, Nigeria…)': 'Type a country (India, Nigeria…)',
+  'Quitar {x}': 'Remove {x}',
+  'Nada con ese nombre.': 'Nothing by that name.',
+  'Frecuentes:': 'Common picks:',
 };

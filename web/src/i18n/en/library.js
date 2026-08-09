@@ -25,6 +25,7 @@ export default {
   '⚙ Filtros': '⚙ Filters',
   '✕ Limpiar filtros': '✕ Clear filters',
   '{n} películas': '{n} movies',
+  '1 película': '1 movie',
   'vista (en Plex o en Letterboxd)': 'watched (in Plex or on Letterboxd)',
 
   // Chips de filtros activos

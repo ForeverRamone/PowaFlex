@@ -42,7 +42,13 @@ export const CACHE_VERSIONS = {
   // cacheado antes tiene esas tres como «sin ficha en TMDB».
   // v9: la fila corta de Wikipedia ya no mete el título original en el campo
   // del director (lo decide la cursiva), y las ediciones marcan su ganadora
-  festival: 9,
+  // v10: sin director en la fila se exige título clavado (antes se emparejaba
+  // sin verificar nada); el título clavado tolera letras dobladas de erratas
+  // («Angelo azzuro»); los nombres pliegan dígrafos de transliteración
+  // («Chukhrai»/«Tchoukhrai»); stripTags decodifica entidades numéricas y los
+  // marcadores en lista de {{ill}} («Veni Vidi Vici» de Sundance); y los
+  // bloques de cortos de Orizzonti ya no se cuelan como películas
+  festival: 10,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

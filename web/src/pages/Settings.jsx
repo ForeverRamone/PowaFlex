@@ -696,6 +696,62 @@ function SeccionCalendario() {
   );
 }
 
+/**
+ * Los pesos de las cinco señales del detector de emergentes. Eran editables
+ * por API desde la 1.08 pero NO tenían interfaz: el ajuste existía y no había
+ * forma humana de tocarlo. Campo vacío = peso de fábrica (la misma regla que
+ * aplica el servidor: un ajuste sin poner o ilegible cae en el de serie).
+ */
+function SeccionEmergentes() {
+  const { s, set } = useAjustes();
+  const señales = [
+    ['emerg_w_institucional', 'Consagración institucional', 45],
+    ['emerg_w_critica', 'Consenso crítico', 18],
+    ['emerg_w_traccion', 'Tracción real', 17],
+    ['emerg_w_aceleracion', 'Aceleración', 12],
+    ['emerg_w_afinidad', 'Afinidad contigo', 8],
+  ];
+  // la suma orientativa, con los de fábrica donde no hay nada escrito: los
+  // pesos son relativos (la señal sin datos sale del reparto), pero 100 es la
+  // escala en la que están pensados y avisar de una suma rara evita sorpresas
+  const suma = señales.reduce((acc, [k, , def]) => {
+    const v = Number(s[k]);
+    return acc + (s[k] != null && String(s[k]).trim() !== '' && Number.isFinite(v) && v >= 0 && v <= 100 ? v : def);
+  }, 0);
+  return (
+    <section className="card p-5 mb-5">
+      <h2 className="font-semibold text-zinc-100">{t('Detector de directores emergentes')}</h2>
+      <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-2xl">
+        {t('Cuánto pesa cada señal en la puntuación de emergente (0–100). La señal sin datos no puntúa cero: sale del reparto y las demás se reparten su peso. Deja un campo vacío para volver al peso de fábrica.')}
+      </p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {señales.map(([k, label, def]) => (
+          <div key={k}>
+            <label className="text-xs text-zinc-400">{t(label)}</label>
+            <input
+              className="input mt-1"
+              type="number"
+              min="0"
+              max="100"
+              placeholder={String(def)}
+              value={s[k] ?? ''}
+              onChange={set(k)}
+            />
+          </div>
+        ))}
+      </div>
+      <p className={`text-[11px] mt-2 ${suma === 100 ? 'text-zinc-500' : 'text-orange-300'}`}>
+        {suma === 100
+          ? t('Los pesos suman 100.')
+          : t('Los pesos suman {n} (no pasa nada: son relativos, pero 100 es la escala pensada).', { n: suma })}
+      </p>
+      <p className="text-[11px] text-zinc-500 mt-1">
+        {t('El detector se rehace una vez por semana en el pase nocturno; el cambio de pesos se nota en la siguiente detección (o al forzarla desde la página de Emergentes).')}
+      </p>
+    </section>
+  );
+}
+
 function SeccionHuecos() {
   const { s, set } = useAjustes();
   return (
@@ -1165,6 +1221,7 @@ export default function Settings() {
               </div>
             </section>
             <SeccionCalendario />
+            <SeccionEmergentes />
             <SeccionHuecos />
           </>
         )}

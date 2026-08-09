@@ -5,6 +5,7 @@ import {
   parseCahiersTables, splitDirectors, elegirCandidato, faltaElTituloOriginal,
 } from '../src/festivals.js';
 import { SIGHT_AND_SOUND_2022 } from '../src/data/sight-and-sound-2022.js';
+import { MIL_UNA_2021 } from '../src/data/1001-movies-2021.js';
 
 /**
  * Festivales: la convención de títulos de artículo y el parser de wikitables.
@@ -62,15 +63,31 @@ test('cada sección de debut casa el nombre real que usa Wikipedia', () => {
   assert.equal(REGISTRY.ssnuevos.article(2025), '73rd San Sebastián International Film Festival');
 });
 
-// las secciones de debut no tienen artículo de premio: solo ofrecen edición por
-// año, como Busan. Ofrecer «palmarés» sería ofrecer una opción que revienta.
-test('las secciones de debut solo ofrecen sección oficial por año', () => {
-  for (const key of ['uncertainregard', 'semaine', 'quinzaine', 'orizzonti', 'perspectives', 'ssnuevos']) {
+// Qué ofrece cada sección de debut: cuatro solo tienen edición por año
+// (ofrecer «palmarés» sería ofrecer una opción que revienta), dos ganaron
+// palmarés con artículo propio (Un Certain Regard y el Gran Premio de la
+// Semana), y la Cámara de Oro es SOLO palmarés — premia la mejor ópera prima
+// de todo Cannes y no tiene sección propia que listar por año.
+test('las secciones de debut ofrecen lo que su artículo de Wikipedia aguanta', () => {
+  for (const key of ['quinzaine', 'orizzonti', 'perspectives', 'ssnuevos']) {
     const f = REGISTRY[key];
     assert.equal(f.group, 'debut', key);
     assert.ok(!f.awardPage && !f.staticList && !f.staticAward, key);
     assert.ok(!f.onlyWinners && !f.awardNominees, key);
   }
+  for (const key of ['uncertainregard', 'semaine']) {
+    const f = REGISTRY[key];
+    assert.equal(f.group, 'debut', key);
+    assert.ok(f.awardPage && f.awardSection, key);
+    assert.ok(!f.onlyWinners && !f.awardNominees, key);
+  }
+  assert.equal(REGISTRY.camaradeoro.group, 'debut');
+  assert.ok(REGISTRY.camaradeoro.onlyWinners);
+  assert.ok(REGISTRY.camaradeoro.awardPage && REGISTRY.camaradeoro.awardSection);
+  assert.ok(!REGISTRY.camaradeoro.section && !REGISTRY.camaradeoro.article);
+  // y el palmarés de Sundance EE UU llega hasta 1984 (Blood Simple), aunque
+  // sus ediciones tabuladas empiecen en 2005
+  assert.equal(REGISTRY.sundanceus.awardSinceYear, 1984);
 });
 
 // una tabla como las reales: cursivas, enlaces, notas [1], celdas con <br>
@@ -237,6 +254,27 @@ test('el dataset de Sight & Sound 2022 está completo y bien formado', () => {
   assert.equal(n1.director, 'Chantal Akerman');
   assert.ok(REGISTRY.sightsound.onlyWinners);
   assert.equal(REGISTRY.sightsound.staticList, SIGHT_AND_SOUND_2022);
+});
+
+// El otro canon empaquetado: el libro de las 1001. Son exactamente 1001 (los
+// cuatro bloques colapsados hacen que no sean 1008), todas las filas completas,
+// y su entrada del REGISTRY va como canon de solo-palmarés con fuente y nota
+// propias — festivalWinners ya no tiene nada de Sight & Sound cableado a mano.
+test('el dataset de las 1001 películas está completo y cableado como canon', () => {
+  assert.equal(MIL_UNA_2021.length, 1001);
+  assert.ok(MIL_UNA_2021.every((r) => r.title && r.year && r.director));
+  const claves = new Set(MIL_UNA_2021.map((r) => `${r.title}:${r.year}`));
+  assert.equal(claves.size, 1001, 'hay filas duplicadas');
+  assert.ok(/Trip to the Moon/.test(MIL_UNA_2021[0].title)); // orden cronológico del libro
+  assert.equal(REGISTRY.mil1.group, 'canon');
+  assert.ok(REGISTRY.mil1.onlyWinners);
+  assert.equal(REGISTRY.mil1.staticList, MIL_UNA_2021);
+  // las dos entradas estáticas llevan su fuente y su nota en el REGISTRY:
+  // si faltan, el palmarés saldría con la fuente de otra o sin explicación
+  for (const key of ['sightsound', 'mil1']) {
+    assert.ok(REGISTRY[key].staticSource, `${key} sin staticSource`);
+    assert.ok(REGISTRY[key].staticNote, `${key} sin staticNote`);
+  }
 });
 
 // Las tablas viejas de BAFTA pegan el «(ex-æquo)» y hasta el título original
@@ -475,4 +513,159 @@ test('un director acreditado en su alfabeto NO casa con cualquiera', () => {
   assert.equal(directorsMatch('Claire Denis', ['Андрей Тарковский']), false);
   // y el caso legítimo sigue funcionando por la transcripción de TMDB
   assert.ok(directorsMatch('Wang Bing', ['Wáng Bīng']));
+});
+
+// Los otros flecos de la auditoría de la 1.10, fijados aquí porque viven en el
+// parser y en la comparación de nombres.
+test('stripTags decodifica entidades numéricas y los marcadores en lista de {{ill}}', () => {
+  // «Veni Vidi Vici» (Sundance 2024) llegaba con espacios finos &#8202; que no
+  // casaban con nada, y con el marcador de idiomas [de; fr] de {{ill}} pegado
+  assert.equal(stripTags('Veni&#8202;Vidi&#8202;Vici'), 'Veni Vidi Vici');
+  assert.equal(stripTags('Fulano Menganez [de; fr]'), 'Fulano Menganez');
+  assert.equal(stripTags('Fulana [wd]'), 'Fulana');
+  assert.equal(stripTags('&#x48;ola'), 'Hola');
+  // una entidad rota no tumba el parseo
+  assert.equal(stripTags('a&#99999999;b'), 'ab');
+});
+
+test('directorsMatch pliega los dígrafos de transliteración francesa', () => {
+  // «Ballad of a Soldier» fallaba en el palmarés de BAFTA por esto
+  assert.ok(directorsMatch('Grigori Chukhrai', ['Grigoriy Tchoukhrai']));
+  assert.ok(directorsMatch('Grigory Tchoukhrai', ['Grigoriy Chukhray']));
+  // y el plegado no acerca apellidos distintos
+  assert.equal(directorsMatch('Grigori Chukhrai', ['Grigori Chereau']), false);
+});
+
+// Orizzonti 2026 mete cortos y largos en la MISMA tabla, separados por
+// filas-cabecera internas: los bloques de cortos se saltan enteros.
+test('parseSelectionTable salta los bloques de cortometrajes', () => {
+  const tabla = `
+<table class="wikitable">
+<tr><th>English Title</th><th>Original Title</th><th>Director(s)</th><th>Production Country</th></tr>
+<tr><td colspan="4">In Competition</td></tr>
+<tr><td><i>Largo Uno</i></td><td><i>Largo Uno</i></td><td>Directora Una</td><td>Italy</td></tr>
+<tr><td colspan="4">Short Films Competition</td></tr>
+<tr><td><i>Corto Uno</i></td><td><i>Corto Uno</i></td><td>Director Corto</td><td>France</td></tr>
+<tr><td colspan="4">Short Films — Out of Competition</td></tr>
+<tr><td><i>Corto Dos</i></td><td><i>Corto Dos</i></td><td>Directora Corta</td><td>Spain</td></tr>
+</table>`;
+  const rows = parseSelectionTable(tabla);
+  assert.deepEqual(rows.map((r) => r.title), ['Largo Uno']);
+  // y si tras los cortos vuelve un bloque de largos, se retoma
+  const conVuelta = tabla.replace(
+    '</table>',
+    '<tr><td colspan="4">Feature Films — Out of Competition</td></tr>' +
+      '<tr><td><i>Largo Dos</i></td><td><i>Largo Dos</i></td><td>Director Dos</td><td>Japan</td></tr></table>'
+  );
+  assert.deepEqual(parseSelectionTable(conVuelta).map((r) => r.title), ['Largo Uno', 'Largo Dos']);
+});
+
+// Los fallos del palmarés de Sundance que Ramón vio en producción (Beta 1.10):
+// tres formas de «Título (algo)» y un «by» traicionero, todos del artículo real.
+test('parseSundanceWinners: nombres con partícula, iniciales y colectivos salen del título', () => {
+  const html = `
+<h3>2026</h3><ul><li>U.S. Grand Jury Prize: Dramatic – Josephine (Beth de Araújo)</li></ul>
+<h3>2024</h3><ul><li>U.S. Grand Jury Prize: Dramatic – Sujo (Astrid Rondero and Fernanda Valadez)</li></ul>
+<h3>2023</h3><ul><li>U.S. Grand Jury Prize: Dramatic – A Thousand and One (A.V. Rockwell)</li></ul>`;
+  const rows = parseSundanceWinners(html, { ambito: 'us' });
+  assert.deepEqual(
+    rows.map((r) => [r.title, r.director]),
+    [
+      ['Josephine', 'Beth de Araújo'],
+      ['Sujo', 'Astrid Rondero and Fernanda Valadez'],
+      ['A Thousand and One', 'A.V. Rockwell'],
+    ]
+  );
+});
+
+test('parseSundanceWinners: el título original va a su campo y el empate se parte en dos', () => {
+  const html = `
+<h3>2009</h3><ul><li>World Cinema Jury Prize Dramatic – The Maid (La Nana)</li></ul>
+<h3>2000</h3><ul><li>Grand Jury Prize: Dramatic – Girlfight &amp; You Can Count on Me (tie)</li></ul>`;
+  const world = parseSundanceWinners(html, { ambito: 'world' });
+  assert.deepEqual(world.filter((r) => r.year === 2009).map((r) => [r.title, r.original_title, r.director]),
+    [['The Maid', 'La Nana', null]]);
+  const us = parseSundanceWinners(html, { ambito: 'us' });
+  assert.deepEqual(us.filter((r) => r.year === 2000).map((r) => r.title).sort(),
+    ['Girlfight', 'You Can Count on Me']);
+});
+
+test('parseSundanceWinners: un «by» que es parte del título no fabrica directora', () => {
+  const html = `<h3>2009</h3><ul><li>Grand Jury Prize: Dramatic – Precious: Based on the Novel "Push" by Sapphire</li></ul>`;
+  const [fila] = parseSundanceWinners(html, { ambito: 'us' });
+  assert.equal(fila.director, null); // Sapphire es la novelista, no la directora
+  assert.ok(/Precious/.test(fila.title));
+  // y un «by Fulano Mengano» de verdad sí parte
+  const html2 = `<h3>2021</h3><ul><li>U.S. Grand Jury Prize: Dramatic Competition – CODA by Sian Heder</li></ul>`;
+  assert.deepEqual(parseSundanceWinners(html2, { ambito: 'us' })[0].director, 'Sian Heder');
+});
+
+// El dataset del Óscar se completó el 2026-08-09 contra las 98 ceremonias de
+// Wikipedia (a Wikidata le faltaban 21 nominadas, Forrest Gump incluida).
+// Estas cifras fijan esa completitud: si una regeneración vuelve a perderlas,
+// que lo diga un test y no la página.
+test('el dataset del Óscar está completo: 98 ganadoras y 10 nominadas recientes', async () => {
+  const { OSCAR_BEST_PICTURE } = await import('../src/data/oscar-best-picture.js');
+  assert.equal(OSCAR_BEST_PICTURE.filter((r) => r.winner).length, 98);
+  for (const y of [2022, 2023, 2024, 2025]) {
+    assert.equal(OSCAR_BEST_PICTURE.filter((r) => r.year === y).length, 10, `año ${y}`);
+  }
+  const gump = OSCAR_BEST_PICTURE.find((r) => r.title === 'Forrest Gump');
+  assert.ok(gump?.winner, 'Forrest Gump ganadora');
+  assert.equal(OSCAR_BEST_PICTURE.find((r) => r.title === 'My Left Foot')?.year, 1989);
+});
+
+// Los hallazgos del revisor adversarial de la misma sesión, fijados:
+test('el «U. S.» con espacio de 2013 no borra a Fruitvale Station', () => {
+  const html = `<h3>2013</h3><ul><li>U. S. Grand Jury Prize: Dramatic – Fruitvale (retitled Fruitvale Station), directed by Ryan Coogler</li></ul>`;
+  const [fila] = parseSundanceWinners(html, { ambito: 'us' });
+  assert.ok(fila, 'el año 2013 desaparecía entero');
+  assert.equal(fila.year, 2013);
+  assert.equal(fila.director, 'Ryan Coogler');
+});
+
+test('un empate en DOS líneas conserva a las dos ganadoras', () => {
+  const html = `<h3>1993</h3><ul>
+<li>Grand Jury Prize Dramatic – Ruby in Paradise, directed by Victor Nunez</li>
+<li>Grand Jury Prize Dramatic – Public Access, directed by Bryan Singer</li>
+</ul>`;
+  const filas = parseSundanceWinners(html, { ambito: 'us' });
+  assert.deepEqual(filas.map((f) => f.title).sort(), ['Public Access', 'Ruby in Paradise']);
+});
+
+test('un título original que repite palabras del título no se vuelve director', () => {
+  const html = `<h3>2008</h3><ul><li>World Cinema Jury Prize Dramatic – King of Ping Pong (Ping Pongkingen)</li></ul>`;
+  const [fila] = parseSundanceWinners(html, { ambito: 'world' });
+  assert.equal(fila.director, null);
+  assert.equal(fila.title, 'King of Ping Pong');
+  assert.equal(fila.original_title, 'Ping Pongkingen');
+});
+
+test('el plegado de dígrafos no iguala dos apellidos que pliegan LOS DOS', () => {
+  // Boucher (ou) y Butcher (tch) convergen en «bucher» y son personas distintas
+  assert.equal(directorsMatch('Marie Boucher', ['Marie Butcher']), false);
+  // y los tokens cortos tampoco: Lou Ye y Lu Ye no son la misma persona por esto
+  assert.equal(directorsMatch('Lou Ye', ['Lu Yeo']), false);
+  // pero la grafía extranjera de UN lado sigue plegando (BAFTA, Ballad of a Soldier)
+  assert.ok(directorsMatch('Grigori Chukhrai', ['Grigoriy Tchoukhrai']));
+  assert.ok(directorsMatch('Grigory Tchoukhrai', ['Grigoriy Chukhray']));
+});
+
+test('en bloque de cortos, una subcabecera de país no reabre el grifo', () => {
+  const tabla = `
+<table class="wikitable">
+<tr><th>English Title</th><th>Original Title</th><th>Director(s)</th><th>Production Country</th></tr>
+<tr><td><i>Largo Uno</i></td><td><i>Largo Uno</i></td><td>Directora Una</td><td>Italy</td></tr>
+<tr><td colspan="4">Short Films Competition</td></tr>
+<tr><td colspan="4">France</td></tr>
+<tr><td><i>Corto Francés</i></td><td><i>Corto Francés</i></td><td>Director Corto</td><td>France</td></tr>
+</table>`;
+  assert.deepEqual(parseSelectionTable(tabla).map((r) => r.title), ['Largo Uno']);
+});
+
+test('«Título (retitled Otro)» se queda con el título definitivo', () => {
+  const html = `<h3>2013</h3><ul><li>U. S. Grand Jury Prize: Dramatic – Fruitvale (retitled Fruitvale Station)</li></ul>`;
+  const [fila] = parseSundanceWinners(html, { ambito: 'us' });
+  assert.equal(fila.title, 'Fruitvale Station');
+  assert.equal(fila.original_title, 'Fruitvale');
 });

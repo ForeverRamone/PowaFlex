@@ -135,7 +135,11 @@ export default function Library() {
         {[...params.keys()].length > 0 && (
           <button className="btn-ghost" onClick={() => { setSearch(''); setParams({}, { replace: true }); setShowFilters(false); }}>{t('✕ Limpiar filtros')}</button>
         )}
-        {data && <span className="text-sm text-zinc-400 ml-auto">{t('{n} películas', { n: data.total.toLocaleString(locale()) })}</span>}
+        {data && (
+          <span className="text-sm text-zinc-400 ml-auto">
+            {data.total === 1 ? t('1 película') : t('{n} películas', { n: data.total.toLocaleString(locale()) })}
+          </span>
+        )}
       </div>
       {/* aquí todo está en tu Plex: la única marca que aplica es la estrella */}
       <p className="text-[11px] text-zinc-500 mb-3"><span className="text-gold-400">★</span> {t('vista (en Plex o en Letterboxd)')}</p>

@@ -240,7 +240,7 @@ export default function Festivals() {
         {!soloPalmares && (
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => setView('seleccion')} className={`${view === 'seleccion' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
-              {info?.editionLabel || (info?.awardNominees ? t('Nominadas por año') : t('Sección oficial por año'))}
+              {t(info?.editionLabel) || (info?.awardNominees ? t('Nominadas por año') : t('Sección oficial por año'))}
             </button>
             <button onClick={() => setView('palmares')} className={`${view === 'palmares' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
               {t('🏆 Palmarés histórico')}
@@ -249,7 +249,9 @@ export default function Festivals() {
         )}
         {info && (
           <span className="text-xs text-zinc-500">
-            {soloPalmares || info.group === 'canon' ? t('Canon: ') : t('Premio que clasifica: ')}
+            {/* «Canon:» solo para los cánones: la Cámara de Oro es solo-palmarés
+                pero es un PREMIO, no un canon */}
+            {info.group === 'canon' ? t('Canon: ') : t('Premio que clasifica: ')}
             <b className="text-zinc-300">{t(info.award)}</b>
             {view === 'seleccion' && info.sinceYear > 1990 && t(' · esta sección existe desde {y}', { y: info.sinceYear })}
           </span>
@@ -264,9 +266,9 @@ export default function Festivals() {
           <div className="flex items-center gap-3 flex-wrap mb-3">
             <span className="text-sm text-zinc-400">
               <b className="text-gold-400">
-                {data.name} {data.year ?? ''}
+                {t(data.name)} {data.year ?? ''}
               </b>{' '}
-              · {data.section || t('todas las ganadoras ({award})', { award: data.award })} · {t('{n} películas', { n: films.length })}
+              · {t(data.section) || t('todas las ganadoras ({award})', { award: t(data.award) })} · {t('{n} películas', { n: films.length })}
               {data.unresolved > 0 && (
                 <span className="text-zinc-500"> · {t('{n} sin casar con TMDB', { n: data.unresolved })}</span>
               )}
@@ -295,7 +297,7 @@ export default function Festivals() {
             </div>
           </div>
           {data.note && (
-            <p className="text-xs text-sky-300 mb-3 max-w-3xl">ℹ️ {data.note}</p>
+            <p className="text-xs text-sky-300 mb-3 max-w-3xl">ℹ️ {t(data.note)}</p>
           )}
 
           <div className="flex items-center gap-3 flex-wrap mb-2">

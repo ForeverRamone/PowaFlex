@@ -117,6 +117,15 @@ function buildSteps({ includeAutoRadarr }) {
       label: 'Notas de IMDb (semanal)',
       // 8 MB en streaming; solo cuando toca, no cada noche
       enabled: () => imdbNecesitaRefresco(),
+      // Este paso no tiene NADA que configurar: si se salta es porque el
+      // volcado semanal ya está fresco. El «sin configurar» genérico aquí
+      // mentía, y se leía como una integración a medias (preguntado por Ramón
+      // con la captura delante).
+      skipNote: () => {
+        const at = Number(getSetting('imdb_ratings_at') || 0);
+        const dias = Math.max(0, Math.floor((Date.now() - at) / (24 * 3600 * 1000)));
+        return `al día: volcado hace ${dias === 1 ? '1 día' : `${dias} días`}, se refresca cada 7`;
+      },
       run: async () => {
         const r = await importImdbRatings();
         if (r.running) return 'ya había una importación en marcha';
@@ -157,6 +166,10 @@ function buildSteps({ includeAutoRadarr }) {
       key: 'emergentes',
       label: 'Detectar directores emergentes (semanal)',
       enabled: () => has('tmdb_key') && emergentesNecesitaRefresco(),
+      // dos motivos de salto distintos: sin clave de TMDB es configuración;
+      // con clave, es que la detección semanal ya está fresca
+      skipNote: () =>
+        has('tmdb_key') ? 'al día: se rehace una vez por semana' : 'sin configurar',
       run: async () => {
         const r = await detectarEmergentes();
         if (r.error) throw new Error(r.error);
@@ -289,7 +302,9 @@ export async function runFullRefresh({ trigger = 'manual', includeAutoRadarr = t
     key: s.key,
     label: s.label,
     state: s.enabled() ? 'pending' : 'skipped',
-    detail: s.enabled() ? null : 'sin configurar',
+    // «sin configurar» solo cuando de verdad falta configuración: los pasos
+    // semanales que ya corrieron dicen que están al día
+    detail: s.enabled() ? null : s.skipNote ? s.skipNote() : 'sin configurar',
     ms: 0,
   }));
 

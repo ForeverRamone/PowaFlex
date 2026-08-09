@@ -284,4 +284,19 @@ export default {
   'El automático las ignora. Se siguen viendo en Cine venidero y puedes mandarlas a Radarr a mano cuando quieras.':
     'The nightly job ignores them. They stay visible in Upcoming cinema and you can send them to Radarr by hand whenever you want.',
   'quitar el veto': 'undo',
+
+  // pesos del detector de emergentes (Ajustes → Automatismos)
+  'Detector de directores emergentes': 'Emerging-directors detector',
+  'Cuánto pesa cada señal en la puntuación de emergente (0–100). La señal sin datos no puntúa cero: sale del reparto y las demás se reparten su peso. Deja un campo vacío para volver al peso de fábrica.':
+    'How much each signal weighs in the emerging score (0–100). A signal with no data does not score zero: it drops out of the split and the rest share its weight. Leave a field empty to go back to the factory weight.',
+  'Consagración institucional': 'Institutional standing',
+  'Consenso crítico': 'Critical consensus',
+  'Tracción real': 'Real traction',
+  'Aceleración': 'Acceleration',
+  'Afinidad contigo': 'Affinity with you',
+  'Los pesos suman 100.': 'The weights add up to 100.',
+  'Los pesos suman {n} (no pasa nada: son relativos, pero 100 es la escala pensada).':
+    'The weights add up to {n} (that’s fine: they are relative, but 100 is the intended scale).',
+  'El detector se rehace una vez por semana en el pase nocturno; el cambio de pesos se nota en la siguiente detección (o al forzarla desde la página de Emergentes).':
+    'The detector rebuilds once a week during the nightly run; a weight change shows up in the next detection (or force one from the Emerging page).',
 };

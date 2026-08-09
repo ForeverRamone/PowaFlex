@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, tmdbImg } from '../api.js';
 import { Select, Spinner } from '../components.jsx';
 import { t, locale } from '../i18n.js';
@@ -426,9 +426,22 @@ function NuevaRegla({ catalog, existentes, onCreate }) {
  * que deja sin traducir a los avisos viejos. El servidor manda las piezas
  * (`reason_kind` + `reason_value`) y guarda su propia frase para el historial.
  */
+// el valor del motivo es un código ISO («hi», «IN»): se enseña con su NOMBRE
+// en el idioma de la interfaz, que es como se eligen ahora los criterios
+const nombreDeCodigo = (code, tipo) => {
+  try {
+    const dn = new Intl.DisplayNames([locale()], { type: tipo });
+    const probe = tipo === 'region' ? String(code).toUpperCase() : String(code).toLowerCase();
+    const name = dn.of(probe);
+    return name && name.toLowerCase() !== probe.toLowerCase() ? name : code;
+  } catch {
+    return code;
+  }
+};
+
 const motivoLegible = (p) => {
-  if (p.reason_kind === 'idioma') return t('idioma {x}', { x: p.reason_value });
-  if (p.reason_kind === 'pais') return t('país {x}', { x: p.reason_value });
+  if (p.reason_kind === 'idioma') return t('idioma {x}', { x: nombreDeCodigo(p.reason_value, 'language') });
+  if (p.reason_kind === 'pais') return t('país {x}', { x: nombreDeCodigo(p.reason_value, 'region') });
   return p.reason || '';
 };
 
@@ -469,16 +482,125 @@ function FilaPendiente({ p, onAprobar, onRechazar }) {
   );
 }
 
-function Cuarentena({ criterios, pendientes, onGuardar, onAprobar, onRechazar, onTodas }) {
-  // el TEXTO tal cual lo escribiste, no la lista normalizada: la lista va en
-  // minúsculas porque es con la que se compara, y devolverte «in» donde
-  // tecleaste «IN» parece que la casilla te corrige
-  const [langs, setLangs] = useState(criterios?.texto?.langs ?? '');
-  const [paises, setPaises] = useState(criterios?.texto?.countries ?? '');
+/**
+ * Todos los códigos ISO de dos letras que el navegador sabe NOMBRAR en el
+ * idioma de la interfaz, vía Intl.DisplayNames: cero datasets que mantener.
+ * Un código sin nombre asignado vuelve tal cual (o revienta) y se descarta.
+ */
+function codigosConNombre(tipo) {
+  let dn;
+  try {
+    dn = new Intl.DisplayNames([locale()], { type: tipo });
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (let a = 97; a <= 122; a++) {
+    for (let b = 97; b <= 122; b++) {
+      const code = String.fromCharCode(a) + String.fromCharCode(b);
+      const probe = tipo === 'region' ? code.toUpperCase() : code;
+      let name;
+      try {
+        name = dn.of(probe);
+      } catch {
+        continue;
+      }
+      if (name && name.toLowerCase() !== probe.toLowerCase()) out.push({ code, name });
+    }
+  }
+  return out.sort((x, y) => x.name.localeCompare(y.name, locale()));
+}
+
+/**
+ * Selector de idiomas/países por NOMBRE. Antes eran dos campos de texto libre
+ * con códigos ISO a pelo («hi, ta, te») — Ramón: complejo de usar y nada
+ * sencillo. Ahora se escribe «hindi» o «India», se pulsa, y el chip enseña el
+ * nombre; el código solo vive en el ajuste guardado, que no cambia de formato
+ * (códigos separados por comas) para no tocar el motor ni las copias.
+ */
+function SelectorCodigos({ tipo, etiqueta, valor, onCambiar, frecuentes = [] }) {
+  const [busca, setBusca] = useState('');
+  const todos = useMemo(() => codigosConNombre(tipo), [tipo]);
+  const porCodigo = useMemo(() => new Map(todos.map((x) => [x.code, x.name])), [todos]);
+  const parse = (v) =>
+    [...new Set(String(v || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean))];
+  // ESTADO LOCAL con el prop de arranque: derivarlo del prop en cada render
+  // perdía chips — cada clic dispara PUT + recarga de criterios, y un segundo
+  // clic antes de que vuelva la recarga recalculaba desde el valor viejo y
+  // pisaba el anterior. Una vez tocado, manda lo local; el prop solo entra
+  // mientras no se ha editado (p. ej. la carga inicial). El Set de `parse`
+  // además pliega duplicados guardados a mano («hi, hi»), que duplicaban keys.
+  const [elegidos, setElegidos] = useState(() => parse(valor));
+  const tocado = useRef(false);
   useEffect(() => {
-    setLangs(criterios?.texto?.langs ?? '');
-    setPaises(criterios?.texto?.countries ?? '');
-  }, [criterios]);
+    if (!tocado.current) setElegidos(parse(valor));
+  }, [valor]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nombreDe = (c) => porCodigo.get(c) || c.toUpperCase();
+  const formato = (c) => (tipo === 'region' ? c.toUpperCase() : c);
+  const guarda = (lista) => {
+    tocado.current = true;
+    setElegidos(lista);
+    onCambiar(lista.map(formato).join(', '));
+  };
+  const añade = (c) => {
+    if (!elegidos.includes(c)) guarda([...elegidos, c]);
+    setBusca('');
+  };
+  const q = busca.trim().toLowerCase();
+  const candidatos = q
+    ? todos.filter((x) => (x.name.toLowerCase().includes(q) || x.code === q) && !elegidos.includes(x.code)).slice(0, 8)
+    : [];
+  const sugeridos = frecuentes.filter((c) => !elegidos.includes(c));
+  return (
+    <div>
+      <label className="text-xs text-zinc-400">{etiqueta}</label>
+      {elegidos.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-1.5">
+          {elegidos.map((c) => (
+            <button
+              key={c}
+              className="btn-ghost !py-0.5 !px-2 text-xs !border-gold-400/60 text-zinc-200"
+              title={t('Quitar {x}', { x: nombreDe(c) })}
+              onClick={() => guarda(elegidos.filter((x) => x !== c))}
+            >
+              {nombreDe(c)} <span className="text-zinc-500">✕</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <input
+        className="input mt-1.5"
+        placeholder={tipo === 'region' ? t('Escribe un país (India, Nigeria…)') : t('Escribe un idioma (hindi, tamil…)')}
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+      />
+      {candidatos.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-1.5">
+          {candidatos.map((x) => (
+            <button key={x.code} className="btn-ghost !py-0.5 !px-2 text-xs" onClick={() => añade(x.code)}>
+              + {x.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {q && !candidatos.length && (
+        <p className="text-[11px] text-zinc-500 mt-1">{t('Nada con ese nombre.')}</p>
+      )}
+      {!q && sugeridos.length > 0 && (
+        <div className="flex flex-wrap items-baseline gap-1.5 mt-1.5">
+          <span className="text-[11px] text-zinc-500">{t('Frecuentes:')}</span>
+          {sugeridos.map((c) => (
+            <button key={c} className="btn-ghost !py-0.5 !px-2 text-xs text-zinc-400" onClick={() => añade(c)}>
+              + {nombreDe(c)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Cuarentena({ criterios, pendientes, onGuardar, onAprobar, onRechazar, onTodas }) {
 
   return (
     <div className="mt-5 pt-4 border-t border-ink-700">
@@ -506,29 +628,23 @@ function Cuarentena({ criterios, pendientes, onGuardar, onAprobar, onRechazar, o
       </label>
 
       {criterios?.enabled && (
-        <div className="grid sm:grid-cols-2 gap-3 mt-3 ml-6 max-w-2xl">
-          <div>
-            <label className="text-xs text-zinc-400">{t('Idiomas originales')}</label>
-            <input
-              className="input mt-1"
-              placeholder="hi, ta, te, ml"
-              value={langs}
-              onChange={(e) => setLangs(e.target.value)}
-              onBlur={() => onGuardar({ quarantine_langs: langs })}
-            />
-            <p className="text-[11px] text-zinc-500 mt-1">{t('Códigos de dos letras separados por comas (hi = hindi, ta = tamil).')}</p>
-          </div>
-          <div>
-            <label className="text-xs text-zinc-400">{t('Países de producción')}</label>
-            <input
-              className="input mt-1"
-              placeholder="IN, NG"
-              value={paises}
-              onChange={(e) => setPaises(e.target.value)}
-              onBlur={() => onGuardar({ quarantine_countries: paises })}
-            />
-            <p className="text-[11px] text-zinc-500 mt-1">{t('Códigos de dos letras separados por comas (IN = India).')}</p>
-          </div>
+        <div className="grid sm:grid-cols-2 gap-4 mt-3 ml-6 max-w-2xl">
+          {/* por nombre y con chips: aquí se escribía «hi, ta, te» a pelo y
+              había que saberse los códigos ISO de memoria */}
+          <SelectorCodigos
+            tipo="language"
+            etiqueta={t('Idiomas originales')}
+            valor={criterios?.texto?.langs ?? ''}
+            onCambiar={(v) => onGuardar({ quarantine_langs: v })}
+            frecuentes={['hi', 'ta', 'te', 'ml', 'kn', 'bn', 'tl', 'id', 'tr']}
+          />
+          <SelectorCodigos
+            tipo="region"
+            etiqueta={t('Países de producción')}
+            valor={criterios?.texto?.countries ?? ''}
+            onCambiar={(v) => onGuardar({ quarantine_countries: v })}
+            frecuentes={['in', 'ng', 'ph', 'id', 'tr', 'bd', 'pk', 'eg']}
+          />
         </div>
       )}
 

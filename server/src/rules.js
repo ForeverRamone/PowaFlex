@@ -82,7 +82,9 @@ export function scopesDeFestival(f) {
   }
   // «palmarés»: el histórico de ganadoras. Busan y Horizontes no lo tienen.
   if (f.awardPage || f.staticList || f.staticAward) {
-    out.push({ key: 'palmares', label: f.onlyWinners ? 'La lista' : 'Palmarés histórico' });
+    // «La lista» es cosa de los cánones (Sight & Sound, las 1001); la Cámara
+    // de Oro también es solo-palmarés pero ES un palmarés histórico
+    out.push({ key: 'palmares', label: f.onlyWinners && f.group === 'canon' ? 'La lista' : 'Palmarés histórico' });
   }
   return out;
 }
