@@ -25,9 +25,24 @@ export const imdbStatus = {
   error: null,
 };
 
+/**
+ * Cuántas filas hay de verdad en la tabla, contadas UNA vez y anotadas.
+ *
+ * Son 1,7 millones y la tabla no tiene más índice que su clave primaria de
+ * texto, así que el COUNT(*) recorre el volcado entero: un cuarto de segundo en
+ * este portátil y bastante más en el N100, cada vez que se abre Ajustes. Solo
+ * cambia cuando termina una importación, que es quien vuelve a apuntarlo.
+ */
+function contarFilas() {
+  const { n } = db.prepare('SELECT COUNT(*) n FROM imdb_ratings').get();
+  setSetting('imdb_ratings_rows', String(n));
+  return n;
+}
+
 /** Cuántas notas hay guardadas y de cuándo son. */
 export function imdbInfo() {
-  const { n } = db.prepare('SELECT COUNT(*) n FROM imdb_ratings').get();
+  const guardado = getSetting('imdb_ratings_rows');
+  const n = guardado == null ? contarFilas() : Number(guardado);
   return {
     rows: n,
     updatedAt: Number(getSetting('imdb_ratings_at') || 0) || null,
@@ -82,6 +97,10 @@ export async function importImdbRatings({ onProgress = null } = {}) {
     }
 
     setSetting('imdb_ratings_at', String(Date.now()));
+    // `n` son las líneas procesadas, no las filas de la tabla: el volcado se
+    // mete con INSERT OR REPLACE sobre lo que ya había, así que el recuento
+    // bueno hay que preguntárselo a SQLite (una vez, aquí, no en cada Ajustes)
+    contarFilas();
     Object.assign(imdbStatus, { rows: n, updatedAt: Date.now() });
     return { ok: true, rows: n };
   } catch (err) {

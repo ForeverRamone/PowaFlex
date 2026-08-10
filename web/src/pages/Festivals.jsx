@@ -295,6 +295,12 @@ export default function Festivals() {
     load(fest, year, view);
   };
 
+  // qué se está construyendo mientras se espera: el palmarés completo de un
+  // premio o de un canon no se lee igual que la sección oficial de un año
+  const etiquetaCarga = soloPalmares || view === 'palmares'
+    ? t('Reconstruyendo el palmarés de {nombre}…', { nombre: t(info?.name || 'este premio') })
+    : t('Leyendo la selección de {festival} {y} en Wikipedia…', { festival: t(info?.name || 'este festival'), y: year });
+
   return (
     <div>
       <PageHeader
@@ -399,7 +405,15 @@ export default function Festivals() {
       </div>
 
       {error && <ErrorBox error={error} />}
-      {loading && <Spinner label={t('Leyendo la selección en Wikipedia y casándola con TMDB…')} />}
+      {/* una edición sin cachear son entre cuatro y nueve segundos de Wikipedia
+          más el emparejado contra TMDB. La etiqueta nombra la edición CONCRETA
+          porque el desplegable de arriba se puede haber movido tres veces
+          mientras esta llegaba, y con el texto genérico no había forma de saber
+          cuál se estaba esperando. Barra indeterminada a propósito: el
+          emparejado de una edición no publica {done,total} en
+          /api/build-progress —solo lo hacen el calendario, Descubrir y los
+          packs de personas—, así que un porcentaje aquí sería inventado. */}
+      {loading && <Spinner label={etiquetaCarga} />}
 
       {data && (
         <>

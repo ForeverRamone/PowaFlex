@@ -1,6 +1,12 @@
 // Fragmento EN del Dashboard (Dashboard.jsx). La clave es el texto castellano
 // exacto que se pasa a t().
 export default {
+  // Pasos de carga
+  'Contando tu colección…': 'Counting your collection…',
+  'Dibujando las gráficas de tu biblioteca…': 'Drawing your library charts…',
+  'Repasando lo último que ha entrado…': 'Going over what came in most recently…',
+  'Ordenando quién manda en tu biblioteca…': 'Ranking who rules your library…',
+
   'Nada todavía.': 'Nothing yet.',
   'Vista en Letterboxd': 'Watched on Letterboxd',
   'Aún no hay películas sincronizadas. Ve a': 'No movies synced yet. Go to',

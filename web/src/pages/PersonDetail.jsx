@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
 import {
-  Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, StatusLegend,
+  Progreso, useCargaProgresiva, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, StatusLegend,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts, DeathBadge, MatchCorrector,
   Select, MinScoreBar, passesScore, useMinScore,
 } from '../components.jsx';
@@ -48,9 +48,6 @@ export default function PersonDetail() {
   const [error, setError] = useState(null);
   const [role, setRole] = useState(null); // active role tab
   const [roles, setRoles] = useState(ROLES_INICIALES);
-  useEffect(() => {
-    api('/roles').then((r) => Array.isArray(r) && r.length && setRoles(r));
-  }, []);
   const roleSingular = (r) => t(roles.find((x) => x.key === r)?.singular || r); // «director/a»
   // vista, orden y listón sobreviven a la navegación hasta pulsar «Limpiar filtros»
   const [view, setView] = useState(() => localStorage.getItem('person_view') || 'all');
@@ -74,19 +71,54 @@ export default function PersonDetail() {
   };
   const hayFiltros = view !== 'all' || sort !== 'reciente' || minScore > 0;
 
-  const cargarFilmografia = () => {
+  // El catálogo de oficios y la filmografía no dependen entre sí y salen a la
+  // vez; el tercer paso sí espera, y es el ÚNICO encadenado justificado de la
+  // aplicación: sin el id local que trae la filmografía no se sabe por quién
+  // preguntar en /tracked.
+  const carga = useCargaProgresiva([
+    { clave: 'roles', etiqueta: t('Mirando qué oficios se pueden seguir…'), carga: () => api('/roles') },
+    { clave: 'filmografia', etiqueta: t('Reuniendo su filmografía en TMDB…'), carga: () => api(`/people/${id}/filmography?role=${wantRole}`) },
+    {
+      clave: 'seguido',
+      etiqueta: t('Comprobando si ya le sigues…'),
+      tras: 'filmografia',
+      carga: (datos) => (datos.filmografia?.person?.id ? api('/tracked') : []),
+    },
+  ], [id, wantRole]);
+
+  const recargarFicha = () => {
     setData(null);
     setError(null);
     setRole(null);
     setLocalShow({});
-    return api(`/people/${id}/filmography?role=${wantRole}`).then((d) => {
-      if (d.error) setError(d.error);
-      else {
-        setData(d);
-        setRole(d.roles?.[wantRole] ? wantRole : d.primary);
-      }
-    });
+    carga.recargar();
   };
+
+  // cambiar de persona (o de faceta pedida) tiene que vaciar la ficha: sin
+  // esto se seguiría viendo la filmografía de la anterior mientras llega la
+  // nueva, que es peor que una espera con nombre
+  useEffect(() => {
+    setData(null);
+    setError(null);
+    setRole(null);
+    setLocalShow({});
+  }, [id, wantRole]);
+
+  useEffect(() => {
+    const catalogo = carga.datos.roles;
+    if (Array.isArray(catalogo) && catalogo.length) setRoles(catalogo);
+  }, [carga.datos.roles]);
+
+  useEffect(() => {
+    const d = carga.datos.filmografia;
+    if (!d) return;
+    if (d.error) setError(d.error);
+    else {
+      setData(d);
+      setRole(d.roles?.[wantRole] ? wantRole : d.primary);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carga.datos.filmografia]);
 
   // El id LOCAL, que puede no existir: a esta ficha se llega también por
   // `tmdb:123` o por `nombre:Fulano` desde cualquier lista de la app, y a esa
@@ -96,17 +128,12 @@ export default function PersonDetail() {
   const enBiblioteca = !!idLocal;
 
   useEffect(() => {
-    cargarFilmografia();
-  }, [id, wantRole]);
-
-  useEffect(() => {
-    if (!idLocal) return setTrackedRoles(new Set());
-    api('/tracked').then(
-      (list) =>
-        Array.isArray(list) &&
-        setTrackedRoles(new Set(list.filter((t) => t.id === idLocal).map((t) => t.role || 'director')))
-    );
-  }, [idLocal]);
+    const lista = carga.datos.seguido;
+    if (!Array.isArray(lista)) return;
+    const suyo = carga.datos.filmografia?.person?.id ?? null;
+    setTrackedRoles(new Set(lista.filter((fav) => fav.id === suyo).map((fav) => fav.role || 'director')));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carga.datos.seguido]);
 
   // follow/unfollow THE FACET you're looking at: the other one is untouched,
   // so someone can be a favorite director AND actor at once
@@ -118,7 +145,7 @@ export default function PersonDetail() {
       if (alta?.error) return toast(`⚠️ ${t(alta.error)}`, 'error');
       toast(t('⭐ {nombre} en favoritos', { nombre: data?.person?.name || '' }), 'success');
       // se recarga la ficha para que pase a ser la local, con su id y su historia
-      return cargarFilmografia();
+      return recargarFicha();
     }
     const siguiendo = trackedRoles.has(facet);
     const r = siguiendo
@@ -150,7 +177,7 @@ export default function PersonDetail() {
     if (r.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     setCorrigiendo(false);
     toast(tmdbId ? t('✓ {name} emparejado a mano', { name: nombre }) : t('✓ Corrección quitada'));
-    cargarFilmografia();
+    recargarFicha();
   };
   const corrector = corrigiendo && (
     <MatchCorrector
@@ -176,7 +203,7 @@ export default function PersonDetail() {
   );
 
   if (error) return <ErrorBox error={t('No se pudo cargar la filmografía: {error}. ¿Está configurada la API key de TMDB en Ajustes?', { error })} />;
-  if (!data) return <Spinner label={t('Consultando TMDB…')} />;
+  if (!data) return <Progreso {...carga} />;
   if (!data.matched)
     return (
       <div>

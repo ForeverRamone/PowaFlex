@@ -896,7 +896,7 @@ export default function RadarrRulesSection() {
       </div>
     );
   }
-  if (!data) return <Spinner />;
+  if (!data) return <Spinner label={t('Leyendo tus reglas automáticas…')} />;
 
   const parteDe = (id) => status?.rules?.find((x) => x.id === id) || null;
   const porTipo = (k) => data.rules.filter((r) => r.kind === k);

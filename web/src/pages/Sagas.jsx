@@ -107,7 +107,7 @@ export default function Sagas({ embedded = false }) {
   };
 
   if (data?.error) return <ErrorBox error={data.error} />;
-  if (!data) return <Spinner />;
+  if (!data) return <Spinner label={t('Repasando tus sagas a medias…')} />;
 
   const { state, sagas } = data;
   const pendingScan = state.totalMovies - state.scanned;

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { toast } from '../toast.js';
 import { t, locale } from '../i18n.js';
-import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid, PageHeader, ErrorBox, Select, SortSelect } from '../components.jsx';
+import { Progreso, MovieCard, MovieModal, Empty, SkeletonGrid, PageHeader, ErrorBox, Select, SortSelect } from '../components.jsx';
 
 const SORT_OPTIONS = [
   ['added', t('Añadida (reciente)')],
@@ -104,7 +104,26 @@ export default function Library() {
   };
 
   if (filters?.error || data?.error) return <ErrorBox error={filters?.error || data?.error} />;
-  if (!filters) return <Spinner />;
+  // las dos peticiones del montaje salen a la vez, así que el porcentaje cuenta
+  // las que YA han vuelto: nada estimado. Solo se ve aquí, en la primera carga;
+  // los cambios de filtro siguen con el esqueleto de rejilla, que es mejor que
+  // una barra porque conserva la forma de la página
+  if (!filters) {
+    const pasos = [
+      [!!filters, t('Preparando los filtros de tu biblioteca…')],
+      [!!data, t('Trayendo tus películas…')],
+    ];
+    const hechos = pasos.filter(([listo]) => listo).length;
+    const pendiente = pasos.find(([listo]) => !listo);
+    return (
+      <Progreso
+        pct={Math.round((hechos / pasos.length) * 100)}
+        paso={pendiente?.[1] ?? null}
+        indice={Math.min(hechos + 1, pasos.length)}
+        total={pasos.length}
+      />
+    );
+  }
 
   // active filters (everything but the free-text search and the sort/paging)
   const FILTER_LABELS = {

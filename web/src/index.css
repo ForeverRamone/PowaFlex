@@ -349,6 +349,76 @@ body {
     @apply text-[11px] px-1.5 py-0.5 rounded;
     background: color-mix(in srgb, currentColor 15%, transparent);
   }
+
+  /* --- Esperas (Progreso) ---------------------------------------------------
+     Toda espera dice qué está haciendo y por dónde va. El ancho tope y el
+     centrado valen igual en el móvil que en la pantalla grande, y el paso puede
+     ocupar dos líneas sin descolocar el porcentaje: hay etiquetas largas de
+     verdad («Leyendo la selección en Wikipedia y casándola con TMDB…»). */
+  .progreso {
+    @apply w-full max-w-md mx-auto px-4 py-10 text-sm text-zinc-400;
+  }
+  .progreso-cabeza {
+    @apply flex items-center gap-2 mb-2;
+  }
+  .progreso-paso {
+    @apply flex-1 min-w-0;
+  }
+  .progreso-pct {
+    @apply shrink-0 text-zinc-300 font-semibold;
+  }
+  .progreso-rueda {
+    @apply w-4 h-4 shrink-0 rounded-full border-2 border-gold-400 border-t-transparent animate-spin;
+  }
+  /* el relleno sale de los tokens (gold-400 sobre ink-800), así que se lee en
+     los tres aspectos sin escribir un solo color fijo */
+  .progreso-pista {
+    @apply h-2.5 rounded-full bg-ink-800 overflow-hidden;
+    border: var(--border-w) solid var(--color-ink-600);
+  }
+  .progreso-barra {
+    @apply h-full bg-gold-400;
+    transition: width 0.25s ease-out;
+  }
+  /* Sin porcentaje real que enseñar: un trozo que va y viene. NUNCA una barra
+     que avanza sola hasta el 90 %, que es fingir un progreso que nadie ha
+     medido. */
+  .progreso-barra-indet {
+    width: 35%;
+    animation: progreso-vaiven 1.5s ease-in-out infinite;
+  }
+  .progreso-nota {
+    @apply text-xs text-zinc-500 mt-2;
+  }
+
+  /* Pestañas dentro de una página: el mismo aspecto que ya tenían el Taller y
+     Ajustes. Los 40 px de alto son el mínimo táctil en el móvil. */
+  .subpestanas {
+    @apply flex gap-2 mb-5 flex-wrap;
+  }
+  .subpestana {
+    @apply inline-flex items-center gap-2;
+    min-height: 40px;
+  }
+}
+
+@keyframes progreso-vaiven {
+  0% { margin-left: -35%; }
+  100% { margin-left: 100%; }
+}
+
+/* Quien ha pedido menos movimiento no debería recibir un péndulo infinito: la
+   barra indeterminada se queda quieta y apagada, que sigue diciendo «esto está
+   en marcha» sin animar nada. */
+@media (prefers-reduced-motion: reduce) {
+  .progreso-barra-indet {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+  .progreso-rueda {
+    animation: none;
+  }
 }
 
 /* --- «Cartelera»: los gestos que hacen que parezca impreso ------------------ */

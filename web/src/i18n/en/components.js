@@ -55,8 +55,17 @@ export default {
   // RatingsChips
   'Abrir en su web': 'Open on its site',
 
-  // Spinner
+  // Spinner / Progreso
   'Cargando…': 'Loading…',
+  'Progreso de carga': 'Loading progress',
+  '{n} de {total}': '{n} of {total}',
+  // en castellano el símbolo lleva espacio delante; en inglés, no
+  '{pct} %': '{pct}%',
+  'Llevamos {s} s': '{s}s so far',
+  'Listo': 'Done',
+
+  // Subpestanas
+  'Secciones de la página': 'Page sections',
 
   // ErrorBoundary
   'Hay una versión nueva de PowaFlex': 'A new version of PowaFlex is ready',

@@ -25,6 +25,19 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.13',
+    fecha: '2026-08-10',
+    titular: 'Visionado tardaba nueve segundos por un índice que faltaba',
+    puntos: [
+      'Visionado abría en 9 segundos y ahora abre en 0,15. La culpa era de una tabla sin índice: cada una de tus películas rebuscaba tu Letterboxd entero, tres veces, para saber qué nota le habías puesto. Se arregla solo al arrancar, sin que tengas que hacer nada.',
+      'Favoritos era todavía peor: 25 segundos. Pedía a Wikipedia los habituales de Cannes, Venecia y Berlín nada más entrar, para llenar la pestaña «Añadir», que ni siquiera es la que se abre. Ahora cada pestaña carga lo suyo cuando la abres: la página está lista en un cuarto de segundo.',
+      'Toda la app iba cargando el paquete de las gráficas —400 KB— en cada página, incluidas las que no tienen ninguna gráfica: React se había colado dentro de ese paquete. Ahora las gráficas solo se bajan cuando de verdad hay una que pintar, y en Visionado y el Dashboard entran después de que la página ya esté a la vista.',
+      'Se acabaron los «Cargando…» a secas: ahora cada espera dice qué está trayendo, cuál de cuántos pasos va y el porcentaje. Cuando solo hay una cosa que traer no te inventamos un porcentaje: te decimos qué es y cuántos segundos llevas esperando.',
+      'Descubrir mandaba a tu navegador un montón de datos que solo usa el servidor y que se tiraban sin pintar: fuera. Y la tabla de tus notas de Letterboxd viaja en 26 KB en vez de 102.',
+      'Todo esto se midió contra una biblioteca de prueba de 12.400 películas, porque con la de 400 con la que se desarrolla no se notaba ni uno de estos problemas.',
+    ],
+  },
+  {
     label: 'Beta 1.12',
     fecha: '2026-08-10',
     titular: 'Trece agentes de repaso: el menú plegado, las 1001 al galope y los filtros a una sola voz',

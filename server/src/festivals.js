@@ -14,12 +14,13 @@
  * Festival»…) con redirects=1 de red de seguridad.
  */
 import { db, cacheRead, cacheWrite } from './db.js';
-import { mapPool } from './pool.js';
+import { mapPool, cedeElHilo } from './pool.js';
 import { cachePrefix } from './cache-versions.js';
 import { foldName, normName } from './names.js';
 import {
   searchMovieCandidates, movieDirectors, movieSummary, findPersonInfo, latinizeNames,
   personCredits, englishTitle, searchPersonCandidates, TMDB_CONCURRENCY,
+  setBuildProgress, clearBuildProgress,
 } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { watchedIndex, isWatched } from './letterboxd.js';
@@ -1978,9 +1979,17 @@ export async function festivalDirectorPacks({ refresh = false } = {}) {
   if (!base) {
     const agg = await festivalTopDirectors({ refresh });
     const packs = [];
+    // Resolver contra TMDB a los habituales de cada festival, de uno en uno,
+    // es medio minuto la primera vez (después vive una semana en caché). Va por
+    // la misma barra que los huecos y el canon en vez de por un giro mudo.
+    const totalDirs = agg.festivals.reduce((n, f) => n + f.directors.length, 0);
+    let hechos = 0;
+    setBuildProgress('festival:packs', 'Buscando en TMDB a los habituales', 0, totalDirs);
     for (const fest of agg.festivals) {
       const people = [];
       for (const d of fest.directors) {
+        setBuildProgress('festival:packs', 'Buscando en TMDB a los habituales', ++hechos, totalDirs);
+        await cedeElHilo(); // con todo cacheado, este bucle no suelta el servidor
         try {
           const info = await findPersonInfo(d.name, 'Directing');
           if (!info?.id) continue;
@@ -2008,6 +2017,7 @@ export async function festivalDirectorPacks({ refresh = false } = {}) {
       });
     }
     await latinizeNames(packs.flatMap((p) => p.people));
+    clearBuildProgress('festival:packs');
     base = { generatedAt: Date.now(), packs };
     if (packs.length) cacheWrite(cacheKey, base);
   }

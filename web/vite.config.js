@@ -26,9 +26,16 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // recharts is heavy and only used on a few pages; keep it in its own
-        // chunk so the initial load doesn't drag it in
+        // recharts pesa 415 KB y solo lo usan tres páginas, así que va en su
+        // propio trozo. OJO con lo que parece obvio y no lo era: declarar SOLO
+        // recharts metía a React DENTRO de ese trozo (es su dependencia y era
+        // el primer grupo que la reclamaba), así que TODAS las páginas —hasta
+        // las que no pintan una gráfica— tenían que bajarse y ejecutarse los
+        // 415 KB para arrancar React. Declarando React aparte, cada uno va a lo
+        // suyo: react se baja siempre porque hace falta siempre, y recharts
+        // solo cuando de verdad hay una gráfica que pintar.
         manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
           recharts: ['recharts'],
         },
       },

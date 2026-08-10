@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Legend } from 'recharts';
 import { api, fmtBytes, fmtDate } from '../api.js';
-import { Spinner, Section, MovieCard, MovieModal, Empty, RadarrButton, useRadarrIds, JustWatchCheck, PageHeader, ProgressBar, ErrorBox} from '../components.jsx';
+import { Spinner, Progreso, useCargaProgresiva, Section, MovieCard, MovieModal, Empty, RadarrButton, useRadarrIds, JustWatchCheck, PageHeader, ProgressBar, ErrorBox} from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 import { useChartTheme } from '../charts.js';
@@ -12,16 +12,11 @@ export default function Quality({ embedded = false }) {
   const pollRef = useRef(null);
   useEffect(() => () => clearInterval(pollRef.current), []);
   const ch = useChartTheme();
-  const [ov, setOv] = useState(null);
-  const [upgrades, setUpgrades] = useState(null);
-  const [dups, setDups] = useState(null);
   const [selected, setSelected] = useState(null);
   const [radarrIds, addRadarrId] = useRadarrIds();
   const [jw, setJw] = useState({ busy: false, done: 0, total: 0, checked: 0, upgradeable: 0, results: {} });
   const [jwFilter, setJwFilter] = useState('todas');
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [wanted, setWanted] = useState(null);
-  const [cutoff, setCutoff] = useState(null);
   const [searchBusy, setSearchBusy] = useState(null);
   const navigate = useNavigate();
 
@@ -36,15 +31,30 @@ export default function Quality({ embedded = false }) {
     navigate(`/biblioteca?resolution=${encodeURIComponent(name)}`);
   };
 
-  useEffect(() => {
-    api('/quality/overview').then(setOv);
-    api('/quality/upgrades?limit=60').then((r) => setUpgrades(Array.isArray(r) ? r : []));
-    api('/quality/duplicates').then(setDups);
-    // la deuda de Radarr: sin configurar, las llamadas fallan y las secciones
-    // simplemente no se pintan
-    api('/radarr/wanted').then((r) => setWanted(r.error ? { error: r.error } : r.items || []));
-    api('/radarr/cutoff').then((r) => setCutoff(r.error ? { error: r.error } : r.items || []));
-  }, []);
+  // Las cuatro salen a la vez y la página se pinta con el resumen, sin esperar
+  // a las demás. Importa el orden de espera, no el de llegada: las dos de
+  // Radarr salen a la red del usuario y en su servidor pueden tardar segundos,
+  // y no pueden retener por delante lo que ya está calculado en local.
+  const carga = useCargaProgresiva([
+    { clave: 'resumen', etiqueta: t('Midiendo la calidad de tus archivos…'), carga: () => api('/quality/overview') },
+    { clave: 'upgrades', etiqueta: t('Buscando las que pedirían una copia mejor…'), carga: () => api('/quality/upgrades?limit=60') },
+    { clave: 'duplicados', etiqueta: t('Buscando duplicados en el disco…'), carga: () => api('/quality/duplicates') },
+    {
+      clave: 'radarr',
+      etiqueta: t('Preguntando a Radarr qué le debe a tu colección…'),
+      // sin Radarr configurado las dos fallan y sus secciones simplemente no se
+      // pintan, igual que antes
+      carga: () => Promise.all([api('/radarr/wanted'), api('/radarr/cutoff')]).then(([w, c]) => ({
+        wanted: w.error ? { error: w.error } : w.items || [],
+        cutoff: c.error ? { error: c.error } : c.items || [],
+      })),
+    },
+  ], []);
+  const ov = carga.datos.resumen ?? null;
+  const upgrades = carga.datos.upgrades ? (Array.isArray(carga.datos.upgrades) ? carga.datos.upgrades : []) : null;
+  const dups = carga.datos.duplicados ?? null;
+  const wanted = carga.datos.radarr?.wanted ?? null;
+  const cutoff = carga.datos.radarr?.cutoff ?? null;
 
   const searchAgain = async (m) => {
     setSearchBusy(m.tmdb_id);
@@ -133,7 +143,7 @@ export default function Quality({ embedded = false }) {
   };
 
   if (ov?.error) return <ErrorBox error={ov.error} />;
-  if (!ov) return <Spinner />;
+  if (!ov) return <Progreso {...carga} />;
 
   const sizeByDecade = ov.sizeByDecade.map((d) => ({ ...d, gb: +(d.size / 1073741824).toFixed(1) }));
 
@@ -215,7 +225,7 @@ export default function Quality({ embedded = false }) {
 
       <Section title={t('Candidatas a upgrade (bien valoradas, por debajo de 1080p)')}>
         {!upgrades ? (
-          <Spinner />
+          <Spinner label={t('Buscando las que pedirían una copia mejor…')} />
         ) : upgrades.length === 0 ? (
           <Empty>{t('Todo está al menos en 1080p.')}</Empty>
         ) : (

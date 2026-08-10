@@ -1,5 +1,43 @@
 # Changelog
 
+## Beta 1.13 (1.0.13-beta) — 2026-08-10
+
+**Los nueve segundos de Visionado eran un índice que faltaba. Y de paso: React vivía dentro del paquete de las gráficas, Favoritos pedía a Wikipedia una pestaña que no estabas mirando, y ninguna espera decía ya por dónde iba.**
+
+### Antes de nada: había que poder medir
+
+La demo con la que se desarrolla tiene 423 películas y ahí **no se reproduce ningún problema de rendimiento** — todo respondía por debajo de 30 ms mientras en una biblioteca de verdad había esperas de segundos. Así que esta versión empieza fabricando una base sintética del tamaño de la real (12.400 películas, 15.114 personas, 160.610 créditos, 8.117 entradas de Letterboxd) y midiendo contra ella. Todas las cifras que siguen están medidas ahí, no estimadas. Queda como entrada `powaflex-grande` en `.claude/launch.json` para la próxima vez.
+
+### Los 9 segundos de Visionado: `idx_lb_movie`
+
+`/api/mdblist/insights` tardaba **9,09 s y no cacheaba nunca**. Sus cinco consultas calculan «tu nota» con una subconsulta correlacionada sobre `lb_entries` —hasta tres veces por fila— y esa tabla solo tenía índice por `list`: cada una de las 12.400 películas recorría las 8.117 entradas enteras, tres veces. Con `CREATE INDEX idx_lb_movie ON lb_entries(movie_id)` el plan pasa de `SEARCH lb_entries` a `SEARCH lb_entries USING INDEX`, y el endpoint de **9,09 s a 0,031 s: 293×**. Por consulta: hiddenGems 3.004 → 3,6 ms, overrated 3.286 → 4,3 ms, letterboxdDivergence 3.262 → 4,5 ms, mustSee y consensusUnwatched 1.200 → 1,8 ms.
+
+El índice se crea solo al arrancar sobre las bases que ya existen (`IF NOT EXISTS` dentro del bloque de esquema), así que no hay migración que lanzar.
+
+Con eso, y con las tres peticiones de la página en paralelo, **Visionado entero pasa de 9,1 s a 0,15 s**. No se ha partido en subpestañas —estaba en el encargo— porque una vez resuelto el índice ninguna pestaña ahorraría espera y solo añadiría clics para ver lo mismo; el reparto en tres pestañas queda estudiado por si algún día hace falta.
+
+### Favoritos: 25,7 segundos esperando una pestaña que no mirabas
+
+El peor caso de la app no era Visionado. `/api/people/festival-packs` baja ~30 tablas de Wikipedia y tarda **25.765 ms en frío**, y se pedía al montar la página… para alimentar la pestaña «Añadir», que no es la que se abre por defecto. Partida con el nuevo `<Subpestanas>`: «Mis favoritos» carga solo lo suyo (`/roles` + `/tracked/health`) y «Añadir» pide sus cuatro peticiones al abrirse y no vuelve a pedirlas al volver. **25.765 ms → 114 ms** al entrar. La espera de Wikipedia, cuando de verdad la pides, se anuncia diciendo por qué tarda y que se guarda una semana.
+
+### React vivía dentro del paquete de recharts
+
+`manualChunks: { recharts: ['recharts'] }` parecía aislar la librería de gráficas para que solo la bajaran las tres páginas que la usan. Pero React es su dependencia y ese era el primer grupo que la reclamaba, así que **React acabó dentro del trozo de recharts y las 415 KB las descargaba y ejecutaba TODA la app**, incluidas las páginas sin una sola gráfica. Declarando `react` aparte cada uno va a lo suyo. Y además las gráficas de Visionado y del Dashboard se han sacado a módulos diferidos (`web/src/pages/charts/`): en Visionado, el JavaScript de la página está listo a los 38 ms y recharts ni se pide hasta los 147, con la página ya pintada. Hoy solo la tocan Taller → Calidad y los dos módulos de gráficas.
+
+### Toda espera dice qué hace, por dónde va y cuánto lleva
+
+Los 28 `<Spinner>` mudos («Cargando…», una ruedecita y nada más) pasan a `<Progreso>`: el paso con nombre, «2 de 4» y el porcentaje. El porcentaje es **peticiones terminadas sobre el total** — nunca una animación que finge avanzar. Con una sola petición no hay porcentaje honesto, así que ahí sale el nombre de lo que se trae, barra indeterminada y, pasados cuatro segundos, «Llevamos N s». `<Spinner>` sigue existiendo (por dentro ya es un Progreso indeterminado), así que ninguna llamada suya se rompió.
+
+Donde el servidor sí publica su avance real —el calendario y los huecos de Descubrir, vía `/api/build-progress`— se ha respetado la barra que ya había: cambiarla por un contador de pasos habría sustituido información real por un porcentaje peor. Aviso comprobado y anotado: `/api/festivals/:clave/:año` y `/palmares` NO publican ahí (solo `festival:packs`), así que una barra en Festivales enseñaría el avance de OTRA tarea.
+
+### Y lo que pesaba de más
+
+- Las parrillas de Descubrir mandaban campos que el servidor usa por dentro y el navegador tira (idioma original, países, géneros en crudo, duración, `character`/`job`): podados **antes** de cachear, así no cuestan por petición. ~650 KB → 484 KB, y suben de versión las tres cachés de Descubrir.
+- `/api/letterboxd/summary` mandaba TODAS las notas del diario y la tabla de Visionado pinta 200: `LIMIT 200` en origen, **102 KB → 26 KB**.
+- Los recorridos largos ceden el turno al bucle de eventos (`cedeElHilo` en pool.js) para que el servidor no se quede mudo durante una pasada.
+
+Tests 255 → 261, con `server/test/rendimiento.test.js` nuevo que fija la poda de campos y que un recorrido largo no deja el servidor sin responder. Cachés de Descubrir subidas de versión.
+
 ## Beta 1.12 (1.0.12-beta) — 2026-08-10
 
 **Seis agentes auditando y siete arreglando: el menú de Festivales plegado, las 1001 al galope, los filtros a una sola voz, el móvil pulsable y las cuatro fichas que faltaban.**

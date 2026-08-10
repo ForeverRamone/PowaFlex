@@ -10,6 +10,11 @@ export default {
 
   // ---- Quality.jsx ----
   'Colección': 'Collection',
+  // pasos de carga
+  'Midiendo la calidad de tus archivos…': 'Measuring the quality of your files…',
+  'Buscando las que pedirían una copia mejor…': 'Looking for the ones that would want a better copy…',
+  'Buscando duplicados en el disco…': 'Looking for duplicates on disk…',
+  'Preguntando a Radarr qué le debe a tu colección…': 'Asking Radarr what it owes your collection…',
   '🔍 Radarr vuelve a buscar «{title}»': '🔍 Radarr is searching for “{title}” again',
   '{n} a': '{n} y',
   '{n} m': '{n} mo',
@@ -69,6 +74,7 @@ export default {
   ' · {n} sin demostrar': ' · {n} unverified',
   '✓ {n} entradas emparejadas': '✓ {n} entries matched',
   'Auditando la base de datos…': 'Auditing the database…',
+  'Mirando si quedó una comprobación a medias…': 'Checking whether a verification was left half-done…',
   'Auditorías locales de la base de datos: huérfanos, homónimos y peticiones zombis, cada uno con su remedio al lado.':
     'Local database audits: orphans, namesakes and zombie requests, each with its fix right next to it.',
   'Películas sin ficha de TMDB': 'Movies without a TMDB entry',

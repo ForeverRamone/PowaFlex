@@ -16,11 +16,16 @@ export const CACHE_VERSIONS = {
   calendar: 7,
   // v8: el umbral de ruido pasó a mirar también los votos de Letterboxd
   // v9: la clave lleva los filtros demográficos (género/vida/continente/país)
-  discover_gaps: 9,
+  // v10: cada película va podada de los datos de trabajo del servidor que no se
+  // pintan (idioma, países, id de IMDb, duración, personaje…): lo cacheado antes
+  // los lleva y son una cuarta parte del JSON — ver podarDatosDeTrabajo
+  discover_gaps: 10,
   // v10: el umbral de ruido mira también los votos de IMDb del volcado local,
   // así que lo cacheado con dos fuentes escondía películas que ahora sí pasan
-  discover_favorites: 10,
-  discover_absent: 5,
+  // v11: podadas también aquí (ver discover_gaps v10)
+  discover_favorites: 11,
+  // v6: podadas también aquí (ver discover_gaps v10)
+  discover_absent: 6,
   // v2: el emparejado con TMDB se verifica contra el director/a (antes un
   // título genérico enganchaba otra película del mismo año)
   // v3: nombres insensibles al orden (Imamura Shōhei), fichas sin equipo aún

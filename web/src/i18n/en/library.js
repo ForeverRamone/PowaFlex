@@ -57,6 +57,10 @@ export default {
   'desde': 'from',
   'hasta': 'to',
 
+  // Espera de la primera carga (los dos pasos que salen a la vez al entrar)
+  'Preparando los filtros de tu biblioteca…': 'Preparing your library filters…',
+  'Trayendo tus películas…': 'Fetching your movies…',
+
   // Parrilla
   'Sin resultados con estos filtros.': 'No results with these filters.',
   'Cargando…': 'Loading…',

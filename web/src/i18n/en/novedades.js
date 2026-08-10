@@ -5,6 +5,22 @@
 // en/app.js, y el titular «Festivales y premios» de la Alpha 0.9.5 ya existe
 // como nombre de página en en/app.js: aquí no se repiten.
 export default {
+  // ── Beta 1.13 ──────────────────────────────────────────────────────────────
+  'Visionado tardaba nueve segundos por un índice que faltaba':
+    'Watch history took nine seconds because of a missing index',
+  'Visionado abría en 9 segundos y ahora abre en 0,15. La culpa era de una tabla sin índice: cada una de tus películas rebuscaba tu Letterboxd entero, tres veces, para saber qué nota le habías puesto. Se arregla solo al arrancar, sin que tengas que hacer nada.':
+    'Watch history used to open in 9 seconds and now opens in 0.15. The culprit was an unindexed table: every one of your movies searched your entire Letterboxd, three times over, just to find the rating you had given it. It fixes itself on startup — there is nothing for you to do.',
+  'Favoritos era todavía peor: 25 segundos. Pedía a Wikipedia los habituales de Cannes, Venecia y Berlín nada más entrar, para llenar la pestaña «Añadir», que ni siquiera es la que se abre. Ahora cada pestaña carga lo suyo cuando la abres: la página está lista en un cuarto de segundo.':
+    'Favorites was even worse: 25 seconds. It asked Wikipedia for the Cannes, Venice and Berlin regulars the moment you walked in, to fill the “Add” tab — which is not even the one that opens. Now each tab loads its own data when you open it: the page is ready in a quarter of a second.',
+  'Toda la app iba cargando el paquete de las gráficas —400 KB— en cada página, incluidas las que no tienen ninguna gráfica: React se había colado dentro de ese paquete. Ahora las gráficas solo se bajan cuando de verdad hay una que pintar, y en Visionado y el Dashboard entran después de que la página ya esté a la vista.':
+    'The whole app was loading the charts bundle — 400 KB — on every page, including the ones with no charts at all: React had ended up inside that bundle. Now the charts are only downloaded when there is actually one to draw, and on Watch history and the Dashboard they arrive after the page is already on screen.',
+  'Se acabaron los «Cargando…» a secas: ahora cada espera dice qué está trayendo, cuál de cuántos pasos va y el porcentaje. Cuando solo hay una cosa que traer no te inventamos un porcentaje: te decimos qué es y cuántos segundos llevas esperando.':
+    'No more bare “Loading…”: every wait now tells you what it is fetching, which step of how many it is on, and the percentage. When there is only one thing to fetch we do not make a percentage up: we tell you what it is and how many seconds you have been waiting.',
+  'Descubrir mandaba a tu navegador un montón de datos que solo usa el servidor y que se tiraban sin pintar: fuera. Y la tabla de tus notas de Letterboxd viaja en 26 KB en vez de 102.':
+    'Discover was sending your browser a pile of data only the server uses, thrown away without ever being drawn: gone. And the table of your Letterboxd ratings now travels in 26 KB instead of 102.',
+  'Todo esto se midió contra una biblioteca de prueba de 12.400 películas, porque con la de 400 con la que se desarrolla no se notaba ni uno de estos problemas.':
+    'All of this was measured against a 12,400-movie test library, because on the 400-movie one used for development not a single one of these problems showed up.',
+
   // ── Beta 1.12 ──────────────────────────────────────────────────────────────
   'Trece agentes de repaso: el menú plegado, las 1001 al galope y los filtros a una sola voz':
     'Thirteen review agents: the menu folded, the 1001 at full speed and the filters speaking with one voice',

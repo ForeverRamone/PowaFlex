@@ -13,6 +13,7 @@ import { TSPDT_DIRECTORS, TSPDT_21C_DIRECTORS } from './data/tspdt-directors.js'
 import { IMDB_501_DIRECTORS } from './data/imdb-501-directors.js';
 import { cachePrefix } from './cache-versions.js';
 import { demographicConds } from './queries.js';
+import { cedeElHilo } from './pool.js';
 
 // Mark TMDB items as watched (Plex view or Letterboxd), for the status system (#3).
 function applyWatched(items) {
@@ -118,6 +119,30 @@ async function pickSignature(released, role) {
 // completist has to fill: they never take a slot in the per-person quota.
 export const isNoise = (m) => !!(m.isShort || m.isDocumentary || m.isMusic || m.isTvMovie || m.isCameo);
 
+/**
+ * Lo que `enrichRuntimes` y los créditos dejan pegado a cada película y NO se
+ * pinta: el idioma y los países los mira la cuarentena de las reglas, el id de
+ * IMDb sirve para cruzar con el volcado local de votos, la duración solo para
+ * decidir «es un corto» y los géneros en crudo para poner los `is*` — y las dos
+ * últimas ya viajan resueltas en `isShort` y en esos mismos `is*`. Son datos de
+ * trabajo del servidor, y aquí ya han cumplido.
+ *
+ * Con la biblioteca de verdad, las parrillas de Descubrir mandaban 650 KB de
+ * JSON por página y una cuarta parte era esto: bytes que el móvil descarga y
+ * analiza para tirarlos. Se poda ANTES de cachear, así no cuesta nada por
+ * petición (por eso suben de versión las tres cachés de Descubrir).
+ */
+const SOLO_DEL_SERVIDOR = [
+  'original_language', 'countries', 'imdb_id', 'runtime', 'genre_ids',
+  'character', 'job', 'popularity', 'directorCount',
+];
+export function podarDatosDeTrabajo(items) {
+  for (const it of items || []) {
+    for (const campo of SOLO_DEL_SERVIDOR) delete it[campo];
+  }
+  return items;
+}
+
 /** Features first (up to `perPerson`), then the same number of noise items at
  *  most, so the client-side toggles still have something to reveal. */
 export function splitNoise(missing, perPerson) {
@@ -135,7 +160,7 @@ async function finishMissing(people, perPerson) {
   const all = people.flatMap((p) => p.missing);
   await enrichRuntimes(all);
   applyWatched(all);
-  for (const p of people) p.missing = splitNoise(p.missing, perPerson).list;
+  for (const p of people) p.missing = podarDatosDeTrabajo(splitNoise(p.missing, perPerson).list);
 }
 
 const HOUR = 3600 * 1000;
@@ -300,6 +325,7 @@ export async function libraryGaps({
       const i = idx++;
       if (i >= tops.length) return;
       setBuildProgress('discover:gaps', 'Cruzando filmografías', i + 1, tops.length);
+      await cedeElHilo(); // con todo cacheado, este bucle no suelta el servidor
       const p = tops[i];
       try {
         const resolved = await resolvePerson(p.id);
@@ -432,6 +458,7 @@ export async function favoritesGaps({ perPerson = 8, refresh = false, role: only
       const i = idx++;
       if (i >= tracked.length) return;
       setBuildProgress('discover:favoritos', 'Cruzando filmografías de tus favoritos', i + 1, tracked.length);
+      await cedeElHilo(); // con todo cacheado, este bucle no suelta el servidor
       const p = tracked[i];
       // OJO: esto colapsaba cualquier oficio que no fuera actor a «director»,
       // así que los huecos de un compositor se calculaban como si dirigiera.
@@ -521,11 +548,17 @@ export async function absentGreats({ perPerson = 6, refresh = false, canon = 'al
   const present = [];
   const errors = [];
 
+  // Los 250 del canon se resuelven uno a uno contra TMDB y eso son segundos de
+  // espera la primera vez: la misma barra que ya usan los huecos, en vez de un
+  // giro mudo (ver setBuildProgress)
+  setBuildProgress('discover:absent', 'Cruzando el canon con tu Plex', 0, names.length);
   let idx = 0;
   async function worker() {
     for (;;) {
       const i = idx++;
       if (i >= names.length) return;
+      setBuildProgress('discover:absent', 'Cruzando el canon con tu Plex', i + 1, names.length);
+      await cedeElHilo(); // con todo cacheado, este bucle no suelta el servidor
       const name = names[i];
       try {
         const info = await findPersonInfo(name, 'Directing');
@@ -569,6 +602,7 @@ export async function absentGreats({ perPerson = 6, refresh = false, canon = 'al
           ...cands.filter(isNoise),
         ].slice(0, perPerson);
         applyWatched(top);
+        podarDatosDeTrabajo(top);
         if (top.length) {
           absent.push({
             name,
@@ -587,6 +621,7 @@ export async function absentGreats({ perPerson = 6, refresh = false, canon = 'al
     }
   }
   await Promise.all(Array.from({ length: 5 }, worker));
+  clearBuildProgress('discover:absent');
 
   absent.sort((a, b) => a.name.localeCompare(b.name));
   present.sort((a, b) => b.inLibrary - a.inLibrary);

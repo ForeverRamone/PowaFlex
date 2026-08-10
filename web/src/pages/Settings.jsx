@@ -129,7 +129,7 @@ function LetterboxdSection() {
       {summary?.error ? (
         <p className="text-sm text-red-400">{summary.error}</p>
       ) : !summary ? (
-        <Spinner />
+        <Spinner label={t('Leyendo tus datos de Letterboxd…')} />
       ) : (
         <>
           <Dropzone
@@ -1147,7 +1147,7 @@ export default function Settings() {
     api('/settings').then((st) => { setS(st); setGuardado(st); });
   };
 
-  if (!s) return <Spinner />;
+  if (!s) return <Spinner label={t('Leyendo tu configuración…')} />;
   const set = (k) => (e) => setS({ ...s, [k]: e.target.value });
 
   const syncPct =

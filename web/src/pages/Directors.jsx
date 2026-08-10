@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Spinner, Empty, PageHeader, ErrorBox, Select, SortSelect, EnlacePersona } from '../components.jsx';
+import { Progreso, useCargaProgresiva, Empty, PageHeader, ErrorBox, Select, SortSelect, EnlacePersona } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t } from '../i18n.js';
 
@@ -124,14 +124,24 @@ export default function Directors({ embedded = false }) {
   });
   const [limite, setLimite] = useState(120);
   const [fotos, setFotos] = useState({});
+  const [caras, setCaras] = useState(0); // cuántas fotos se están resolviendo ahora
   const sinFotos = useRef(false); // sin clave de TMDB: no insistir
 
   useEffect(() => { localStorage.setItem('dir_filters', JSON.stringify(f)); }, [f]);
   const setOrdenPref = (v) => { setOrden(v); localStorage.setItem('dir_sort', v); };
 
-  const cargar = () =>
-    api('/directors/catalog').then((r) => (r.error ? setError(r.error) : setData(r)));
-  useEffect(() => { cargar(); }, []);
+  // Una sola petición, así que no hay porcentaje que enseñar: Progreso pinta
+  // la barra indeterminada y, si tarda, los segundos que llevamos. Inventarse
+  // un tanto por ciento con un solo paso sería mentir.
+  const carga = useCargaProgresiva([
+    { clave: 'catalogo', etiqueta: t('Abriendo el catálogo de directores en activo…'), carga: () => api('/directors/catalog') },
+  ], []);
+  useEffect(() => {
+    const r = carga.datos.catalogo;
+    if (!r) return;
+    if (r.error) setError(r.error);
+    else setData(r);
+  }, [carga.datos.catalogo]);
 
   const todos = data?.directors || [];
 
@@ -179,8 +189,13 @@ export default function Directors({ embedded = false }) {
     if (!pendientes.length) return;
     let vivo = true;
     const tanda = pendientes.slice(0, 150);
+    // la parrilla ya está pintada con las iniciales: esto NO bloquea nada, solo
+    // avisa de que las caras vienen de camino. La primera vez son casi ocho
+    // segundos y sin decirlo parece que esas fotos no existen.
+    setCaras(tanda.length);
     api('/directors/photos', { method: 'POST', body: { names: tanda } }).then((r) => {
       if (!vivo) return;
+      setCaras(0);
       if (r.unavailable) { sinFotos.current = true; return; }
       // Se apuntan TODOS los pedidos —los que TMDB no conoce y los de una
       // petición fallida— porque este efecto se dispara con cada render: sin
@@ -241,7 +256,7 @@ export default function Directors({ embedded = false }) {
   };
 
   if (error) return <ErrorBox error={error} />;
-  if (!data) return <Spinner label={t('Cargando el catálogo de directores…')} />;
+  if (!data) return <Progreso {...carga} />;
 
   const pendientesVisibles = filtrados.filter((d) => !d.tracked).length;
 
@@ -310,6 +325,13 @@ export default function Directors({ embedded = false }) {
         {t('La')} <b className="text-zinc-400">{t('importancia')}</b>{' '}
         {t('combina prestigio (premios y reconocimiento crítico, 60 %) e impacto (notoriedad, alcance de la obra y taquilla, 40 %). Es una convención operativa, no un juicio de valor: Wikidata no es exhaustiva ni neutral y su cobertura de premios está sesgada hacia Europa y Norteamérica. «En activo» significa al menos un largometraje en los últimos ocho años.')}
       </p>
+
+      {/* aviso discreto y NO bloqueante: la rejilla ya se ve con las iniciales */}
+      {caras > 0 && (
+        <p className="text-[11px] text-zinc-500 mb-2" aria-live="polite">
+          {t('Buscando en TMDB las caras de {n} directores/as…', { n: caras })}
+        </p>
+      )}
 
       {filtrados.length === 0 ? (
         <Empty>{t('Nadie con esos filtros.')} <button className="text-gold-400 hover:underline" onClick={limpiar}>{t('Limpiar')}</button></Empty>

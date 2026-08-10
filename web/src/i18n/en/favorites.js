@@ -148,4 +148,13 @@ export default {
   'Ya los sigues a todos': 'You already follow them all',
   'Añadir todos': 'Add all',
   '✓ Todos añadidos': '✓ All added',
+
+  // ── pasos de carga: los de la pestaña «Mis favoritos» y los de «Añadir»
+  'Mirando qué oficios se pueden seguir…': 'Checking which roles you can follow…',
+  'Repasando a quién sigues y qué le falta…': 'Going over who you follow and what they are missing…',
+  'Buscando los cánones disponibles…': 'Looking up the available canons…',
+  'Comprobando si hay un alta en marcha…': 'Checking whether a bulk add is already running…',
+  'Buscando a quién más podrías seguir…': 'Looking for who else you could follow…',
+  'Bajando de Wikipedia los habituales de Cannes, Venecia y Berlín (la primera vez tarda; se guarda una semana)…':
+    'Downloading the Cannes, Venice and Berlin regulars from Wikipedia (the first time is slow; it is kept for a week)…',
 };

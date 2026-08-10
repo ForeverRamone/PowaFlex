@@ -100,6 +100,19 @@ test('los duplicados heredados de lb_entries se colapsan y el índice los impide
   assert.equal(res.changes, 0, 'el índice de expresiones sí ve los NULL');
 });
 
+test('la base YA CREADA recibe el índice de lb_entries por película', () => {
+  // «Tu nota» y «¿la has visto?» preguntan por lb_entries.movie_id en cada fila
+  // de la biblioteca; sin este índice, Visionado tardaba nueve segundos. La base
+  // de esta prueba nació sin él, como la de cualquiera que ya tuviera la app.
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_lb_movie'").get());
+  const plan = db
+    .prepare('EXPLAIN QUERY PLAN SELECT MAX(rating) FROM lb_entries WHERE movie_id = 1')
+    .all()
+    .map((r) => r.detail)
+    .join(' ');
+  assert.match(plan, /idx_lb_movie/, plan);
+});
+
 test('sin POWAFLEX_SECRET las credenciales se guardan en claro (compatibilidad)', () => {
   setSetting('plex_token', 'token-en-claro');
   assert.equal(getSetting('plex_token'), 'token-en-claro');

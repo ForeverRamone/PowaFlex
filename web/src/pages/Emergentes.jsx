@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Spinner, Empty, PageHeader, ErrorBox, Select, SortSelect, EnlacePersona } from '../components.jsx';
+import { Spinner, Progreso, Empty, PageHeader, ErrorBox, Select, SortSelect, EnlacePersona } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t, locale } from '../i18n.js';
 
@@ -190,6 +190,7 @@ export default function Emergentes() {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
   const [corriendo, setCorriendo] = useState(false);
+  const [estadoVivo, setEstadoVivo] = useState(null); // lo que va contando el sondeo
   const [q, setQ] = useState('');
   const [orden, setOrden] = useState(() => localStorage.getItem('emerg_sort') || 'puntuacion');
   const [f, setF] = useState(() => {
@@ -205,11 +206,14 @@ export default function Emergentes() {
   useEffect(() => { cargar(); }, []);
 
   // mientras el detector corre, la página se refresca sola: la pasada dura
-  // minutos y quedarse mirando una lista vieja parece que no hace nada
+  // minutos y quedarse mirando una lista vieja parece que no hace nada. Lo que
+  // devuelve el sondeo se guarda: el bloque de progreso pintaba el estado que
+  // vino con la lista, o sea el de hace minutos, y no se movía nunca.
   useEffect(() => {
     if (!corriendo) return;
     const id = setInterval(async () => {
       const s = await api('/emergentes/status');
+      if (s && !s.error) setEstadoVivo(s.running ? s : null);
       if (s && !s.running) {
         setCorriendo(false);
         cargar();
@@ -336,10 +340,22 @@ export default function Emergentes() {
         </button>
       </div>
 
-      {(corriendo || data.status?.running) && data.status?.paso && (
-        <p className="text-[11px] text-zinc-500 mb-3">
-          {data.status.paso} · {t('{n} mirados de {c} candidatos', { n: data.status.mirados, c: data.status.candidatos })}
-        </p>
+      {/* Sin porcentaje a propósito: la pasada solo mira a los mejores hasta el
+          tope, así que «mirados de candidatos» NUNCA llega a 100 y pintarlo
+          como barra sería un número falso. Los dos contadores sí son reales. */}
+      {(corriendo || data.status?.running) && (
+        <Progreso
+          className="mb-3"
+          paso={
+            (estadoVivo || data.status)?.paso
+              ? t('Rastreando debuts · {paso} · {n} mirados de {c} candidatos', {
+                  paso: t((estadoVivo || data.status).paso),
+                  n: (estadoVivo || data.status).mirados,
+                  c: (estadoVivo || data.status).candidatos,
+                })
+              : t('Rastreando debuts en las ediciones de festival…')
+          }
+        />
       )}
 
       {todos.length === 0 ? (

@@ -88,4 +88,8 @@ export default {
   'Sudeste Asiático': 'Southeast Asia',
   'África Subsahariana': 'Sub-Saharan Africa',
   'Asia Meridional': 'South Asia',
+
+  // ── pasos de carga
+  'Abriendo el catálogo de directores en activo…': 'Opening the catalogue of working directors…',
+  'Buscando en TMDB las caras de {n} directores/as…': 'Looking up {n} directors’ faces on TMDB…',
 };

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { Ticket, Flag, MonitorPlay, Tv, Plus, RotateCw } from 'lucide-react';
 import {
-  ErrorBox, TmdbCard, RadarrButton, Empty, BuildProgress, PageHeader, Select,
+  ErrorBox, TmdbCard, RadarrButton, Empty, Spinner, PageHeader, Select,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts,
   MinScoreBar, passesScore, useMinScore, OwnFilterBar,
 } from '../components.jsx';
@@ -242,7 +242,17 @@ export default function Estrenos() {
       {error ? (
         <ErrorBox error={`${error}${t(' — comprueba la API key de TMDB en Ajustes.')}`} />
       ) : !data ? (
-        <BuildProgress label={t('Consultando los estrenos en TMDB…')} />
+        /* las dos pestañas de plataformas tardan cinco veces más que las de
+           cines porque además del descubrimiento traen el «dónde verla» de cada
+           película: la etiqueta lo dice en vez de dejar pensar que se ha colgado.
+           Barra indeterminada y no BuildProgress: /api/releases no publica
+           {done,total} en /api/build-progress, así que la barra que salía era la
+           de OTRA tarea (el calendario, un envío masivo a Radarr) o ninguna. */
+        <Spinner
+          label={conProviders
+            ? t('Buscando novedades en plataformas y mirando dónde se ve cada una…')
+            : t('Buscando los estrenos en salas de los últimos {n} días…', { n: win })}
+        />
       ) : (
         <>
           <div className="flex items-center justify-between flex-wrap gap-2 mb-4">

@@ -27,6 +27,9 @@ export default {
   '{n} por estrenar': '{n} upcoming',
   '+{n} más': '+{n} more',
 
+  // esperas
+  'Repasando tus sagas a medias…': 'Reviewing your half-finished sagas…',
+
   // detalle
   'Consultando TMDB…': 'Querying TMDB…',
   '{owned} / {released} estrenadas': '{owned} / {released} released',

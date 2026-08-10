@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, fmtDate } from '../api.js';
-import { Spinner, Section, PageHeader, ErrorBox, ProgressBar } from '../components.jsx';
+import { Progreso, useCargaProgresiva, Section, PageHeader, ErrorBox, ProgressBar } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t, locale } from '../i18n.js';
 
@@ -24,17 +24,31 @@ const Lista = ({ children }) => (
 );
 
 export default function Salud({ embedded = false }) {
-  const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [resolviendo, setResolviendo] = useState(false);
   const [verif, setVerif] = useState(null);
 
-  const cargar = () => api('/datahealth').then((r) => (r.error ? setError(r.error) : setData(r)));
+  // las dos a la vez: la auditoría no necesita saber nada de la comprobación en
+  // marcha, y la segunda es un vistazo de un milisegundo
+  const carga = useCargaProgresiva([
+    { clave: 'auditoria', etiqueta: t('Auditando la base de datos…'), carga: () => api('/datahealth') },
+    { clave: 'verif', etiqueta: t('Mirando si quedó una comprobación a medias…'), carga: () => api('/datahealth/verify-people') },
+  ], []);
+
+  // la auditoría se vuelve a pedir cuando algo de esta página la cambia
+  // (resolver Letterboxd, demostrar identidades): esa recarga manda sobre la
+  // primera, sin devolver la página a la pantalla de carga
+  const [dataFresca, setDataFresca] = useState(null);
+  const cargar = () => api('/datahealth').then((r) => (r.error ? setError(r.error) : setDataFresca(r)));
+  const bruto = dataFresca ?? carga.datos.auditoria ?? null;
+  const fallo = error ?? bruto?.error ?? null;
+  const data = bruto && !bruto.error ? bruto : null;
+
+  // por si quedó una comprobación en marcha de una visita anterior
   useEffect(() => {
-    cargar();
-    // por si quedó una comprobación en marcha de una visita anterior
-    api('/datahealth/verify-people').then((r) => !r.error && (r.running || r.finishedAt) && setVerif(r));
-  }, []);
+    const r = carga.datos.verif;
+    if (r && !r.error && (r.running || r.finishedAt)) setVerif(r);
+  }, [carga.datos.verif]);
 
   // mientras corre se pregunta cada segundo y medio; al terminar se recarga la
   // auditoría, que es justo lo que la comprobación acaba de cambiar
@@ -70,8 +84,8 @@ export default function Salud({ embedded = false }) {
     }
   };
 
-  if (error) return <ErrorBox error={error} />;
-  if (!data) return <Spinner label={t('Auditando la base de datos…')} />;
+  if (fallo) return <ErrorBox error={fallo} />;
+  if (!data) return <Progreso {...carga} />;
 
   return (
     <div>

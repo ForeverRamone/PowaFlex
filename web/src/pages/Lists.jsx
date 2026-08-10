@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import {
-  Spinner, ErrorBox, Empty, ProgressBar, MovieModal, MediaModal, PageHeader, RadarrButton, useRadarrIds,
+  Spinner, Progreso, useCargaProgresiva, ErrorBox, Empty, ProgressBar, MovieModal, MediaModal,
+  PageHeader, RadarrButton, useRadarrIds,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
@@ -231,12 +232,11 @@ function ChallengeCard({ l, mode, open, setOpen, load }) {
  * de la app sin él). Ahora vive aquí, y las que el emparejado ya resolvió a
  * TMDB se pueden pedir a Radarr directamente.
  */
-function LbWatchlist() {
-  const [summary, setSummary] = useState(null);
+// El resumen se lo pasa la pestaña, que lo pide junto a los retos y cuenta las
+// dos esperas en la misma barra: pedirlo aquí dentro dejaba la sección sin
+// avisar de nada mientras llegaban sus cien kilobytes.
+function LbWatchlist({ summary }) {
   const [radarrIds, addRadarrId] = useRadarrIds();
-  useEffect(() => {
-    api('/letterboxd/summary').then((s) => !s?.error && setSummary(s));
-  }, []);
   const missing = summary?.watchlistMissing || [];
   const owned = summary?.watchlistOwned || [];
   if (!summary || (!missing.length && !owned.length)) return null;
@@ -289,8 +289,8 @@ function LbWatchlist() {
   );
 }
 
-function LetterboxdChallenges() {
-  const [lists, setLists] = useState(null);
+function LetterboxdChallenges({ listasIniciales }) {
+  const [lists, setLists] = useState(listasIniciales);
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -298,8 +298,9 @@ function LetterboxdChallenges() {
   const [mode, setMode] = useState('both'); // owned | watched | both
   const [showHidden, setShowHidden] = useState(false);
 
+  // la primera lectura llega ya hecha desde la pestaña; esto es para después de
+  // añadir, ocultar o quitar un reto
   const load = () => api('/letterboxd/lists').then((r) => setLists(Array.isArray(r) ? r : []));
-  useEffect(() => { load(); }, []);
 
   const addByUrl = async (e) => {
     e.preventDefault();
@@ -312,9 +313,8 @@ function LetterboxdChallenges() {
     else { setUrl(''); load(); }
   };
 
-  if (!lists) return <Spinner />;
-  const visible = lists.filter((l) => !l.hidden);
-  const hidden = lists.filter((l) => l.hidden);
+  const visible = (lists || []).filter((l) => !l.hidden);
+  const hidden = (lists || []).filter((l) => l.hidden);
 
   return (
     <div>
@@ -456,7 +456,30 @@ function ListDetail({ listId, onChanged }) {
   );
 }
 
-export default function Lists() {
+/**
+ * La pestaña de Letterboxd, que es la que se abre al entrar: pide sus dos cosas
+ * a la vez y las cuenta en la misma barra. Antes cada sección traía su propio
+ * spinner mudo, y encima la página entera esperaba a las listas de MDBList —los
+ * datos de la OTRA pestaña— antes de pintar nada de esta.
+ */
+function PanelLetterboxd() {
+  const carga = useCargaProgresiva([
+    { clave: 'resumen', etiqueta: t('Leyendo tu watchlist de Letterboxd…'), carga: () => api('/letterboxd/summary') },
+    { clave: 'retos', etiqueta: t('Repasando tus retos en marcha…'), carga: () => api('/letterboxd/lists') },
+  ], []);
+
+  if (!carga.terminado) return <Progreso {...carga} />;
+  const resumen = carga.datos.resumen;
+  return (
+    <>
+      <LbWatchlist summary={resumen && !resumen.error ? resumen : null} />
+      <LetterboxdChallenges listasIniciales={Array.isArray(carga.datos.retos) ? carga.datos.retos : []} />
+    </>
+  );
+}
+
+/** Las listas de MDBList, que solo se piden cuando se abre SU pestaña. */
+function PanelMdblist() {
   const [lists, setLists] = useState(null);
   const [url, setUrl] = useState('');
   const [query, setQuery] = useState('');
@@ -464,7 +487,6 @@ export default function Lists() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(null);
-  const [tab, setTab] = useState('letterboxd');
   // el ↻ de una lista puede tardar (MDBList + reemparejado): sin este estado el
   // botón parecía muerto y se pulsaba tres veces, encolando tres refrescos
   const [refreshingId, setRefreshingId] = useState(null);
@@ -479,9 +501,14 @@ export default function Lists() {
   };
 
   const load = () => api('/mdblist/lists').then((r) => setLists(Array.isArray(r) ? r : []));
+  // una sola petición: barra indeterminada y sin porcentaje inventado
+  const carga = useCargaProgresiva([
+    { clave: 'listas', etiqueta: t('Buscando las listas que sigues en MDBList…'), carga: () => api('/mdblist/lists') },
+  ], []);
   useEffect(() => {
-    load();
-  }, []);
+    const r = carga.datos.listas;
+    if (r) setLists(Array.isArray(r) ? r : []);
+  }, [carga.datos.listas]);
 
   const addByUrl = async (e) => {
     e.preventDefault();
@@ -524,26 +551,10 @@ export default function Lists() {
     }
   };
 
-  if (!lists) return <Spinner />;
+  if (!lists) return <Progreso {...carga} />;
 
   return (
-    <div>
-      <PageHeader eyebrow={t('La caza')} title={t('Listas y retos')} />
-      <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-        {t('Convierte listas famosas en retos de completismo: qué % tienes, qué has visto, qué te falta y envío a Radarr.')}
-      </p>
-      <div className="flex gap-2 mb-6">
-        <button onClick={() => setTab('letterboxd')} className={tab === 'letterboxd' ? 'btn-gold' : 'btn-ghost'}>{t('🟠 Retos de Letterboxd')}</button>
-        <button onClick={() => setTab('mdblist')} className={tab === 'mdblist' ? 'btn-gold' : 'btn-ghost'}>{t('Listas de MDBList')}</button>
-      </div>
-
-      {tab === 'letterboxd' ? (
-        <>
-          <LbWatchlist />
-          <LetterboxdChallenges />
-        </>
-      ) : (
-      <>
+    <>
       <p className="text-sm text-zinc-500 mb-5 max-w-3xl">
         {t('Sigue listas de MDBList (1001 películas, palmarés de premios, tops de la comunidad…). Necesita la API key de MDBList en Ajustes.')}
       </p>
@@ -650,8 +661,27 @@ export default function Lists() {
           );
         })
       )}
-      </>
-      )}
+    </>
+  );
+}
+
+export default function Lists() {
+  // cada pestaña pide LO SUYO y solo al abrirse: la de Letterboxd es la que se
+  // pinta al entrar y no tiene por qué esperar a MDBList
+  const [tab, setTab] = useState('letterboxd');
+
+  return (
+    <div>
+      <PageHeader eyebrow={t('La caza')} title={t('Listas y retos')} />
+      <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
+        {t('Convierte listas famosas en retos de completismo: qué % tienes, qué has visto, qué te falta y envío a Radarr.')}
+      </p>
+      <div className="flex gap-2 mb-6">
+        <button onClick={() => setTab('letterboxd')} className={tab === 'letterboxd' ? 'btn-gold' : 'btn-ghost'}>{t('🟠 Retos de Letterboxd')}</button>
+        <button onClick={() => setTab('mdblist')} className={tab === 'mdblist' ? 'btn-gold' : 'btn-ghost'}>{t('Listas de MDBList')}</button>
+      </div>
+
+      {tab === 'letterboxd' ? <PanelLetterboxd /> : <PanelMdblist />}
     </div>
   );
 }

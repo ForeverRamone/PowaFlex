@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid, X, Layers } from 'lucide-react';
 import {
-  Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
+  Spinner, Progreso, useCargaProgresiva, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts, PageHeader, Signature, Select,
   MinScoreBar, passesScore, useMinScore } from '../components.jsx';
 import { toast } from '../toast.js';
@@ -164,7 +164,7 @@ function FilmGrid({ people, show, minScore, dismissed, onDismiss, radarrIds, add
 
 function GapsView({
   endpoint, role, radarrIds, addRadarrId, show, toggle, minScore, setMinScore,
-  dismissed, onDismiss, intro, paginated, clearBaseFilters,
+  dismissed, onDismiss, intro, paginated, clearBaseFilters, cargando,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -210,7 +210,11 @@ function GapsView({
   };
 
   if (error) return <ErrorBox error={t('{error} — comprueba la API key de TMDB en Ajustes.', { error })} />;
-  if (!data) return <BuildProgress label={t('Cruzando filmografías con TMDB…')} />;
+  // BuildProgress y no Progreso: aquí hay UNA petición, pero mientras el
+  // servidor arma el cruce va publicando done/total en /build-progress, y ese
+  // es el único porcentaje de verdad que se puede enseñar. La etiqueta la pone
+  // cada pestaña: no es lo mismo cruzar tus favoritos que ordenar el top.
+  if (!data) return <BuildProgress label={cargando || t('Cruzando filmografías con TMDB…')} />;
 
   // people with something still missing drive this page
   const withGaps = (data.people || []).filter((p) => (p.missingTotal || 0) > 0);
@@ -419,20 +423,35 @@ function FollowButton({ person, seguido, onSeguir }) {
 }
 
 function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
-  const [canons, setCanons] = useState([]);
   const [canon, setCanon] = useState('alltime');
-  const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadCanons = () => api('/discover/canons').then((r) => Array.isArray(r) && setCanons(r));
-  useEffect(() => { loadCanons(); }, []);
+  // Las tres a la vez: la lista de cánones y a quién sigues no hacen falta para
+  // lanzar la comparación, y son un milisegundo cada una frente a los seis
+  // segundos de la tercera. Se rehacen al cambiar de canon porque el canon es
+  // justo lo que decide qué se compara.
+  const carga = useCargaProgresiva([
+    { clave: 'canones', etiqueta: t('Buscando los cánones disponibles…'), carga: () => api('/discover/canons') },
+    { clave: 'seguidos', etiqueta: t('Comprobando a quién ya sigues…'), carga: () => api('/tracked') },
+    {
+      clave: 'ausentes',
+      etiqueta: t('Comparando el canon de grandes directores/as con tu Plex…'),
+      carga: () => api(`/discover/absent?canon=${canon}`),
+    },
+  ], [canon]);
+
+  // guardar o borrar una lista propia cambia los cánones sin recargar nada más
+  const [canonesFrescos, setCanonesFrescos] = useState(null);
+  const loadCanons = () => api('/discover/canons').then((r) => Array.isArray(r) && setCanonesFrescos(r));
+  const canons = canonesFrescos ?? (Array.isArray(carga.datos.canones) ? carga.datos.canones : []);
 
   // quiénes sigues ya, para no ofrecer «Seguir» a quien está en favoritos
   const [seguidos, setSeguidos] = useState(new Set());
   useEffect(() => {
-    api('/tracked').then((r) => Array.isArray(r) && setSeguidos(new Set(r.map((t) => t.tmdb_id).filter(Boolean))));
-  }, []);
+    const r = carga.datos.seguidos;
+    if (Array.isArray(r)) setSeguidos(new Set(r.map((p) => p.tmdb_id).filter(Boolean)));
+  }, [carga.datos.seguidos]);
   const onSeguir = async (person) => {
     const r = await api('/tracked/tmdb-bulk', {
       method: 'POST',
@@ -456,17 +475,24 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
     loadCanons();
   };
 
-  const load = (refresh = false) => {
+  // «Actualizar» rehace SOLO la comparación (es lo único que se recalcula) y su
+  // resultado manda sobre el de la primera carga
+  const [dataFresca, setDataFresca] = useState(null);
+  const refrescar = () => {
     setError(null);
-    if (refresh) setRefreshing(true);
-    else setData(null);
-    api(`/discover/absent?canon=${canon}${refresh ? '&refresh=1' : ''}`).then((d) => {
+    setRefreshing(true);
+    api(`/discover/absent?canon=${canon}&refresh=1`).then((d) => {
       setRefreshing(false);
       if (d.error) setError(d.error);
-      else setData(d);
+      else setDataFresca(d);
     });
   };
-  useEffect(() => { load(); }, [canon]);
+  // al cambiar de canon lo refrescado ya no vale: es de otra lista
+  useEffect(() => { setDataFresca(null); setError(null); }, [canon]);
+
+  const bruto = dataFresca ?? carga.datos.ausentes ?? null;
+  const fallo = error ?? bruto?.error ?? null;
+  const data = bruto && !bruto.error ? bruto : null;
 
   const canonUrl = CANON_URLS[canon];
   const activo = canons.find((c) => c.key === canon);
@@ -497,10 +523,10 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
         <NewCanonForm onSaved={(key) => { loadCanons(); setCanon(key); }} />
       </div>
 
-      {error ? (
-        <ErrorBox error={t('{error} — comprueba la API key de TMDB en Ajustes.', { error })} />
+      {fallo ? (
+        <ErrorBox error={t('{error} — comprueba la API key de TMDB en Ajustes.', { error: fallo })} />
       ) : !data ? (
-        <Spinner label={t('Comprobando el canon de grandes directores/as contra tu Plex…')} />
+        <Progreso {...carga} />
       ) : (
       <>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
@@ -516,7 +542,7 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
           ,{' '}
           <b className="text-gold-400">{t('{n} no tienen ni una película en tu Plex', { n: data.absent.length })}</b> {t('({n} sí están).', { n: data.present.length })}
         </p>
-        <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={() => load(true)} disabled={refreshing}>
+        <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={refrescar} disabled={refreshing}>
           {refreshing ? t('Actualizando…') : <><RotateCw size={13} strokeWidth={2} /> {t('Actualizar')}</>}
         </button>
       </div>
@@ -725,7 +751,7 @@ export default function Discover() {
       )}
 
       {tab === 'sagas' ? (
-        <Suspense fallback={<Spinner />}>
+        <Suspense fallback={<Spinner label={t('Abriendo tus sagas…')} />}>
           <Sagas embedded />
         </Suspense>
       ) : tab === 'absent' ? (
@@ -735,6 +761,7 @@ export default function Discover() {
           key={`fav-${favRole}`}
           endpoint={`/discover/favorites?role=${favRole}`}
           role={favRole}
+          cargando={t('Cruzando las filmografías de tus favoritos con tu Plex…')}
           {...gapProps}
           intro={t('Qué te falta (ya estrenado) de tus favoritos seguidos como {role}.', { role: t(roles.find((r) => r.key === favRole)?.label || 'Directores/as').toLowerCase() })}
         />
@@ -744,6 +771,7 @@ export default function Discover() {
           endpoint={`/discover/gaps?role=${tab}${demoQs}`}
           role={tab}
           paginated
+          cargando={t('Ordenando quién manda en tu biblioteca…')}
           {...gapProps}
           intro={demoActivo
             ? t('Qué te falta de las filmografías de {role} más presentes en tu biblioteca, con tus filtros demográficos aplicados.', { role: tab === 'director' ? t('directores/as') : t('actores/actrices') })

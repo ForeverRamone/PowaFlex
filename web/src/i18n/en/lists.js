@@ -77,4 +77,9 @@ export default {
   'Dejar de seguir': 'Unfollow',
   '¿Dejar de seguir «{name}»?': 'Unfollow “{name}”?',
   '¿Quitar el reto «{name}»? Su progreso se pierde.': 'Remove the challenge “{name}”? Its progress is lost.',
+
+  // ── pasos de carga de cada pestaña
+  'Leyendo tu watchlist de Letterboxd…': 'Reading your Letterboxd watchlist…',
+  'Repasando tus retos en marcha…': 'Going over your challenges in progress…',
+  'Buscando las listas que sigues en MDBList…': 'Looking up the lists you follow on MDBList…',
 };

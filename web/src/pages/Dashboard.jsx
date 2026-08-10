@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line,
-} from 'recharts';
 import { api, fmtBytes, fmtDate, tmdbImg } from '../api.js';
 import { t, locale } from '../i18n.js';
-import { Spinner, StatCard, Section, PersonCard, Empty, MovieModal, LetterboxdLogo, PageHeader, ErrorBox} from '../components.jsx';
+import { Progreso, useCargaProgresiva, StatCard, Section, PersonCard, Empty, MovieModal, LetterboxdLogo, PageHeader, ErrorBox} from '../components.jsx';
 import { useChartTheme } from '../charts.js';
+
+// recharts son 400 KB y esta es la pantalla de entrada: en diferido, los
+// contadores y las novedades se pintan sin esperar a la librería de gráficas
+const DashboardCharts = lazy(() => import('./charts/DashboardCharts.jsx'));
 
 // small poster tile used across the "recent" strips
 function PosterTile({ item, onClick, badge, sub }) {
@@ -65,29 +66,52 @@ function RecentStrip({ items, onSelect, kind }) {
 
 export default function Dashboard() {
   const ch = useChartTheme();
-  const [ov, setOv] = useState(null);
-  const [charts, setCharts] = useState(null);
-  const [recent, setRecent] = useState(null);
-  const [captures, setCaptures] = useState(null);
-  const [events, setEvents] = useState(null);
-  const [directors, setDirectors] = useState([]);
-  const [actors, setActors] = useState([]);
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => {
-    api('/stats/overview').then(setOv);
-    api('/stats/charts').then(setCharts);
-    api('/stats/recent').then(setRecent);
-    api('/radarr/captures?days=7').then((r) => Array.isArray(r) && setCaptures(r));
-    api('/events?days=14').then((r) => Array.isArray(r) && setEvents(r));
-    api('/people?role=director&limit=10').then((r) => Array.isArray(r) && setDirectors(r));
-    api('/people?role=actor&limit=10').then((r) => Array.isArray(r) && setActors(r));
-  }, []);
+  // Siete peticiones agrupadas en cuatro pasos por lo que cuentan, no por
+  // endpoint: quien espera entiende «lo último que ha entrado», no tres rutas.
+  // Todas salen a la vez; los contadores y las gráficas pintan sin esperar al
+  // resto, que es lo que aquí bloquea.
+  const carga = useCargaProgresiva([
+    { clave: 'resumen', etiqueta: t('Contando tu colección…'), carga: () => api('/stats/overview') },
+    { clave: 'graficas', etiqueta: t('Dibujando las gráficas de tu biblioteca…'), carga: () => api('/stats/charts') },
+    {
+      clave: 'reciente',
+      etiqueta: t('Repasando lo último que ha entrado…'),
+      carga: () => Promise.all([
+        api('/stats/recent'),
+        api('/events?days=14'),
+        api('/radarr/captures?days=7'),
+      ]).then(([recent, events, captures]) => ({
+        recent,
+        events: Array.isArray(events) ? events : null,
+        captures: Array.isArray(captures) ? captures : null,
+      })),
+    },
+    {
+      clave: 'personas',
+      etiqueta: t('Ordenando quién manda en tu biblioteca…'),
+      carga: () => Promise.all([
+        api('/people?role=director&limit=10'),
+        api('/people?role=actor&limit=10'),
+      ]).then(([directors, actors]) => ({
+        directors: Array.isArray(directors) ? directors : [],
+        actors: Array.isArray(actors) ? actors : [],
+      })),
+    },
+  ], []);
+  const ov = carga.datos.resumen ?? null;
+  const charts = carga.datos.graficas ?? null;
+  const recent = carga.datos.reciente?.recent ?? null;
+  const events = carga.datos.reciente?.events ?? null;
+  const captures = carga.datos.reciente?.captures ?? null;
+  const directors = carga.datos.personas?.directors ?? [];
+  const actors = carga.datos.personas?.actors ?? [];
 
   // un error del servidor NO es «no hay nada»: antes el Dashboard decía «aún no
   // hay películas sincronizadas» a alguien con 12.400
   if (ov?.error || charts?.error) return <ErrorBox error={ov?.error || charts?.error} />;
-  if (!ov || !charts) return <Spinner />;
+  if (!ov || !charts) return <Progreso {...carga} />;
   if (!ov.movies)
     return (
       <Empty>
@@ -190,42 +214,11 @@ export default function Dashboard() {
       )}
 
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
-        <Section title={t('Películas por década')} className="min-w-0">
-          <div className="card p-4 h-72 min-w-0">
-            <ResponsiveContainer>
-              <BarChart data={charts.byDecade} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
-                <XAxis dataKey="decade" stroke={ch.axis} fontSize={12} tickMargin={6} />
-                <YAxis stroke={ch.axis} fontSize={12} width={38} />
-                <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
-                <Bar dataKey="n" name={t('Películas')} fill={ch.accent} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
-        <Section title={t('Géneros principales')} className="min-w-0">
-          <div className="card p-4 h-72 min-w-0">
-            <ResponsiveContainer>
-              <BarChart data={charts.byGenre.slice(0, 12)} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
-                <XAxis type="number" stroke={ch.axis} fontSize={12} />
-                <YAxis type="category" dataKey="name" width={110} stroke={ch.axis} fontSize={11} interval={0} tickMargin={4} />
-                <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
-                <Bar dataKey="n" name={t('Películas')} fill={ch.ramp[1] || ch.accent} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
-        <Section title={t('Crecimiento de la biblioteca (añadidas por mes)')} className="min-w-0">
-          <div className="card p-4 h-72 min-w-0">
-            <ResponsiveContainer>
-              <LineChart data={charts.addedByMonth} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-                <XAxis dataKey="month" stroke={ch.axis} fontSize={10} tickMargin={6} minTickGap={24} />
-                <YAxis stroke={ch.axis} fontSize={12} width={38} />
-                <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ stroke: ch.axis }} />
-                <Line type="monotone" dataKey="n" name={t('Añadidas')} stroke={ch.accent} dot={false} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
+        {/* los huecos reservan el alto de las tres gráficas para que lo de
+            debajo no dé un salto cuando entren */}
+        <Suspense fallback={<><div className="card h-72" /><div className="card h-72" /><div className="card h-72" /></>}>
+          <DashboardCharts ch={ch} byDecade={charts.byDecade} byGenre={charts.byGenre} addedByMonth={charts.addedByMonth} />
+        </Suspense>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

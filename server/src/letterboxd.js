@@ -686,6 +686,11 @@ export function letterboxdSummary() {
   // Your Letterboxd rating vs the Letterboxd community and the combined score.
   // Scales: lb_entries.rating is Letterboxd's 0–5 (×2 → 0–10); mdb_ratings.letterboxd
   // ALREADY comes 0–10 from MDBList, so scaling it again is what produced "16.8/10".
+  //
+  // El LIMIT no es un capricho: la tabla de Visionado pinta 200 filas y punto
+  // (WatchStats.jsx), pero aquí salían TODAS las notas del diario — con un
+  // Letterboxd de años son ~100 KB de JSON que el móvil baja y parsea para
+  // tirar. Si algún día se pagina la tabla, este número sube con ella.
   const ratingCompare = db
     .prepare(
       `SELECT m.rating_key, m.title, m.year, m.thumb, MAX(e.rating) * 2 AS lb,
@@ -693,7 +698,8 @@ export function letterboxdSummary() {
        FROM lb_entries e JOIN movies m ON m.rating_key = e.movie_id
        LEFT JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
        WHERE e.list IN ('ratings','diary') AND e.rating IS NOT NULL
-       GROUP BY m.rating_key ORDER BY MAX(e.rating) DESC`
+       GROUP BY m.rating_key ORDER BY MAX(e.rating) DESC
+       LIMIT 200`
     )
     .all();
 

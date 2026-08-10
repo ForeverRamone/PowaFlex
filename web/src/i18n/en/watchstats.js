@@ -1,6 +1,10 @@
 // Traducciones EN de WatchStats.jsx (página Visionado). Clave = texto
 // castellano. «Visionado» ya vive en app.js.
 export default {
+  // Pasos de carga
+  'Leyendo tu historial de visionado…': 'Reading your watch history…',
+  'Recogiendo tus notas de Letterboxd…': 'Collecting your Letterboxd ratings…',
+  'Cruzando con las notas de la crítica…': 'Cross-checking with the critics’ ratings…',
   // Emparejado con Letterboxd
   'Buscando en TMDB las vistas sin emparejar…': 'Searching TMDB for unmatched watched films…',
   '✓ {n} emparejadas': '✓ {n} matched',

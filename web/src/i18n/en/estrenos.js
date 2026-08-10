@@ -34,7 +34,10 @@ export default {
   '✕ Limpiar filtros': '✕ Clear filters',
   '{n} ocultas por tus filtros': '{n} hidden by your filters',
   ' — comprueba la API key de TMDB en Ajustes.': ' — check the TMDB API key in Settings.',
-  'Consultando los estrenos en TMDB…': 'Fetching releases from TMDB…',
+  // la espera dice qué pestaña se está trayendo: la de plataformas tarda mucho
+  // más porque además pregunta dónde se ve cada película
+  'Buscando los estrenos en salas de los últimos {n} días…': 'Looking for theatrical releases from the last {n} days…',
+  'Buscando novedades en plataformas y mirando dónde se ve cada una…': 'Looking for streaming and VOD releases and where to watch each one…',
   'Actualizado {date}.': 'Updated {date}.',
   'TMDB cortó a mitad: lista incompleta, recarga en un rato': 'TMDB cut off midway: incomplete list, reload in a while',
   'Añadir {n} visibles a Radarr': 'Add {n} visible to Radarr',

@@ -140,4 +140,12 @@ export default {
   '✓ Corrección quitada': '✓ Correction removed',
 
   'Directores, actores y equipo': 'Directors, actors & crew',
+
+  // ── pasos de carga (People.jsx y PersonDetail.jsx)
+  'Mirando qué oficios se pueden seguir…': 'Checking which roles you can follow…',
+  'Cargando los filtros de país y continente…': 'Loading the country and continent filters…',
+  'Ordenando quién manda en tu biblioteca…': 'Ranking who rules your library…',
+  'Comprobando a quién ya sigues…': 'Checking who you already follow…',
+  'Reuniendo su filmografía en TMDB…': 'Gathering their filmography from TMDB…',
+  'Comprobando si ya le sigues…': 'Checking whether you already follow them…',
 };

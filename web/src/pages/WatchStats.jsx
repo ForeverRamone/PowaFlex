@@ -1,11 +1,16 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { api } from '../api.js';
-import { Spinner, Section, MovieCard, Empty, PageHeader, ErrorBox } from '../components.jsx';
+import { Progreso, useCargaProgresiva, Section, MovieCard, Empty, PageHeader, ErrorBox } from '../components.jsx';
 import { MovieModal } from '../components.jsx';
 import { useChartTheme } from '../charts.js';
 import { t, locale } from '../i18n.js';
+
+// recharts pesa 415 KB y hasta ahora entraba por importación directa: el
+// navegador tenía que bajarlo y ejecutarlo ANTES de pintar los contadores y las
+// parrillas, que no lo necesitan para nada. En diferido, la página sale primero
+// y las gráficas entran cuando llegan.
+const WatchCharts = lazy(() => import('./charts/WatchCharts.jsx'));
 
 function InsightGrid({ title, hint, items, caption, onSelect }) {
   if (!items?.length) return null;
@@ -26,23 +31,30 @@ function InsightGrid({ title, hint, items, caption, onSelect }) {
 
 export default function WatchStats() {
   const ch = useChartTheme();
-  const [data, setData] = useState(null);
-  const [ins, setIns] = useState(null);
   const [selected, setSelected] = useState(null);
-  // tus notas vs. la comunidad venía de la antigua página Letterboxd; aquí es
-  // donde se compara lo visto, así que es su sitio natural
-  const [lbCompare, setLbCompare] = useState(null);
-  useEffect(() => {
-    api('/letterboxd/summary').then((s) => setLbCompare(Array.isArray(s?.ratingCompare) ? s.ratingCompare : []));
-  }, []);
   const [resolving, setResolving] = useState(false);
   const [resolveMsg, setResolveMsg] = useState('');
 
-  const load = () => api('/stats/watch').then(setData);
-  useEffect(() => {
-    load();
-    api('/mdblist/insights').then((r) => !r.error && setIns(r));
-  }, []);
+  // Las tres salen a la vez y ninguna espera a otra: son las tres fuentes que
+  // se cruzan en esta página (lo reproducido, tus notas y las de la crítica) y
+  // no comparten ni un dato. Tus notas vs. la comunidad venía de la antigua
+  // página Letterboxd; aquí es donde se compara lo visto, así que es su sitio.
+  const carga = useCargaProgresiva([
+    { clave: 'watch', etiqueta: t('Leyendo tu historial de visionado…'), carga: () => api('/stats/watch') },
+    { clave: 'notas', etiqueta: t('Recogiendo tus notas de Letterboxd…'), carga: () => api('/letterboxd/summary') },
+    { clave: 'critica', etiqueta: t('Cruzando con las notas de la crítica…'), carga: () => api('/mdblist/insights') },
+  ], []);
+
+  // El emparejado por TMDB cambia los contadores, así que hay que volver a
+  // pedirlos; se pide SOLO esa petición porque relanzar las tres devolvería a
+  // la pantalla de carga una página que ya está pintada entera.
+  const [watchFresco, setWatchFresco] = useState(null);
+  const load = () => api('/stats/watch').then(setWatchFresco);
+  const data = watchFresco ?? carga.datos.watch ?? null;
+  // sin clave de MDBList esto responde con error, y entonces sus cinco
+  // secciones sencillamente no se pintan (como antes)
+  const ins = carga.datos.critica && !carga.datos.critica.error ? carga.datos.critica : null;
+  const lbCompare = Array.isArray(carga.datos.notas?.ratingCompare) ? carga.datos.notas.ratingCompare : null;
 
   const resolveUnmatched = async () => {
     setResolving(true);
@@ -64,7 +76,9 @@ export default function WatchStats() {
   };
 
   if (data?.error) return <ErrorBox error={data.error} />;
-  if (!data) return <Spinner />;
+  // se pinta en cuanto está el historial: esperar también a las otras dos
+  // retrasaría a propósito lo que ya se puede leer
+  if (!data) return <Progreso {...carga} />;
 
   const s = data.summary;
 
@@ -115,44 +129,11 @@ export default function WatchStats() {
       )}
 
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
-        <Section title={t('Visto vs. pendiente por década')} className="min-w-0">
-          <div className="card p-4 h-72 min-w-0">
-            <ResponsiveContainer>
-              <BarChart data={data.watchedByDecade} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
-                <XAxis dataKey="decade" stroke={ch.axis} fontSize={12} tickMargin={6} />
-                <YAxis stroke={ch.axis} fontSize={12} width={38} />
-                <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
-                {/* el formatter es necesario: recharts pinta cada rótulo del color de su
-                    serie, y el gris claro de «Total» era ilegible sobre el papel */}
-                <Legend
-                  wrapperStyle={{ fontSize: 12 }}
-                  formatter={(v) => <span style={{ color: ch.axis }}>{v}</span>}
-                />
-                <Bar dataKey="watched" name={t('Vistas')} stackId="a" fill={ch.positive} />
-                <Bar dataKey="total" name={t('Total')} fill={ch.muted} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
-        <Section title={t('Visto vs. total por género')} className="min-w-0">
-          <div className="card p-4 h-72 min-w-0">
-            <ResponsiveContainer>
-              <BarChart data={data.watchedByGenre} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
-                <XAxis type="number" stroke={ch.axis} fontSize={12} />
-                <YAxis type="category" dataKey="name" width={104} stroke={ch.axis} fontSize={11} interval={0} tickMargin={4} />
-                <Tooltip contentStyle={ch.tooltip} labelStyle={ch.tooltipLabel} itemStyle={ch.tooltipItem} cursor={{ fill: ch.cursor }} />
-                {/* el formatter es necesario: recharts pinta cada rótulo del color de su
-                    serie, y el gris claro de «Total» era ilegible sobre el papel */}
-                <Legend
-                  wrapperStyle={{ fontSize: 12 }}
-                  formatter={(v) => <span style={{ color: ch.axis }}>{v}</span>}
-                />
-                <Bar dataKey="watched" name={t('Vistas')} fill={ch.positive} />
-                <Bar dataKey="total" name={t('Total')} fill={ch.muted} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
+        {/* el hueco reserva el alto de las dos gráficas para que el resto de la
+            página no dé un salto cuando entren */}
+        <Suspense fallback={<><div className="card h-72" /><div className="card h-72" /></>}>
+          <WatchCharts ch={ch} watchedByDecade={data.watchedByDecade} watchedByGenre={data.watchedByGenre} />
+        </Suspense>
       </div>
 
       <Section title={t('Directores/as con obra pendiente en tu biblioteca')}>
@@ -200,6 +181,13 @@ export default function WatchStats() {
           </>
         )}
       </Section>
+
+      {/* lo que falta por llegar se anuncia donde va a aparecer: aquí abajo
+          entran de golpe cinco secciones de carteles y la tabla de notas, y sin
+          este aviso la página parecía terminada y luego pegaba un salto */}
+      {!carga.terminado && (
+        <div className="card p-3 mb-8 max-w-md"><Progreso {...carga} /></div>
+      )}
 
       {/* «Consenso crítico sin ver» y «Mejor valoradas que aún no has visto»
           eran la MISMA consulta (sin ver + nota combinada, ordenadas por nota):

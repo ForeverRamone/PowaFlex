@@ -7,6 +7,9 @@
 // festivales— se reutilizan tal cual desde el servidor y desde el catálogo,
 // que a propósito manda las MISMAS cadenas castellanas que ya usa la interfaz.
 export default {
+  // ── espera del montaje ────────────────────────────────────────────────────
+  'Leyendo tus reglas automáticas…': 'Reading your automatic rules…',
+
   // ── cabecera de la sección ────────────────────────────────────────────────
   'Reglas automáticas a Radarr': 'Automatic Radarr rules',
   'Cada regla vigila una cosa —un festival, un premio, los estrenos de una región, tus favoritos de un oficio— y manda a Radarr lo que pase su filtro. Se revisan CADA NOCHE: una película que hoy no llega al umbral puede entrar mañana, cuando tenga más notas.':

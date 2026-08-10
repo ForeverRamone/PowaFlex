@@ -19,7 +19,11 @@ export default {
   'Canon: ': 'Canon: ',
   'Premio que clasifica: ': 'Qualifying award: ',
   ' · esta sección existe desde {y}': ' · this section has existed since {y}',
-  'Leyendo la selección en Wikipedia y casándola con TMDB…': 'Reading the selection on Wikipedia and matching it with TMDB…',
+  // la espera nombra la edición concreta que se está construyendo
+  'Leyendo la selección de {festival} {y} en Wikipedia…': 'Reading the {festival} {y} selection on Wikipedia…',
+  'Reconstruyendo el palmarés de {nombre}…': 'Rebuilding the {nombre} winners list…',
+  'este festival': 'this festival',
+  'este premio': 'this award',
   'todas las ganadoras ({award})': 'all winners ({award})',
   '{n} películas': '{n} movies',
   '{n} sin casar con TMDB': '{n} not matched with TMDB',

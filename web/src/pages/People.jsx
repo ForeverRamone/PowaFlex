@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard } from 'lucide-react';
-import { Spinner, PersonCard, Empty, PageHeader, Select, DeathBadge } from '../components.jsx';
+import { PersonCard, Empty, PageHeader, Select, DeathBadge, Progreso, useCargaProgresiva } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t, locale } from '../i18n.js';
 
@@ -48,10 +48,11 @@ export default function People() {
   const [people, setPeople] = useState(null);
   const [limit, setLimit] = useState(60);
   const [opts, setOpts] = useState(null);
+  // ── seguimiento: la estrella vive aquí desde que el ranking duplicado de
+  // Favoritos se retiró — misma semántica por faceta que tenía allí
+  const [tracked, setTracked] = useState([]);
+  const loadTracked = () => api('/tracked').then((r) => Array.isArray(r) && setTracked(r));
   const [roles, setRoles] = useState(ROLES_INICIALES);
-  useEffect(() => {
-    api('/roles').then((r) => Array.isArray(r) && r.length && setRoles(r));
-  }, []);
   // un oficio que aún no conocemos se trata como no rankeable: así no asoma el
   // alta masiva un instante para desaparecer cuando llega la lista de verdad
   const info = (r) => roles.find((x) => x.key === r) || { key: r, label: r, singular: r, rankable: false, principal: false };
@@ -84,16 +85,44 @@ export default function People() {
     localStorage.setItem('demo_filters', JSON.stringify(f));
   }, [f]);
 
+  // Las cuatro peticiones del montaje, juntas y en paralelo, con un progreso
+  // que dice cuál falta: son independientes entre sí y encadenarlas solo
+  // añadiría espera. La parrilla entra aquí para que la barra cuente la
+  // petición que de verdad manda en lo que se ve.
+  //
+  // El oficio se sabe desde el primer render (viene en la URL), así que a un
+  // oficio sin ranking —fotografía, música, montaje— no se le pide parrilla:
+  // Plex no acredita esos créditos y no hay nada que ordenar.
+  const rankableAlEntrar = useRef(rankable).current;
+  const carga = useCargaProgresiva([
+    { clave: 'roles', etiqueta: t('Mirando qué oficios se pueden seguir…'), carga: () => api('/roles') },
+    { clave: 'filtros', etiqueta: t('Cargando los filtros de país y continente…'), carga: () => api('/people/filter-options') },
+    rankableAlEntrar && {
+      clave: 'parrilla',
+      etiqueta: t('Ordenando quién manda en tu biblioteca…'),
+      carga: () => api(`/people?${new URLSearchParams({ role, limit: String(limit), search, ...f })}`),
+    },
+    { clave: 'seguidos', etiqueta: t('Comprobando a quién ya sigues…'), carga: () => api('/tracked') },
+  ], []);
+
   useEffect(() => {
-    api('/people/filter-options').then((o) => !o.error && setOpts(o));
-  }, []);
+    const { roles: catalogo, filtros, parrilla, seguidos } = carga.datos;
+    if (Array.isArray(catalogo) && catalogo.length) setRoles(catalogo);
+    if (filtros && !filtros.error) setOpts(filtros);
+    if (Array.isArray(seguidos)) setTracked(seguidos);
+    if (parrilla) setPeople(Array.isArray(parrilla) ? parrilla : []);
+  }, [carga.datos.roles, carga.datos.filtros, carga.datos.parrilla, carga.datos.seguidos]);
 
   // debounced, and the grid keeps the previous results while refetching so
   // typing a name doesn't flash the whole page to a spinner per keystroke.
   // Los oficios sin ranking (fotografía, música, montaje) no salen de Plex: no
   // hay parrilla que pedir, se sigue por nombre desde TMDB.
+  // La primera parrilla la trae la carga de arriba; esto se ocupa solo de los
+  // cambios de oficio, de filtro, de búsqueda y del «Cargar más».
+  const primeraParrilla = useRef(true);
   useEffect(() => {
-    if (!rankable) { setPeople([]); return undefined; }
+    if (!rankable) { setPeople([]); primeraParrilla.current = false; return undefined; }
+    if (primeraParrilla.current) { primeraParrilla.current = false; return undefined; }
     const temporizador = setTimeout(() => {
       const qs = new URLSearchParams({ role, limit: String(limit), search, ...f });
       api(`/people?${qs}`).then((r) => setPeople(Array.isArray(r) ? r : []));
@@ -101,11 +130,6 @@ export default function People() {
     return () => clearTimeout(temporizador);
   }, [role, search, limit, f, rankable]);
 
-  // ── seguimiento: la estrella vive aquí desde que el ranking duplicado de
-  // Favoritos se retiró — misma semántica por faceta que tenía allí
-  const [tracked, setTracked] = useState([]);
-  const loadTracked = () => api('/tracked').then((r) => Array.isArray(r) && setTracked(r));
-  useEffect(() => { loadTracked(); }, []);
   const followState = (id) => {
     const here = tracked.some((fav) => fav.id === id && (fav.role || 'director') === role);
     if (here) return 'here';
@@ -330,7 +354,7 @@ export default function People() {
       )}
 
       {!rankable ? null : !people ? (
-        <Spinner />
+        <Progreso {...carga} />
       ) : people.length === 0 ? (
         <Empty>{t('No hay resultados.')}</Empty>
       ) : (

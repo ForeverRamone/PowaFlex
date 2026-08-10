@@ -1,8 +1,11 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Search, Scissors, X } from 'lucide-react';
-import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature, ErrorBox, SortSelect } from '../components.jsx';
+import {
+  Progreso, useCargaProgresiva, Subpestanas, Section, Empty, DeathBadge, ProgressBar,
+  PageHeader, Signature, ErrorBox, SortSelect,
+} from '../components.jsx';
 import { toast } from '../toast.js';
 import { t } from '../i18n.js';
 
@@ -176,14 +179,10 @@ const ACCENTS = {
  * Resolver 500 nombres contra TMDB lleva su rato, así que el servidor lo hace en
  * segundo plano y aquí se sigue el progreso.
  */
-function CanonPacks({ role, faceta, onDone }) {
-  const [canons, setCanons] = useState([]);
-  const [estado, setEstado] = useState(null);
-
-  useEffect(() => {
-    api('/discover/canons').then((r) => Array.isArray(r) && setCanons(r));
-    api('/tracked/from-canon').then((r) => !r.error && r.running && setEstado(r));
-  }, []);
+function CanonPacks({ role, faceta, canons, enMarcha, onDone }) {
+  // las dos peticiones que alimentaban esta sección las hace ya la pestaña
+  // «Añadir», que es la única que la pinta, y las cuenta en su barra
+  const [estado, setEstado] = useState(() => (enMarcha?.running ? enMarcha : null));
 
   // mientras corre, se pregunta cada segundo y medio
   useEffect(() => {
@@ -212,7 +211,7 @@ function CanonPacks({ role, faceta, onDone }) {
     setEstado({ running: true, canon: c.label, added: 0, total: r.total });
   };
 
-  if (!canons.length) return null;
+  if (!canons?.length) return null;
   return (
     <Section title={t('Listas y cánones')}>
       <p className="text-xs text-zinc-500 -mt-2 mb-3 max-w-3xl">
@@ -251,15 +250,53 @@ function CanonPacks({ role, faceta, onDone }) {
   );
 }
 
+// las cuatro claves de «Añadir», en un sitio para que la comprobación de caché
+// no se desincronice de los pasos
+const CLAVES_ANADIR = ['canones', 'enMarcha', 'sugerencias', 'festivales'];
+
+/**
+ * Las cuatro peticiones de «Añadir». Antes se lanzaban AL MONTAR LA PÁGINA, y
+ * una de ellas —los habituales de festival— baja unas treinta tablas de
+ * Wikipedia: veintiséis segundos la primera vez de cada semana, para pintar una
+ * pestaña que casi nunca se estaba mirando. Ahora se piden al abrirla, y esa
+ * espera sí es de quien la pidió: por eso se le cuenta con barra y con nombre.
+ *
+ * La caché la pone la página (un ref) y no este componente: Subpestanas
+ * DESMONTA la pestaña al cambiar, así que volver a «Añadir» pediría otra vez lo
+ * mismo. Lo que falla NO se guarda: un error de red no puede dejar la pestaña
+ * rota hasta que se recargue la aplicación.
+ */
+function CargaAnadir({ cache, children }) {
+  const pedir = (clave, fn) =>
+    clave in cache.current
+      ? cache.current[clave]
+      : Promise.resolve(fn()).then((r) => {
+          if (r && !r.error) cache.current[clave] = r;
+          return r;
+        });
+  const carga = useCargaProgresiva([
+    { clave: 'canones', etiqueta: t('Buscando los cánones disponibles…'), carga: () => pedir('canones', () => api('/discover/canons')) },
+    { clave: 'enMarcha', etiqueta: t('Comprobando si hay un alta en marcha…'), carga: () => pedir('enMarcha', () => api('/tracked/from-canon')) },
+    { clave: 'sugerencias', etiqueta: t('Buscando a quién más podrías seguir…'), carga: () => pedir('sugerencias', () => api('/people/suggestions')) },
+    {
+      clave: 'festivales',
+      etiqueta: t('Bajando de Wikipedia los habituales de Cannes, Venecia y Berlín (la primera vez tarda; se guarda una semana)…'),
+      carga: () => pedir('festivales', () => api('/people/festival-packs')),
+    },
+  ], []);
+
+  // ya cacheado: se pinta directamente, sin que la barra pegue un parpadeo
+  const enCache = CLAVES_ANADIR.every((k) => k in cache.current);
+  if (!carga.terminado && !enCache) return <Progreso {...carga} />;
+  return children(carga.terminado ? carga.datos : cache.current);
+}
+
 export default function Favorites() {
   const [tracked, setTracked] = useState(null);
   // la faceta y los filtros sobreviven a la navegación hasta pulsar «Limpiar»
   const [role, setRoleState] = useState(() => localStorage.getItem('fav_role') || 'director'); // scopes the entire page
   const setRole = (r) => { setRoleState(r); localStorage.setItem('fav_role', r); };
   const [roles, setRoles] = useState(ROLES_INICIALES);
-  useEffect(() => {
-    api('/roles').then((r) => Array.isArray(r) && r.length && setRoles(r));
-  }, []);
   const info = (r) => roles.find((x) => x.key === r) || { key: r, label: r, singular: r, rankable: false, principal: false };
   const roleLabel = (r) => t(info(r).label); // «Directores/as»
   const roleSingular = (r) => t(info(r).singular); // «director/a»
@@ -269,21 +306,26 @@ export default function Favorites() {
   // dirección e interpretación van emparejadas: es la otra cara del atajo
   // Eastwood, y solo entre esas dos se ofrece «seguirle TAMBIÉN como…»
   const parejaDe = (r) => (r === 'director' ? 'actor' : 'director');
-  const [tab, setTab] = useState('mine'); // mine | discover
   // el catálogo de directores en activo, plegado por defecto para no alargar
   // la pestaña; /directores (ruta vieja) llega aquí con ?add=activos y lo abre
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [catalogoAbierto, setCatalogoAbierto] = useState(() => params.get('add') === 'activos');
+  // la pestaña abierta vive en la URL (Subpestanas la lee de ahí): así el
+  // enlace viejo /directores?add=activos sigue abriendo «Añadir»
+  const irAAnadir = () =>
+    setParams((previos) => {
+      const siguientes = new URLSearchParams(previos);
+      siguientes.set('tab', 'discover');
+      return siguientes;
+    }, { replace: true });
   useEffect(() => {
-    if (params.get('add') === 'activos') {
-      setRoleState('director');
-      localStorage.setItem('fav_role', 'director');
-      setTab('discover');
-    }
+    if (params.get('add') !== 'activos') return;
+    setRoleState('director');
+    localStorage.setItem('fav_role', 'director');
+    irAAnadir();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [health, setHealth] = useState({ gaps: false, calendar: false });
-  const [suggest, setSuggest] = useState(null);
   const [pq, setPq] = useState('');
   const [presults, setPresults] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -314,25 +356,37 @@ export default function Favorites() {
   const [confirmClear, setConfirmClear] = useState(false);
 
   const [loadError, setLoadError] = useState(null);
-  const loadTracked = () =>
-    api('/tracked/health').then((r) => {
-      if (Array.isArray(r?.people)) {
-        setTracked(r.people);
-        setHealth(r.cached || {});
-        setLoadError(null);
-      } else if (Array.isArray(r)) setTracked(r);
-      // si no, el spinner se quedaba girando indefinidamente sin decir nada
-      else setLoadError(r?.error || t('No se han podido cargar tus favoritos'));
-    });
+  const aplicarSalud = (r) => {
+    if (Array.isArray(r?.people)) {
+      setTracked(r.people);
+      setHealth(r.cached || {});
+      setLoadError(null);
+    } else if (Array.isArray(r)) setTracked(r);
+    // si no, el spinner se quedaba girando indefinidamente sin decir nada
+    else setLoadError(r?.error || t('No se han podido cargar tus favoritos'));
+  };
+  const loadTracked = () => api('/tracked/health').then(aplicarSalud);
 
-  // los «habituales de festival» llegan por su propio endpoint: la primera
-  // construcción baja ~30 tablas de Wikipedia y no debe frenar al resto
-  const [festPacks, setFestPacks] = useState(null);
+  // Lo ÚNICO que hace falta para pintar la pestaña que se abre. Lo de «Añadir»
+  // —sugerencias, cánones y los habituales de festival— se pide al abrir esa
+  // pestaña y no antes: es lo que convertía esta página en una espera de medio
+  // minuto la primera vez de cada semana.
+  const carga = useCargaProgresiva([
+    { clave: 'roles', etiqueta: t('Mirando qué oficios se pueden seguir…'), carga: () => api('/roles') },
+    { clave: 'salud', etiqueta: t('Repasando a quién sigues y qué le falta…'), carga: () => api('/tracked/health') },
+  ], []);
   useEffect(() => {
-    loadTracked();
-    api('/people/suggestions').then((s) => !s.error && setSuggest(s));
-    api('/people/festival-packs').then((r) => Array.isArray(r?.packs) && setFestPacks(r.packs));
-  }, []);
+    const catalogo = carga.datos.roles;
+    if (Array.isArray(catalogo) && catalogo.length) setRoles(catalogo);
+  }, [carga.datos.roles]);
+  useEffect(() => {
+    if (carga.datos.salud) aplicarSalud(carga.datos.salud);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carga.datos.salud]);
+
+  // lo que ya se bajó para «Añadir», para no volver a pedirlo cada vez que se
+  // vuelve a esa pestaña (Subpestanas la desmonta al cambiar)
+  const cacheAnadir = useRef({});
 
   // scoped to the active facet: followed as director must still be addable as actor
   const trackedTmdb = new Set(
@@ -441,7 +495,7 @@ export default function Favorites() {
     });
 
   if (loadError) return <ErrorBox error={loadError} />;
-  if (!tracked) return <Spinner />;
+  if (!tracked) return <Progreso {...carga} />;
 
   // everything below is scoped to the active role — no mixed counts, ever
   const roleFavs = tracked.filter((t) => (t.role || 'director') === role);
@@ -507,18 +561,18 @@ export default function Favorites() {
         <span className="text-xs text-zinc-600 w-full">{t('Cada faceta se gestiona por separado')}</span>
       </div>
 
-      {/* flex-wrap: en móvil los dos botones no caben y, sin él, se estrujaban
-          en bloques de tres líneas en vez de pasar cada uno a su fila */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        <button onClick={() => setTab('mine')} className={`${tab === 'mine' ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
-          <Star size={15} strokeWidth={1.75} /> {t('Mis {faceta}', { faceta })} ({counts[role]})
-        </button>
-        <button onClick={() => setTab('discover')} className={`${tab === 'discover' ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
-          <Search size={15} strokeWidth={1.75} /> {t('Añadir {faceta}', { faceta })}
-        </button>
-      </div>
-
-      {tab === 'mine' && (
+      {/* Cada pestaña carga LO SUYO, y la de «Añadir» solo cuando se abre.
+          Antes las dos vivían en el mismo montaje: entrar aquí bajaba treinta
+          tablas de Wikipedia para una pestaña que no se estaba mirando. */}
+      <Subpestanas
+        id="favoritos"
+        className="mt-1"
+        pestanas={[
+          {
+            clave: 'mine',
+            icono: Star,
+            etiqueta: `${t('Mis {faceta}', { faceta })} (${counts[role] || 0})`,
+            render: () => (
         <>
           {/* headline numbers for this facet */}
           {roleFavs.length > 0 && (
@@ -545,7 +599,7 @@ export default function Favorites() {
           {roleFavs.length === 0 ? (
             <Empty>
               {t('Aún no sigues a nadie como {faceta}. Usa', { faceta: roleSingular(role) })}{' '}
-              <button className="text-gold-400 hover:underline" onClick={() => setTab('discover')}>{t('Añadir {faceta}', { faceta })}</button>.
+              <button className="text-gold-400 hover:underline" onClick={irAAnadir}>{t('Añadir {faceta}', { faceta })}</button>.
             </Empty>
           ) : (
             <>
@@ -649,9 +703,15 @@ export default function Favorites() {
             </div>
           )}
         </>
-      )}
-
-      {tab === 'discover' && (
+            ),
+          },
+          {
+            clave: 'discover',
+            icono: Search,
+            etiqueta: t('Añadir {faceta}', { faceta }),
+            render: () => (
+              <CargaAnadir cache={cacheAnadir}>
+                {(datos) => (
         <>
           <p className="text-xs text-zinc-500 mb-4">
             {t('Lo que añadas aquí se sigue como')} <b>{roleSingular(role)}</b>
@@ -682,7 +742,7 @@ export default function Favorites() {
               </button>
               {catalogoAbierto && (
                 <div className="mt-4 border-t border-ink-700 pt-4">
-                  <Suspense fallback={<Spinner />}>
+                  <Suspense fallback={<Progreso label={t('Abriendo el catálogo de directores en activo…')} />}>
                     <Directors embedded />
                   </Suspense>
                 </div>
@@ -737,14 +797,22 @@ export default function Favorites() {
 
           {/* los cánones son listas de películas: sus nombres se resuelven como
               quien las dirige o las interpreta, no como su montador/a */}
-          {info(role).principal && <CanonPacks role={role} faceta={faceta} onDone={loadTracked} />}
+          {info(role).principal && (
+            <CanonPacks
+              role={role}
+              faceta={faceta}
+              canons={Array.isArray(datos.canones) ? datos.canones : []}
+              enMarcha={datos.enMarcha}
+              onDone={loadTracked}
+            />
+          )}
 
           {/* los cuadros de festivales y los curados son de gente que dirige o
               interpreta: fuera de esas dos facetas no vienen a cuento */}
-          {info(role).principal && (festPacks?.length > 0 || suggest?.packs) && (
+          {info(role).principal && (datos.festivales?.packs?.length > 0 || datos.sugerencias?.packs) && (
             <div className="mb-8 space-y-5">
               {/* primero los habituales de Cannes/Venecia/Berlín, luego los curados */}
-              {[...(festPacks || []), ...(suggest?.packs || [])].map((pack) => {
+              {[...(datos.festivales?.packs || []), ...(datos.sugerencias?.packs || [])].map((pack) => {
                 const pending = pack.people.filter((p) => !p.tracked && !trackedTmdb.has(p.tmdb_id)).length;
                 const accent = ACCENTS[pack.accent] || ACCENTS.gold;
                 return (
@@ -773,7 +841,12 @@ export default function Favorites() {
             </div>
           )}
         </>
-      )}
+                )}
+              </CargaAnadir>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

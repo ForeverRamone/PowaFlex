@@ -1,5 +1,5 @@
 import { Component, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { api, fmtDuration, tmdbImg, ratingLinks, primaryRating } from './api.js';
 import { t } from './i18n.js';
@@ -403,13 +403,191 @@ export function RatingsChips({ ratings, movie, className = '' }) {
   return <div className={`flex flex-wrap gap-1.5 text-[11px] ${className}`}>{chips}</div>;
 }
 
-export function Spinner({ label = t('Cargando…') }) {
+/**
+ * Segundos transcurridos desde que arrancó una espera. Solo corre mientras
+ * `activo`: es lo único REAL que se puede enseñar cuando no hay porcentaje que
+ * medir, y no tiene sentido pagar un temporizador cuando sí lo hay.
+ */
+function useSegundos(activo) {
+  const [segundos, setSegundos] = useState(0);
+  useEffect(() => {
+    if (!activo) return undefined;
+    setSegundos(0);
+    const reloj = setInterval(() => setSegundos((n) => n + 1), 1000);
+    return () => clearInterval(reloj);
+  }, [activo]);
+  return segundos;
+}
+
+const estadoVacio = (lista) => ({
+  // arrancar en 0 % y no en «sin porcentaje»: con dos o más peticiones el
+  // cociente ya es cierto antes de que vuelva ninguna (cero de dos son cero),
+  // y así la barra no cambia de forma —de indeterminada a determinada— a mitad
+  // de la espera, que es lo que hacía dudar de si iba o no iba
+  pct: lista.length > 1 ? 0 : null,
+  paso: lista[0]?.etiqueta ?? null,
+  indice: lista.length ? 1 : 0,
+  hechos: 0,
+  total: lista.length,
+  terminado: !lista.length,
+  error: null,
+  datos: {},
+});
+
+/**
+ * Los pasos declarados de una página, lanzados a la vez y contados de uno en
+ * uno. Cada paso es `{ clave, etiqueta, carga, tras }`:
+ *
+ *   - `etiqueta` es lo que se le enseña a quien espera, en castellano y por
+ *     t(): «Cruzando con las notas de la crítica…», no «Cargando…».
+ *   - `carga(datos)` devuelve la promesa de la petición y recibe lo que ya
+ *     hayan resuelto los pasos anteriores, para que un paso dependiente pueda
+ *     usar el id que acaba de traer otro.
+ *   - `tras` (una clave o varias) obliga a esperar a esos pasos. SIN `tras`
+ *     todo sale en paralelo: encadenar peticiones que no dependen entre sí es
+ *     justamente lo que hace que Visionado tarde nueve segundos.
+ *
+ * El porcentaje sale de peticiones TERMINADAS entre el total. No se anima ni
+ * se estima: si de cuatro peticiones han vuelto dos, es un 50 % y punto. Con un
+ * solo paso `pct` vale null a propósito —no hay nada que medir— y quien pinta
+ * decide (Progreso enseña barra indeterminada y los segundos que llevamos).
+ *
+ * Los pasos se leen de una referencia y el efecto depende de `deps`, no del
+ * array: las páginas lo escriben en línea en cada render y con el array por
+ * dependencia se relanzaría para siempre. `deps` debe tener SIEMPRE la misma
+ * longitud, como cualquier lista de dependencias de React.
+ */
+export function useCargaProgresiva(pasos, deps = []) {
+  const pasosRef = useRef(pasos);
+  pasosRef.current = pasos;
+  const [intento, setIntento] = useState(0);
+  const [estado, setEstado] = useState(() => estadoVacio((pasos || []).filter(Boolean)));
+
+  useEffect(() => {
+    const lista = (pasosRef.current || []).filter(Boolean);
+    const claveDe = (paso, i) => paso.clave ?? String(i);
+    let vivo = true;
+    setEstado(estadoVacio(lista));
+    if (!lista.length) return () => { vivo = false; };
+
+    const porClave = new Map(lista.map((paso, i) => [claveDe(paso, i), paso]));
+    const datos = {};
+    const errores = {};
+    let hechos = 0;
+
+    const publicar = (terminado) => {
+      if (!vivo) return;
+      const pendiente = lista.find((paso, i) => !(claveDe(paso, i) in datos));
+      const primerError = Object.values(errores)[0] ?? null;
+      setEstado({
+        // el porcentaje solo existe si hay más de una petición que contar
+        pct: lista.length > 1 ? Math.round((hechos / lista.length) * 100) : null,
+        paso: pendiente?.etiqueta ?? null,
+        // cuenta peticiones terminadas (+1, la que toca); la etiqueta es la
+        // primera que falta, que con paralelismo no siempre es la misma
+        indice: Math.min(hechos + 1, lista.length),
+        hechos,
+        total: lista.length,
+        terminado,
+        error: primerError,
+        datos: { ...datos },
+      });
+    };
+
+    const lanzadas = new Map();
+    const lanzar = (paso, clave, pila) => {
+      if (lanzadas.has(clave)) return lanzadas.get(clave);
+      const previas = [].concat(paso.tras || []).map((k) => {
+        const dep = porClave.get(k);
+        // una dependencia que no existe (o que se muerde la cola) no puede
+        // dejar la página esperando para siempre: se ignora
+        if (!dep || pila.includes(k)) return null;
+        return lanzar(dep, k, [...pila, clave]);
+      });
+      const promesa = Promise.all(previas)
+        .then(() => paso.carga(datos))
+        .then(
+          (r) => r,
+          // api() ya resuelve los fallos de red como { error }; esto es la red
+          // de seguridad para cualquier otra promesa que sí rechace
+          (fallo) => ({ error: String(fallo?.message || fallo) }),
+        )
+        .then((r) => {
+          datos[clave] = r;
+          if (r && r.error) errores[clave] = t(r.error);
+          hechos++;
+          publicar(hechos === lista.length);
+          return r;
+        });
+      lanzadas.set(clave, promesa);
+      return promesa;
+    };
+
+    lista.forEach((paso, i) => lanzar(paso, claveDe(paso, i), []));
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...deps, intento]);
+
+  return { ...estado, recargar: () => setIntento((n) => n + 1) };
+}
+
+/**
+ * El sustituto de Spinner: toda espera dice QUÉ está haciendo, por dónde va y
+ * cuánto queda. Se le pasa el estado de useCargaProgresiva tal cual
+ * (`<Progreso {...carga} />`) o suelto.
+ *
+ * EL CASO HONESTO: con una sola petición no hay porcentaje real que medir, y
+ * un número inventado (o una barra animada hasta el 90 % «porque queda bien»)
+ * es mentirle a quien espera. Ahí se pinta el nombre del paso, una barra
+ * INDETERMINADA —sin aria-valuenow, que es justo como se declara «no sé cuánto
+ * queda»— y, pasados unos segundos, los que llevamos: eso sí es un dato real y
+ * responde a «¿se ha colgado?». El porcentaje aparece en cuanto hay 2+ pasos.
+ */
+export function Progreso({ pct = null, paso = null, indice = 0, total = 0, label = null, className = '' }) {
+  const indeterminado = pct == null;
+  const segundos = useSegundos(indeterminado);
+  const valor = indeterminado ? null : Math.max(0, Math.min(100, Math.round(pct)));
+  // sin paso pendiente y al 100 % ya no queda nada: decir «Cargando…» ahí sería
+  // exactamente el spinner mudo que veníamos a quitar
+  const texto = paso
+    ? (total > 1 ? `${t('{n} de {total}', { n: indice, total })} · ${paso}` : paso)
+    : valor === 100
+      ? t('Listo')
+      : label || t('Cargando…');
   return (
-    <div className="flex items-center gap-3 text-zinc-400 py-10 justify-center">
-      <div className="w-5 h-5 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
-      {label}
+    <div className={`progreso ${className}`}>
+      <div className="progreso-cabeza">
+        {indeterminado && <span className="progreso-rueda" aria-hidden="true" />}
+        <span className="progreso-paso">{texto}</span>
+        {valor != null && <span className="progreso-pct tabular">{t('{pct} %', { pct: valor })}</span>}
+      </div>
+      <div
+        className="progreso-pista"
+        role="progressbar"
+        aria-label={t('Progreso de carga')}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={valor ?? undefined}
+        aria-valuetext={texto}
+      >
+        <div
+          className={`progreso-barra ${indeterminado ? 'progreso-barra-indet' : ''}`}
+          style={indeterminado ? undefined : { width: `${valor}%` }}
+        />
+      </div>
+      {/* antes de cuatro segundos el contador solo mete ruido */}
+      {indeterminado && segundos >= 4 && (
+        <div className="progreso-nota tabular">{t('Llevamos {s} s', { s: segundos })}</div>
+      )}
     </div>
   );
+}
+
+// La espera de una sola petición, ahora por dentro un Progreso indeterminado.
+// Sigue recibiendo `label` y nada más: hay 28 usos vivos y las páginas migran
+// a useCargaProgresiva de una en una.
+export function Spinner({ label = t('Cargando…') }) {
+  return <Progreso label={label} total={1} />;
 }
 
 /**
@@ -1001,6 +1179,99 @@ export function BuildProgress({ label = t('Construyendo desde TMDB…') }) {
           <div className="text-xs text-zinc-500 mt-2">{p.label} · {p.done} / {p.total}</div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Pestañas dentro de una página. El bloque estaba copiado carácter a carácter
+ * en el Taller, en Ajustes y en Favoritos (y a mano en Calidad), así que aquí
+ * conserva EXACTAMENTE el mismo aspecto: fila de botones, el activo en oro.
+ *
+ * Cada pestaña es `{ clave, etiqueta, icono, render }` y `render()` SOLO se
+ * llama cuando esa pestaña está abierta: ese es el motivo de todo esto. Una
+ * página que baja cinco bloques pesados de golpe se convierte en cinco esperas
+ * cortas, cada una cuando de verdad se pide. La etiqueta llega ya traducida
+ * (la página escribe t('…')).
+ *
+ * Al cambiar de pestaña la anterior se DESMONTA en vez de esconderse: escondida
+ * seguirían corriendo sus temporizadores y sus consultas, y las gráficas de
+ * Recharts dentro de un div oculto se miden a cero ancho y vuelven vacías.
+ *
+ * La elegida se recuerda en localStorage por `id`, pero manda el parámetro de
+ * la URL cuando lo hay: los enlaces tipo /taller?tab=datos ya existen y tienen
+ * que seguir abriendo esa pestaña aunque la última vez se dejara otra.
+ */
+export function Subpestanas({ id, pestanas, param = 'tab', className = '', children = null }) {
+  const [params, setParams] = useSearchParams();
+  const [elegida, setElegida] = useState(null);
+  const lista = (pestanas || []).filter(Boolean);
+  const claves = lista.map((p) => p.clave);
+  const almacen = id ? `subtab_${id}` : null;
+  const enUrl = param ? params.get(param) : null;
+  const guardada = almacen ? localStorage.getItem(almacen) : null;
+  const activa = [enUrl, elegida, guardada].find((c) => claves.includes(c)) ?? claves[0];
+
+  useEffect(() => {
+    if (almacen && activa) localStorage.setItem(almacen, activa);
+  }, [almacen, activa]);
+
+  const elegir = (clave) => {
+    setElegida(clave);
+    // solo se toca el parámetro de pestaña: los demás filtros de la URL son de
+    // la página y no pueden desaparecer al cambiar de pestaña
+    if (param) {
+      setParams((previos) => {
+        const siguientes = new URLSearchParams(previos);
+        siguientes.set(param, clave);
+        return siguientes;
+      }, { replace: true });
+    }
+  };
+
+  // teclado estándar de un tablist: flechas para moverse, Inicio/Fin a los extremos
+  const porTeclado = (e) => {
+    const i = claves.indexOf(activa);
+    const salto = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    let destino = null;
+    if (salto) destino = claves[(i + salto + claves.length) % claves.length];
+    else if (e.key === 'Home') destino = claves[0];
+    else if (e.key === 'End') destino = claves[claves.length - 1];
+    if (!destino) return;
+    e.preventDefault();
+    elegir(destino);
+    document.getElementById(`${id}-tab-${destino}`)?.focus();
+  };
+
+  if (!lista.length) return null;
+  const abierta = lista.find((p) => p.clave === activa);
+  return (
+    <div className={className}>
+      <div className="subpestanas" role="tablist" aria-label={t('Secciones de la página')} onKeyDown={porTeclado}>
+        {lista.map(({ clave, etiqueta, icono: Icono }) => (
+          <button
+            key={clave}
+            id={`${id}-tab-${clave}`}
+            type="button"
+            role="tab"
+            aria-selected={clave === activa}
+            aria-controls={`${id}-panel-${clave}`}
+            tabIndex={clave === activa ? 0 : -1}
+            onClick={() => elegir(clave)}
+            className={`${clave === activa ? 'btn-gold' : 'btn-ghost'} subpestana`}
+          >
+            {Icono && <Icono size={15} strokeWidth={1.75} />} {etiqueta}
+          </button>
+        ))}
+        {children}
+      </div>
+      {/* la clave es imprescindible: dos pestañas que pinten el MISMO componente
+          en el mismo sitio se reconcilian como una sola —React reutiliza la
+          instancia y no vuelve a ejecutar su efecto de carga—, así que la
+          segunda pestaña se quedaría con los datos de la primera */}
+      <div key={activa} id={`${id}-panel-${activa}`} role="tabpanel" aria-labelledby={`${id}-tab-${activa}`}>
+        {abierta?.render ? abierta.render() : abierta?.contenido ?? null}
+      </div>
     </div>
   );
 }

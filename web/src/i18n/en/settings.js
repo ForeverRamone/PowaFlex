@@ -2,6 +2,10 @@
 // byte-idéntico al string pasado a t(). El selector de idioma vive aparte, en
 // settings-selector.js.
 export default {
+  // ── esperas (ninguna llega a un cuarto de segundo, pero dicen qué hacen) ───
+  'Leyendo tu configuración…': 'Reading your settings…',
+  'Leyendo tus datos de Letterboxd…': 'Reading your Letterboxd data…',
+
   // ── LetterboxdSection ──────────────────────────────────────────────────────
   'No se pudo subir: {msg}': 'Upload failed: {msg}',
   '(opcional: tus vistas, notas y watchlist)': '(optional: your watched movies, ratings and watchlist)',

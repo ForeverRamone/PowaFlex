@@ -91,4 +91,11 @@ export default {
     'Without a TMDB key the directors cannot be identified',
   'Ya hay una detección en marcha': 'A detection is already under way',
   'No está en la lista de emergentes': 'Not in the emerging-directors list',
+
+  // ── progreso de la detección (el paso lo nombra el servidor)
+  'Rastreando debuts en las ediciones de festival…': 'Tracking debuts across the festival line-ups…',
+  'Rastreando debuts · {paso} · {n} mirados de {c} candidatos':
+    'Tracking debuts · {paso} · {n} of {c} candidates checked',
+  'leyendo las ediciones': 'reading the line-ups',
+  'cribando': 'sifting',
 };

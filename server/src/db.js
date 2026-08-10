@@ -176,6 +176,12 @@ CREATE TABLE IF NOT EXISTS lb_entries (
   UNIQUE (list, title, year, watched_date, uri)
 );
 CREATE INDEX IF NOT EXISTS idx_lb_list ON lb_entries(list);
+-- «Tu nota» sale SIEMPRE de aquí (SELECT MAX(rating) FROM lb_entries WHERE
+-- movie_id = m.rating_key), y Visionado la pide hasta tres veces por fila sobre
+-- la biblioteca entera: sin índice por movie_id cada una de esas consultas
+-- recorría las miles de entradas de Letterboxd por película. Con 12.400 fichas
+-- eran nueve segundos de espera en /api/mdblist/insights.
+CREATE INDEX IF NOT EXISTS idx_lb_movie ON lb_entries(movie_id);
 
 CREATE TABLE IF NOT EXISTS mdb_ratings (
   tmdb_id INTEGER PRIMARY KEY,
