@@ -10,7 +10,7 @@ export default {
   'Más veteranos': 'Oldest',
   'Debut más reciente': 'Most recent debut',
   'Último estreno más reciente': 'Most recent release',
-  'Alfabético (A–Z)': 'Alphabetical (A–Z)',
+  'Nombre (A-Z)': 'Name (A-Z)',
 
   // ficha
   'Ya le sigues como director/a': 'You already follow them as a director',
@@ -41,16 +41,15 @@ export default {
   'Buscar nombre o país…': 'Search name or country…',
   'Región': 'Region',
   'País': 'Country',
-  'Sexo/género': 'Sex/gender',
+  'Género||persona': 'Gender',
   'Actividad': 'Activity',
-  'Mujeres': 'Women',
-  'Hombres': 'Men',
+  'Mujer': 'Female',
+  'Hombre': 'Male',
   'En activo': 'Active',
   'Sin estreno reciente': 'No recent release',
   'Esconde a quien ya sigues como director/a': 'Hides anyone you already follow as a director',
   '☆ Solo los que no sigo': "☆ Only those I don't follow",
   '✕ Limpiar filtros': '✕ Clear filters',
-  'Ordenar por:': 'Sort by:',
   'de': 'of',
   ' · {n} ya en favoritos': ' · {n} already in favorites',
   'Los busca en TMDB y los añade a tus favoritos como directores/as':

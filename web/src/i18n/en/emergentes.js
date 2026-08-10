@@ -33,9 +33,15 @@ export default {
   'debut en {a}': 'debut in {a}',
   'un largo': 'one feature',
 
-  // parrilla y controles
+  // parrilla y controles (el placeholder de género y sus etiquetas en singular
+  // son los mismos que en Personas/Descubrir; «Nombre (A-Z)» y «Ordenar:» los
+  // comparten todas las listas de personas)
   'Puntuación': 'Score',
   'Menos películas': 'Fewest movies',
+  'Nombre (A-Z)': 'Name (A-Z)',
+  'Género||persona': 'Gender',
+  'Mujer': 'Female',
+  'Hombre': 'Male',
   'Continente': 'Continent',
   'Lo que sigas aquí alimenta': 'What you follow here feeds',
   // los continentes salen del mismo mapa que la demografía de tu biblioteca, y

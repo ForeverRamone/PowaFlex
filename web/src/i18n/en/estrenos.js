@@ -8,7 +8,7 @@ export default {
   'Último mes': 'Last month',
   'Últimos 3 meses': 'Last 3 months',
   'Por fecha': 'By date',
-  'Nota media Σ': 'Average rating Σ',
+  'Nota combinada Σ': 'Combined rating Σ',
   'Popularidad TMDB': 'TMDB popularity',
   'Más votadas': 'Most voted',
   'sin fecha': 'no date',
@@ -29,9 +29,8 @@ export default {
     ' (TMDB digital release date, with where to watch in each country). Feature films only. The Σ bar separates the release that matters from the filler in the listings; titles without a score yet are not hidden.',
   'Estrenadas en:': 'Released in:',
   'Ordenar:': 'Sort:',
-  'Todas': 'All',
-  'Me faltan': 'Missing',
-  'Las tengo': 'Owned',
+  // el trío Todas / Me faltan / Las tengo lo pinta OwnFilterBar: sus claves
+  // viven en components.js
   '✕ Limpiar filtros': '✕ Clear filters',
   '{n} ocultas por tus filtros': '{n} hidden by your filters',
   ' — comprueba la API key de TMDB en Ajustes.': ' — check the TMDB API key in Settings.',

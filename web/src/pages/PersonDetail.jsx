@@ -3,17 +3,19 @@ import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api, tmdbImg, fmtDate } from '../api.js';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, StatusLegend,
-  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, DeathBadge, MatchCorrector,
-  Select, MinScoreBar, passesScore,
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts, DeathBadge, MatchCorrector,
+  Select, MinScoreBar, passesScore, useMinScore,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 import { t } from '../i18n.js';
 
+// el mismo vocabulario en primera persona que OwnFilterBar (Me faltan / Las
+// tengo), para no decir «te faltan» aquí y «me faltan» en la página de al lado
 const VIEWS = [
   ['all', 'Todas'],
-  ['owned', 'Las tienes'],
-  ['missing', 'Te faltan'],
+  ['owned', 'Las tengo'],
+  ['missing', 'Me faltan'],
   ['upcoming', 'Próximas'],
 ];
 
@@ -32,7 +34,7 @@ const ROLE_ICON = { director: '🎬', actor: '🎭', writer: '✍️', dop: '�
 const SORTS = {
   reciente: { label: 'Más recientes', fn: (a, b) => String(b.date || '9999').localeCompare(String(a.date || '9999')) },
   antigua: { label: 'Más antiguas', fn: (a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')) },
-  score: { label: 'Nota media Σ', fn: (a, b) => (b.mdb?.score ?? -1) - (a.mdb?.score ?? -1) },
+  score: { label: 'Nota combinada Σ', fn: (a, b) => (b.mdb?.score ?? -1) - (a.mdb?.score ?? -1) },
   imdb: { label: 'Nota IMDb', fn: (a, b) => (b.mdb?.imdb ?? -1) - (a.mdb?.imdb ?? -1) },
   letterboxd: { label: 'Nota Letterboxd', fn: (a, b) => (b.mdb?.letterboxd ?? -1) - (a.mdb?.letterboxd ?? -1) },
   votos: { label: 'Más votadas', fn: (a, b) => (b.votes || 0) - (a.votes || 0) },
@@ -59,9 +61,9 @@ export default function PersonDetail() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState(false);
   const [sort, setSort] = useState(() => localStorage.getItem('person_film_sort') || 'reciente');
-  const [minScore, setMinScore] = useState(() => Number(localStorage.getItem('person_min_score') || 0));
+  // listón Σ compartido con el resto de páginas (hereda el person_min_score viejo)
+  const [minScore, setMinScorePref] = useMinScore();
   const setSortPref = (v) => { setSort(v); localStorage.setItem('person_film_sort', v); };
-  const setMinScorePref = (v) => { setMinScore(v); localStorage.setItem('person_min_score', String(v)); };
   const setViewPref = (v) => { setView(v); localStorage.setItem('person_view', v); };
   const limpiarFiltros = () => {
     setViewPref('all');
@@ -122,6 +124,9 @@ export default function PersonDetail() {
     const r = siguiendo
       ? await api(`/tracked/${idLocal}?role=${facet}`, { method: 'DELETE' })
       : await api(`/tracked/${idLocal}`, { method: 'POST', body: { role: facet } });
+    // si el servidor no lo hizo, la estrella no puede cambiar: pintarla seguida
+    // sin estarlo es la mentira que luego no se explica en Favoritos
+    if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     setTrackedRoles((prev) => {
       const next = new Set(prev);
       if (siguiendo) next.delete(facet);
@@ -209,13 +214,9 @@ export default function PersonDetail() {
   const toggleEff = (k) =>
     k in specialistDefaults ? setLocalShow((p) => ({ ...p, [k]: !showEff[k] })) : toggle(k);
 
-  const typeCounts = {
-    shorts: items.filter((i) => i.isShort).length,
-    docs: items.filter((i) => i.isDocumentary).length,
-    music: items.filter((i) => i.isMusic).length,
-    tv: items.filter((i) => i.isTvMovie).length,
-    coral: items.filter((i) => i.isCoral).length,
-  };
+  // las siete claves contadas siempre (typeCounts, components.jsx): omitir una
+  // pintaba su chip sin recuento en vez de esconderlo
+  const counts = typeCounts(items);
   const filtered = items
     .filter((i) => {
       if (!matchesTypeFilters(i, showEff) || !passesScore(i, minScore)) return false;
@@ -352,8 +353,8 @@ export default function PersonDetail() {
         )}
       </div>
 
-      {Object.values(typeCounts).some((n) => n > 0) && (
-        <TypeFilterBar show={showEff} toggle={toggleEff} counts={typeCounts} />
+      {Object.values(counts).some((n) => n > 0) && (
+        <TypeFilterBar show={showEff} toggle={toggleEff} counts={counts} />
       )}
 
       {/* orden y listón de nota, con las notas de MDBList que trae el servidor */}

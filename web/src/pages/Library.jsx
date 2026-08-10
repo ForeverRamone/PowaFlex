@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { toast } from '../toast.js';
 import { t, locale } from '../i18n.js';
-import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid, PageHeader, ErrorBox, Select } from '../components.jsx';
+import { Spinner, MovieCard, MovieModal, Empty, SkeletonGrid, PageHeader, ErrorBox, Select, SortSelect } from '../components.jsx';
 
 const SORT_OPTIONS = [
   ['added', t('Añadida (reciente)')],
   ['release', t('Estreno (reciente)')],
   ['release_asc', t('Estreno (antigua)')],
-  ['title', t('Título')],
+  ['title', t('Título (A-Z)')],
   ['runtime', t('Duración (larga)')],
   ['runtime_asc', t('Duración (corta)')],
   ['size', t('Tamaño en disco')],
   ['last_viewed', t('Vista recientemente')],
-  ['mdb_score', t('Nota combinada (MDBList)')],
+  ['mdb_score', t('Nota combinada Σ')],
   ['imdb', t('Nota IMDb')],
   ['rt_critic', t('RT crítica')],
   ['letterboxd', t('Nota Letterboxd')],
@@ -51,10 +51,16 @@ export default function Library() {
     localStorage.setItem('lib_filters', JSON.stringify(keep));
   }, [q]);
 
+  // cambiar un filtro relanza la carga sin esperar a la anterior: cada petición
+  // lleva su número y solo la última en salir puede pintar, para que una
+  // respuesta lenta (una búsqueda pesada) no pise el resultado de la nueva
+  const reqId = useRef(0);
   useEffect(() => {
+    const id = ++reqId.current;
     setLoading(true);
     const qs = new URLSearchParams({ limit: '60', ...q });
     api(`/movies?${qs}`).then((d) => {
+      if (id !== reqId.current) return;
       setData(d);
       setMovies(d.movies || []);
       setLoading(false);
@@ -68,6 +74,15 @@ export default function Library() {
     next.delete('offset');
     setParams(next, { replace: true });
   };
+
+  // la búsqueda filtra sola al teclear (como en Personas): sin esto la caja
+  // exigía Enter y no lo decía en ningún sitio. Enter sigue valiendo: el submit
+  // aplica al instante y este temporizador se salta el valor ya aplicado
+  useEffect(() => {
+    if (search === (q.search || '')) return;
+    const timer = setTimeout(() => set('search', search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // el guardia evita que un doble clic pida dos veces el mismo tramo y añada las
   // mismas 60 películas repetidas (con claves duplicadas incluidas)
@@ -128,7 +143,10 @@ export default function Library() {
         <form className="max-sm:w-full" onSubmit={(e) => { e.preventDefault(); set('search', search); }}>
           <input className="input !w-52 max-sm:!w-full" placeholder={t('Buscar título…')} value={search} onChange={(e) => setSearch(e.target.value)} />
         </form>
-        <Select value={q.sort || ''} onChange={(v) => set('sort', v)} placeholder={t('Orden: añadida')} options={SORT_OPTIONS} />
+        {/* con el rótulo «Ordenar:» común no hace falta placeholder: el orden
+            por defecto («Añadida») es una opción más, y elegirla vuelve a la
+            URL limpia para que el botón de limpiar no salga por el defecto */}
+        <SortSelect value={q.sort || 'added'} onChange={(v) => set('sort', v === 'added' ? '' : v)} options={SORT_OPTIONS} />
         <button className={`btn-ghost ${showFilters ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setShowFilters((s) => !s)}>
           {t('⚙ Filtros')}{activeKeys.length > 0 ? ` (${activeKeys.length})` : ''}
         </button>

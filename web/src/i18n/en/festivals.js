@@ -8,6 +8,8 @@ export default {
   'Festivales': 'Festivals',
   'Premios': 'Awards',
   'Cánones': 'Canons',
+  'Secciones de debut': 'Debut sections',
+  '{n} más…': '{n} more…',
   'Edición anterior': 'Previous edition',
   'Elegir edición': 'Choose edition',
   'Edición siguiente': 'Next edition',

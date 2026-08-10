@@ -131,6 +131,7 @@ function ChallengeDetail({ listId, onChanged }) {
     const res = await api(`/letterboxd/lists/${listId}/radarr`, { method: 'POST' });
     setBulk({
       running: false,
+      error: !!res.error,
       msg: res.error ? `⚠️ ${t(res.error)}` : `✓ ${t('{n} añadidas', { n: res.added })}${res.alreadyInRadarr ? ` · ${t('{n} ya estaban', { n: res.alreadyInRadarr })}` : ''}${res.failed ? ` · ${t('{n} fallaron', { n: res.failed })}` : ''}`,
     });
   };
@@ -138,8 +139,9 @@ function ChallengeDetail({ listId, onChanged }) {
   return (
     <div className="mt-3">
       <div className="flex gap-2 mb-2 flex-wrap items-center">
-        <button className={`btn-ghost !py-1 text-xs ${view === 'missing' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('missing')}>{t('No tengo ({n})', { n: missing.length })}</button>
-        <button className={`btn-ghost !py-1 text-xs ${view === 'owned' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('owned')}>{t('Tengo ({n})', { n: owned.length })}</button>
+        {/* mismo vocabulario en primera persona que OwnFilterBar (Me faltan / Las tengo) */}
+        <button className={`btn-ghost !py-1 text-xs ${view === 'missing' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('missing')}>{t('Me faltan ({n})', { n: missing.length })}</button>
+        <button className={`btn-ghost !py-1 text-xs ${view === 'owned' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('owned')}>{t('Las tengo ({n})', { n: owned.length })}</button>
         <button className={`btn-ghost !py-1 text-xs ${view === 'unwatched' ? '!border-gold-400 text-gold-400' : ''}`} onClick={() => setView('unwatched')}>{t('Sin ver ({n})', { n: unwatched.length })}</button>
         {missing.length > 0 && (
           <button className="btn-gold !py-1 text-xs ml-auto" onClick={sendMissing} disabled={bulk.running}>
@@ -147,7 +149,8 @@ function ChallengeDetail({ listId, onChanged }) {
           </button>
         )}
       </div>
-      {bulk.msg && <div className="text-xs text-emerald-400 mb-2">{bulk.msg}</div>}
+      {/* en verde solo el éxito: un fallo vestido de emerald se lee como «hecho» */}
+      {bulk.msg && <div className={`text-xs mb-2 ${bulk.error ? 'text-red-400' : 'text-emerald-400'}`}>{bulk.msg}</div>}
       {shown.length === 0 ? (
         <Empty>{view === 'missing' ? t('¡Lista completa! 🏆') : view === 'unwatched' ? t('Todas vistas 👁️') : t('Ninguna todavía.')}</Empty>
       ) : (
@@ -202,7 +205,15 @@ function ChallengeCard({ l, mode, open, setOpen, load }) {
             <button
               className="text-zinc-500 hover:text-red-400"
               title={t('Quitar reto')}
-              onClick={async () => { await api(`/letterboxd/lists/${l.id}`, { method: 'DELETE' }); if (open === l.id) setOpen(null); load(); }}
+              onClick={async () => {
+                // quitar el reto borra también su progreso importado: se pregunta
+                // con el nombre delante para que la ✕ pequeña no se lleve otro
+                if (!window.confirm(t('¿Quitar el reto «{name}»? Su progreso se pierde.', { name: l.name }))) return;
+                const r = await api(`/letterboxd/lists/${l.id}`, { method: 'DELETE' });
+                if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
+                if (open === l.id) setOpen(null);
+                load();
+              }}
             >
               ✕
             </button>
@@ -403,25 +414,27 @@ function ListDetail({ listId, onChanged }) {
   const bulkAdd = async () => {
     setBulk({ running: true, summary: null });
     // sin «a Radarr» detrás: aquí el contexto ya es la lista y su botón
-    const { summary } = await addBulkToRadarr(missing.map((i) => i.tmdb_id), { onAdded: addRadarrId, target: '' });
-    setBulk({ running: false, summary });
+    const { summary, error } = await addBulkToRadarr(missing.map((i) => i.tmdb_id), { onAdded: addRadarrId, target: '' });
+    setBulk({ running: false, summary, error: !!error });
   };
 
   return (
     <div className="mt-4">
       <div className="flex gap-2 items-center flex-wrap mb-3">
+        {/* mismo vocabulario en primera persona que OwnFilterBar (Me faltan / Las tengo) */}
         <button className={view === 'missing' ? 'btn-gold' : 'btn-ghost'} onClick={() => setView('missing')}>
-          {t('Te faltan ({n})', { n: missing.length })}
+          {t('Me faltan ({n})', { n: missing.length })}
         </button>
         <button className={view === 'owned' ? 'btn-gold' : 'btn-ghost'} onClick={() => setView('owned')}>
-          {t('Las tienes ({n})', { n: owned.length })}
+          {t('Las tengo ({n})', { n: owned.length })}
         </button>
         {missing.length > 0 && (
           <button className="btn-gold ml-auto" onClick={bulkAdd} disabled={bulk.running}>
             {bulk.running ? t('Añadiendo…') : t('➕ Añadir {n} a Radarr', { n: Math.min(missing.length, 300) })}
           </button>
         )}
-        {bulk.summary && <span className="text-xs text-emerald-400 w-full">{bulk.summary}</span>}
+        {/* en verde solo el éxito: un fallo vestido de emerald se lee como «hecho» */}
+        {bulk.summary && <span className={`text-xs w-full ${bulk.error ? 'text-red-400' : 'text-emerald-400'}`}>{bulk.summary}</span>}
       </div>
       {shown.length === 0 ? (
         <Empty>{view === 'missing' ? t('¡Lista completa! 🏆') : t('Ninguna todavía.')}</Empty>
@@ -452,6 +465,18 @@ export default function Lists() {
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(null);
   const [tab, setTab] = useState('letterboxd');
+  // el ↻ de una lista puede tardar (MDBList + reemparejado): sin este estado el
+  // botón parecía muerto y se pulsaba tres veces, encolando tres refrescos
+  const [refreshingId, setRefreshingId] = useState(null);
+
+  const refreshList = async (l) => {
+    setRefreshingId(l.id);
+    const r = await api(`/mdblist/lists/${l.id}/refresh`, { method: 'POST' });
+    setRefreshingId(null);
+    if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
+    toast(t('↻ «{name}» actualizada desde MDBList', { name: l.name }), 'success');
+    load();
+  };
 
   const load = () => api('/mdblist/lists').then((r) => setLists(Array.isArray(r) ? r : []));
   useEffect(() => {
@@ -593,12 +618,10 @@ export default function Lists() {
                     </a>
                   )}
                   <button
-                    className="text-zinc-500 hover:text-gold-400"
+                    className="text-zinc-500 hover:text-gold-400 disabled:opacity-40 disabled:animate-pulse"
                     title={t('Actualizar la lista desde MDBList')}
-                    onClick={async () => {
-                      await api(`/mdblist/lists/${l.id}/refresh`, { method: 'POST' });
-                      load();
-                    }}
+                    disabled={refreshingId === l.id}
+                    onClick={() => refreshList(l)}
                   >
                     ↻
                   </button>
@@ -606,7 +629,11 @@ export default function Lists() {
                     className="text-zinc-500 hover:text-red-400"
                     title={t('Dejar de seguir')}
                     onClick={async () => {
-                      await api(`/mdblist/lists/${l.id}`, { method: 'DELETE' });
+                      // dejar de seguir borra el progreso calculado de la lista:
+                      // se pregunta con el nombre para que la ✕ no se equivoque de fila
+                      if (!window.confirm(t('¿Dejar de seguir «{name}»?', { name: l.name }))) return;
+                      const r = await api(`/mdblist/lists/${l.id}`, { method: 'DELETE' });
+                      if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
                       if (open === l.id) setOpen(null);
                       load();
                     }}

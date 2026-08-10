@@ -98,6 +98,13 @@ export default {
   'Todas': 'All',
   '(las sin nota no se ocultan)': '(unrated ones are never hidden)',
 
+  // OwnFilterBar
+  'Me faltan': 'Missing',
+  'Las tengo': 'Owned',
+
+  // SortSelect
+  'Ordenar:': 'Sort:',
+
   // MatchCorrector
   'Quitar corrección / volver al automático': 'Remove correction / back to automatic',
   'Corregir emparejado de {title}': 'Fix matching for {title}',

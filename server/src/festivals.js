@@ -19,7 +19,7 @@ import { cachePrefix } from './cache-versions.js';
 import { foldName, normName } from './names.js';
 import {
   searchMovieCandidates, movieDirectors, movieSummary, findPersonInfo, latinizeNames,
-  personCredits, englishTitle, searchPersonCandidates,
+  personCredits, englishTitle, searchPersonCandidates, TMDB_CONCURRENCY,
 } from './tmdb.js';
 import { enrichWithScores } from './mdblist.js';
 import { watchedIndex, isWatched } from './letterboxd.js';
@@ -1207,6 +1207,31 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
     }
   }
 
+  // La misma segunda vuelta para las filas SIN director, que antes no tenían
+  // ninguna: con el candidato fechado a 2+ años, la ventana no lo mira y
+  // peliculaPorDirector necesita un nombre, así que la película no podía casar
+  // por NINGUNA vía. La prueba es la doble que la ventana ya les pide: título
+  // clavado (o el internacional EXACTO, sin la tolerancia de «contiene» — aquí
+  // no hay dirección que verifique nada) y ficha con equipo, porque una ficha
+  // sin créditos fuera de ventana es demasiado poco para fiarse.
+  if (!tmdbId && !fallosRed && !row.director) {
+    const dentro = new Set(enVentana.map((c) => c.id));
+    for (const c of candidatos.filter((x) => !dentro.has(x.id))) {
+      let clavaAqui = tituloClavado(c);
+      if (!clavaAqui && tituloEnDe) clavaAqui = clava(await tituloEnDe(c.id));
+      if (!clavaAqui) continue;
+      const dirs = await dirsDe(c.id);
+      if (dirs === null) {
+        fallosRed = true;
+        break;
+      }
+      if (dirs.length) {
+        tmdbId = c.id;
+        break;
+      }
+    }
+  }
+
   // Solo si NADIE con créditos lo demostró (y sin cortes de red a medias),
   // valen las fichas sin equipo por título clavado — las recién anunciadas.
   // El título clavado se exige SIEMPRE: en las filas sin director era la única
@@ -1290,7 +1315,7 @@ export async function peliculaPorDirector({ title, year, director }, { personasP
   return null;
 }
 
-async function resolveFilms(rows, yearOf) {
+export async function resolveFilms(rows, yearOf) {
   const films = new Array(rows.length);
   let errors = 0; // fallos de RED (429 de TMDB…): quien llama no debe cachear
   // correcciones manuales del usuario: mandan sobre todo lo demás
@@ -1299,7 +1324,7 @@ async function resolveFilms(rows, yearOf) {
   );
   // para desempatar dobles legítimos (Fanny y Alexander cine vs TV, ambos de
   // Bergman): entre candidatos verificados, gana el que YA está en tu Plex
-  const inLib = new Set(db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((m) => m.tmdb_id));
+  const inLib = liveSets().inLib;
   let i = 0;
   async function worker() {
     for (;;) {
@@ -1308,13 +1333,24 @@ async function resolveFilms(rows, yearOf) {
       const r = rows[idx];
       const y = yearOf(r);
 
+      // Una serie no tiene ficha de película en TMDB y nunca la va a tener:
+      // buscarla en cada reconstrucción era gastar búsquedas para acabar en el
+      // mismo «sin ficha» — y encima contaba como fallo del emparejado.
+      if (r.tv) {
+        films[idx] = { ...r, tmdb_id: null, poster_path: null, date: null, year: r.year ?? null };
+        continue;
+      }
+
       // Emparejado verificado YA cacheado (30 días): ni búsquedas ni créditos.
       // Clave: sin esto, un palmarés grande con un solo 429 no se cacheaba
       // entero y CADA visita relanzaba la ráfaga completa contra TMDB — que
       // volvía a cortar. Con la caché por película, cada reintento solo toca
       // lo que falló y converge en un par de cargas.
       const claveBase = festivalOverrideKey(r.title, y, r.director);
-      const matchKey = `film_match:v2:${claveBase}`;
+      // v3: la entrada guarda también poster_path y date. Antes solo llevaba
+      // {id} y reconstruir la página caducada pedía movieSummary de CADA
+      // película: en las 1001, mil GETs a TMDB para repetir lo ya sabido.
+      const matchKey = `film_match:v3:${claveBase}`;
       // corrección manual: ni búsqueda ni verificación, lo que dijo el usuario
       const override = overrides.has(claveBase) ? overrides.get(claveBase) : undefined;
       // Un año de vida, MUY por encima de los 30 días de la página: «este
@@ -1326,11 +1362,16 @@ async function resolveFilms(rows, yearOf) {
       // reglas del emparejado se sube la versión en cache-versions.js.
       const matchHit = override !== undefined ? { id: override } : cacheRead(matchKey, 365 * DAY);
       if (matchHit?.id) {
-        let sum = null;
-        try {
-          sum = await movieSummary(matchHit.id);
-        } catch {
-          errors++; // ficha coja por la red: que no se cachee la página y se reintente
+        // si la entrada ya trae el cartel y la fecha (v3), no hay nada que
+        // pedir; movieSummary queda de respaldo para overrides y entradas
+        // guardadas antes de tener los dos campos
+        let sum = 'poster_path' in matchHit ? { poster_path: matchHit.poster_path, date: matchHit.date } : null;
+        if (!sum) {
+          try {
+            sum = await movieSummary(matchHit.id);
+          } catch {
+            errors++; // ficha coja por la red: que no se cachee la página y se reintente
+          }
         }
         films[idx] = {
           ...r,
@@ -1382,10 +1423,6 @@ async function resolveFilms(rows, yearOf) {
           }
         );
       }
-      // el emparejado limpio se guarda por película: los reintentos tras un
-      // corte de red solo tocan lo que falló
-      if (tmdbId && !fallosRed) cacheWrite(matchKey, { id: tmdbId });
-
       let sum = null;
       let fichaCoja = false;
       if (tmdbId) {
@@ -1394,6 +1431,12 @@ async function resolveFilms(rows, yearOf) {
         } catch {
           fichaCoja = true; // ficha coja: no cachear la página, reintentar luego
         }
+      }
+      // el emparejado limpio se guarda por película: los reintentos tras un
+      // corte de red solo tocan lo que falló. Con la ficha a mano se guardan
+      // también cartel y fecha; coja, solo el id (el hit los completará)
+      if (tmdbId && !fallosRed) {
+        cacheWrite(matchKey, sum ? { id: tmdbId, poster_path: sum.poster_path || null, date: sum.date || null } : { id: tmdbId });
       }
       if (fallosRed || fichaCoja) errors++;
       films[idx] = {
@@ -1407,7 +1450,10 @@ async function resolveFilms(rows, yearOf) {
       };
     }
   }
-  await Promise.all(Array.from({ length: 5 }, worker));
+  // el mismo límite que el propio cliente de TMDB: con menos workers, la carga
+  // en frío de un canon grande (las 1001 son ~71 s con 5) tarda el doble sin
+  // proteger a TMDB de nada — el limitador de tmdb.js ya frena lo que sobre
+  await Promise.all(Array.from({ length: TMDB_CONCURRENCY }, worker));
   return { films, errors };
 }
 
@@ -1508,7 +1554,7 @@ async function buildEdition(key, f, year) {
     source: `https://en.wikipedia.org/wiki/${page.replace(/ /g, '_')}`,
     fetchedAt: Date.now(),
     films,
-    unresolved: films.filter((x) => !x.tmdb_id).length,
+    unresolved: films.filter((x) => !x.tmdb_id && !x.tv).length, // una serie sin ficha no es un fallo del emparejado
     resolveErrors: errors,
   };
 }
@@ -1586,15 +1632,45 @@ export async function watchFestivalEditions() {
 }
 
 // Lo vivo (la tienes, vista, notas) se calcula al leer, nunca se cachea.
+//
+// Pero sus dos ingredientes pesados sí se memoizan 60 segundos: en el Beelink,
+// el set de «ya en tu Plex» y el índice de vistas son ~12.400 filas CADA UNO,
+// y se estaban montando de cero en cada visita a cualquier palmarés. Un minuto
+// basta para que pasear por los festivales no lo repita, y es lo bastante
+// corto para que un sync de Plex o un import de Letterboxd se noten solos, sin
+// tener que avisar desde plex.js/letterboxd.js de que invaliden nada.
+const LIVE_SETS_TTL = 60 * 1000;
+let liveSetsMemo = { at: 0, inLib: null, widx: null };
+function liveSets() {
+  if (Date.now() - liveSetsMemo.at > LIVE_SETS_TTL) {
+    liveSetsMemo = {
+      at: Date.now(),
+      inLib: new Set(db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((r) => r.tmdb_id)),
+      widx: watchedIndex(),
+    };
+  }
+  return liveSetsMemo;
+}
+
 async function decorateLive(films) {
-  const inLib = new Set(db.prepare('SELECT tmdb_id FROM movies WHERE tmdb_id IS NOT NULL').all().map((r) => r.tmdb_id));
-  const widx = watchedIndex();
+  const { inLib, widx } = liveSets();
   const out = films.map((x) => ({
     ...x,
     owned: x.tmdb_id ? inLib.has(x.tmdb_id) : false,
     watched: isWatched({ tmdb_id: x.tmdb_id, title: x.title, year: x.year }, widx),
   }));
-  await enrichWithScores(out, { maxFetch: 50 });
+  // Las notas se sirven con lo que YA hay en mdb_ratings: pedir las que faltan
+  // aquí bloqueaba la respuesta ~300 ms y quemaba 50 peticiones de MDBList por
+  // visita. Las ausentes se piden al colgar, fuera de la respuesta —el fetch
+  // las deja guardadas en la tabla y la SIGUIENTE visita ya las trae; la
+  // interfaz tolera films sin f.mdb.
+  await enrichWithScores(out, { fetchMissing: false });
+  const sinNota = out.filter((x) => x.tmdb_id && !x.mdb).map((x) => ({ tmdb_id: x.tmdb_id }));
+  if (sinNota.length) {
+    setImmediate(() => {
+      enrichWithScores(sinNota, { maxFetch: 50 }).catch(() => {});
+    });
+  }
   return out;
 }
 
@@ -1689,9 +1765,23 @@ async function buildAwardYear(key, f, year) {
       : `https://en.wikipedia.org/wiki/${f.awardPage.replace(/ /g, '_')}`,
     fetchedAt: Date.now(),
     films,
-    unresolved: films.filter((x) => !x.tmdb_id).length,
+    unresolved: films.filter((x) => !x.tmdb_id && !x.tv).length, // una serie sin ficha no es un fallo del emparejado
     resolveErrors: errors,
   };
+}
+
+/**
+ * Filas de un dataset fijo empaquetado con la app (Sight & Sound, las 1001):
+ * cada entrada trae su fuente y su nota en el REGISTRY. El `tmdb_id` puesto a
+ * mano en el dataset tiene que sobrevivir al mapeo — resolveFilms lo usa para
+ * saltarse la búsqueda entera— y ya se perdió una vez por no copiarlo aquí.
+ */
+export function staticListRows(f) {
+  return f.staticList.map((r) => ({
+    year: r.year, title: r.title, original_title: r.title, director: r.director, country: null, rank: r.rank,
+    tmdb_id: r.tmdb_id || null,
+    tv: !!r.tv, // una serie no tiene ficha de película: la interfaz lo dice
+  }));
 }
 
 /**
@@ -1721,12 +1811,7 @@ export async function festivalWinners(key, { refresh = false } = {}) {
       source = 'https://www.wikidata.org/wiki/Q102427';
       note = `Las ${rows.length} ganadoras de la historia; en «Nominadas por año» están las ${f.staticAward.length} candidatas completas.`;
     } else if (f.staticList) {
-      // dataset fijo empaquetado con la app (Sight & Sound, las 1001): cada
-      // entrada trae su fuente y su nota en el REGISTRY
-      rows = f.staticList.map((r) => ({
-        year: r.year, title: r.title, original_title: r.title, director: r.director, country: null, rank: r.rank,
-        tv: !!r.tv, // una serie no tiene ficha de película: la interfaz lo dice
-      }));
+      rows = staticListRows(f);
       source = f.staticSource || source;
       note = f.staticNote || null;
     } else if (f.awardParse === 'cahiers') {
@@ -1757,7 +1842,7 @@ export async function festivalWinners(key, { refresh = false } = {}) {
       source,
       fetchedAt: Date.now(),
       films,
-      unresolved: films.filter((x) => !x.tmdb_id).length,
+      unresolved: films.filter((x) => !x.tmdb_id && !x.tv).length, // una serie sin ficha no es un fallo del emparejado
       resolveErrors: errors,
     };
     // con fallos de red no se cachea: se reintenta en la siguiente visita

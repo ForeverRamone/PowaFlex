@@ -190,6 +190,10 @@ export function GlobalSearch() {
   };
   // al cambiar los resultados, la selección vuelve arriba
   useEffect(() => { setActive(0); }, [q, res]);
+  // la lista scrollea pero el foco se queda en el campo de texto: sin esto, al
+  // bajar con ↑/↓ la fila activa desaparecía del área visible
+  const activeRef = useRef(null);
+  useEffect(() => { activeRef.current?.scrollIntoView({ block: 'nearest' }); }, [active]);
 
   if (!open) return null;
   let rowIdx = -1;
@@ -215,7 +219,7 @@ export function GlobalSearch() {
           onKeyDown={onInputKey}
         />
         {term && (
-          <div className="mt-2 max-h-[60vh] overflow-y-auto">
+          <div className="mt-2 max-h-[60vh] overflow-y-auto overscroll-contain">
             {flat.map((f) => {
               if (f.header) {
                 return (
@@ -232,7 +236,7 @@ export function GlobalSearch() {
               if (f.kind === 'person') {
                 const p = f.p;
                 return (
-                  <button key={f.key} className={cls} onClick={f.run}>
+                  <button key={f.key} ref={isActive ? activeRef : null} className={cls} onClick={f.run}>
                     {p.thumb ? (
                       <img src={`/img/person/${p.id}`} alt="" loading="lazy" className="w-7 h-7 rounded-full object-cover bg-ink-800 shrink-0" />
                     ) : (
@@ -248,7 +252,7 @@ export function GlobalSearch() {
               if (f.kind === 'movie') {
                 const m = f.m;
                 return (
-                  <button key={f.key} className={cls} onClick={f.run}>
+                  <button key={f.key} ref={isActive ? activeRef : null} className={cls} onClick={f.run}>
                     <img
                       src={`/img/${m.rating_key}/poster`}
                       alt=""
@@ -261,7 +265,7 @@ export function GlobalSearch() {
                 );
               }
               return (
-                <button key={f.key} className={cls} onClick={f.run}>
+                <button key={f.key} ref={isActive ? activeRef : null} className={cls} onClick={f.run}>
                   <span className="truncate">{f.label}</span>
                   {f.sub && <span className="text-zinc-500 text-xs ml-auto shrink-0">{f.sub}</span>}
                 </button>
@@ -799,6 +803,41 @@ export function MinScoreBar({ minScore, setMinScore }) {
 }
 
 /**
+ * El trío Todas / Me faltan / Las tengo. Vivía copiado carácter a carácter en
+ * Estrenos y en Festivales; aquí para que cambiar su aspecto no obligue a
+ * tocar cada copia (y que la tercera página que lo necesite no haga otra).
+ */
+export function OwnFilterBar({ own, setOwn }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap text-sm">
+      {[['', 'Todas'], ['missing', 'Me faltan'], ['owned', 'Las tengo']].map(([v, label]) => (
+        <button
+          key={v}
+          onClick={() => setOwn(v)}
+          className={`btn-ghost !py-1 text-xs ${own === v ? '!border-gold-400 text-gold-400' : ''}`}
+        >
+          {t(label)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Select de orden con su rótulo fijo, tal y como lo pinta Estrenos. Siempre
+ * hay un orden puesto, así que va sin `placeholder` (la opción vacía saldría
+ * como un duplicado del primer orden).
+ */
+export function SortSelect({ value, onChange, options }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-xs text-zinc-500">{t('Ordenar:')}</span>
+      <Select className="!py-1 text-xs" value={value} onChange={onChange} options={options} />
+    </div>
+  );
+}
+
+/**
  * El corrector manual de emparejado con TMDB, para lo que ninguna regla va a
  * acertar: dos personas con el mismo nombre, alguien con la obra repartida en
  * dos fichas, o una película que Plex identificó con el guid de otra.
@@ -853,7 +892,7 @@ export function MatchCorrector({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto overscroll-contain" onClick={onClose}>
       <div
         ref={dialogo}
         role="dialog"
@@ -884,7 +923,7 @@ export function MatchCorrector({
 
         {cands && cands.length === 0 && <Empty>{t('Nada en TMDB con esa búsqueda.')}</Empty>}
         {cands?.length > 0 && (
-          <div className="divide-y divide-ink-800 max-h-80 overflow-y-auto">
+          <div className="divide-y divide-ink-800 max-h-80 overflow-y-auto overscroll-contain">
             {cands.map((c) => {
               const id = esPersona ? c.tmdb_id : c.id;
               const img = esPersona ? c.profile_path : c.poster_path;
@@ -1009,6 +1048,45 @@ export const matchesTypeFilters = (item, show) =>
   (show.tv || !item.isTvMovie) && (show.eventos || !item.isEvento) &&
   (show.coral || !item.isCoral) && (show.cameos || !item.isCameo);
 
+/**
+ * Los recuentos que TypeFilterBar espera, contando los flags is* de una lista.
+ * SIEMPRE las siete claves y contadas de verdad, no a cero: la barra esconde
+ * el chip cuyo recuento es 0, y un cero puesto «porque el servidor ya filtró
+ * ese tipo» dejaba tipos imposibles de filtrar cuando algo se le escapaba.
+ */
+export const typeCounts = (items) => ({
+  shorts: items.filter((i) => i.isShort).length,
+  docs: items.filter((i) => i.isDocumentary).length,
+  music: items.filter((i) => i.isMusic).length,
+  tv: items.filter((i) => i.isTvMovie).length,
+  eventos: items.filter((i) => i.isEvento).length,
+  coral: items.filter((i) => i.isCoral).length,
+  cameos: items.filter((i) => i.isCameo).length,
+});
+
+// De cuando cada página guardaba su propio listón Σ: se miran una única vez,
+// al estrenar la clave compartida, para no perder el valor que ya había
+const CLAVES_VIEJAS_MIN_SCORE = ['rel_min_score', 'gaps_min_score', 'festival_min_score', 'person_min_score'];
+
+// Listón Σ compartido, simétrico a useTypeFilters: puesto en una página, vale
+// en todas. El primer valor viejo distinto de cero hereda como arranque.
+export function useMinScore() {
+  const [minScore, setMinScoreState] = useState(() => {
+    const guardado = localStorage.getItem('min_score');
+    if (guardado != null) return Number(guardado) || 0;
+    for (const clave of CLAVES_VIEJAS_MIN_SCORE) {
+      const viejo = Number(localStorage.getItem(clave) || 0);
+      if (viejo > 0) return viejo;
+    }
+    return 0;
+  });
+  const setMinScore = (v) => {
+    setMinScoreState(v);
+    localStorage.setItem('min_score', String(v));
+  };
+  return [minScore, setMinScore];
+}
+
 // Toggle chips, not struck-through buttons: strikethrough reads as
 // "unavailable", and this bar sits above the gaps grid all day long.
 export function TypeFilterBar({ show, toggle, counts }) {
@@ -1082,9 +1160,28 @@ function useEsc(onClose) {
   }, [onClose]);
 }
 
+/**
+ * Mientras hay un modal (o el cajón de móvil) abierto, la página de detrás no
+ * debe scrollear: en táctil el gesto atraviesa el velo y te mueve el fondo.
+ * Contador y no booleano porque las capas se apilan —la Ficha abre el
+ * MatchCorrector encima— y al cerrar la de arriba la de abajo sigue
+ * necesitando el bloqueo.
+ */
+let capasDeBloqueo = 0;
+export function useBloqueoDeFondo(activo = true) {
+  useEffect(() => {
+    if (!activo) return undefined;
+    if (++capasDeBloqueo === 1) document.body.style.overflow = 'hidden';
+    return () => {
+      if (--capasDeBloqueo === 0) document.body.style.overflow = '';
+    };
+  }, [activo]);
+}
+
 export function useFocusTrap(onClose, activo = true) {
   const ref = useRef(null);
   useEsc(onClose);
+  useBloqueoDeFondo(activo);
   useEffect(() => {
     if (!activo) return undefined;
     const previo = document.activeElement;
@@ -1211,13 +1308,15 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-label={vm?.title || t('Ficha de película')}
-        className="card-float max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6 flex gap-6 relative"
+        className="card-float max-w-3xl w-full max-h-[85vh] overflow-y-auto overscroll-contain p-6 flex gap-6 relative"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* padding + margen negativo: área táctil de ~44 px con el icono en el
+            mismo sitio de siempre */}
         <button
           onClick={onClose}
           aria-label={t('Cerrar')}
-          className="absolute top-3 right-3 text-zinc-500 hover:text-zinc-100 transition-colors z-10"
+          className="absolute top-3 right-3 p-2.5 -m-2.5 text-zinc-500 hover:text-zinc-100 transition-colors z-10"
         >
           <X size={18} />
         </button>
@@ -1280,7 +1379,7 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
                 <div className="mt-3">
                   <button
                     onClick={() => setCorrigiendo(true)}
-                    className="text-[11px] text-zinc-500 hover:text-gold-400 cursor-pointer"
+                    className="p-2 -m-2 text-[11px] text-zinc-500 hover:text-gold-400 cursor-pointer"
                     title={t('Elegir a mano su ficha de TMDB')}
                   >
                     ✎ {vm.tmdbLocked ? t('emparejado a mano') : t('corregir emparejado con TMDB')}

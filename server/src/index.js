@@ -3,6 +3,7 @@ import { today } from './dates.js';
 import { mapPool } from './pool.js';
 import { normName } from './names.js';
 import fastifyStatic from '@fastify/static';
+import compress from '@fastify/compress';
 import multipart from '@fastify/multipart';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -102,6 +103,12 @@ import * as q from './queries.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf-8'));
 const app = Fastify({ logger: { level: 'info' } });
+
+// Compresión para TODO (API y estáticos): un palmarés grande son ~282 KB de
+// JSON que en el wifi de casa se notan, y gzip los deja en una fracción. Va
+// registrado antes que cualquier ruta porque el plugin solo envuelve las
+// respuestas de lo declarado después de él.
+await app.register(compress);
 
 // --- optional authentication ----------------------------------------------------
 // POWAFLEX_AUTH="user:password" turns on HTTP Basic for the whole panel (API,

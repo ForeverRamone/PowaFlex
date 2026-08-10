@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Spinner, Empty, PageHeader, ErrorBox, Select, EnlacePersona } from '../components.jsx';
+import { Spinner, Empty, PageHeader, ErrorBox, Select, SortSelect, EnlacePersona } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t, locale } from '../i18n.js';
 
@@ -50,7 +50,7 @@ const ORDENES = {
   puntuacion: { label: 'Puntuación', fn: (a, b) => b.score - a.score },
   reciente: { label: 'Debut más reciente', fn: (a, b) => (b.first_year ?? 0) - (a.first_year ?? 0) },
   primeriza: { label: 'Menos películas', fn: (a, b) => (a.features ?? 9) - (b.features ?? 9) },
-  alfabetico: { label: 'Alfabético (A–Z)', fn: (a, b) => a.name.localeCompare(b.name, 'es') },
+  alfabetico: { label: 'Nombre (A-Z)', fn: (a, b) => a.name.localeCompare(b.name, 'es') },
 };
 
 const VACIO = { continente: '', pais: '', sexo: '', pendientes: false };
@@ -307,8 +307,10 @@ export default function Emergentes() {
           placeholder={t('Continente')} options={opciones.continentes} />
         <Select value={f.pais} onChange={(v) => setF((p) => ({ ...p, pais: v }))}
           placeholder={t('País')} options={opciones.paises} />
+        {/* mismo placeholder y etiquetas en singular que el resto de filtros de
+            persona; los VALORES ('mujer'/'hombre') son de los datos y no se tocan */}
         <Select value={f.sexo} onChange={(v) => setF((p) => ({ ...p, sexo: v }))}
-          placeholder={t('Sexo/género')} options={[['mujer', t('Mujeres')], ['hombre', t('Hombres')]]} />
+          placeholder={t('Género||persona')} options={[['mujer', t('Mujer')], ['hombre', t('Hombre')]]} />
         <button
           className={`chip ${f.pendientes ? 'chip-on' : ''}`}
           onClick={() => setF((p) => ({ ...p, pendientes: !p.pendientes }))}
@@ -320,8 +322,8 @@ export default function Emergentes() {
       </div>
 
       <div className="flex flex-wrap gap-2 items-center mb-4">
-        <span className="text-xs text-zinc-500">{t('Ordenar por:')}</span>
-        <Select
+        {/* SortSelect trae el rótulo «Ordenar:» común */}
+        <SortSelect
           value={orden}
           onChange={(v) => { setOrden(v); localStorage.setItem('emerg_sort', v); }}
           options={Object.entries(ORDENES).map(([k, o]) => [k, t(o.label)])}

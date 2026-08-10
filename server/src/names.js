@@ -20,7 +20,7 @@ const PLIEGUES = {
 
 /** Las letras que NFD no sabe descomponer, cambiadas por su equivalente. */
 export function foldName(s) {
-  return String(s || '').replace(/[łØøĐđÐðıİŦŧĦħÞþÆæŒœß]/g, (c) => PLIEGUES[c.toLowerCase()] ?? c);
+  return String(s || '').replace(/[ŁłØøĐđÐðıİŦŧĦħÞþÆæŒœß]/g, (c) => PLIEGUES[c.toLowerCase()] ?? c);
 }
 
 /** Nombre comparable: sin acentos, sin letras raras, sin puntuación ni espacios. */

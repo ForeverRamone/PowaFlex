@@ -41,7 +41,11 @@ function createLimiter(max) {
   });
 }
 
-const tmdbLimit = createLimiter(Number(process.env.TMDB_CONCURRENCY) || 10);
+// Exportada porque el pool de resolveFilms (festivals.js) debe ir al MISMO
+// ritmo: con menos workers que este límite, la carga en frío de un canon de
+// 1.001 fichas tarda el doble sin proteger a TMDB de nada.
+export const TMDB_CONCURRENCY = Number(process.env.TMDB_CONCURRENCY) || 10;
+const tmdbLimit = createLimiter(TMDB_CONCURRENCY);
 
 // Shared progress for long TMDB-building pages (calendar, descubrir), polled by
 // the frontend to show a real progress bar instead of a mute spinner (#5).
@@ -702,10 +706,14 @@ export async function searchMovieCandidates(title, year = null) {
       if (Number.isFinite(year)) await buscar({ primary_release_year: year, ...idioma });
       if (!hayCandidatoCreible()) await buscar(idioma);
       // los años vecinos: el BFI y los festivales fechan por producción o por
-      // estreno en festival, y TMDB por estreno comercial
-      for (const y of [year + 1, year - 1]) {
-        if (hayCandidatoCreible()) break;
-        await buscar({ primary_release_year: y, ...idioma });
+      // estreno en festival, y TMDB por estreno comercial. Solo con año de
+      // verdad: con year nulo, year±1 lanzaba búsquedas absurdas con
+      // primary_release_year=1 y -1.
+      if (Number.isFinite(year)) {
+        for (const y of [year + 1, year - 1]) {
+          if (hayCandidatoCreible()) break;
+          await buscar({ primary_release_year: y, ...idioma });
+        }
       }
       if (hayCandidatoCreible()) break; // ya está: no hace falta la vuelta en inglés
     }

@@ -6,13 +6,15 @@
  *
  * OJO con las listas que circulan como «edición 2024»: no hay constancia de que
  * ese libro exista (Wikipedia salta de la 15.ª de 2021 a la 16.ª de 2026, y ni
- * OpenLibrary ni Goodreads la registran). Se descartó a propósito.
+ * OpenLibrary ni Goodreads la registran). Se descartó a propósito; la lista
+ * que circulaba quedó archivada como estudio en
+ * assets/estudios/1001-variante-2024-no-verificada.json, fuera del código.
  *
  * Y OJO con cuatro bloques que el libro trata como una sola entrada y aquí
  * aparecen solo con su primera película: Toy Story, El Señor de los Anillos,
  * Iván el Terrible y Olympia. Por eso iCheckMovies cuenta 1008 y esto 1001.
  *
- * SIN CABLEAR TODAVÍA: falta su entrada en el REGISTRY de festivals.js como
+ * Cableado como `mil1` en el REGISTRY de festivals.js desde la Beta 1.11:
  * canon (group 'canon', onlyWinners, staticList), igual que Sight & Sound.
  */
 export const MIL_UNA_2021 = [
@@ -2489,7 +2491,9 @@ export const MIL_UNA_2021 = [
   {
     "title": "The Sorrow and the Pity",
     "year": 1969,
-    "director": "Marcel Ophüls"
+    "director": "Marcel Ophüls",
+    "_comentario": "TMDB solo la tiene como entrada de TELEVISIÓN (tv/128062, «Das Haus nebenan»): se hizo para la tele francesa —que la vetó años— y nunca le han abierto ficha de película, así que se marca como Twin Peaks en Sight & Sound para poder decirlo en la interfaz.",
+    "tv": true
   },
   {
     "title": "The Wild Bunch",
@@ -2564,7 +2568,9 @@ export const MIL_UNA_2021 = [
   {
     "title": "The Ear",
     "year": 1970,
-    "director": "Karel Kachyňa"
+    "director": "Karel Kachyňa",
+    "_comentario": "Id fijado a mano: TMDB fecha «Ucho» en 1990 porque estuvo PROHIBIDA veinte años y esa es su fecha de estreno real — a dos décadas del 1970 del libro, ninguna ventana de años la alcanza.",
+    "tmdb_id": 88953
   },
   {
     "title": "The Garden of the Finzi-Continis",
@@ -4039,7 +4045,9 @@ export const MIL_UNA_2021 = [
   {
     "title": "The Killer",
     "year": 1989,
-    "director": "John Woo"
+    "director": "John Woo",
+    "_comentario": "Id fijado a mano: la búsqueda por título en TMDB devuelve una docena de «The Killer» y la ficha buena («喋血雙雄», 1989) acredita a Woo como «Wu Yu-Sheng», así que ni el título ni el director casaban solos.",
+    "tmdb_id": 10835
   },
   {
     "title": "The Unbelievable Truth",
@@ -4994,7 +5002,9 @@ export const MIL_UNA_2021 = [
   {
     "title": "Lovers Rock",
     "year": 2020,
-    "director": "Steve McQueen"
+    "director": "Steve McQueen",
+    "_comentario": "Episodio del antológico «Small Axe»: TMDB lo trata como serie y no tiene ficha de película (buscar «Lovers Rock» solo devuelve un documental de 2011), igual que Twin Peaks: The Return en Sight & Sound.",
+    "tv": true
   },
   {
     "title": "Ma Rainey's Black Bottom",

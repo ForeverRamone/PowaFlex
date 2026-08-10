@@ -105,10 +105,10 @@ export default {
   '🗓️ {n} proyectos anunciados o por estrenar': '🗓️ {n} projects announced or upcoming',
   '🗓️ 1 proyecto anunciado o por estrenar': '🗓️ 1 project announced or upcoming',
 
-  // vistas, orden y Radarr
+  // vistas, orden y Radarr (mismo vocabulario en primera persona que OwnFilterBar)
   'Todas': 'All',
-  'Las tienes': 'Owned',
-  'Te faltan': 'Missing',
+  'Las tengo': 'Owned',
+  'Me faltan': 'Missing',
   'Próximas': 'Upcoming',
   'Añadiendo…': 'Adding…',
   '➕ Mandar a Radarr las {n} que te faltan': '➕ Send the {n} you’re missing to Radarr',
@@ -117,7 +117,7 @@ export default {
   'Ordenar:': 'Sort:',
   'Más recientes': 'Newest first',
   'Más antiguas': 'Oldest first',
-  'Nota media Σ': 'Average rating Σ',
+  'Nota combinada Σ': 'Combined rating Σ',
   'Nota IMDb': 'IMDb rating',
   'Nota Letterboxd': 'Letterboxd rating',
   'Más votadas': 'Most voted',

@@ -5,7 +5,7 @@ import { api, tmdbImg, fmtDate } from '../api.js';
 import { Plus, RotateCw, Ban } from 'lucide-react';
 import {
   ErrorBox, RadarrButton, Empty, useRadarrIds, MediaModal, BuildProgress,
-  useTypeFilters, matchesTypeFilters, TypeFilterBar, Select, EnlacePersona,
+  useTypeFilters, matchesTypeFilters, TypeFilterBar, typeCounts, Select, EnlacePersona,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t, locale } from '../i18n.js';
@@ -162,14 +162,9 @@ export default function Calendar() {
 
   const today = data.today;
 
-  const counts = {
-    shorts: data.events.filter((e) => e.isShort).length,
-    docs: data.events.filter((e) => e.isDocumentary).length,
-    music: data.events.filter((e) => e.isMusic).length,
-    tv: data.events.filter((e) => e.isTvMovie).length,
-    coral: data.events.filter((e) => e.isCoral).length,
-    cameos: 0, // calendar events aren't actor credits: the toggle doesn't apply
-  };
+  // las siete claves contadas siempre (typeCounts, components.jsx): omitir una
+  // pintaba su chip sin recuento en vez de esconderlo
+  const counts = typeCounts(data.events);
   const visible = data.events.filter((e) => matchesTypeFilters(e, show));
   const hiddenCount = data.events.length - visible.length;
 

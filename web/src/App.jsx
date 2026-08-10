@@ -5,7 +5,7 @@ import {
   Eye, Wrench, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award, Ticket, Sparkles,
   TrendingUp,
 } from 'lucide-react';
-import { Spinner, Toaster, GlobalSearch, ErrorBoundary } from './components.jsx';
+import { Spinner, Toaster, GlobalSearch, ErrorBoundary, useBloqueoDeFondo } from './components.jsx';
 import { api, applyTheme } from './api.js';
 import { t, getLang, setLang, locale } from './i18n.js';
 import { ScrollMemory } from './scroll.js';
@@ -213,6 +213,9 @@ function Shell() {
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
+  // con el cajón abierto, el gesto de scroll atravesaba el velo y movía la
+  // página de detrás; solo en móvil, que es donde el menú es un cajón
+  useBloqueoDeFondo(enMovil && open);
 
   useEffect(() => {
     api('/setup-state').then((s) => {
@@ -241,14 +244,16 @@ function Shell() {
       <ScrollMemory />
       {/* mobile top bar */}
       <div className="app-nav md:hidden fixed top-0 inset-x-0 z-30 flex items-center gap-3 bg-ink-900 border-b border-ink-700 px-4 h-14">
-        <button onClick={() => setOpen(true)} className="text-zinc-300 hover:text-zinc-100" aria-label={t('Menú')}>
+        {/* padding + margen negativo: el área táctil llega a ~44 px sin mover
+            el icono ni un píxel de donde estaba */}
+        <button onClick={() => setOpen(true)} className="p-2.5 -m-2.5 text-zinc-300 hover:text-zinc-100" aria-label={t('Menú')}>
           <Menu size={20} strokeWidth={1.75} />
         </button>
         {/* la barra de móvil mide 56 px: ahí va el horizontal, no el apilado */}
         <Logotipo variante="linea" className="text-[19px] text-zinc-100" />
         <button
           onClick={() => window.dispatchEvent(new Event('powaflex-search'))}
-          className="ml-auto text-zinc-300 hover:text-zinc-100"
+          className="ml-auto p-2.5 -my-2.5 -mr-2.5 text-zinc-300 hover:text-zinc-100"
           aria-label={t('Buscar')}
         >
           <Search size={18} strokeWidth={1.75} />
@@ -260,13 +265,15 @@ function Shell() {
         /* cerrado en móvil sigue estando en el orden de tabulación: al tabular
            desde la barra superior recorrías trece enlaces invisibles */
         inert={enMovil && !open}
-        className={`app-nav w-56 shrink-0 border-r border-ink-700 bg-ink-900 py-4 flex flex-col z-50 fixed md:sticky top-0 h-screen overflow-y-auto transition-transform ${
+        /* h-dvh y no h-screen: en móvil 100vh incluye la barra del navegador y
+           el pie del menú quedaba escondido debajo de ella */
+        className={`app-nav w-56 shrink-0 border-r border-ink-700 bg-ink-900 py-4 flex flex-col z-50 fixed md:sticky top-0 h-dvh overflow-y-auto overscroll-contain transition-transform ${
           open ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0`}
       >
         <div className="mb-4 px-5 flex items-center justify-between">
           <Logotipo className="text-[27px] text-zinc-100" />
-          <button onClick={() => setOpen(false)} className="md:hidden text-zinc-500" aria-label={t('Cerrar')}>
+          <button onClick={() => setOpen(false)} className="md:hidden p-2.5 -m-2.5 text-zinc-500" aria-label={t('Cerrar')}>
             <X size={18} />
           </button>
         </div>

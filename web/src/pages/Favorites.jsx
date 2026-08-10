@@ -2,7 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Search, Scissors, X } from 'lucide-react';
-import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature, ErrorBox, Select } from '../components.jsx';
+import { Spinner, Section, Empty, DeathBadge, ProgressBar, PageHeader, Signature, ErrorBox, SortSelect } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t } from '../i18n.js';
 
@@ -341,7 +341,10 @@ export default function Favorites() {
   const trackedIds = new Set((tracked || []).filter((t) => (t.role || 'director') === role).map((t) => t.id));
 
   const addTmdb = async (p) => {
-    await api('/tracked/tmdb', { method: 'POST', body: { tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path, role } });
+    // api() nunca rechaza: los fallos llegan como {error}, y cantar éxito sobre
+    // un alta que no ocurrió deja al usuario buscando una estrella que no está
+    const r = await api('/tracked/tmdb', { method: 'POST', body: { tmdbId: p.tmdb_id, name: p.name, profilePath: p.profile_path, role } });
+    if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     toast(t('⭐ {nombre} añadido como {faceta}', { nombre: p.name, faceta: roleSingular(role) }), 'success');
     loadTracked();
   };
@@ -385,14 +388,18 @@ export default function Favorites() {
   // la ✕ de una tarjeta quita SOLO la faceta de la lista que estás viendo
   const removeFav = async (p) => {
     setTracked((prev) => prev.filter((t) => !(t.id === p.id && (t.role || 'director') === role)));
-    await api(`/tracked/${p.id}?role=${p.role || role}`, { method: 'DELETE' });
+    const r = await api(`/tracked/${p.id}?role=${p.role || role}`, { method: 'DELETE' });
+    // la tarjeta ya se quitó en optimista: si el borrado falló, loadTracked la
+    // devuelve a su sitio y el toast explica por qué reaparece
+    if (r?.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return loadTracked(); }
     toast(t('{nombre} fuera de {faceta}', { nombre: p.name, faceta }));
     loadTracked();
   };
   // seguirle también en la otra faceta, sin dejar esta
   const addOtherFacet = async (p) => {
     const next = parejaDe(p.role || 'director');
-    await api(`/tracked/${p.id}`, { method: 'POST', body: { role: next } });
+    const r = await api(`/tracked/${p.id}`, { method: 'POST', body: { role: next } });
+    if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     toast(t('⭐ {nombre} también en {faceta}', { nombre: p.name, faceta: next === 'director' ? t('directores/as') : t('actores/actrices') }), 'success');
     loadTracked();
   };
@@ -549,7 +556,8 @@ export default function Favorites() {
                   value={favSearch}
                   onChange={(e) => setFavSearch(e.target.value)}
                 />
-                <Select className="!py-1.5 text-xs" value={favSort} onChange={setFavSort}
+                {/* rótulo «Ordenar:» común: el select solo no decía qué era */}
+                <SortSelect value={favSort} onChange={setFavSort}
                   options={Object.entries(FAV_SORTS).map(([k, s]) => [k, s.label])} />
                 <button
                   onClick={() => { setPruneMode((v) => !v); setSelected(new Set()); }}

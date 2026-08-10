@@ -18,4 +18,8 @@ export default {
   ' a Radarr': ' to Radarr',
   ' · {n} ya estaban': ' · {n} were already there',
   ' · ⚠️ {n} fallaron': ' · ⚠️ {n} failed',
+
+  // ---- Calidad y disco: la píldora de fase con fecha se quedó sin traducir
+  // cuando el resto de sus textos se mudó a taller.js ----
+  'digital {date}': 'digital {date}',
 };

@@ -48,7 +48,13 @@ export const CACHE_VERSIONS = {
   // («Chukhrai»/«Tchoukhrai»); stripTags decodifica entidades numéricas y los
   // marcadores en lista de {{ill}} («Veni Vidi Vici» de Sundance); y los
   // bloques de cortos de Orizzonti ya no se cuelan como películas
-  festival: 10,
+  // v11: la entrada film_match guarda cartel y fecha (v3 de su clave: antes
+  // reconstruir una página caducada pedía movieSummary de cada película); los
+  // datasets fijos conservan su tmdb_id puesto a mano y sus filas tv ya no se
+  // buscan contra TMDB ni cuentan como «sin casar»; y la segunda vuelta sin
+  // ventana de año vale también para filas sin director (título clavado y
+  // ficha con equipo). Lo cacheado antes tiene esas películas como «sin ficha».
+  festival: 11,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

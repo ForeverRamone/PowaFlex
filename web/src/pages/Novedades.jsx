@@ -18,9 +18,28 @@ import { t } from '../i18n.js';
  *
  * REGLA DE MANTENIMIENTO: cada vez que se despliega una versión se añade su
  * entrada AQUÍ ARRIBA, además del CHANGELOG, el README y los tres package.json.
+ * Y como todo pasa por t(), el titular y los puntos nuevos necesitan sus claves
+ * EN en i18n/en/novedades.js: sin ellas la entrada cae en castellano con la
+ * interfaz en inglés.
  */
 
 const VERSIONES = [
+  {
+    label: 'Beta 1.12',
+    fecha: '2026-08-10',
+    titular: 'Trece agentes de repaso: el menú plegado, las 1001 al galope y los filtros a una sola voz',
+    puntos: [
+      'El menú de Festivales, premios y cánones arranca plegado en tres categorías y se despliega al clicar: desplegado entero, en móvil eran casi tres pantallas antes de la primera película. La selección activa queda siempre a la vista.',
+      'El canon de las 1001 va ligero: la página pinta 120 tarjetas y carga el resto según bajas, el servidor comprime lo que manda (282 → 70 KB) y ya no se para a pedir notas a MDBList en cada visita — las trae en segundo plano. La visita repetida pasa de ~300 ms a ~11 ms.',
+      'Las cuatro de las 1001 que seguían sin casar, cerradas: The Killer y El oído (Ucho) llevan su ficha fijada con su porqué, y The Sorrow and the Pity resulta que para TMDB es una serie de televisión, como Lovers Rock — ahora lo dicen en vez de parecer averías.',
+      'Los filtros hablan igual en todas las páginas: «Me faltan»/«Las tengo», «Nota combinada Σ», «Ordenar:» y «✕ Limpiar filtros» son los mismos en las diez secciones, y el listón Σ puesto en una página te sigue a las demás.',
+      'Móvil de verdad: los botones de la barra se pulsan con el pulgar (medían 18 px, ahora 40), los buscadores ya no disparan el zoom de iOS, y el fondo se queda quieto cuando abres el menú o una ficha.',
+      'Borrar un canon propio, quitar un reto o dejar de seguir una lista piden confirmación; y si el servidor falla, la app lo dice en vez de cantar éxito.',
+      'La Biblioteca busca mientras tecleas, como Personas: se acabó el Enter secreto.',
+      'Esta misma página existe en inglés: el historial completo, traducido.',
+      'Trece agentes trabajaron en esta versión: seis auditando (móvil, escritorio, emparejado, rendimiento, filtros y plan de trabajo) y siete arreglando, con todo verificado en navegador. La suite pasa de 253 a 255 tests.',
+    ],
+  },
   {
     label: 'Beta 1.11',
     fecha: '2026-08-10',

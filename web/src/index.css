@@ -250,8 +250,11 @@ body {
     border: var(--border-w) solid var(--color-ink-700);
   }
 
+  /* text-base en móvil y no text-sm: iOS Safari hace zoom a toda la página al
+     enfocar cualquier campo cuya fuente baje de 16 px, y no hay forma decente
+     de impedirlo sin capar el zoom manual en el viewport */
   .input {
-    @apply bg-ink-800 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-400 w-full;
+    @apply bg-ink-800 rounded-lg px-3 py-2 text-base sm:text-sm text-zinc-200 outline-none focus:border-zinc-400 w-full;
     border: var(--border-w) solid var(--color-ink-600);
   }
 

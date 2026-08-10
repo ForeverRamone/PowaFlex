@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Spinner, Empty, PageHeader, ErrorBox, Select, EnlacePersona } from '../components.jsx';
+import { Spinner, Empty, PageHeader, ErrorBox, Select, SortSelect, EnlacePersona } from '../components.jsx';
 import { toast } from '../toast.js';
 import { t } from '../i18n.js';
 
@@ -30,7 +30,7 @@ const ORDENES = {
   veteranos: { label: 'Más veteranos', fn: (a, b) => (b.age ?? -1) - (a.age ?? -1) },
   debut: { label: 'Debut más reciente', fn: (a, b) => (b.first ?? -1) - (a.first ?? -1) },
   reciente: { label: 'Último estreno más reciente', fn: (a, b) => (b.last ?? -1) - (a.last ?? -1) },
-  alfabetico: { label: 'Alfabético (A–Z)', fn: (a, b) => a.name.localeCompare(b.name, 'es') },
+  alfabetico: { label: 'Nombre (A-Z)', fn: (a, b) => a.name.localeCompare(b.name, 'es') },
 };
 
 // el orden de las regiones va por peso en el catálogo, no alfabético: buscar
@@ -269,8 +269,10 @@ export default function Directors({ embedded = false }) {
         />
         <Select value={f.region} onChange={setFiltro('region')} placeholder={t('Región')} options={opciones.regiones} />
         <Select value={f.country} onChange={setFiltro('country')} placeholder={t('País')} options={opciones.paises} />
-        <Select value={f.gender} onChange={setFiltro('gender')} placeholder={t('Sexo/género')}
-          options={[['Mujer', t('Mujeres')], ['Hombre', t('Hombres')]]} />
+        {/* mismo placeholder y etiquetas en singular que el resto de filtros de
+            persona; los VALORES ('Mujer'/'Hombre') son del dataset y no se tocan */}
+        <Select value={f.gender} onChange={setFiltro('gender')} placeholder={t('Género||persona')}
+          options={[['Mujer', t('Mujer')], ['Hombre', t('Hombre')]]} />
         <Select value={f.status} onChange={setFiltro('status')} placeholder={t('Actividad')}
           options={[['activo', t('En activo')], ['parado', t('Sin estreno reciente')]]} />
         <button
@@ -284,10 +286,9 @@ export default function Directors({ embedded = false }) {
       </div>
 
       <div className="flex flex-wrap gap-2 items-center mb-4">
-        <span className="text-xs text-zinc-500">{t('Ordenar por:')}</span>
-        {/* sin placeholder: aquí siempre hay un orden puesto, no existe el
-            «sin ordenar» que justifica la opción vacía de los filtros */}
-        <Select value={orden} onChange={setOrdenPref}
+        {/* SortSelect trae el rótulo «Ordenar:» común y va sin placeholder:
+            aquí siempre hay un orden puesto */}
+        <SortSelect value={orden} onChange={setOrdenPref}
           options={Object.entries(ORDENES).map(([k, o]) => [k, t(o.label)])} />
         <span className="text-xs text-zinc-400 tabular">
           {filtrados.length} {t('de')} {todos.length}

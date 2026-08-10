@@ -4,7 +4,8 @@ import { api } from '../api.js';
 import { Ticket, Flag, MonitorPlay, Tv, Plus, RotateCw } from 'lucide-react';
 import {
   ErrorBox, TmdbCard, RadarrButton, Empty, BuildProgress, PageHeader, Select,
-  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, MinScoreBar, passesScore,
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts,
+  MinScoreBar, passesScore, useMinScore, OwnFilterBar,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
@@ -28,7 +29,7 @@ const WINDOWS = [
 
 const SORTS = {
   fecha: { label: 'Por fecha', fn: null }, // el orden natural del servidor
-  score: { label: 'Nota media Σ', fn: (a, b) => (b.mdb?.score ?? -1) - (a.mdb?.score ?? -1) },
+  score: { label: 'Nota combinada Σ', fn: (a, b) => (b.mdb?.score ?? -1) - (a.mdb?.score ?? -1) },
   popularidad: { label: 'Popularidad TMDB', fn: (a, b) => (b.popularity || 0) - (a.popularity || 0) },
   votos: { label: 'Más votadas', fn: (a, b) => (b.votes || 0) - (a.votes || 0) },
 };
@@ -99,8 +100,8 @@ export default function Estrenos() {
   const [refreshing, setRefreshing] = useState(false);
   const [radarrIds, addRadarrId] = useRadarrIds();
   const [show, toggle, resetTypes] = useTypeFilters();
-  const [minScore, setMinScoreState] = useState(() => Number(localStorage.getItem('rel_min_score') || 0));
-  const setMinScore = (v) => { setMinScoreState(v); localStorage.setItem('rel_min_score', String(v)); };
+  // listón Σ compartido con el resto de páginas (hereda el rel_min_score viejo)
+  const [minScore, setMinScore] = useMinScore();
   const [own, setOwnState] = useState(() => localStorage.getItem('rel_own') || '');
   const setOwn = (v) => { setOwnState(v); localStorage.setItem('rel_own', v); };
   const [sort, setSortState] = useState(() => localStorage.getItem('rel_sort') || 'fecha');
@@ -145,7 +146,9 @@ export default function Estrenos() {
   useEffect(() => { load(); setProvider(''); }, [tab, win]);
 
   const limpiarFiltros = () => { setMinScore(0); setOwn(''); setSort('fecha'); setProvider(''); resetTypes(); };
-  const hayFiltros = minScore > 0 || own || sort !== 'fecha' || provider;
+  // los chips de tipo arrancan todos apagados: cualquiera encendido es un
+  // filtro activo, y sin mirarlos el botón de limpiar no salía para ellos
+  const hayFiltros = minScore > 0 || own || sort !== 'fecha' || provider || Object.values(show).some(Boolean);
 
   const conProviders = esPlataformas(tab);
   const visibles = (list) => {
@@ -179,23 +182,8 @@ export default function Estrenos() {
     if (summary) toast(summary, e ? 'error' : undefined);
   };
 
-  const counts = (() => {
-    const all = [...(data?.recent || []), ...(data?.upcoming || [])];
-    // Los recuentos van CONTADOS, no a cero. Estaban a cero «porque el servidor
-    // ya echó a los cortos», pero TypeFilterBar esconde el chip cuyo recuento es
-    // 0: el resultado era que en Estrenos NO había forma de filtrar cortos ni
-    // películas de TV, y las que el servidor no puede descartar —las que aún no
-    // tienen duración en TMDB— se quedaban a la vista sin remedio.
-    return {
-      shorts: all.filter((f) => f.isShort).length,
-      docs: all.filter((f) => f.isDocumentary).length,
-      music: all.filter((f) => f.isMusic).length,
-      tv: all.filter((f) => f.isTvMovie).length,
-      eventos: all.filter((f) => f.isEvento).length,
-      coral: 0,
-      cameos: 0,
-    };
-  })();
+  // los recuentos van CONTADOS, no a cero: el porqué vive en typeCounts (components.jsx)
+  const counts = typeCounts([...(data?.recent || []), ...(data?.upcoming || [])]);
 
   const grid = (films) => (
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
@@ -240,13 +228,7 @@ export default function Estrenos() {
           )}
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap text-sm">
-            {[['', 'Todas'], ['missing', 'Me faltan'], ['owned', 'Las tengo']].map(([v, label]) => (
-              <button key={v} onClick={() => setOwn(v)} className={`btn-ghost !py-1 text-xs ${own === v ? '!border-gold-400 text-gold-400' : ''}`}>
-                {t(label)}
-              </button>
-            ))}
-          </div>
+          <OwnFilterBar own={own} setOwn={setOwn} />
           <MinScoreBar minScore={minScore} setMinScore={setMinScore} />
           {hayFiltros && (
             <button className="btn-ghost !py-1 text-xs" onClick={limpiarFiltros}>{t('✕ Limpiar filtros')}</button>

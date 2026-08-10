@@ -1,5 +1,44 @@
 # Changelog
 
+## Beta 1.12 (1.0.12-beta) — 2026-08-10
+
+**Seis agentes auditando y siete arreglando: el menú de Festivales plegado, las 1001 al galope, los filtros a una sola voz, el móvil pulsable y las cuatro fichas que faltaban.**
+
+### El menú de Festivales, plegado en tres categorías
+
+Desplegado entero eran ~24 botones y en móvil casi tres pantallas antes de la primera película. Ahora arranca plegado en Festivales / Premios / Cánones (acordeón `openCat` en `Festivals.jsx`; las secciones de debut son un subgrupo rotulado dentro de Festivales, sin mezclarse con la competición principal) y la selección activa queda a la vista como chip dorado aunque su categoría esté plegada — clicarla la abre.
+
+### Las 1001 (y todos los palmareses gordos), rápidas
+
+Cuatro causas medidas, cuatro arreglos:
+
+- **Sin compresión HTTP**: el palmarés de las 1001 eran 282 KB de JSON en claro. `@fastify/compress` global los deja en ~70 KB (brotli/gzip), y beneficia a toda la API.
+- **`decorateLive` bloqueaba cada visita** con una llamada viva a MDBList (`maxFetch: 50`): ~300-400 ms por petición cacheada y 50 peticiones del presupuesto diario. Ahora sirve con las notas que ya hay en `mdb_ratings` y pide las que falten en `setImmediate`. Medido: 300 ms → 11 ms la visita en caliente. Además `watchedIndex()` y el set de biblioteca se memoizan 60 s (en el Beelink eran ~12.400 filas recorridas por petición).
+- **La reconstrucción mensual eran ~1.001 GETs a TMDB**: `film_match` (v2→v3) solo guardaba `{id}` y el cartel/fecha venían de una caché de 7 días ya caducada. Ahora la propia entrada guarda `poster_path` y `date` (TTL 365 días) y `movieSummary` queda de respaldo. El pool de `resolveFilms` sube de 5 a `TMDB_CONCURRENCY` (10) para la carga en frío.
+- **La parrilla pintaba las 1001 tarjetas de golpe**: 15.176 nodos DOM y cada clic re-renderizaba todo. Ahora pinta 120 y carga por tramos con un sentinel de `IntersectionObserver` («N más…»), con la tarjeta extraída a `FestivalCard` en `React.memo` con props primitivas y `splitDirectors` memoizado por lista. 2.111 nodos en el primer pintado; los botones masivos siguen contando todas las visibles.
+
+### Las cuatro de las 1001 sin casar, cerradas con diagnóstico
+
+- `festivalWinners` **tiraba el `tmdb_id`** de las listas fijas antes de llegar a `resolveFilms` (que ya sabía respetarlo). Arreglado el mapeo, **The Killer** (Woo, 1989 → 10835) y **The Ear** (Ucho, 1970 → 88953; TMDB la fecha en 1990 por la prohibición y la ventana de ±1 año no podía verla) llevan su ficha fijada en el dataset con su porqué.
+- **The Sorrow and the Pity no existe como película en TMDB** (solo como entrada de televisión): `tv: true`, como **Lovers Rock** (episodio de Small Axe). `resolveFilms` ya no busca las filas `tv` contra TMDB y el contador «sin casar» las exime — el hueco explicado deja de parecer avería.
+- De propina: tres codirectores fantasma heredados de Wikidata fuera del dataset del Óscar (un Q-id crudo en No Country for Old Men, Alain Cuniot en Awakenings, James Tinling en The Ox-Bow Incident); la **Ł mayúscula** entra en el plegado de `names.js` («Łoziński» normalizaba a «ozinski»); los años vecinos con `year` nulo ya no lanzan búsquedas con `primary_release_year=1`; y las filas sin director pueden casar fuera de la ventana de año con título clavado o internacional exacto (el patrón The Ear, con test). Caché `festival` v10 → v11.
+
+### Los filtros, a una sola voz
+
+Un agente comparó las barras de filtros de las diez páginas: el mismo concepto tenía hasta cinco nombres. Ahora en `components.jsx` viven `OwnFilterBar` (Todas/Me faltan/Las tengo — antes «Las tienes», «No tengo (n)»…), `typeCounts` (las siete claves siempre contadas: se acabaron los chips fantasma sin recuento en Calendario, Descubrir y la ficha de persona), `SortSelect` («Ordenar:» único, «Título (A-Z)»/«Nombre (A-Z)») y `useMinScore` — el listón Σ pasa a una clave compartida: puesto en Estrenos te sigue a Festivales (hereda el valor viejo la primera vez). La nota de MDBList se llama «Nota combinada Σ» en todas partes (había cuatro nombres), el género de persona es «Género» con Mujer/Hombre en las cuatro páginas que lo ofrecen, «✕ Limpiar filtros» es una sola clave, y los demográficos de Personas y Descubrir comparten persistencia (`demo_filters`).
+
+### Móvil pulsable, escritorio que avisa
+
+- Los tres controles de la barra móvil medían 18-20 px (el icono a pelo): ahora ~40 px de área táctil sin mover el dibujo, igual que la X de la Ficha y el ✎ de corregir emparejado. Los campos de texto suben a 16 px en móvil (`.input text-base sm:text-sm`): iOS Safari deja de hacer zoom al enfocar. El cajón usa `h-dvh` y el fondo se bloquea con cajón o modal abiertos (`useBloqueoDeFondo` enganchado en `useFocusTrap`, con `overscroll-contain`).
+- Borrar un canon propio, quitar un reto de Letterboxd o dejar de seguir una lista MDBList piden confirmación con su nombre; Favoritos, la ficha de persona y Listas comprueban `r.error` antes de cantar éxito (con el servidor caído la estrella mentía); el resultado del envío masivo se pinta en rojo cuando es error; el ↻ de MDBList tiene busy y toast.
+- La Biblioteca busca al teclear con debounce y guardia de carrera `reqId` (antes exigía Enter sin decirlo y una respuesta lenta pisaba a la nueva); la paleta ⌘K desplaza la fila activa con ↑/↓ (`scrollIntoView`).
+
+### /novedades, en inglés
+
+`i18n/en/novedades.js` traduce los 88 textos del historial (17 titulares y 71 puntos). Regla nueva anotada en el propio fichero: cada versión exige sus claves EN. Cuatro claves EN sueltas que faltaban ('digital {date}' y las tres de reglas ya cubiertas), y el JSON de la «variante 2024» de las 1001 sale de `server/src/data` a `assets/estudios/` (nada lo importaba y se colaba en la imagen Docker).
+
+Tests: 253 → 255 (segunda vuelta sin director y `resolveFilms` con filas `tv`/`tmdb_id` de dataset, con contador de URLs que demuestra que la fila `tv` no toca la red). Verificado en navegador en ES y EN, a 375 px y en escritorio.
+
 ## Beta 1.11 (1.0.11-beta) — 2026-08-10
 
 **Las 1001 películas, los palmareses que faltaban de Cannes y Sundance, el Óscar completo de verdad, y la cuarentena sin códigos.**

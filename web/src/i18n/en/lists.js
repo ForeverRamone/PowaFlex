@@ -11,8 +11,9 @@ export default {
   '{n} añadidas': '{n} added',
   '{n} ya estaban': '{n} were already there',
   '{n} fallaron': '{n} failed',
-  'No tengo ({n})': 'Missing ({n})',
-  'Tengo ({n})': 'Owned ({n})',
+  // mismo vocabulario en primera persona que OwnFilterBar
+  'Me faltan ({n})': 'Missing ({n})',
+  'Las tengo ({n})': 'Owned ({n})',
   'Sin ver ({n})': 'Unwatched ({n})',
   'Resolviendo en TMDB…': 'Resolving on TMDB…',
   '➕ Mandar las {n} que faltan a Radarr': '➕ Send the {n} missing to Radarr',
@@ -55,8 +56,6 @@ export default {
   'Retos ocultos ({n})': 'Hidden challenges ({n})',
   // Listas de MDBList
   ' vista': ' watched',
-  'Te faltan ({n})': 'Missing ({n})',
-  'Las tienes ({n})': 'Owned ({n})',
   'Añadiendo…': 'Adding…',
   '➕ Añadir {n} a Radarr': '➕ Add {n} to Radarr',
   'Convierte listas famosas en retos de completismo: qué % tienes, qué has visto, qué te falta y envío a Radarr.':
@@ -74,5 +73,8 @@ export default {
   'Seguir': 'Follow',
   'No sigues ninguna lista todavía. Añade una por URL o búscala arriba.': "You're not following any lists yet. Add one by URL or search above.",
   'Actualizar la lista desde MDBList': 'Refresh the list from MDBList',
+  '↻ «{name}» actualizada desde MDBList': '↻ “{name}” refreshed from MDBList',
   'Dejar de seguir': 'Unfollow',
+  '¿Dejar de seguir «{name}»?': 'Unfollow “{name}”?',
+  '¿Quitar el reto «{name}»? Su progreso se pierde.': 'Remove the challenge “{name}”? Its progress is lost.',
 };

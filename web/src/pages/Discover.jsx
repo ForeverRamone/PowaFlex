@@ -4,8 +4,8 @@ import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid, X, Layers } from 'lucide-react';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
-  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, PageHeader, Signature, Select,
-  MinScoreBar, passesScore } from '../components.jsx';
+  useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts, PageHeader, Signature, Select,
+  MinScoreBar, passesScore, useMinScore } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 import { t, locale } from '../i18n.js';
@@ -108,26 +108,14 @@ function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, 
   );
 }
 
-function typeCounts(people) {
-  const all = people.flatMap((p) => p.missing || []);
-  return {
-    shorts: all.filter((f) => f.isShort).length,
-    docs: all.filter((f) => f.isDocumentary).length,
-    music: all.filter((f) => f.isMusic).length,
-    tv: all.filter((f) => f.isTvMovie).length,
-    coral: all.filter((f) => f.isCoral).length,
-    cameos: all.filter((f) => f.isCameo).length,
-  };
-}
-
 const PERSON_SORTS = {
   huecos: { label: 'Más huecos primero', fn: (a, b) => (b.missingTotal || 0) - (a.missingTotal || 0) },
   biblioteca: { label: 'Más películas en tu Plex', fn: (a, b) => (b.inLibrary || b.owned || 0) - (a.inLibrary || a.owned || 0) },
   completismo: { label: 'Menos completos primero', fn: (a, b) => (a.pct ?? 101) - (b.pct ?? 101) },
-  nombre: { label: 'Alfabético (A-Z)', fn: (a, b) => a.name.localeCompare(b.name) },
+  nombre: { label: 'Nombre (A-Z)', fn: (a, b) => a.name.localeCompare(b.name) },
 };
 const FILM_SORTS = {
-  score: { label: 'Nota media Σ', fn: (a, b) => (b.mdb?.score ?? -1) - (a.mdb?.score ?? -1) },
+  score: { label: 'Nota combinada Σ', fn: (a, b) => (b.mdb?.score ?? -1) - (a.mdb?.score ?? -1) },
   votos: { label: 'Más votadas', fn: (a, b) => (b.votes || 0) - (a.votes || 0) },
   reciente: { label: 'Más recientes', fn: (a, b) => String(b.date || '').localeCompare(String(a.date || '')) },
   antigua: { label: 'Más antiguas', fn: (a, b) => String(a.date || '').localeCompare(String(b.date || '')) },
@@ -280,12 +268,14 @@ function GapsView({
                 title={t('Vuelve la página a su estado de fábrica: vista, orden, nota mínima y filtros de tipo')}
                 onClick={() => { clearBaseFilters?.(); setViewPref('person'); setPersonSortPref('huecos'); setFilmSortPref('score'); }}
               >
-                ✕ {t('Limpiar filtros')}
+                {t('✕ Limpiar filtros')}
               </button>
             </div>
           </div>
 
-          <TypeFilterBar show={show} toggle={toggle} counts={typeCounts(data.people)} />
+          {/* las siete claves contadas siempre (typeCounts, components.jsx):
+              omitir una pintaba su chip sin recuento en vez de esconderlo */}
+          <TypeFilterBar show={show} toggle={toggle} counts={typeCounts(data.people.flatMap((p) => p.missing || []))} />
 
           {view === 'grid' ? (
             <FilmGrid
@@ -456,9 +446,13 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
     toast(t('⭐ {name} añadido a tus directores/as favoritos', { name: person.name }), 'success');
   };
 
-  const removeCanon = async (key) => {
-    await api(`/discover/canons/${encodeURIComponent(key)}`, { method: 'DELETE' });
-    if (canon === key) setCanon('alltime');
+  // borrar un canon propio destruye la lista de nombres que el usuario pegó a
+  // mano: sin vuelta atrás, así que se pregunta antes con su nombre delante
+  const removeCanon = async (c) => {
+    if (!window.confirm(t('¿Borrar la lista «{name}»? No hay papelera: habría que volver a pegar los nombres.', { name: c.label }))) return;
+    const r = await api(`/discover/canons/${encodeURIComponent(c.key)}`, { method: 'DELETE' });
+    if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
+    if (canon === c.key) setCanon('alltime');
     loadCanons();
   };
 
@@ -491,7 +485,7 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
             </button>
             {!c.builtin && (
               <button
-                onClick={() => removeCanon(c.key)}
+                onClick={() => removeCanon(c)}
                 title={t('Borrar esta lista')}
                 className="text-zinc-600 hover:text-red-400 ml-1"
               >
@@ -594,22 +588,23 @@ export default function Discover() {
   const [favRole, setFavRole] = useState(() => localStorage.getItem('gaps_fav_role') || 'director');
   const [radarrIds, addRadarrId] = useRadarrIds();
   const [show, toggle, resetTypes] = useTypeFilters();
-  const [minScore, setMinScoreState] = useState(() => Number(localStorage.getItem('gaps_min_score') || 0));
-  const setMinScore = (v) => {
-    setMinScoreState(v);
-    localStorage.setItem('gaps_min_score', String(v));
-  };
-  // filtros demográficos de las pestañas «top» (mismos que en Personas), para
-  // acotar el ranking a «mis directores top españoles», «mujeres», etc.
+  // listón Σ compartido con el resto de páginas (hereda el gaps_min_score viejo)
+  const [minScore, setMinScore] = useMinScore();
+  // filtros demográficos de las pestañas «top», compartidos con Personas bajo
+  // una única clave: elegir «mujeres españolas» en una página vale en la otra.
+  // La primera lectura hereda de las claves viejas de cada página.
   const [demo, setDemo] = useState(() => {
     try {
-      return { ...DEMO_VACIO, ...JSON.parse(localStorage.getItem('gaps_demo_filters') || '{}') };
+      const crudo = localStorage.getItem('demo_filters')
+        ?? localStorage.getItem('gaps_demo_filters')
+        ?? localStorage.getItem('people_filters');
+      return { ...DEMO_VACIO, ...JSON.parse(crudo || '{}') };
     } catch {
       return { ...DEMO_VACIO };
     }
   });
   useEffect(() => {
-    localStorage.setItem('gaps_demo_filters', JSON.stringify(demo));
+    localStorage.setItem('demo_filters', JSON.stringify(demo));
   }, [demo]);
   const setDemoFilter = (k) => (v) => setDemo((prev) => ({ ...prev, [k]: v }));
   const demoActivo = Object.values(demo).some(Boolean);
@@ -700,7 +695,7 @@ export default function Discover() {
             options={(demoOpts?.countries || []).map((c) => [c, c])} />
           {demoActivo && (
             <button className="btn-ghost !py-1 text-xs" onClick={() => setDemo({ ...DEMO_VACIO })}>
-              ✕ {t('Limpiar')}
+              {t('✕ Limpiar filtros')}
             </button>
           )}
           {demoOpts && (

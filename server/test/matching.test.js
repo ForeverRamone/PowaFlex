@@ -335,3 +335,73 @@ test('la contención exige un subtítulo de verdad: Halloween II no es Halloween
   );
   assert.equal(subtitulo.tmdbId, 92);
 });
+
+// La segunda vuelta sin ventana de año también para filas SIN director: un
+// candidato fechado a 2+ años no podía casar por NINGUNA vía (la ventana no lo
+// mira y peliculaPorDirector necesita un nombre). Se exige la misma prueba
+// doble que la ventana ya les pide: título clavado y ficha con equipo.
+test('sin director, el título clavado fuera de la ventana también empareja', async () => {
+  const { elegirCandidato } = await import('../src/festivals.js');
+  const candidato = { id: 101, title: 'La oreja', original_title: 'Ucho', date: '1990-01-01' };
+  // título clavado (vía el internacional exacto) y ficha con equipo: sí
+  const clavado = await elegirCandidato(
+    { title: 'The Ear', director: null }, 1970, [candidato],
+    new Set(), async () => ['Karel Kachyňa'], async () => 'The Ear'
+  );
+  assert.equal(clavado.tmdbId, 101);
+  // sin título clavado, no hay prueba ninguna: sin ficha
+  const sinTitulo = await elegirCandidato(
+    { title: 'The Ear', director: null }, 1970, [candidato],
+    new Set(), async () => ['Karel Kachyňa'], async () => 'Otra cosa'
+  );
+  assert.equal(sinTitulo.tmdbId, null);
+  // y una ficha SIN créditos fuera de ventana tampoco: demasiado poco
+  const sinCreditos = await elegirCandidato(
+    { title: 'The Ear', director: null }, 1970,
+    [{ id: 102, title: 'The Ear', original_title: 'The Ear', date: '1990-01-01' }],
+    new Set(), async () => []
+  );
+  assert.equal(sinCreditos.tmdbId, null);
+});
+
+// resolveFilms con datasets fijos: las filas tv salen directas (sin gastar ni
+// una llamada) y el tmdb_id puesto a mano en el dataset llega vivo — se perdió
+// una vez en el mapeo de staticList y las tres del libro se quedaron sin casar.
+test('resolveFilms respeta las filas tv y el tmdb_id del dataset', async () => {
+  const { resolveFilms, staticListRows } = await import('../src/festivals.js');
+  const { setSetting } = await import('../src/db.js');
+  setSetting('tmdb_key', 'clave-de-prueba');
+
+  const rows = staticListRows({
+    staticList: [
+      { title: 'Lovers Rock', year: 2020, director: 'Steve McQueen', tv: true },
+      { title: 'The Killer', year: 1989, director: 'John Woo', tmdb_id: 10835 },
+    ],
+  });
+  assert.equal(rows[0].tv, true);
+  assert.equal(rows[1].tmdb_id, 10835, 'el tmdb_id del dataset se pierde en el mapeo');
+
+  const urls = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    return {
+      ok: true, status: 200,
+      json: async () => ({ id: 10835, title: 'The Killer', original_title: '喋血雙雄', poster_path: '/killer.jpg', release_date: '1989-03-24' }),
+    };
+  };
+  try {
+    const { films, errors } = await resolveFilms(rows, (r) => r.year);
+    assert.equal(errors, 0);
+    // la fila tv sale sin ficha, marcada, y SIN tocar TMDB
+    assert.equal(films[0].tv, true);
+    assert.equal(films[0].tmdb_id, null);
+    assert.ok(!urls.some((u) => u.includes('search')), 'la fila tv (o la ya casada) lanzó una búsqueda');
+    // la fila con id de origen conserva el id y trae su cartel
+    assert.equal(films[1].tmdb_id, 10835);
+    assert.equal(films[1].poster_path, '/killer.jpg');
+  } finally {
+    globalThis.fetch = real;
+    setSetting('tmdb_key', '');
+  }
+});

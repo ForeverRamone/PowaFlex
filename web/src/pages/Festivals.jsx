@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import {
   Spinner, ErrorBox, TmdbCard, RadarrButton, Empty, StatusLegend, PageHeader, useRadarrIds,
-  MatchCorrector, MinScoreBar, passesScore, EnlacePersona,
+  MatchCorrector, MinScoreBar, passesScore, EnlacePersona, OwnFilterBar, useMinScore,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
@@ -36,6 +36,95 @@ export function splitDirectors(s) {
 }
 
 /**
+ * Una tarjeta de la parrilla, en memo: los cánones pintan 1001 a la vez y
+ * cualquier cambio de estado de la página (abrir el corrector, seguir a una
+ * persona) re-renderizaba las 1001. Las props son primitivas o de referencia
+ * estable —nada de pasar los Sets de Radarr o de seguidos: un Set nuevo
+ * repintaría todo—, así que un cambio solo repinta las tarjetas afectadas.
+ */
+const FestivalCard = memo(function FestivalCard({ f, dirs, inRadarr, followedStr, busyDir, onFollow, onEdit, onAdded }) {
+  // los seguidos de ESTA tarjeta llegan unidos con \n (un salto de línea no
+  // puede aparecer dentro de un nombre): primitivo, estable mientras no cambie
+  const followed = followedStr ? followedStr.split('\n') : [];
+  return (
+    <div>
+      {f.tmdb_id ? (
+        <TmdbCard
+          item={f}
+          badge={
+            f.winner ? (
+              <span className="absolute top-1.5 right-1.5 on-art bg-black/70 text-[11px] px-1.5 py-0.5 rounded">{t('🏆 Ganadora')}</span>
+            ) : undefined
+          }
+        >
+          {f.mdb?.score > 0 && (
+            <div className="text-[11px] text-gold-400/90 tabular">
+              Σ {f.mdb.score}
+              {f.mdb.imdb != null ? ` · IMDb ${Number(f.mdb.imdb).toFixed(1)}` : ''}
+            </div>
+          )}
+          {!f.owned && (
+            <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={inRadarr} onAdded={onAdded} />
+          )}
+        </TmdbCard>
+      ) : (
+        <div className="poster flex items-center justify-center text-center p-2 text-[11px] text-zinc-400" title={t('Sin ficha en TMDB (todavía)')}>
+          {f.title}
+        </div>
+      )}
+      <div className="flex items-baseline gap-1.5">
+        <button
+          onClick={() => onEdit(f)}
+          title={t('Corregir el emparejado con TMDB a mano')}
+          className="text-[11px] text-zinc-600 hover:text-gold-400 shrink-0 cursor-pointer"
+        >
+          ✎
+        </button>
+        {f.rank && (
+          <span className="text-[11px] text-gold-400 font-semibold tabular shrink-0" title={f.tied ? t('Puesto {n} (empate)', { n: f.rank }) : t('Puesto {n}', { n: f.rank })}>
+            #{f.rank}
+          </span>
+        )}
+        {/* no todo lo que está en un canon es cine: Sight & Sound
+            metió «Twin Peaks: The Return» en 2022 y es una serie.
+            Decirlo evita que su hueco parezca un emparejado roto. */}
+        {f.tv && (
+          <span className="badge-quiet text-zinc-500 mt-1" title={t('Es una serie de televisión: no tiene ficha de película en TMDB')}>
+            {t('serie de televisión')}
+          </span>
+        )}
+        {dirs.length > 0 && (
+          /* una estrella POR persona: una película con dos
+             directores tiene dos perfiles que seguir por separado */
+          <div className="flex flex-col items-start">
+            {dirs.map((d) => (
+              /* la estrella sigue siendo el botón de seguir; el
+                 NOMBRE lleva a su ficha, la tengas fichada o no */
+              <span key={d} className="mt-1 text-[11px] leading-tight flex items-baseline gap-1">
+                <button
+                  onClick={() => onFollow(d)}
+                  disabled={busyDir === d || followed.includes(d)}
+                  className="text-zinc-400 hover:text-gold-400 cursor-pointer disabled:cursor-default shrink-0"
+                  title={followed.includes(d) ? t('Ya en favoritos') : t('Seguir a {name} como director/a', { name: d })}
+                >
+                  {followed.includes(d) ? '⭐' : busyDir === d ? '…' : '☆'}
+                </button>
+                <EnlacePersona nombre={d} className="text-zinc-400 text-left" />
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// La parrilla entra por tramos de este tamaño: 1001 tarjetas de golpe eran
+// ~15.000 nodos DOM en el primer pintado. Con filtros o ediciones normales
+// (menos de un tramo) no cambia nada visible.
+const TRAMO = 120;
+
+/**
  * Secciones oficiales de los seis festivales de la «vía festival» al Óscar
  * internacional: ganar su premio gordo clasifica una película no inglesa sin
  * pasar por el comité nacional. Datos de Wikipedia, casados contra TMDB.
@@ -62,11 +151,17 @@ export default function Festivals() {
   // corrector manual de emparejado: película en edición (el diálogo es el
   // MatchCorrector compartido, que aquí busca con el endpoint de festivales)
   const [editar, setEditar] = useState(null);
-  // filtros de contenido, como en Descubrir: nota mínima Σ y posesión
-  const [minScore, setMinScoreState] = useState(() => Number(localStorage.getItem('festival_min_score') || 0));
-  const setMinScore = (v) => { setMinScoreState(v); localStorage.setItem('festival_min_score', String(v)); };
+  // el menú arranca PLEGADO en tres categorías (debut va dentro de Festivales):
+  // desplegado entero se comía dos pantallas de móvil antes de la primera
+  // película. Acordeón sin memoria: cada visita vuelve a empezar plegada.
+  const [openCat, setOpenCat] = useState(null);
+  // filtros de contenido, como en Descubrir: nota mínima Σ (compartida entre
+  // páginas) y posesión
+  const [minScore, setMinScore] = useMinScore();
   const [own, setOwnState] = useState(() => localStorage.getItem('festival_own') || '');
   const setOwn = (v) => { setOwnState(v); localStorage.setItem('festival_own', v); };
+  // cuántos tramos de la parrilla están pintados; vuelve a 1 con cada lista
+  const [tramos, setTramos] = useState(1);
 
   useEffect(() => {
     api('/festivals').then((r) => !r.error && setIndex(r));
@@ -123,6 +218,9 @@ export default function Festivals() {
     else if (year > añoMax) setYear(añoMax);
   }, [fest, info, soloPalmares, year, añoMin, añoMax]);
   const films = data?.films || [];
+  // la dirección partida UNA vez por lista: splitDirectors son varios regex
+  // por película y antes se recalculaba para las 1001 en cada render
+  const dirsDe = useMemo(() => new Map(films.map((f) => [f, splitDirectors(f.director)])), [films]);
   // lo que se enseña es lo que cuentan los botones masivos: mismo criterio que
   // en Descubrir («las N visibles»). Las sin ficha TMDB no se filtran por nota.
   const shown = films.filter(
@@ -130,6 +228,21 @@ export default function Festivals() {
   );
   const hidden = films.length - shown.length;
   const missingIds = shown.filter((f) => f.tmdb_id && !f.owned && !radarrIds.has(f.tmdb_id)).map((f) => f.tmdb_id);
+  // la parrilla pinta por tramos; el resto entra cuando el sentinel asoma
+  const pintadas = shown.slice(0, tramos * TRAMO);
+  const sentinel = useRef(null);
+  useEffect(() => { setTramos(1); }, [data]);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el) return;
+    // margen generoso: el tramo siguiente entra antes de que el hueco se vea
+    const io = new IntersectionObserver(
+      (entradas) => entradas.some((e) => e.isIntersecting) && setTramos((n) => n + 1),
+      { rootMargin: '600px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [shown.length, tramos]);
 
   const bulkAdd = async () => {
     setBulkBusy(true);
@@ -138,20 +251,26 @@ export default function Festivals() {
     if (summary) toast(summary, error ? 'error' : undefined);
   };
 
-  // cada estrella sigue a UNA persona: el nombre llega ya partido de la celda
-  const followDirector = async (name) => {
+  // cada estrella sigue a UNA persona: el nombre llega ya partido de la celda.
+  // Referencia estable (solo cierra sobre setters): si cambiara en cada render,
+  // el memo de las 1001 tarjetas no serviría de nada.
+  const followDirector = useCallback(async (name) => {
     setDirBusy(name);
     const r = await api('/tracked/by-names', { method: 'POST', body: { names: name, role: 'director' } });
     setDirBusy(null);
     if (r.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return; }
     setFollowedDirs((prev) => new Set(prev).add(name));
     toast(r.added ? t('⭐ {name} en favoritos (directores/as)', { name }) : t('{name} ya estaba en favoritos', { name }), 'success');
-  };
+  }, []);
+  const abrirEditor = useCallback((f) => setEditar(f), []);
+  // addRadarrId se recrea en cada render pero solo cierra sobre su setter:
+  // capturar la primera instancia da la referencia estable que pide el memo
+  const onAdded = useCallback((id) => addRadarrId(id), []);
 
   // para las ediciones venideras: en cuanto se anuncie la sección oficial,
   // seguir de un golpe a toda su dirección (ya por personas) y que entren en
   // el calendario
-  const pendingDirs = [...new Set(shown.flatMap((f) => splitDirectors(f.director)).filter((d) => !followedDirs.has(d)))];
+  const pendingDirs = [...new Set(shown.flatMap((f) => dirsDe.get(f) || []).filter((d) => !followedDirs.has(d)))];
   const followAll = async () => {
     setFollowAllBusy(true);
     const r = await api('/tracked/by-names', { method: 'POST', body: { names: pendingDirs.join('\n'), role: 'director' } });
@@ -186,33 +305,54 @@ export default function Festivals() {
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
         {[
-          ['festival', 'Festivales'],
-          // donde estrena quien empieza, y de donde sale el detector de
-          // emergentes: van en su propia fila para no mezclarlas con la
-          // competición principal, que es otra cosa
-          ['debut', 'Secciones de debut'],
-          ['premio', 'Premios'],
-          ['canon', 'Cánones'],
-        ].map(([g, label]) => {
-          const del = (index?.festivals || []).filter((f) => f.group === g);
+          // donde estrena quien empieza (debut) vive DENTRO de Festivales como
+          // subgrupo con su propio rótulo: son tres categorías a la vista, pero
+          // sin mezclar las secciones de debut con la competición principal
+          { key: 'festivales', label: 'Festivales', groups: [['festival', null], ['debut', 'Secciones de debut']] },
+          { key: 'premios', label: 'Premios', groups: [['premio', null]] },
+          { key: 'canones', label: 'Cánones', groups: [['canon', null]] },
+        ].map((cat) => {
+          const del = (index?.festivals || []).filter((f) => cat.groups.some(([g]) => g === f.group));
           if (!del.length) return null;
+          const abierta = openCat === cat.key;
+          const activa = del.find((f) => f.key === fest);
           return (
-            <div key={g} className="flex gap-2 items-center flex-wrap">
-              <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{t(label)}:</span>
-              {del.map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => {
-                    setFest(f.key);
-                    if (f.onlyWinners) setView('palmares');
-                  }}
-                  className={fest === f.key ? 'btn-gold' : 'btn-ghost'}
-                  title={t(f.award)}
-                >
-                  {t(f.name)}
+            <div key={cat.key} className={`flex gap-2 items-center flex-wrap ${abierta ? 'w-full' : ''}`}>
+              <button
+                onClick={() => setOpenCat(abierta ? null : cat.key)}
+                aria-expanded={abierta}
+                className={`btn-ghost ${activa ? '!border-gold-400 text-gold-400' : ''}`}
+              >
+                {abierta ? '▾' : '▸'} {t(cat.label)}
+              </button>
+              {/* plegada, la selección actual sigue a la vista; clicarla abre */}
+              {!abierta && activa && (
+                <button onClick={() => setOpenCat(cat.key)} className="btn-gold" title={t(activa.award)}>
+                  {t(activa.name)}
                 </button>
-              ))}
-              <span className="w-2" />
+              )}
+              {abierta && cat.groups.map(([g, sub]) => {
+                const propias = del.filter((f) => f.group === g);
+                if (!propias.length) return null;
+                return (
+                  <div key={g} className="flex gap-2 items-center flex-wrap">
+                    {sub && <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{t(sub)}:</span>}
+                    {propias.map((f) => (
+                      <button
+                        key={f.key}
+                        onClick={() => {
+                          setFest(f.key);
+                          if (f.onlyWinners) setView('palmares');
+                        }}
+                        className={fest === f.key ? 'btn-gold' : 'btn-ghost'}
+                        title={t(f.award)}
+                      >
+                        {t(f.name)}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -301,17 +441,7 @@ export default function Festivals() {
           )}
 
           <div className="flex items-center gap-3 flex-wrap mb-2">
-            <div className="flex items-center gap-2 flex-wrap text-sm">
-              {[['', 'Todas'], ['missing', 'Me faltan'], ['owned', 'Las tengo']].map(([v, label]) => (
-                <button
-                  key={v}
-                  onClick={() => setOwn(v)}
-                  className={`btn-ghost !py-1 text-xs ${own === v ? '!border-gold-400 text-gold-400' : ''}`}
-                >
-                  {t(label)}
-                </button>
-              ))}
-            </div>
+            <OwnFilterBar own={own} setOwn={setOwn} />
             <MinScoreBar minScore={minScore} setMinScore={setMinScore} />
             {(own || minScore > 0) && (
               <button className="btn-ghost !py-1 text-xs" onClick={() => { setOwn(''); setMinScore(0); }}>
@@ -325,79 +455,31 @@ export default function Festivals() {
           {shown.length === 0 ? (
             <Empty>{films.length === 0 ? t('Sin películas en esta edición.') : t('Nada que enseñar con estos filtros.')}</Empty>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {shown.map((f, i) => (
-                <div key={f.tmdb_id || `${f.title}-${i}`}>
-                  {f.tmdb_id ? (
-                    <TmdbCard
-                      item={f}
-                      badge={
-                        f.winner ? (
-                          <span className="absolute top-1.5 right-1.5 on-art bg-black/70 text-[11px] px-1.5 py-0.5 rounded">{t('🏆 Ganadora')}</span>
-                        ) : undefined
-                      }
-                    >
-                      {f.mdb?.score > 0 && (
-                        <div className="text-[11px] text-gold-400/90 tabular">
-                          Σ {f.mdb.score}
-                          {f.mdb.imdb != null ? ` · IMDb ${Number(f.mdb.imdb).toFixed(1)}` : ''}
-                        </div>
-                      )}
-                      {!f.owned && (
-                        <RadarrButton tmdbId={f.tmdb_id} small alreadyInRadarr={radarrIds.has(f.tmdb_id)} onAdded={addRadarrId} />
-                      )}
-                    </TmdbCard>
-                  ) : (
-                    <div className="poster flex items-center justify-center text-center p-2 text-[11px] text-zinc-400" title={t('Sin ficha en TMDB (todavía)')}>
-                      {f.title}
-                    </div>
-                  )}
-                  <div className="flex items-baseline gap-1.5">
-                    <button
-                      onClick={() => setEditar(f)}
-                      title={t('Corregir el emparejado con TMDB a mano')}
-                      className="text-[11px] text-zinc-600 hover:text-gold-400 shrink-0 cursor-pointer"
-                    >
-                      ✎
-                    </button>
-                    {f.rank && (
-                      <span className="text-[11px] text-gold-400 font-semibold tabular shrink-0" title={f.tied ? t('Puesto {n} (empate)', { n: f.rank }) : t('Puesto {n}', { n: f.rank })}>
-                        #{f.rank}
-                      </span>
-                    )}
-                    {/* no todo lo que está en un canon es cine: Sight & Sound
-                        metió «Twin Peaks: The Return» en 2022 y es una serie.
-                        Decirlo evita que su hueco parezca un emparejado roto. */}
-                    {f.tv && (
-                      <span className="badge-quiet text-zinc-500 mt-1" title={t('Es una serie de televisión: no tiene ficha de película en TMDB')}>
-                        {t('serie de televisión')}
-                      </span>
-                    )}
-                    {f.director && (
-                      /* una estrella POR persona: una película con dos
-                         directores tiene dos perfiles que seguir por separado */
-                      <div className="flex flex-col items-start">
-                        {splitDirectors(f.director).map((d) => (
-                          /* la estrella sigue siendo el botón de seguir; el
-                             NOMBRE lleva a su ficha, la tengas fichada o no */
-                          <span key={d} className="mt-1 text-[11px] leading-tight flex items-baseline gap-1">
-                            <button
-                              onClick={() => followDirector(d)}
-                              disabled={dirBusy === d || followedDirs.has(d)}
-                              className="text-zinc-400 hover:text-gold-400 cursor-pointer disabled:cursor-default shrink-0"
-                              title={followedDirs.has(d) ? t('Ya en favoritos') : t('Seguir a {name} como director/a', { name: d })}
-                            >
-                              {followedDirs.has(d) ? '⭐' : dirBusy === d ? '…' : '☆'}
-                            </button>
-                            <EnlacePersona nombre={d} className="text-zinc-400 text-left" />
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {pintadas.map((f, i) => {
+                  const dirs = dirsDe.get(f) || [];
+                  return (
+                    <FestivalCard
+                      key={f.tmdb_id || `${f.title}-${i}`}
+                      f={f}
+                      dirs={dirs}
+                      inRadarr={!!f.tmdb_id && radarrIds.has(f.tmdb_id)}
+                      followedStr={dirs.filter((d) => followedDirs.has(d)).join('\n')}
+                      busyDir={dirs.includes(dirBusy) ? dirBusy : null}
+                      onFollow={followDirector}
+                      onEdit={abrirEditor}
+                      onAdded={onAdded}
+                    />
+                  );
+                })}
+              </div>
+              {pintadas.length < shown.length && (
+                <div ref={sentinel} className="py-6 text-center text-xs text-zinc-500">
+                  {t('{n} más…', { n: shown.length - pintadas.length })}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </>
       )}

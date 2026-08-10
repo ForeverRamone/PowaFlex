@@ -1147,7 +1147,7 @@ export const OSCAR_BEST_PICTURE = [
  {
   "title": "No Country for Old Men",
   "year": 2007,
-  "director": "Joel Coen, Ethan Coen, Q138950471",
+  "director": "Joel Coen, Ethan Coen",
   "tmdb_id": 6977,
   "winner": true
  },
@@ -1749,7 +1749,7 @@ export const OSCAR_BEST_PICTURE = [
  {
   "title": "Awakenings",
   "year": 1990,
-  "director": "Penny Marshall, Alain Cuniot",
+  "director": "Penny Marshall",
   "tmdb_id": 11005,
   "winner": false
  },
@@ -3415,7 +3415,7 @@ export const OSCAR_BEST_PICTURE = [
  {
   "title": "The Ox-Bow Incident",
   "year": 1943,
-  "director": "William A. Wellman, James Tinling",
+  "director": "William A. Wellman",
   "tmdb_id": 980,
   "winner": false
  },

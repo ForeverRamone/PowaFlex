@@ -50,7 +50,7 @@ test('sin nada cacheado se sale a la red', async () => {
  */
 test('el emparejado de festivales sobrevive de sobra a la caché de la página', () => {
   const DIA = 24 * 3600 * 1000;
-  cacheWrite('film_match:v2:prueba:2020:director', { id: 42 });
+  cacheWrite('film_match:v3:prueba:2020:director', { id: 42 });
   // a los 60 días (el doble de lo que vive la página del palmarés) sigue ahí
-  assert.ok(cacheRead('film_match:v2:prueba:2020:director', 365 * DIA), 'debería seguir vivo');
+  assert.ok(cacheRead('film_match:v3:prueba:2020:director', 365 * DIA), 'debería seguir vivo');
 });

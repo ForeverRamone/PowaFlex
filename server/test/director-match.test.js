@@ -102,6 +102,9 @@ test('los nombres con ł, ø o ı casan entre Wikidata y TMDB', async () => {
   // y la letra se convierte, no se borra
   assert.equal(foldName('Małgorzata'), 'Malgorzata');
   assert.equal(normName('Małgorzata'), 'malgorzata');
+  // la Ł MAYÚSCULA también: un apellido que empieza por ella («Łoziński»)
+  // perdía su inicial y ya no casaba con el «Lozinski» de TMDB
+  assert.equal(normName('Łoziński'), 'lozinski');
 });
 
 test('plegar letras no confunde a personas distintas', async () => {

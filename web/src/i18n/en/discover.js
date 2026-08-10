@@ -37,8 +37,8 @@ export default {
   'Más huecos primero': 'Most gaps first',
   'Más películas en tu Plex': 'Most movies in your Plex',
   'Menos completos primero': 'Least complete first',
-  'Alfabético (A-Z)': 'Alphabetical (A-Z)',
-  'Nota media Σ': 'Average rating Σ',
+  'Nombre (A-Z)': 'Name (A-Z)',
+  'Nota combinada Σ': 'Combined rating Σ',
   'Más votadas': 'Most voted',
   'Más recientes': 'Newest first',
   'Más antiguas': 'Oldest first',
@@ -60,7 +60,7 @@ export default {
   'Todas las películas juntas': 'All movies together',
   'Ordenar:': 'Sort:',
   'Vuelve la página a su estado de fábrica: vista, orden, nota mínima y filtros de tipo': 'Resets the page to its factory state: view, sort, minimum rating and type filters',
-  'Limpiar filtros': 'Clear filters',
+  '✕ Limpiar filtros': '✕ Clear filters',
   'Cargando…': 'Loading…',
   'Ver más ({shown} de {total})': 'Show more ({shown} of {total})',
 
@@ -75,6 +75,8 @@ export default {
   '{n} nombres': '{n} names',
   'Se actualiza solo con el ranking de TMDB': 'Updates itself from the TMDB ranking',
   'Borrar esta lista': 'Delete this list',
+  '¿Borrar la lista «{name}»? No hay papelera: habría que volver a pegar los nombres.':
+    'Delete the list “{name}”? There is no trash bin: you would have to paste the names again.',
 
   // grandes ausentes
   'No se ha podido abrir su ficha': 'Could not open their page',
@@ -105,7 +107,6 @@ export default {
   'Fallecidos': 'Deceased',
   'Continente': 'Continent',
   'País (nacimiento)': 'Country (birth)',
-  'Limpiar': 'Clear',
   'Datos demográficos de {n} personas · amplíalos en Ajustes → «Actualizar estado vital»': 'Demographic data for {n} people · expand it in Settings → “Update life status”',
   'Faceta:': 'Facet:',
 

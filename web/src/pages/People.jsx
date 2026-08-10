@@ -66,17 +66,22 @@ export default function People() {
   const secundarios = roles.filter((r) => !r.principal);
 
   // los filtros sobreviven a la navegación (adelante, atrás, otra página y
-  // vuelta) hasta que se pulse «Limpiar»
+  // vuelta) hasta que se pulse «Limpiar». Comparten clave con los demográficos
+  // de Descubrir: elegir «mujeres españolas» en una página vale en la otra.
+  // La primera lectura hereda de las claves viejas de cada página.
   const [f, setF] = useState(() => {
     const vacio = { gender: '', life: '', continent: '', country: '' };
     try {
-      return { ...vacio, ...JSON.parse(localStorage.getItem('people_filters') || '{}') };
+      const crudo = localStorage.getItem('demo_filters')
+        ?? localStorage.getItem('people_filters')
+        ?? localStorage.getItem('gaps_demo_filters');
+      return { ...vacio, ...JSON.parse(crudo || '{}') };
     } catch {
       return vacio;
     }
   });
   useEffect(() => {
-    localStorage.setItem('people_filters', JSON.stringify(f));
+    localStorage.setItem('demo_filters', JSON.stringify(f));
   }, [f]);
 
   useEffect(() => {
