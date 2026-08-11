@@ -25,6 +25,16 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.15',
+    fecha: '2026-08-11',
+    titular: 'Tres arreglos del emparejado, vistos en el palmarés recién estrenado',
+    puntos: [
+      'El Ástor de Oro de 1959 de Mar del Plata apuntaba al making-of de «Fresas salvajes» en vez de a la película de Bergman: los dos son de 1957 y los dos los firma él. Ahora el emparejado compara con los DOS nombres que trae cada fila —el internacional y el original—, que es lo que hacía falta para separarlos. De paso se rescatan otras tres películas que estaban sin cartel.',
+      '«Paradise Is Burning» salía dirigida por Nima Yousefi, que es su productor, y «Triangle of Sadness» por Erik Hemmendorff en vez de por Ruben Östlund. Venía mal de Wikipedia, que en el palmarés sueco pone productores en la columna de dirección: ahora, cuando la ficha se reconoce por el equipo, la dirección se toma de TMDB.',
+      'El Guldbagge de 2025 sigue sin aparecer, y no es cosa de la app: la lista de Wikipedia que se lee termina en 2024. El premio sí se falló en enero (Eagles of the Republic), pero nadie ha llevado el dato a esa página. Aparecerá solo en cuanto alguien la edite.',
+    ],
+  },
+  {
     label: 'Beta 1.14',
     fecha: '2026-08-11',
     titular: 'Trece premios nuevos y una vista que enseña lo mejor de un año entero',

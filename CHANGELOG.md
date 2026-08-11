@@ -1,5 +1,31 @@
 # Changelog
 
+## Beta 1.15 (1.0.15-beta) — 2026-08-11
+
+**Tres arreglos del emparejado que salieron de mirar el palmarés recién estrenado: el Ástor de 1959 apuntaba al making-of, «Paradise Is Burning» salía firmada por su productor y el Guldbagge de 2025 no está porque Wikipedia no lo ha escrito.**
+
+### El emparejado compara con los DOS títulos de la fila
+
+Cada fila de Wikipedia nombra la misma película dos veces —título internacional y original— y solo se comparaba con el primero. Eso dejaba fuera al candidato que TMDB guarda por el original (el Ástor de 1959 es *Smultronstället*, y TMDB lo tiene como *Fresas salvajes*) y, peor, abría la puerta a que ganara un parecido: ese año acabó emparejado con ***Bakomfilm Smultronstället*, el making-of**, que también es de 1957 y también lo firma Bergman.
+
+Ahora los dos nombres cuentan como prueba, que es lo que son. No es una relajación: son dos maneras de nombrar la misma película, y la verificación de dirección sigue intacta. Mar del Plata era el caso claro —sus títulos internacionales son traducciones libres y el original es exacto— pero vale para todos. **De 13 películas sin casar a 9** en los 32 palmareses (2.000 fichas): se rescata también *King of Ping Pong* de Sundance.
+
+### La dirección de las fichas rescatadas por el equipo sale de TMDB
+
+La Beta 1.14 estrenó la vuelta que rescata fichas verificando contra producción y guion, para la columna «Director(s)» del Guldbagge que trae productores. Pero la ficha se quedaba con el nombre de la celda: ***Paradise Is Burning* aparecía dirigida por Nima Yousefi**, que es su productor —la dirige Mika Gustafson—, y *Triangle of Sadness* por Erik Hemmendorff en vez de Ruben Östlund.
+
+Cuando el rescate es por el equipo ya se sabe que esa celda no traía dirección, diga lo que diga su cabecera: la dirección buena es la de TMDB, y viaja también en la caché por película para que no vuelva el nombre malo al caducar la página.
+
+### Cachés
+
+`festival` v12 → v13 y, sobre todo, **`film_match` v3 → v4**: esa caché dura un AÑO y no la barre el bump de `festival`, así que sin subirla los aciertos viejos —el making-of de Bergman incluido— habrían sobrevivido a la versión nueva. Queda anotado donde se construye la clave.
+
+### Lo que NO se puede arreglar desde aquí
+
+**El Guldbagge de 2025 falta porque Wikipedia no lo ha publicado.** La lista que lee la app, [Guldbagge Award for Best Film](https://en.wikipedia.org/wiki/Guldbagge_Award_for_Best_Film), termina en 2024 (60.ª edición). La 61.ª sí se falló —enero de 2026, *Eagles of the Republic* de Tarik Saleh— y tiene su propio artículo, pero nadie ha llevado el dato a la lista. Aparecerá solo en cuanto alguien lo edite; mientras tanto sale como «sin fallar todavía» en «Lo mejor del año», que es la verdad que la fuente sostiene.
+
+275 tests.
+
 ## Beta 1.14 (1.0.14-beta) — 2026-08-11
 
 **Trece premios nuevos en Festivales, la vista «Lo mejor del año» que cruza los treinta y ocho palmareses por un año, y seis fallos del parser de Wikipedia que solo se veían al meter tablas nuevas.**

@@ -1472,7 +1472,15 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
     ? candidatos.filter((c) => !c.date || Math.abs(Number(c.date.slice(0, 4)) - year) <= 1)
     : [...candidatos];
 
-  const wanted = normName(row.title);
+  // Los DOS títulos con los que la fila nombra a la MISMA película: el
+  // internacional y el original. Comparar solo con el primero dejaba fuera al
+  // candidato que TMDB guarda por el original —el Ástor de 1959 es
+  // «Smultronstället», y TMDB lo tiene como «Fresas salvajes»— y, peor, abría
+  // la puerta a que ganara un parecido: ese año acabó emparejado con
+  // «Bakomfilm Smultronstället», el MAKING-OF, que también es de 1957 y
+  // también lo firma Bergman. Dos nombres de la misma película son dos
+  // pruebas igual de buenas, no una relajación.
+  const deseados = [...new Set([normName(row.title), normName(row.original_title)].filter(Boolean))];
   // «Clavado» tolera UNA cosa: letras dobladas de más o de menos. «Angelo
   // azzuro» es una errata de Wikipedia (Orizzonti 2026) que TMDB escribe
   // «Angelo Azzurro», y sin esto la búsqueda ni siquiera la consideraba título
@@ -1481,9 +1489,10 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
   const plegado = (s) => String(s || '').replace(/([a-z])\1+/g, '$1');
   const clava = (s) => {
     const n = normName(s);
+    if (!n) return false;
     // el plegado de dobles solo con cuerpo: «Anna» y «Ana» son DOS películas
     // distintas y con cuatro letras no hay errata que valga
-    return n === wanted || (wanted.length >= 5 && plegado(n) === plegado(wanted));
+    return deseados.some((w) => n === w || (w.length >= 5 && plegado(n) === plegado(w)));
   };
   const tituloClavado = (c) => clava(c.title) || clava(c.original_title);
   // Para filas SIN director, el título es la única prueba y se pide clavado —
@@ -1498,7 +1507,8 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
     return largo.includes(corto) && largo.length - corto.length >= 8;
   };
   const tituloBastaSinDirector = (c) =>
-    tituloClavado(c) || contiene(normName(c.title), wanted) || contiene(normName(c.original_title || ''), wanted);
+    tituloClavado(c) ||
+    deseados.some((w) => contiene(normName(c.title), w) || contiene(normName(c.original_title || ''), w));
   const distAño = (c) => (c.date && Number.isFinite(year) ? Math.abs(Number(c.date.slice(0, 4)) - year) : 0.5);
   enVentana.sort(
     (a, b) =>
@@ -1509,6 +1519,7 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
 
   let tmdbId = null;
   let fallosRed = false;
+  let porEquipo = false;
   const sinCreditos = [];
   for (const c of enVentana) {
     // null = fallo de red (no «sin créditos»). Se ABORTA la resolución de esta
@@ -1573,7 +1584,7 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
         // «Tie Xi Qu: West of the Tracks». Se acepta que lo CONTENGA, pero solo
         // en títulos largos — dejar que «M» o «Vertigo» casen por estar dentro
         // de otro título sería colar cualquier cosa.
-        clavaAqui = en === wanted || (wanted.length >= 8 && en.includes(wanted));
+        clavaAqui = deseados.some((w) => en === w || (w.length >= 8 && en.includes(w)));
       }
       if (!clavaAqui) continue;
       const dirs = await dirsDe(c.id);
@@ -1638,6 +1649,7 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
       if (equipo === FICHA_FANTASMA) continue;
       if (equipo.length && directorsMatch(row.director, equipo)) {
         tmdbId = c.id;
+        porEquipo = true; // quien llama sabrá que la celda NO traía dirección
         break;
       }
     }
@@ -1651,7 +1663,7 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
     const c = sinCreditos.find((x) => (row.director ? tituloClavado(x) : tituloBastaSinDirector(x)));
     if (c) tmdbId = c.id;
   }
-  return { tmdbId, fallosRed };
+  return { tmdbId, fallosRed, porEquipo };
 }
 
 /**
@@ -1761,7 +1773,12 @@ export async function resolveFilms(rows, yearOf) {
       // v3: la entrada guarda también poster_path y date. Antes solo llevaba
       // {id} y reconstruir la página caducada pedía movieSummary de CADA
       // película: en las 1001, mil GETs a TMDB para repetir lo ya sabido.
-      const matchKey = `film_match:v3:${claveBase}`;
+      // v4: y la dirección corregida de las fichas rescatadas por el equipo.
+      // OJO: esta caché dura un AÑO y NO la barre el bump de `festival`, así
+      // que cuando cambian las reglas del emparejado hay que subir ESTE número
+      // o los aciertos viejos —«Smultronstället» emparejado con su making-of—
+      // sobreviven a la versión nueva.
+      const matchKey = `film_match:v4:${claveBase}`;
       // corrección manual: ni búsqueda ni verificación, lo que dijo el usuario
       const override = overrides.has(claveBase) ? overrides.get(claveBase) : undefined;
       // Un año de vida, MUY por encima de los 30 días de la página: «este
@@ -1786,6 +1803,8 @@ export async function resolveFilms(rows, yearOf) {
         }
         films[idx] = {
           ...r,
+          // la dirección corregida (ver `direccionReal`) viaja en la entrada
+          director: matchHit.director || r.director,
           tmdb_id: matchHit.id,
           poster_path: sum?.poster_path || null,
           date: sum?.date || null,
@@ -1818,7 +1837,7 @@ export async function resolveFilms(rows, yearOf) {
           if (!vistos.has(c.id)) cands.push(c);
         }
       }
-      let { tmdbId, fallosRed } = await elegirCandidato(
+      let { tmdbId, fallosRed, porEquipo } = await elegirCandidato(
         r, y, cands, inLib,
         // un 404 es una ficha fantasma (saltar), cualquier otro fallo es red (abortar)
         (id) => movieDirectors(id).catch((e) => (esFichaFantasma(e) ? FICHA_FANTASMA : null)),
@@ -1845,15 +1864,31 @@ export async function resolveFilms(rows, yearOf) {
           fichaCoja = true; // ficha coja: no cachear la página, reintentar luego
         }
       }
+      // Si la ficha se rescató por el EQUIPO, la celda de Wikipedia no traía
+      // dirección por mucho que su cabecera dijera «Director(s)»: eran los
+      // productores. La dirección buena es la de TMDB — «Paradise Is Burning»
+      // salía firmada por su productor, Nima Yousefi, y la dirige Mika
+      // Gustafson. Va también a la caché por película, que dura un año: si no,
+      // volvía el nombre malo en cuanto caducara la página.
+      let direccionReal = null;
+      if (tmdbId && porEquipo && !fallosRed) {
+        const reales = await movieDirectors(tmdbId).catch(() => null);
+        if (reales?.length) direccionReal = reales.join(', ');
+      }
       // el emparejado limpio se guarda por película: los reintentos tras un
       // corte de red solo tocan lo que falló. Con la ficha a mano se guardan
       // también cartel y fecha; coja, solo el id (el hit los completará)
       if (tmdbId && !fallosRed) {
-        cacheWrite(matchKey, sum ? { id: tmdbId, poster_path: sum.poster_path || null, date: sum.date || null } : { id: tmdbId });
+        const guardar = sum
+          ? { id: tmdbId, poster_path: sum.poster_path || null, date: sum.date || null }
+          : { id: tmdbId };
+        if (direccionReal) guardar.director = direccionReal;
+        cacheWrite(matchKey, guardar);
       }
       if (fallosRed || fichaCoja) errors++;
       films[idx] = {
         ...r,
+        director: direccionReal || r.director,
         tmdb_id: tmdbId,
         poster_path: sum?.poster_path || null,
         date: sum?.date || null,

@@ -71,7 +71,12 @@ export const CACHE_VERSIONS = {
   // que es, una serie; y la comparación de dirección tolera los diminutivos
   // ingleses («Tom» por «Thomas», «Rick» por «Richard»). Lo cacheado antes
   // lleva esos fallos.
-  festival: 12,
+  // v13: el emparejado compara con los DOS títulos de la fila (el internacional
+  // y el original), que es lo que separa «Smultronstället» de su making-of; un
+  // 404 de TMDB ya no aborta la resolución entera; y la dirección de las fichas
+  // rescatadas por el equipo sale de TMDB, no de la celda que decía dirección y
+  // traía productores. Lo cacheado antes lleva esos emparejados y esos nombres.
+  festival: 13,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)
