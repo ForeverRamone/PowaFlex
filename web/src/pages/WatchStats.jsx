@@ -238,26 +238,29 @@ export default function WatchStats() {
 
       {lbCompare?.length > 0 && (
         <Section title={t('Tus notas de Letterboxd vs. la comunidad')}>
+          {/* mismo caso que la tabla de archivos pesados del Taller: cinco
+              columnas no caben en 375 px y sin ancho mínimo se aplastan unas
+              contra otras en vez de dejar desplazar */}
           <div className="card p-4 overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[34rem] text-sm">
               <thead>
                 <tr className="text-zinc-500 text-left border-b border-ink-700">
-                  <th className="py-2">{t('Título')}</th><th>{t('Año')}</th>
-                  <th className="text-right">{t('Tu nota /10')}</th>
-                  <th className="text-right">{t('Comunidad LB /10')}</th>
+                  <th className="py-2 pr-3">{t('Título')}</th><th className="pr-3">{t('Año')}</th>
+                  <th className="text-right pr-3">{t('Tu nota /10')}</th>
+                  <th className="text-right pr-3">{t('Comunidad LB /10')}</th>
                   <th className="text-right">Σ MDBList</th>
                 </tr>
               </thead>
               <tbody>
                 {lbCompare.slice(0, 200).map((m) => (
                   <tr key={m.rating_key} className="border-b border-ink-800">
-                    <td className="py-1.5 text-zinc-200">
+                    <td className="py-1.5 pr-3 text-zinc-200">
                       <button className="hover:text-gold-400 text-left" onClick={() => setSelected(m.rating_key)}>{m.title}</button>
                     </td>
-                    <td className="text-zinc-500">{m.year}</td>
-                    <td className="text-right text-gold-400">{m.lb?.toFixed(1)}</td>
-                    <td className="text-right text-orange-300">{m.community != null ? m.community.toFixed(1) : '—'}</td>
-                    <td className="text-right text-zinc-400">{m.mdb_score ?? '—'}</td>
+                    <td className="text-zinc-500 pr-3 whitespace-nowrap">{m.year}</td>
+                    <td className="text-right text-gold-400 pr-3 whitespace-nowrap">{m.lb?.toFixed(1)}</td>
+                    <td className="text-right text-orange-300 pr-3 whitespace-nowrap">{m.community != null ? m.community.toFixed(1) : '—'}</td>
+                    <td className="text-right text-zinc-400 whitespace-nowrap">{m.mdb_score ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

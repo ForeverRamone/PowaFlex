@@ -253,8 +253,11 @@ export default function Quality({ embedded = false }) {
                 </>
               )}
 
+              {/* el `ml-auto` empuja a la derecha en la barra de una sola línea
+                  del escritorio; en móvil la barra se parte y ese empujón deja
+                  el botón sangrado a media línea, así que ahí va a lo ancho */}
               {shownUpgrades.length > 0 && (
-                <button className="btn-gold !py-1.5 text-xs ml-auto" onClick={requestAllUpgrades} disabled={bulkBusy}>
+                <button className="btn-gold !py-1.5 text-xs w-full sm:w-auto sm:ml-auto" onClick={requestAllUpgrades} disabled={bulkBusy}>
                   {bulkBusy
                     ? t('Pidiendo…')
                     : t('Pedir {n} a Radarr', { n: pendingUpgradeIds.length }) + (jwFilter === 'mejor' ? '' : t(' (todas las visibles)'))}
@@ -369,23 +372,28 @@ export default function Quality({ embedded = false }) {
       )}
 
       <Section title={t('Los 30 archivos más pesados')}>
+        {/* Una tabla de cinco columnas NO cabe en 375 px: con `w-full` a secas
+            se encoge hasta que el año se pega a la resolución («20041080») y el
+            códec al tamaño. El ancho mínimo la deja desbordar DENTRO de su
+            propio scroll horizontal, que es justo para lo que está el
+            overflow-x-auto del contenedor. */}
         <div className="card p-4 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[34rem] text-sm">
             <thead>
               <tr className="text-zinc-500 text-left border-b border-ink-700">
-                <th className="py-2">{t('Título')}</th><th>{t('Año')}</th><th>{t('Resolución')}</th><th>{t('Códec')}</th><th className="text-right">{t('Tamaño')}</th>
+                <th className="py-2 pr-3">{t('Título')}</th><th className="pr-3">{t('Año')}</th><th className="pr-3">{t('Resolución')}</th><th className="pr-3">{t('Códec')}</th><th className="text-right">{t('Tamaño')}</th>
               </tr>
             </thead>
             <tbody>
               {ov.largest.map((m) => (
                 <tr key={m.rating_key} className="border-b border-ink-800">
-                  <td className="py-1.5">
-                    <button className="text-zinc-200 hover:text-gold-400" onClick={() => setSelected(m.rating_key)}>{m.title}</button>
+                  <td className="py-1.5 pr-3">
+                    <button className="text-zinc-200 hover:text-gold-400 text-left" onClick={() => setSelected(m.rating_key)}>{m.title}</button>
                   </td>
-                  <td className="text-zinc-500">{m.year}</td>
-                  <td className="text-zinc-400">{m.resolution}</td>
-                  <td className="text-zinc-400">{m.video_codec}</td>
-                  <td className="text-right text-gold-400">{fmtBytes(m.size_bytes)}</td>
+                  <td className="text-zinc-500 pr-3 whitespace-nowrap">{m.year}</td>
+                  <td className="text-zinc-400 pr-3 whitespace-nowrap">{m.resolution}</td>
+                  <td className="text-zinc-400 pr-3 whitespace-nowrap">{m.video_codec}</td>
+                  <td className="text-right text-gold-400 whitespace-nowrap">{fmtBytes(m.size_bytes)}</td>
                 </tr>
               ))}
             </tbody>

@@ -25,6 +25,20 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.17',
+    fecha: '2026-08-11',
+    titular: 'Los palmareses viejos vienen dentro de la app: Wikipedia se queda para lo que se mueve',
+    puntos: [
+      'Los años cerrados ya no se preguntan por ahí: 4.794 películas de 31 palmareses, hasta 2024, vienen guardadas con la aplicación y con su ficha de TMDB ya emparejada. «Lo mejor de 1998» tardaba 13,7 segundos y ahora tarda 2,1; el palmarés de Cannes, 27,5 y ahora 4,2. La temporada en curso se sigue leyendo de Wikipedia, que es lo único que todavía cambia.',
+      'Y si Wikipedia se cae, cambia el formato de una tabla o mueve un artículo, lo viejo se sigue viendo igual en vez de dejarte la página con un error.',
+      'Dos festivales nuevos: la Seminci de Valladolid (70 Espigas de Oro desde 1958, con su dirección y su país) y Sitges (46 ganadoras desde 1972). Con ellos son cuarenta festivales y premios, y los dos entran también en «Lo mejor del año».',
+      'Al meter esas dos tablas salieron a la luz fallos viejos del lector de Wikipedia: el país que faltaba en media Cannes y media Venecia ya aparece, y 28 fichas que llevaban el título original metido en el campo del director están arregladas (la Concha de Oro de 1977, el Óscar de 1955, la Cámara de Oro de 2000 y catorce nominadas de Toronto).',
+      'Mirando las 46 fichas de Sitges una a una aparecieron cuatro emparejamientos falsos que ninguna cifra delataba: la ganadora de 2000 apuntaba a una película de 2025 que se llama igual, y el «Ringu» de 1999 a una versión de televisión de 1995. Cuando una fila no dice quién dirige, ahora el año tiene que cuadrar: hasta tres años antes del premio, uno después.',
+      'Directores emergentes mira también los palmareses, empezando por la Cámara de Oro de Cannes, que es el premio a la mejor ópera prima y era la mejor pista que teníamos sin usar. Ahora caben hasta cinco películas —antes tres— y salen 47 nombres en vez de 33, con gente que solo llegaba por el Goya o el César. Quien ya ganó la Palma, el León o el Oso deja de contar como promesa.',
+      'En el móvil, la tabla de archivos más pesados del Taller se aplastaba hasta pegar el año con la resolución («20041080»); ahora se desliza de lado y se lee. Igual la de tus notas de Letterboxd en Visionado.',
+    ],
+  },
+  {
     label: 'Beta 1.16',
     fecha: '2026-08-11',
     titular: 'Si la lista de un premio se queda atrás, se mira la edición de ese año',

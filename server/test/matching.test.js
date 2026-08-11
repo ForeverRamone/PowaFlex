@@ -336,32 +336,85 @@ test('la contención exige un subtítulo de verdad: Halloween II no es Halloween
   assert.equal(subtitulo.tmdbId, 92);
 });
 
-// La segunda vuelta sin ventana de año también para filas SIN director: un
-// candidato fechado a 2+ años no podía casar por NINGUNA vía (la ventana no lo
-// mira y peliculaPorDirector necesita un nombre). Se exige la misma prueba
-// doble que la ventana ya les pide: título clavado y ficha con equipo.
-test('sin director, el título clavado fuera de la ventana también empareja', async () => {
+/**
+ * La segunda vuelta para filas SIN director: con el candidato fechado a 2+ años
+ * la ventana de ±1 no lo mira y `peliculaPorDirector` necesita un nombre, así
+ * que la película no podía casar por NINGUNA vía. Se exige la misma prueba
+ * doble que la ventana ya les pide (título clavado y ficha con equipo) Y que el
+ * año siga sosteniéndose: la ventana de esta vuelta es asimétrica —hasta tres
+ * años ATRÁS, uno hacia delante— porque sin dirección el año es la otra mitad
+ * de la prueba y un premio no se lo lleva una película que aún no existe.
+ *
+ * Lo que enseñó Sitges, que es el primer palmarés entero sin columna de
+ * dirección: sin acotar el año, «In the Light of the Moon» (el otro nombre de
+ * «Ed Gein», 2000) se emparejaba con una película de 2025 que se llama igual, y
+ * el «Ringu» de 1999 con la versión de televisión de 1995. Las dos con título
+ * clavado y equipo acreditado, que era todo lo que se les pedía.
+ */
+test('sin director, el título clavado casa dentro del margen de años y no fuera', async () => {
   const { elegirCandidato } = await import('../src/festivals.js');
-  const candidato = { id: 101, title: 'La oreja', original_title: 'Ucho', date: '1990-01-01' };
-  // título clavado (vía el internacional exacto) y ficha con equipo: sí
-  const clavado = await elegirCandidato(
-    { title: 'The Ear', director: null }, 1970, [candidato],
-    new Set(), async () => ['Karel Kachyňa'], async () => 'The Ear'
+  // «The Cremator» es de 1969 y ganó Sitges en 1972: tres años atrás, con el
+  // título clavado por el internacional y ficha con equipo
+  const viejaDeVerdad = await elegirCandidato(
+    { title: 'The Cremator', director: null }, 1972,
+    [{ id: 101, title: 'El incinerador de cadáveres', original_title: 'Spalovač mrtvol', date: '1969-03-14' }],
+    new Set(), async () => ['Juraj Herz'], async () => 'The Cremator'
   );
-  assert.equal(clavado.tmdbId, 101);
+  assert.equal(viejaDeVerdad.tmdbId, 101);
+  // la misma prueba, pero con la ficha veinticinco años POSTERIOR al premio:
+  // eso ya no es la película que ganó nada
+  const delFuturo = await elegirCandidato(
+    { title: 'In the Light of the Moon', director: null }, 2000,
+    [{ id: 102, title: 'In The Light Of The Moon', original_title: 'In The Light Of The Moon', date: '2025-04-28' }],
+    new Set(), async () => ['Otra Persona']
+  );
+  assert.equal(delFuturo.tmdbId, null);
+  // ni la de cuatro años antes, que es como se coló la versión de televisión
+  const demasiadoAtras = await elegirCandidato(
+    { title: 'Ringu', director: null }, 1999,
+    [{ id: 103, title: 'Ringu', original_title: 'リング', date: '1995-08-11' }],
+    new Set(), async () => ['Chisui Takigawa']
+  );
+  assert.equal(demasiadoAtras.tmdbId, null);
   // sin título clavado, no hay prueba ninguna: sin ficha
   const sinTitulo = await elegirCandidato(
-    { title: 'The Ear', director: null }, 1970, [candidato],
-    new Set(), async () => ['Karel Kachyňa'], async () => 'Otra cosa'
+    { title: 'The Cremator', director: null }, 1972,
+    [{ id: 101, title: 'El incinerador de cadáveres', original_title: 'Spalovač mrtvol', date: '1969-03-14' }],
+    new Set(), async () => ['Juraj Herz'], async () => 'Otra cosa'
   );
   assert.equal(sinTitulo.tmdbId, null);
   // y una ficha SIN créditos fuera de ventana tampoco: demasiado poco
   const sinCreditos = await elegirCandidato(
-    { title: 'The Ear', director: null }, 1970,
-    [{ id: 102, title: 'The Ear', original_title: 'The Ear', date: '1990-01-01' }],
+    { title: 'The Cremator', director: null }, 1972,
+    [{ id: 102, title: 'The Cremator', original_title: 'The Cremator', date: '1969-03-14' }],
     new Set(), async () => []
   );
   assert.equal(sinCreditos.tmdbId, null);
+});
+
+/**
+ * Y la ficha SIN FECHA (una película recién anunciada) solo vale de candidata
+ * cuando hay una dirección que la verifique. Sin director entra en la ventana Y
+ * ordena por delante de las fechadas, así que el homónimo fantasma le ganaba
+ * siempre a la película buena: el «The Cremator» de Sitges 1972 acabó en un
+ * documental nepalí sin fecha, y «The Invitation» de 2015, en un corto.
+ */
+test('sin director, una ficha sin fecha no le gana a la que sí la tiene', async () => {
+  const { elegirCandidato } = await import('../src/festivals.js');
+  const fantasma = { id: 201, title: 'The Invitation', original_title: 'The Invitation', date: null };
+  const buena = { id: 202, title: 'La invitación', original_title: 'The Invitation', date: '2016-04-08' };
+  const sinDirector = await elegirCandidato(
+    { title: 'The Invitation', director: null }, 2015, [fantasma, buena],
+    new Set(), async () => ['Karyn Kusama']
+  );
+  assert.equal(sinDirector.tmdbId, 202);
+  // con dirección en la fila, la ficha sin fecha sigue siendo candidata: ahí
+  // hay quien verifique, y es como casan los estrenos aún sin fecha
+  const conDirector = await elegirCandidato(
+    { title: 'The Invitation', director: 'Nadie Conocido' }, 2015, [fantasma],
+    new Set(), async () => ['Nadie Conocido']
+  );
+  assert.equal(conDirector.tmdbId, 201);
 });
 
 // resolveFilms con datasets fijos: las filas tv salen directas (sin gastar ni

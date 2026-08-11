@@ -5,6 +5,23 @@
 // en/app.js, y el titular «Festivales y premios» de la Alpha 0.9.5 ya existe
 // como nombre de página en en/app.js: aquí no se repiten.
 export default {
+  // ── Beta 1.17 ──────────────────────────────────────────────────────────────
+  'Los palmareses viejos vienen dentro de la app: Wikipedia se queda para lo que se mueve':
+    'The old award lists now ship inside the app: Wikipedia is left for what still moves',
+  'Los años cerrados ya no se preguntan por ahí: 4.794 películas de 31 palmareses, hasta 2024, vienen guardadas con la aplicación y con su ficha de TMDB ya emparejada. «Lo mejor de 1998» tardaba 13,7 segundos y ahora tarda 2,1; el palmarés de Cannes, 27,5 y ahora 4,2. La temporada en curso se sigue leyendo de Wikipedia, que es lo único que todavía cambia.':
+    'Closed years are no longer looked up: 4,794 movies from 31 award lists, up to 2024, now ship with the app with their TMDB match already done. “The best of 1998” used to take 13.7 seconds and now takes 2.1; the Cannes winners list, 27.5 and now 4.2. The current season is still read from Wikipedia, which is the only part that still changes.',
+  'Y si Wikipedia se cae, cambia el formato de una tabla o mueve un artículo, lo viejo se sigue viendo igual en vez de dejarte la página con un error.':
+    'And if Wikipedia goes down, changes a table layout or moves an article, the old years still show up instead of leaving you with an error page.',
+  'Dos festivales nuevos: la Seminci de Valladolid (70 Espigas de Oro desde 1958, con su dirección y su país) y Sitges (46 ganadoras desde 1972). Con ellos son cuarenta festivales y premios, y los dos entran también en «Lo mejor del año».':
+    'Two new festivals: Valladolid’s Seminci (70 Golden Spikes since 1958, with director and country) and Sitges (46 winners since 1972). That makes forty festivals and awards, and both also show up in “Best of the year”.',
+  'Al meter esas dos tablas salieron a la luz fallos viejos del lector de Wikipedia: el país que faltaba en media Cannes y media Venecia ya aparece, y 28 fichas que llevaban el título original metido en el campo del director están arregladas (la Concha de Oro de 1977, el Óscar de 1955, la Cámara de Oro de 2000 y catorce nominadas de Toronto).':
+    'Adding those two tables brought old Wikipedia-parser bugs to light: the country that was missing from half of Cannes and half of Venice is now there, and 28 entries that had the original title sitting in the director field are fixed (the 1977 Golden Shell, the 1955 Oscar, the 2000 Caméra d’Or and fourteen Toronto nominees).',
+  'Mirando las 46 fichas de Sitges una a una aparecieron cuatro emparejamientos falsos que ninguna cifra delataba: la ganadora de 2000 apuntaba a una película de 2025 que se llama igual, y el «Ringu» de 1999 a una versión de televisión de 1995. Cuando una fila no dice quién dirige, ahora el año tiene que cuadrar: hasta tres años antes del premio, uno después.':
+    'Going through Sitges’ 46 entries one by one turned up four false matches that no number gave away: the 2000 winner pointed at a 2025 movie with the same name, and 1999’s “Ringu” at a 1995 television version. When a row does not say who directed, the year now has to add up: up to three years before the award, one after.',
+  'Directores emergentes mira también los palmareses, empezando por la Cámara de Oro de Cannes, que es el premio a la mejor ópera prima y era la mejor pista que teníamos sin usar. Ahora caben hasta cinco películas —antes tres— y salen 47 nombres en vez de 33, con gente que solo llegaba por el Goya o el César. Quien ya ganó la Palma, el León o el Oso deja de contar como promesa.':
+    'Emerging directors now also watches the award lists, starting with Cannes’ Caméra d’Or, the best-first-feature prize and the strongest lead we had left unused. Up to five features now count — three before — and 47 names come out instead of 33, including people who only ever showed up through the Goya or the César. Anyone who has already won the Palme, the Lion or the Bear stops counting as a promise.',
+  'En el móvil, la tabla de archivos más pesados del Taller se aplastaba hasta pegar el año con la resolución («20041080»); ahora se desliza de lado y se lee. Igual la de tus notas de Letterboxd en Visionado.':
+    'On mobile, the Workshop’s heaviest-files table used to squash until the year touched the resolution (“20041080”); now it scrolls sideways and reads properly. Same for your Letterboxd ratings table under Watch history.',
   // ── Beta 1.13 ──────────────────────────────────────────────────────────────
   'Visionado tardaba nueve segundos por un índice que faltaba':
     'Watch history took nine seconds because of a missing index',

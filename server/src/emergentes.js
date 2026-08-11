@@ -42,7 +42,7 @@
 import { db, getSetting, setSetting } from './db.js';
 import { today } from './dates.js';
 import { normName } from './names.js';
-import { REGISTRY, editionRowsLight, winnersRowsLight, splitDirectors } from './festivals.js';
+import { REGISTRY, editionRowsLight, winnersRowsLight, awardRowsLight, splitDirectors } from './festivals.js';
 import {
   resolveCatalogDirector, personDetails, personCredits, enrichRuntimes,
   classifyGenres, featureRule, latinPersonName, geoDeLugar,
@@ -81,15 +81,88 @@ export const PESO_FESTIVAL = {
   horizontes: 18,
 };
 
-/** Los cánones y los premios de la Academia no son radar de emergentes. */
+/**
+ * LOS PALMARESES, que son la otra mitad del radar.
+ *
+ * `PESO_FESTIVAL` mira SELECCIONES: quién fue programado. Pero hay premios cuya
+ * lista de ganadoras y nominadas está llena de gente que acaba de llegar, y el
+ * detector no los miraba porque no tienen tabla de selección por año. El caso
+ * sangrante es la **Cámara de Oro**, que es literalmente el premio a la mejor
+ * ópera prima de Cannes: no había señal más pura de «emergente» en toda la app
+ * y se estaba tirando.
+ *
+ * El criterio para entrar aquí es ese: premios que ALCANZAN primeras y segundas
+ * películas. Las academias nacionales nominan al debut del año en su país
+ * (Goya, César, Guldbagge, Lola, Donatello), los festivales de clase A de fuera
+ * del eje descubren cine que Europa aún no ha visto (Mar del Plata, Seminci,
+ * Sitges), y el Óscar internacional recoge lo que cada país manda. Se quedan
+ * FUERA los que coronan carreras hechas —Óscar, Globos, los círculos de crítica
+ * de EE UU— y los cánones: ahí no hay emergentes que detectar, y meterlos solo
+ * subiría la puntuación de quien ya está consagrado.
+ *
+ * Pesan menos que una plaza en competición porque llegan más tarde: cuando un
+ * premio nacional te nombra, el festival ya te vio.
+ */
+export const PESO_PREMIO = {
+  camaradeoro: 36, // la ópera prima de TODO Cannes: la señal más pura que hay
+  efa: 22,
+  mardelplata: 22,
+  oscarint: 20,
+  goya: 20,
+  cesar: 20,
+  seminci: 20,
+  lola: 18,
+  sitges: 18,
+  bafta: 14,
+};
+
+/**
+ * Y los que se quedan fuera aunque sean premios de los que descubren, porque su
+ * tabla NO dice quién dirige:
+ *
+ *  - **Guldbagge**: su columna se titula «Director(s)» y en los años recientes
+ *    lista PRODUCTORES (por eso existe la última vuelta de `elegirCandidato`).
+ *    Metido aquí, el radar fichaba a Mattias Nohrborg —productor— como
+ *    promesa de la dirección sueca.
+ *  - **David di Donatello**: directamente no tiene columna de dirección
+ *    (`awardSinDirector`), así que sus filas llegan con el nombre en blanco y
+ *    no aportarían un solo candidato.
+ *
+ * Sitges tampoco la tiene, pero ahí no hay riesgo de confundir a nadie: sus
+ * filas llegan sin nombre y, cuando el palmarés ya está construido, la
+ * dirección viene de TMDB (que es de donde tiene que venir).
+ */
+export const PREMIOS_SIN_DIRECCION_FIABLE = ['guldbagge', 'donatello'];
+
+/** Los cánones y los premios que coronan carreras no son radar de emergentes. */
 export const RADAR = Object.keys(PESO_FESTIVAL);
+export const RADAR_PREMIOS = Object.keys(PESO_PREMIO);
+
+/** El peso de una plaza, venga de una selección o de un palmarés. */
+export const pesoDe = (key) => PESO_FESTIVAL[key] || PESO_PREMIO[key] || 0;
 
 // Ventana del radar y de la elegibilidad. Ocho años es el horizonte del plan:
 // más atrás ya no es una promesa, es una carrera.
 const VENTANA_AÑOS = 8;
-// Un cuarto largometraje ya no es un debutante. El límite es del plan y define
-// de qué estamos hablando: promesas, no directores consolidados.
-const MAX_LARGOS = 3;
+/**
+ * Y hasta cuándo se le sigue llamando promesa a alguien.
+ *
+ * Eran el mismo número, y con el límite de largos en cinco eso dejaba fuera
+ * justo a quien Ramón pedía: alguien con cuatro o cinco películas RARA VEZ las
+ * ha hecho en ocho años, así que el filtro de la obra no llegaba ni a
+ * aplicarse —lo echaba antes la fecha del debut—. Separados, el radar sigue
+ * mirando ocho años de ediciones (la presencia tiene que ser RECIENTE, ahí no
+ * se afloja nada) y la carrera puede haber empezado hasta doce atrás mientras
+ * quepa en cinco largos. Un ritmo así —cinco películas en doce años, y todavía
+ * en la competición de Cannes— es exactamente el perfil que se buscaba.
+ */
+const VENTANA_DEBUT = 12;
+// Cuántos largos caben todavía en «promesa». El plan puso tres; Ramón lo subió
+// a cinco al ampliar el radar a los palmareses, y encaja: quien ha hecho cinco
+// películas en menos de ocho años y sigue apareciendo en festivales grandes
+// está en plena subida, no consagrado. La otra mitad del filtro —haber debutado
+// dentro de la ventana— es la que impide que entre una carrera hecha.
+const MAX_LARGOS = 5;
 
 /**
  * Cuántos candidatos se resuelven contra TMDB por pasada.
@@ -147,7 +220,7 @@ const acotar = (x, min = 0, max = 1) => Math.min(max, Math.max(min, x));
  */
 export function puntosInstitucionales(apariciones = []) {
   const ps = apariciones
-    .map((a) => (PESO_FESTIVAL[a.festival] || 0) * (a.winner ? 2 : 1))
+    .map((a) => pesoDe(a.festival) * (a.winner ? 2 : 1))
     .filter((p) => p > 0)
     .sort((a, b) => b - a);
   if (!ps.length) return 0;
@@ -364,6 +437,27 @@ export async function recolectarApariciones({ years = VENTANA_AÑOS } = {}) {
       errores.push(`palmarés de ${key}: ${String(err.message || err)}`);
     }
   }
+
+  // LOS PALMARESES como fuente propia (ver PESO_PREMIO). Estos premios no tienen
+  // tabla de selección por año: su lista ES la aparición. Una llamada cacheada
+  // por premio, no una por año.
+  for (const key of RADAR_PREMIOS) {
+    if (!REGISTRY[key]) continue;
+    try {
+      const filas = await awardRowsLight(key);
+      let leidas = 0;
+      for (const r of filas) {
+        if (!r.year || r.year <= nowYear - years) continue;
+        leidas++;
+        for (const nombre of splitDirectors(r.director)) {
+          anotar(nombre, { festival: key, year: r.year, title: r.title, winner: !!r.winner });
+        }
+      }
+      if (leidas) edicionesLeidas.push(`${key}:palmarés`);
+    } catch (err) {
+      errores.push(`palmarés de ${key}: ${String(err.message || err)}`);
+    }
+  }
   return { candidatos: [...porNombre.values()], ediciones: edicionesLeidas, errores };
 }
 
@@ -411,15 +505,31 @@ const descartados = () => {
  * filtro de consolidados gratis: si Wikidata ya le cuenta cuatro largos o un
  * debut de hace quince años, no es una promesa.
  */
+/**
+ * Los tres premios que dejan de ser una promesa el día que los ganas. Ganar la
+ * Palma, el León o el Oso es la consagración, no el camino hacia ella —y el
+ * filtro por número de películas no lo ve: Chloé Zhao tiene cinco largos y un
+ * León de Oro, y al subir el límite a cinco se colaba en la lista de promesas.
+ * La Cámara de Oro, Un Certain Regard o la Semaine NO están aquí a propósito:
+ * ganar ahí es justo la señal contraria.
+ */
+const CORONAS = new Set(['cannes', 'venecia', 'berlinale']);
+
 export function mereceMirarse(cand, { nowYear, seguidos, fuera, catalogo = CATALOGO }) {
   if (seguidos.has(cand.clave)) return 'ya le sigues';
   if (fuera.has(cand.clave)) return 'descartado';
-  // cuatro ediciones distintas en ocho años es una carrera hecha
-  if (new Set(cand.apariciones.map((a) => `${a.festival}:${a.year}`)).size > 3) return 'ya consagrado';
+  if (cand.apariciones.some((a) => a.winner && CORONAS.has(a.festival))) return 'ya consagrado';
+  // Una carrera hecha se nota en las PELÍCULAS distintas que pasean por el
+  // radar, no en las apariciones: desde que también se leen los palmareses, una
+  // sola película puede sumar cinco (Cannes, Cámara de Oro, Goya, Seminci,
+  // EFA), y contando apariciones ese debut se descartaba solo por haber
+  // gustado. Más de cinco películas distintas en la ventana ya no es una
+  // promesa, y es el mismo número que MAX_LARGOS.
+  if (new Set(cand.apariciones.map((a) => normName(a.title))).size > MAX_LARGOS) return 'ya consagrado';
   const cat = catalogo.get(cand.clave);
   if (cat) {
     if (cat.features > MAX_LARGOS) return 'ya consagrado';
-    if (cat.first && cat.first < nowYear - VENTANA_AÑOS) return 'debutó hace demasiado';
+    if (cat.first && cat.first < nowYear - VENTANA_DEBUT) return 'debutó hace demasiado';
   }
   return null;
 }
@@ -533,7 +643,7 @@ export async function resolverCandidato(cand, { nowYear, hoy, gustos }) {
   if (!largos.length) return { descartado: 'aún sin largometraje estrenado' };
   if (largos.length > MAX_LARGOS) return { descartado: `${largos.length} largos: ya no es un debut` };
   const primerAño = Number(String(largos[0].date).slice(0, 4));
-  if (primerAño < nowYear - VENTANA_AÑOS) return { descartado: `debutó en ${primerAño}` };
+  if (primerAño < nowYear - VENTANA_DEBUT) return { descartado: `debutó en ${primerAño}` };
 
   // notas: las cacheadas y, si hay presupuesto de MDBList, las que falten
   await enrichWithScores(largos, { maxFetch: 40 });

@@ -358,7 +358,7 @@ export default function Festivals() {
       <PageHeader
         eyebrow={t('La caza')}
         title={t('Festivales y premios')}
-        subtitle={t('Las secciones oficiales de los grandes festivales (los seis de la vía Óscar, San Sebastián y Mar del Plata), el palmarés y las nominadas de los premios de cada año, los premios de la crítica gremial y los cánones.')}
+        subtitle={t('Las secciones oficiales de los grandes festivales (los seis de la vía Óscar, San Sebastián, Mar del Plata, Seminci y Sitges), el palmarés y las nominadas de los premios de cada año, los premios de la crítica gremial y los cánones.')}
       />
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">

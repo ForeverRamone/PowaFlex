@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 // base propia: este fichero escribe en las tablas de emergentes
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'powaflex-emerg-'));
 
 const { db } = await import('../src/db.js');
 const {
-  PESO_FESTIVAL, RADAR, PESOS_POR_DEFECTO,
+  PESO_FESTIVAL, PESO_PREMIO, PREMIOS_SIN_DIRECCION_FIABLE, RADAR, RADAR_PREMIOS, PESOS_POR_DEFECTO,
   puntosInstitucionales, senalInstitucional, senalCritica, senalTraccion,
   senalAceleracion, senalAfinidad, puntuar, mereceMirarse,
   descartarEmergente, recuperarEmergente, listaEmergentes,
@@ -26,12 +27,62 @@ test('todo lo que mira el radar existe en el REGISTRY', () => {
   for (const key of RADAR) assert.ok(REGISTRY[key], `«${key}» no está en el REGISTRY`);
 });
 
-test('el radar no mira cánones ni premios de la Academia', () => {
-  // Sight & Sound o el Óscar no descubren emergentes: son lo contrario
+/**
+ * La lista de nombres de la interfaz está escrita a mano, y ya sabemos cómo
+ * acaba eso: en la 1.08, `RadarrRules.jsx` enumeraba los tipos de regla a mano
+ * y el tipo nuevo se podía crear por la API sin que pintara NADA. Aquí el fallo
+ * sería más callado todavía —la ficha diría «camaradeoro 2025» en vez de
+ * «Cannes · Cámara de Oro»— así que se cruza.
+ */
+test('cada fuente del radar tiene nombre en la interfaz', () => {
+  const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const jsx = fs.readFileSync(path.join(raiz, 'web/src/pages/Emergentes.jsx'), 'utf8');
+  const bloque = jsx.slice(jsx.indexOf('const NOMBRE_FESTIVAL'), jsx.indexOf('const ORDENES'));
+  const nombrados = new Set([...bloque.matchAll(/^\s*([a-z]+):/gm)].map((m) => m[1]));
+  for (const key of [...RADAR, ...RADAR_PREMIOS]) {
+    assert.ok(nombrados.has(key), `«${key}» no tiene nombre en Emergentes.jsx: saldría el código crudo`);
+  }
+});
+
+test('los palmareses del radar también existen, y traen palmarés que leer', () => {
+  for (const key of RADAR_PREMIOS) {
+    const f = REGISTRY[key];
+    assert.ok(f, `«${key}» no está en el REGISTRY`);
+    assert.ok(f.awardPage || f.staticAward, `«${key}» no tiene palmarés que leer`);
+  }
+});
+
+test('el radar no mira cánones, ni los premios que coronan carreras hechas', () => {
+  // Sight & Sound no descubre emergentes: es lo contrario. Y de los premios
+  // solo entran los que ALCANZAN primeras películas (ver PESO_PREMIO): el
+  // Óscar, los Globos y los círculos de crítica de EE UU se quedan fuera.
   for (const key of RADAR) {
     assert.notEqual(REGISTRY[key].group, 'canon', key);
     assert.notEqual(REGISTRY[key].group, 'premio', key);
   }
+  for (const key of RADAR_PREMIOS) assert.notEqual(REGISTRY[key].group, 'canon', key);
+  for (const key of ['oscar', 'globosdrama', 'globoscomedia', 'nbr', 'nyfcc', 'lafca', 'chicago', 'boston', 'criticschoice']) {
+    assert.ok(!RADAR_PREMIOS.includes(key), `«${key}» corona carreras, no descubre emergentes`);
+  }
+});
+
+test('un premio cuya tabla no dice quién dirige no entra en el radar', () => {
+  // el Guldbagge titula su columna «Director(s)» y lista PRODUCTORES: metido en
+  // el radar, fichaba a un productor como promesa de la dirección sueca
+  for (const key of PREMIOS_SIN_DIRECCION_FIABLE) {
+    assert.ok(!RADAR_PREMIOS.includes(key), `«${key}» no dice quién dirige: no puede ser fuente de nombres`);
+  }
+});
+
+test('la Cámara de Oro es la señal más fuerte de los palmareses', () => {
+  // es literalmente el premio a la mejor ópera prima de todo Cannes
+  for (const [key, peso] of Object.entries(PESO_PREMIO)) {
+    if (key === 'camaradeoro') continue;
+    assert.ok(PESO_PREMIO.camaradeoro > peso, `camaradeoro debería pesar más que ${key}`);
+  }
+  // pero un palmarés nacional pesa menos que una plaza en competición: cuando
+  // un premio de tu país te nombra, el festival ya te vio
+  assert.ok(PESO_PREMIO.goya < PESO_FESTIVAL.cannes);
 });
 
 test('las secciones de debut pesan como las competiciones grandes', () => {
@@ -214,12 +265,31 @@ test('la ✕ se respeta también aquí', () => {
   assert.equal(criba(c, { fuera: new Set(['x']) }), 'descartado');
 });
 
-test('cuatro ediciones distintas en la ventana ya es una carrera hecha', () => {
+test('más películas distintas en la ventana que largos permitidos: carrera hecha', () => {
   const c = {
     clave: 'y', name: 'Y',
-    apariciones: [ap('cannes', 2025), ap('cannes', 2023), ap('venecia', 2021), ap('berlinale', 2019)],
+    apariciones: [
+      ap('cannes', 2025), ap('cannes', 2024), ap('venecia', 2023),
+      ap('berlinale', 2022), ap('tiff', 2021), ap('sundance', 2020),
+    ],
   };
   assert.equal(criba(c), 'ya consagrado');
+});
+
+test('UNA película que arrasa no es una carrera hecha', () => {
+  // desde que el radar lee también los palmareses, un solo debut puede sumar
+  // cinco apariciones el mismo año (Cannes, Cámara de Oro, Goya, Seminci,
+  // EFA). Contando apariciones en vez de películas, ese debut se descartaba
+  // solo por haber gustado.
+  const mismaPeli = { title: 'Su ópera prima' };
+  const c = {
+    clave: 'w', name: 'W',
+    apariciones: [
+      ap('cannes', 2025, mismaPeli), ap('camaradeoro', 2025, mismaPeli), ap('goya', 2025, mismaPeli),
+      ap('seminci', 2025, mismaPeli), ap('efa', 2025, mismaPeli),
+    ],
+  };
+  assert.equal(criba(c), null);
 });
 
 test('el catálogo de directores en activo hace de filtro de consolidados, gratis', () => {
@@ -228,6 +298,19 @@ test('el catálogo de directores en activo hace de filtro de consolidados, grati
   assert.equal(criba(c, { catalogo: conObra }), 'ya consagrado');
   const debutViejo = new Map([['z', { name: 'Z', features: 2, first: 2001 }]]);
   assert.equal(criba(c, { catalogo: debutViejo }), 'debutó hace demasiado');
+});
+
+test('quien ya ganó la Palma, el León o el Oso no es una promesa', () => {
+  // el filtro por número de películas no lo ve: cinco largos y un León de Oro
+  // siguen siendo cinco largos (le pasaba a Chloé Zhao al subir el límite)
+  const c = { clave: 'p', name: 'P', apariciones: [ap('venecia', 2020, { winner: true })] };
+  assert.equal(criba(c), 'ya consagrado');
+  // pero ganar la Cámara de Oro, Un Certain Regard o la Semaine es lo
+  // contrario: es la señal de que acaba de llegar
+  for (const key of ['camaradeoro', 'uncertainregard', 'semaine']) {
+    const q = { clave: 'q', name: 'Q', apariciones: [ap(key, 2025, { winner: true })] };
+    assert.equal(criba(q), null, key);
+  }
 });
 
 test('un debutante de este año pasa la criba', () => {

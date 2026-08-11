@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import {
   REGISTRY, parseSelectionTable, parseSundanceWinners, parseWinnersTables, stripTags, directorsMatch, cleanTableTitle,
   parseCahiersTables, splitDirectors, elegirCandidato, faltaElTituloOriginal, esGrisNeutro, filaResaltada,
-  expandirColspan, partePorSalto, esSerieConocida, anuarioKeys, parseEditionRows,
+  expandirColspan, expandirTabla, partePorSalto, parteEnCursivas, esSerieConocida, anuarioKeys, parseEditionRows,
+  filasEmpaquetadas, empaquetadoHasta,
 } from '../src/festivals.js';
+import { PALMARES } from '../src/data/palmares-2026.js';
 import { mismoDiminutivo } from '../src/names.js';
 import { SIGHT_AND_SOUND_2022 } from '../src/data/sight-and-sound-2022.js';
 import { MIL_UNA_2021 } from '../src/data/1001-movies-2021.js';
@@ -969,4 +971,211 @@ test('«Título (retitled Otro)» se queda con el título definitivo', () => {
   const [fila] = parseSundanceWinners(html, { ambito: 'us' });
   assert.equal(fila.title, 'Fruitvale Station');
   assert.equal(fila.original_title, 'Fruitvale');
+});
+
+/**
+ * LA REJILLA: las celdas que se estiran hacia abajo.
+ *
+ * El parser expandía el `colspan` dentro de la fila pero no arrastraba nada
+ * entre filas, así que una celda con `rowspan` dejaba un hueco que nadie
+ * rellenaba y las columnas de detrás se leían corridas. Es la misma familia
+ * que la fila corta, y la que hacía imposible leer Sitges.
+ */
+test('expandirTabla: una celda alta baja a las filas que ocupa, y el eco de un colspan no es propia', () => {
+  const filas = [
+    '<tr><td rowspan="2">1961</td><td colspan="2">Ancha</td><td>Suelta</td></tr>',
+    '<tr><td>Otra</td></tr>',
+  ];
+  const [a, b] = expandirTabla(filas);
+  assert.deepEqual(a.map((c) => [stripTags(c.raw), c.propia, c.heredada]), [
+    ['1961', true, false],
+    ['Ancha', true, false],
+    ['Ancha', false, false], // el eco del colspan: ocupa columna, pero no es una celda nueva
+    ['Suelta', true, false],
+  ]);
+  // la segunda fila hereda el año y sigue por donde le toca
+  assert.deepEqual(b.map((c) => [stripTags(c.raw), c.heredada]), [
+    ['1961', true],
+    ['Otra', false],
+  ]);
+});
+
+// La Concha de 1977, el Óscar internacional de 1955 y catorce nominadas de
+// Platform: en todas, el PAÍS venía heredado de la fila de arriba, la fila se
+// leía corta y el título original acababa en el campo de la dirección.
+test('rejilla: el país heredado deja de correr las columnas', () => {
+  const tabla = `
+<table class="wikitable">
+<tr><th>Year</th><th>English title</th><th>Original title</th><th>Director(s)</th><th>Country</th></tr>
+<tr><td>1977</td><td><i>An Unfinished Piece for Mechanical Piano</i></td><td><i>Неоконченная пьеса</i></td><td>Nikita Mikhalkov</td><td rowspan="2">Soviet Union</td></tr>
+<tr><td>1976</td><td><i>The Ascent</i></td><td><i>Восхождение</i></td><td>Larisa Shepitko</td></tr>
+</table>`;
+  const rows = parseWinnersTables(tabla);
+  assert.deepEqual(rows.map((r) => [r.year, r.director, r.country]), [
+    [1977, 'Nikita Mikhalkov', 'Soviet Union'],
+    [1976, 'Larisa Shepitko', 'Soviet Union'],
+  ]);
+  assert.equal(rows[1].original_title, 'Восхождение');
+});
+
+// Los Globos de 1961 tenían cinco nominadas de comedia y cuatro de musical, así
+// que la musical de abajo ocupa dos filas con un rowspan para cuadrar la
+// rejilla. Es la MISMA nominada, no dos.
+test('rejilla: una película heredada no se apunta dos veces', () => {
+  const tabla = `
+<table class="wikitable">
+<tr><th>Year</th><th>Comedy</th><th>Director</th><th>Musical</th><th>Director</th></tr>
+<tr><td rowspan="2">1961</td><td><i>Breakfast at Tiffany’s</i></td><td>Blake Edwards</td><td rowspan="2"><i>Babes in Toyland</i></td><td rowspan="2">Jack Donohue</td></tr>
+<tr><td><i>One, Two, Three</i></td><td>Billy Wilder</td></tr>
+</table>`;
+  assert.deepEqual(parseWinnersTables(tabla).map((r) => r.title), [
+    'Breakfast at Tiffany’s',
+    'Babes in Toyland',
+    'One, Two, Three',
+  ]);
+});
+
+/**
+ * SITGES: cuatro premios en columnas de la misma tabla.
+ *
+ * Aquí «Best Director» no es quien dirige a la ganadora, sino otro premio de
+ * otra película, y dejar que el parser lo empareje solo da datos falsos sin que
+ * nada chirríe: «The Cremator» firmada por Robert Mulligan. Por eso sus
+ * columnas van declaradas en el REGISTRY.
+ */
+test('Sitges: las columnas declaradas mandan, y la dirección de otro premio no se cuela', () => {
+  const tabla = `
+<table class="wikitable">
+<tr><th>Year</th><th>Best Film</th><th>Best Director</th><th>Best Actor</th><th>Best Actress</th></tr>
+<tr><td>1972</td><td><i>The Cremator</i></td><td>Robert Mulligan (<i>The Other</i>)</td><td>Rudolf Hrusinsky</td><td>Geraldine Chaplin</td></tr>
+<tr><td>1973</td><td rowspan="2"></td><td>Juan Luis Buñuel</td><td>Eugene Levy</td><td>Andrea Martin</td></tr>
+<tr><td>1974</td><td>Robert Fuest (<i>Dr. Phibes Rises Again</i>)</td><td>Mark Burns</td><td>Cristina Galbó</td></tr>
+</table>`;
+  const rows = parseWinnersTables(tabla, { sinDirector: true, columnas: REGISTRY.sitges.awardColumns });
+  // 1973 y 1974 no dieron mejor película: su celda va vacía con un rowspan, y
+  // sin rejilla «Robert Fuest (Dr. Phibes…)» se leería como la ganadora de 1974
+  assert.deepEqual(rows, [
+    { year: 1972, title: 'The Cremator', original_title: 'The Cremator', director: null, country: null },
+  ]);
+});
+
+test('Sitges: sin columnas declaradas, esa tabla no se parsea (falla cerrado)', () => {
+  const tabla = `
+<table class="wikitable">
+<tr><th>Year</th><th>Best Film</th><th>Best Director</th></tr>
+<tr><td>1972</td><td><i>The Cremator</i></td><td>Robert Mulligan</td></tr>
+</table>`;
+  assert.deepEqual(parseWinnersTables(tabla), []);
+});
+
+/**
+ * LA SEMINCI viene de la Wikipedia ESPAÑOLA, que es la única que tabula la
+ * Espiga de Oro entera (1956-2025) con dirección y país.
+ */
+test('Espiga de Oro: cabeceras en español, ex aequo y años sin competición', () => {
+  const tabla = `
+<table class="sortable wikitable">
+<tr><th>Año</th><th>Película</th><th>Director</th><th>País</th></tr>
+<tr><td>2025​</td><td><i>Magallanes</i><br /><i>The Mastermind</i> (ex aequo)</td><td>Lav Díaz<br />Kelly Reichardt</td><td>Portugal<br />EE. UU.</td></tr>
+<tr><td>1957</td><td><i>Sin competición</i></td><td></td><td></td></tr>
+<tr><td>1958​</td><td><i>El que debe morir</i></td><td>Jules Dassin</td><td>Francia</td></tr>
+</table>`;
+  const rows = parseWinnersTables(tabla);
+  assert.deepEqual(rows.map((r) => [r.year, r.title, r.director]), [
+    [2025, 'Magallanes', 'Lav Díaz'],
+    [2025, 'The Mastermind', 'Kelly Reichardt'],
+    [1958, 'El que debe morir', 'Jules Dassin'], // 1957 se cae solo: sin dirección
+  ]);
+});
+
+/**
+ * El espacio de ancho cero de la plantilla de referencias española: invisible,
+ * y `\s` no lo toca. Con él pegado detrás, «1958» dejaba de parecer un año y la
+ * tabla entera se leía corrida. Pero el ZWNJ persa SÍ es letra.
+ */
+test('stripTags: se van los espacios de ancho cero, se queda el ZWNJ persa', () => {
+  assert.equal(stripTags('<td>1958​</td>'), '1958');
+  assert.equal(stripTags('<td>﻿Misericordia⁠</td>'), 'Misericordia');
+  assert.equal(stripTags('<td><i>دانه‌ی انجیر معابد</i></td>'), 'دانه‌ی انجیر معابد');
+});
+
+test('los dos festivales españoles entran solo por el palmarés, y la Seminci en español', () => {
+  for (const key of ['seminci', 'sitges']) {
+    const f = REGISTRY[key];
+    assert.ok(f.onlyWinners && f.awardPage && f.awardSection, key);
+    assert.ok(!f.article && !f.section, `${key} no tiene ediciones tabuladas en Wikipedia`);
+    assert.ok(anuarioKeys().includes(key), `${key} tiene que entrar en «Lo mejor del año»`);
+  }
+  assert.equal(REGISTRY.seminci.awardLang, 'es');
+  assert.ok(REGISTRY.seminci.awardSection.test('Palmarés histórico (solo largometrajes)'));
+  assert.ok(REGISTRY.sitges.awardSection.test('Winners'));
+  // sin dirección en la tabla, el emparejado exige título clavado
+  assert.ok(REGISTRY.sitges.awardSinDirector);
+  assert.equal(REGISTRY.sitges.awardColumns.director, null);
+});
+
+/**
+ * El empate escrito con «&» en vez de con un salto de línea: dos títulos en
+ * cursia dentro de la misma celda. Sitges 1994 (Haneke y Justino) y la EFA de
+ * 1994 (la trilogía de Kieślowski) lo escriben así, y sin partirlo el palmarés
+ * enseña un título imposible que además no empareja con nada.
+ */
+test('parteEnCursivas: dos títulos en una celda unidos por &, pero un título con & dentro no se toca', () => {
+  const empate = '<i><a href="/wiki/A">71 Fragmente einer Chronologie des Zufalls</a></i> &amp; <i>Justino, un asesino de la tercera edad</i>';
+  assert.deepEqual(parteEnCursivas(empate), [
+    '71 Fragmente einer Chronologie des Zufalls',
+    'Justino, un asesino de la tercera edad',
+  ]);
+  // un solo título, aunque lleve «&»: ni se parte ni se mira
+  assert.equal(parteEnCursivas('<i>Sex &amp; Drugs &amp; Rock &amp; Roll</i>'), null);
+  // dos cursivas con texto de verdad entre medias: la celda dice otra cosa
+  assert.equal(parteEnCursivas('<i>Uno</i> ganó por delante de <i>Otra</i>'), null);
+  // la trilogía, con «ex aequo» de propina
+  assert.deepEqual(parteEnCursivas('<i>Azul</i>, <i>Blanco</i> y <i>Rojo</i> (ex aequo)'), ['Azul', 'Blanco', 'Rojo']);
+});
+
+/**
+ * EL PALMARÉS EMPAQUETADO. Lo que se guarda hecho tiene que poder volver a su
+ * forma de siempre sin que nada del resto de la app se entere.
+ */
+test('una fila empaquetada vuelve a su forma de siempre', () => {
+  const key = Object.keys(PALMARES)[0];
+  const rows = filasEmpaquetadas(key, { keepAll: true });
+  assert.ok(rows.length, 'el paquete no puede estar vacío');
+  for (const r of rows.slice(0, 50)) {
+    assert.equal(typeof r.year, 'number');
+    assert.ok(r.title, 'toda fila tiene título');
+    // el título original se guarda solo cuando difiere, y al leer vuelve
+    assert.ok(r.original_title, 'el título original nunca llega vacío');
+    assert.equal(typeof r.winner, 'boolean');
+  }
+  // sin keepAll salen solo las ganadoras, y sin la bandera (como el resto de
+  // los palmareses, donde ganar es lo único que hay)
+  const soloGanadoras = filasEmpaquetadas(key);
+  assert.ok(soloGanadoras.every((r) => !('winner' in r)));
+  assert.ok(soloGanadoras.length <= rows.length);
+});
+
+test('el paquete solo trae años CERRADOS, y de premios que existen', () => {
+  const nowYear = new Date().getFullYear();
+  for (const [key, snap] of Object.entries(PALMARES)) {
+    assert.ok(REGISTRY[key], `«${key}» no está en el REGISTRY`);
+    assert.ok(Number.isInteger(snap.hasta), `«${key}» no dice hasta qué año llega`);
+    // el año en curso y el anterior se quedan vivos: ahí Wikipedia sigue
+    // completando tablas y todavía se falla la temporada
+    assert.ok(snap.hasta <= nowYear - 1, `«${key}» empaqueta un año que aún se mueve`);
+    for (const r of snap.rows) {
+      assert.ok(r.y <= snap.hasta, `«${key}» trae ${r.y}, más allá de su corte`);
+      assert.ok(r.t, `«${key}» tiene una fila sin título`);
+    }
+  }
+});
+
+test('el paquete trae el emparejado hecho: es para lo que está', () => {
+  const filas = Object.values(PALMARES).flatMap((s) => s.rows);
+  const conFicha = filas.filter((r) => r.i).length;
+  assert.ok(filas.length > 1000, `solo ${filas.length} filas empaquetadas`);
+  // el emparejado ronda el 97 %; por debajo del 90 es que algo se rompió al
+  // generar y se estaría empaquetando el fallo
+  assert.ok(conFicha / filas.length > 0.9, `solo ${Math.round((conFicha / filas.length) * 100)} % con ficha`);
 });

@@ -3,8 +3,8 @@
 // todas las piezas están aquí y no hay ni un mensaje compuesto sin traducir.
 export default {
   'Directores emergentes': 'Emerging directors',
-  'Quién puede ser un grande dentro de diez años. Sale de las tablas de selección oficial que PowaFlex ya tiene cacheadas —con las cinco secciones de debut, que es donde de verdad estrena quien empieza— y se puntúa de 0 a 100. Cada ficha enseña con qué datos puntuó.':
-    'Who could be a great director ten years from now. It comes from the official line-up tables PowaFlex already has cached — including the five debut sections, which is where people actually premiere when they are starting out — and is scored from 0 to 100. Every card shows the data behind its score.',
+  'Quién puede ser un grande dentro de diez años. Sale de lo que PowaFlex ya tiene cacheado —las tablas de selección oficial, con las cinco secciones de debut que es donde de verdad estrena quien empieza, y los palmareses que alcanzan primeras películas, empezando por la Cámara de Oro— y se puntúa de 0 a 100. Cada ficha enseña con qué datos puntuó.':
+    'Who could be a great director ten years from now. It comes from what PowaFlex already has cached — the official line-up tables, including the five debut sections where people actually premiere when they are starting out, and the award lists that reach first features, starting with the Caméra d’Or — and is scored from 0 to 100. Every card shows the data behind its score.',
   'Cargando emergentes…': 'Loading emerging directors…',
 
   // señales
@@ -20,6 +20,7 @@ export default {
   '▾ Por qué esta puntuación': '▾ Why this score',
   'sin detalle': 'no detail',
   '{fuente} {n} de media': '{fuente} {n} on average',
+  'RT crítica': 'RT critics',
   'Letterboxd {nota} con {marcas} marcas': 'Letterboxd {nota} with {marcas} logs',
   'nota': 'rating',
   'volumen': 'volume',
@@ -76,6 +77,16 @@ export default {
   'Berlinale · Perspectives': 'Berlinale · Perspectives',
   'S.S. · Nuevos Directores': 'S.S. · New Directors',
   'Cannes · Cámara de Oro': 'Cannes · Caméra d’Or',
+
+  // los palmareses que también mira el radar. Los nombres propios (Sitges, Mar
+  // del Plata, BAFTA, Seminci, David di Donatello) se quedan igual y por eso no
+  // llevan entrada
+  'Cine Europeo (EFA)': 'European Film Awards',
+  'Óscar internacional': 'International Oscar',
+  'Premios Goya': 'Goya Awards',
+  'Premios César': 'César Awards',
+  'Guldbagge (Suecia)': 'Guldbagge (Sweden)',
+  'Lola (Alemania)': 'Lola (Germany)',
 
   // regla de Radarr sobre emergentes
   'Emergentes': 'Emerging',

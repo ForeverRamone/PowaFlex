@@ -27,6 +27,7 @@ import { watchedIndex, isWatched } from './letterboxd.js';
 import { SIGHT_AND_SOUND_2022 } from './data/sight-and-sound-2022.js';
 import { MIL_UNA_2021 } from './data/1001-movies-2021.js';
 import { OSCAR_BEST_PICTURE } from './data/oscar-best-picture.js';
+import { PALMARES } from './data/palmares-2026.js';
 
 const DAY = 24 * 3600 * 1000;
 
@@ -156,6 +157,41 @@ export const REGISTRY = {
     sinceYear: 1959, // el primer Ástor de Oro; las ediciones de 1954-58 no lo dieron
     awardPage: 'Mar del Plata International Film Festival',
     awardSection: /^golden [aá]stor winners$/i,
+  },
+  // Los dos festivales españoles que faltaban, y los dos entran solo por el
+  // palmarés: sus ediciones no están tabuladas en Wikipedia (Sitges tiene
+  // artículo propio desde la 56.ª y nada más atrás).
+  //
+  // La Seminci es el caso raro del REGISTRY: su mejor artículo —el único con
+  // dirección y país— está en la Wikipedia ESPAÑOLA, y ahí la tabla llega
+  // entera de 1956 a 2025. La inglesa se conforma con una viñeta por año desde
+  // 1999, sin dirección, y encima avisa de que lista «algunos» ganadores. Las
+  // dos primeras ediciones no tuvieron competición y salen sin dirección, así
+  // que el propio parser las descarta.
+  seminci: {
+    name: 'Seminci (Valladolid)',
+    award: 'Espiga de Oro a la mejor película',
+    onlyWinners: true,
+    sinceYear: 1958, // la primera Espiga: en 1956 y 1957 no hubo competición
+    awardPage: 'Espiga de Oro',
+    awardLang: 'es',
+    awardSection: /^palmar[ée]s hist[óo]rico/i,
+  },
+  // Sitges pone CUATRO premios en columnas de la misma tabla (película,
+  // dirección, actor y actriz), así que sus columnas van declaradas: dejar que
+  // el parser adivine emparejaría cada ganadora con el director de OTRA
+  // película —«The Cremator» firmada por Robert Mulligan— sin que nada
+  // chirriara. Al no haber columna de dirección de la ganadora, el emparejado
+  // con TMDB exige título clavado, como en el David di Donatello.
+  sitges: {
+    name: 'Sitges',
+    award: 'Sitges a la mejor película',
+    onlyWinners: true,
+    sinceYear: 1972, // la primera mejor película; 1971 y 1973-82 no la dieron
+    awardPage: 'Sitges Film Festival',
+    awardSection: /^winners$/i,
+    awardSinDirector: true,
+    awardColumns: { title: /^best film$/, director: null },
   },
   horizontes: {
     name: 'S.S. · Horizontes Latinos',
@@ -551,9 +587,21 @@ export function festivalsIndex() {
 
 // --- Wikipedia ----------------------------------------------------------------
 
-async function wikiParse(params) {
+/**
+ * La Wikipedia de la que sale cada cosa. Por defecto la INGLESA, que es la
+ * única que cubre los seis grandes con tablas consistentes; pero hay premios
+ * cuyo mejor artículo (a veces el único con dirección y país) está en otra
+ * lengua: la Espiga de Oro de la Seminci se tabula entera —1956-2025, con
+ * director y país— en la española, mientras la inglesa se conforma con una
+ * viñeta por año desde 1999 y sin dirección. El idioma va en el REGISTRY
+ * (`awardLang`) y viaja hasta la clave de caché y el enlace de la fuente.
+ */
+const wikiUrl = (page, lang = 'en') =>
+  `https://${lang}.wikipedia.org/wiki/${String(page).replace(/ /g, '_')}`;
+
+async function wikiParse({ lang = 'en', ...params }) {
   const qs = new URLSearchParams({ format: 'json', formatversion: '2', redirects: '1', action: 'parse', ...params });
-  const res = await fetch(`https://en.wikipedia.org/w/api.php?${qs}`, {
+  const res = await fetch(`https://${lang}.wikipedia.org/w/api.php?${qs}`, {
     headers: { 'User-Agent': 'PowaFlex/0.9 (self-hosted; https://github.com/ForeverRamone/PowaFlex)' },
     signal: AbortSignal.timeout(20000),
   });
@@ -585,6 +633,17 @@ export function stripTags(html) {
     // colapso de espacios, que pliega los espacios raros decodificados.
     .replace(/&#x([0-9a-f]+);/gi, (_, h) => codePoint(parseInt(h, 16)))
     .replace(/&#(\d+);/g, (_, n) => codePoint(Number(n)))
+    // Los espacios INVISIBLES, que no son espacios para nadie salvo para el
+    // ojo: la plantilla de referencias de la Wikipedia española deja un
+    // &#8203; (espacio de ancho cero) pegado detrás de cada celda, así que el
+    // año de la Espiga de Oro llegaba como «1971␋» y `\s` no lo toca —en
+    // JavaScript U+200B no es espacio—. Con eso la fila dejaba de reconocerse
+    // como fila de año y la tabla entera se leía corrida una columna. Se van
+    // SOLO los que no significan nada (U+200B, U+2060, U+FEFF): el ZWNJ
+    // U+200C y el ZWJ U+200D sí son letra en persa y en las lenguas índicas
+    // —«دانه‌ی انجیر معابد», la EFA de 2024, los lleva dentro— y borrarlos
+    // cambia el título original.
+    .replace(/[\u200b\u2060\ufeff]/g, '')
     // enlaces sin renderizar que se cuelan en algunos artículos (Sundance):
     // «[[Fulano|Fulano]] [wd]» debe quedar en «Fulano»
     .replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1')
@@ -691,10 +750,21 @@ export function filaResaltada(row) {
  * Cómo se llama la columna de la película. Cada familia de artículos la titula
  * a su manera: «English title» en los festivales, «Film» en casi todos los
  * premios, «Winner» en los críticos de EE UU, «Winner and nominees» en los de
- * Chicago, y «Comedy»/«Musical» en los Globos de 1958-1962, cuando eran dos
- * premios distintos en columnas gemelas.
+ * Chicago, «Comedy»/«Musical» en los Globos de 1958-1962 (cuando eran dos
+ * premios distintos en columnas gemelas) y «Película» en la Wikipedia española,
+ * de donde sale la Espiga de Oro.
+ *
+ * OJO con ensanchar esto a «best film» y parecidos: hay artículos que ponen
+ * VARIOS premios en columnas (Sitges lista mejor película, dirección, actor y
+ * actriz en la misma tabla) y ahí «Best Director» no es quien dirige a la
+ * ganadora, sino otro premio de otra película. Esas tablas declaran sus
+ * columnas en el REGISTRY (`awardColumns`) en vez de adivinarlas.
  */
-const RX_COLUMNA_TITULO = /english title|^film\b|^title|^winner|^comedy$|^musical$/;
+const RX_COLUMNA_TITULO = /english title|^film\b|^title|^winner|^comedy$|^musical$|^pel[íi]cula/;
+const RX_COLUMNA_AÑO = /year|^a[ñn]o/;
+const RX_COLUMNA_DIRECCION = /director|direcci[óo]n/;
+const RX_COLUMNA_ORIGINAL = /original title|t[íi]tulo original/;
+const RX_COLUMNA_PAIS = /countr|^pa[íi]s/;
 
 /**
  * Las celdas que traen VARIAS películas (o varios nombres) partidas por un
@@ -715,6 +785,87 @@ export function expandirColspan(rawCells) {
     const n = Number((String(c ?? '').match(/colspan\s*=\s*"?(\d+)/i) || [])[1]) || 1;
     return new Array(Math.min(n, 12)).fill(c);
   });
+}
+
+const atributo = (raw, nombre, tope) => {
+  const n = Number((String(raw ?? '').match(new RegExp(`${nombre}\\s*=\\s*"?(\\d+)`, 'i')) || [])[1]) || 1;
+  return Math.min(Math.max(n, 1), tope);
+};
+
+/**
+ * La tabla entera puesta en REJILLA: cada fila con una entrada por columna, con
+ * las celdas anchas (`colspan`) repetidas a lo ancho y las altas (`rowspan`)
+ * repetidas hacia abajo en las filas que ocupan.
+ *
+ * Cada entrada es `{ raw, propia, heredada }`, y las tres cosas hacen falta:
+ * `propia` marca UNA vez la celda que esta fila escribe de verdad (es la lista
+ * que miran los heurísticos del año, y por eso el eco de un colspan no la
+ * lleva), y `heredada` marca la que baja de una fila anterior.
+ *
+ * Por qué hacía falta: el parser expandía el `colspan` DENTRO de una fila pero
+ * no arrastraba nada ENTRE filas, así que una celda con `rowspan` dejaba a las
+ * filas siguientes con un hueco que nadie rellenaba y todo lo que venía detrás
+ * se leía corrido. En Sitges es catastrófico y silencioso: 1973 abre una celda
+ * de película VACÍA con `rowspan="5"`, así que las filas de 1974-77 llegan con
+ * cuatro celdas y «Robert Fuest (Dr. Phibes Rises Again)» —que es el premio a
+ * la mejor DIRECCIÓN de otra película— se leería como la ganadora del año.
+ *
+ * El caso del país absorbido por un rowspan que hasta ahora resolvía la cursiva
+ * (`faltaElTituloOriginal`) queda cubierto aquí de raíz; aquella sigue viva
+ * para las filas que de verdad se dejan una columna sin escribir (el premio
+ * alemán omite la del trofeo).
+ */
+export function expandirTabla(filas) {
+  const arrastre = new Map(); // columna → { raw, quedan }
+  return filas.map((row) => {
+    const propias = String(row || '').match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || [];
+    const linea = [];
+    const nuevas = new Map();
+    let col = 0;
+    let k = 0;
+    while ((k < propias.length || arrastre.has(col)) && col < 64) {
+      const deArriba = arrastre.get(col);
+      if (deArriba) {
+        linea.push({ raw: deArriba.raw, propia: false, heredada: true });
+        deArriba.quedan -= 1;
+        if (deArriba.quedan <= 0) arrastre.delete(col);
+        col += 1;
+        continue;
+      }
+      const raw = propias[k];
+      k += 1;
+      const ancho = atributo(raw, 'colspan', 12);
+      const alto = atributo(raw, 'rowspan', 60);
+      for (let j = 0; j < ancho; j++) {
+        linea.push({ raw, propia: j === 0, heredada: false });
+        if (alto > 1) nuevas.set(col, { raw, quedan: alto - 1 });
+        col += 1;
+      }
+    }
+    for (const [c, v] of nuevas) arrastre.set(c, v);
+    return linea;
+  });
+}
+
+/**
+ * El otro empate: DOS TÍTULOS EN CURSIVA dentro de la misma celda, unidos por
+ * una «&» en vez de por un salto de línea. Sitges 1994 dio su premio ex aequo a
+ * «71 Fragmente einer Chronologie des Zufalls» y a «Justino, un asesino de la
+ * tercera edad», y sin partirlo el palmarés enseña un título imposible que
+ * además solo empareja con el primero.
+ *
+ * La cursiva es lo que lo hace seguro: en estas tablas los títulos van en <i> y
+ * un título con «&» dentro («Sex & Drugs & Rock & Roll») vive en UNA sola. Se
+ * exige además que lo que quede fuera de las cursivas sean solo separadores: si
+ * hay texto de verdad entre medias, la celda dice otra cosa y se deja en paz.
+ */
+export function parteEnCursivas(rawCell) {
+  const src = String(rawCell || '');
+  const cursivas = [...src.matchAll(/<i[^>]*>([\s\S]*?)<\/i>/gi)].map((m) => stripTags(m[1]).trim()).filter(Boolean);
+  if (cursivas.length < 2) return null;
+  const fuera = stripTags(src.replace(/<i[^>]*>[\s\S]*?<\/i>/gi, '|'));
+  if (!/^[|\s&+,;·y]*(?:\(?ex\s*[ -]?\s*ae?quo\)?)?[|\s&+,;·y]*$/i.test(fuera)) return null;
+  return cursivas;
 }
 
 export function partePorSalto(rawCell) {
@@ -822,18 +973,25 @@ export function parseSelectionTable(html, { all = false } = {}) {
  * se recoloca aquí. Devuelve filas {year, title, original_title, director,
  * country}, de la más reciente a la más antigua.
  */
-export function parseWinnersTables(html, { keepAll = false, sinDirector = false } = {}) {
+export function parseWinnersTables(html, { keepAll = false, sinDirector = false, columnas = null } = {}) {
   const out = [];
   const tables = String(html || '').match(/<table[^>]*wikitable[\s\S]*?<\/table>/gi) || [];
   for (const t of tables) {
     const rows = t.match(/<tr[\s\S]*?<\/tr>/gi) || [];
     if (rows.length < 2) continue;
     const headers = (rows[0].match(/<th[\s\S]*?<\/th>/gi) || []).map((c) => stripTags(c).toLowerCase());
-    const idxYear = headers.findIndex((h) => /year/.test(h));
-    const columnasTitulo = headers.map((h, i) => (RX_COLUMNA_TITULO.test(h) ? i : -1)).filter((i) => i >= 0);
-    const columnasDir = headers.map((h, i) => (/director/.test(h) ? i : -1)).filter((i) => i >= 0);
-    const idxOrig = headers.findIndex((h) => /original title/.test(h));
-    const idxCountry = headers.findIndex((h) => /countr/.test(h));
+    const idxYear = headers.findIndex((h) => RX_COLUMNA_AÑO.test(h));
+    const columnasTitulo = headers
+      .map((h, i) => ((columnas?.title || RX_COLUMNA_TITULO).test(h) ? i : -1))
+      .filter((i) => i >= 0);
+    // `columnas.director: null` es «esta tabla NO tiene columna de dirección»,
+    // que no es lo mismo que no haber encontrado ninguna: ver `columnas`.
+    const columnasDir =
+      columnas && 'director' in columnas && !columnas.director
+        ? []
+        : headers.map((h, i) => (RX_COLUMNA_DIRECCION.test(h) ? i : -1)).filter((i) => i >= 0);
+    const idxOrig = headers.findIndex((h) => RX_COLUMNA_ORIGINAL.test(h));
+    const idxCountry = headers.findIndex((h) => RX_COLUMNA_PAIS.test(h));
     if (idxYear === -1 || !columnasTitulo.length) continue;
     // Casi todas las tablas traen UNA columna de película. La de los Globos de
     // 1958-1962, cuando comedia y musical eran DOS premios distintos, trae dos
@@ -852,8 +1010,16 @@ export function parseWinnersTables(html, { keepAll = false, sinDirector = false 
 
     let lastYear = null;
     const delTable = [];
-    for (const row of rows.slice(1)) {
-      const rawCells = row.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || [];
+    // La tabla en rejilla, con las celdas que se estiran hacia abajo repetidas
+    // en las filas que ocupan (ver `expandirTabla`). Se calcula sobre la tabla
+    // entera porque un `rowspan` es, por definición, cosa de varias filas.
+    const rejilla = expandirTabla(rows);
+    for (let ri = 1; ri < rows.length; ri++) {
+      const row = rows[ri];
+      const linea = rejilla[ri] || [];
+      // «las celdas que esta fila escribe», que es lo que miran los heurísticos
+      // del año: una celda heredada de la fila de arriba no dice nada de esta
+      const rawCells = linea.filter((c) => c.propia).map((c) => c.raw);
       const crudas = rawCells.map(stripTags);
       if (!crudas.length) continue;
       // El año abre la fila de la ganadora — como <th> (Palma), como <td
@@ -887,19 +1053,33 @@ export function parseWinnersTables(html, { keepAll = false, sinDirector = false 
           // palmarés como una película titulada «1971–1995»
           (/^(?:19|20)\d{2}(?:\s*[–—-]\s*(?:19|20)\d{2})?$/.test(crudas[0]) &&
             (ancho === headers.length || !primeraEsTitulo)));
-      // el HTML alineado con las columnas, para poder mirar la cursiva de la
-      // celda que caería en el título original
-      let rawAlineado = rawCells;
-      if (esFilaDeAño) {
-        lastYear = Number(y0[1]);
+      if (esFilaDeAño) lastYear = Number(y0[1]);
+      // El HTML alineado con las columnas, para poder mirar la cursiva de la
+      // celda que caería en el título original.
+      //
+      // Cuando la fila HEREDA alguna celda de la de arriba, la rejilla ya la
+      // trae completa y colocada: se usa tal cual. Si no hereda ninguna, la
+      // rejilla y la fila son la misma cosa y se mantiene el camino de siempre,
+      // con la celda del año puesta a la izquierda cuando no viene escrita.
+      let rawPorColumna;
+      if (linea.some((c) => c.heredada)) {
+        rawPorColumna = linea.map((c) => c.raw);
+        // el año puede ser justo la celda heredada (Goya y BAFTA lo estiran
+        // sobre la ganadora y sus nominadas): es el mismo año de la fila de
+        // arriba, así que `lastYear` no cambia, pero sí hay que reconocerlo
+        // para no correr las columnas
+        if (!esFilaDeAño && idxYear >= 0 && linea[idxYear]?.heredada) {
+          const heredado = stripTags(linea[idxYear].raw).match(/^((?:19|20)\d{2})\b/);
+          if (heredado) lastYear = Number(heredado[1]);
+        }
       } else {
-        rawAlineado = [null, ...rawCells]; // la del año no viene en el HTML
+        // Cada celda, en TODAS las columnas que ocupa: la fila de 1959 de los
+        // Globos mete «Billy Wilder» en dirección y producción de una vez con
+        // un colspan, y contando celdas a pelo lo que viene detrás se lee
+        // corrido — el musical de ese año salía con el nombre del director de
+        // título.
+        rawPorColumna = expandirColspan(esFilaDeAño ? rawCells : [null, ...rawCells]);
       }
-      // Cada celda, en TODAS las columnas que ocupa: la fila de 1959 de los
-      // Globos mete «Billy Wilder» en dirección y producción de una vez con un
-      // colspan, y contando celdas a pelo lo que viene detrás se lee corrido —
-      // el musical de ese año salía con el nombre del director de título.
-      const rawPorColumna = expandirColspan(rawAlineado);
       const cells = rawPorColumna.map((c) => (c == null ? '' : stripTags(c)));
       cells[0] = String(lastYear ?? '');
       // ¿Sin celda de título original, o sin celda de PAÍS? En las tablas de
@@ -923,6 +1103,13 @@ export function parseWinnersTables(html, { keepAll = false, sinDirector = false 
       };
       if (!lastYear) continue;
       for (const { ti, di } of parejas) {
+        // Una película cuya celda BAJA de la fila de arriba ya se apuntó allí:
+        // es la misma, no una nueva. Los Globos de 1961 tienen cinco nominadas
+        // de comedia y cuatro de musical, así que «Babes in Toyland» ocupa dos
+        // filas con un rowspan para cuadrar la rejilla — y sin esto salía dos
+        // veces. La celda del AÑO sí puede venir heredada (Goya, BAFTA): lo que
+        // manda aquí es la del título.
+        if (linea[columna(ti)]?.heredada) continue;
         // Una nota que abarca la fila entera («No awards given», «Festival
         // Cancelled» de los 25 inviernos que Mar del Plata no se celebró) cae
         // con su colspan en la columna del título Y en la de la dirección: es
@@ -933,7 +1120,7 @@ export function parseWinnersTables(html, { keepAll = false, sinDirector = false 
         // el título quedaba en «Slumdog Millionaire , WALL-E» y se perdían las
         // dos películas; se parte por el salto, que no puede aparecer dentro de
         // un título, y no por la coma, que sí.
-        const titulos = partePorSalto(cellRaw(ti)) || [cell(ti)];
+        const titulos = partePorSalto(cellRaw(ti)) || parteEnCursivas(cellRaw(ti)) || [cell(ti)];
         // La dirección solo se parte si el TÍTULO se partió: un salto en la
         // celda de dirección casi siempre es una CODIRECCIÓN de una sola
         // película —la Palma de 1946 (Ipsen y Lauritzen) y la de 1956
@@ -1520,7 +1707,18 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
   // Si el año de la fila viniera roto, filtrar por ventana descartaría a TODOS
   // los candidatos con fecha y solo quedaría morralla sin fecha.
   const enVentana = Number.isFinite(year)
-    ? candidatos.filter((c) => !c.date || Math.abs(Number(c.date.slice(0, 4)) - year) <= 1)
+    ? candidatos.filter(
+        (c) =>
+          // una ficha SIN FECHA vale de candidata (película recién anunciada),
+          // pero solo cuando hay una dirección que la verifique: para una fila
+          // sin director el año es la segunda prueba, y una ficha sin fecha no
+          // la aporta —encima entra en la ventana Y ordena por delante de las
+          // fechadas, así que un homónimo fantasma le ganaba siempre a la
+          // película buena. Le pasaba a «The Cremator» de Sitges 1972, que
+          // acabó en un documental nepalí sin fecha, y a «The Invitation».
+          (!c.date && (row.director || !Number.isFinite(year))) ||
+          (c.date && Math.abs(Number(c.date.slice(0, 4)) - year) <= 1)
+      )
     : [...candidatos];
 
   // Los DOS títulos con los que la fila nombra a la MISMA película: el
@@ -1651,16 +1849,32 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
     }
   }
 
-  // La misma segunda vuelta para las filas SIN director, que antes no tenían
-  // ninguna: con el candidato fechado a 2+ años, la ventana no lo mira y
-  // peliculaPorDirector necesita un nombre, así que la película no podía casar
-  // por NINGUNA vía. La prueba es la doble que la ventana ya les pide: título
-  // clavado (o el internacional EXACTO, sin la tolerancia de «contiene» — aquí
-  // no hay dirección que verifique nada) y ficha con equipo, porque una ficha
-  // sin créditos fuera de ventana es demasiado poco para fiarse.
-  if (!tmdbId && !fallosRed && !row.director) {
+  // La misma segunda vuelta para las filas SIN director, pero CON EL AÑO
+  // PUESTO. Aquí no hay dirección que verificar, así que el año no es un
+  // detalle que se pueda soltar: es la otra mitad de la prueba. Sin acotarlo,
+  // «In the Light of the Moon» (Sitges 2000, que es el otro nombre de «Ed
+  // Gein») se emparejó con una película de 2025 que se llama igual, y el
+  // «Ringu» de 1999 con la versión de televisión de 1995. Las dos con título
+  // clavado y equipo acreditado: exactamente lo que se les pedía.
+  //
+  // La ventana de esta vuelta es ASIMÉTRICA y sale de lo que un palmarés puede
+  // decir: un premio de 1972 no puede haberlo ganado una película que aún no
+  // existe (+1 por el estreno comercial que sigue al festival), y hacia atrás
+  // caben los años que un festival tarda en enseñar una película de fuera —«The
+  // Cremator» es de 1969 y ganó Sitges en 1972—. Más allá de eso, mejor sin
+  // ficha: es la regla de la casa y aquí no hay nada más que la sostenga.
+  const ATRAS_SIN_DIRECTOR = 3;
+  if (!tmdbId && !fallosRed && !row.director && Number.isFinite(year)) {
     const dentro = new Set(enVentana.map((c) => c.id));
-    for (const c of candidatos.filter((x) => !dentro.has(x.id))) {
+    const cerca = candidatos.filter((x) => {
+      if (dentro.has(x.id) || !x.date) return false;
+      const d = Number(x.date.slice(0, 4)) - year;
+      return d <= 1 && d >= -ATRAS_SIN_DIRECTOR;
+    });
+    // el año más cercano primero: si dos fichas se llaman igual dentro del
+    // margen, la del año del premio se parece más a lo que dice la fila
+    cerca.sort((a, b) => distAño(a) - distAño(b));
+    for (const c of cerca) {
       let clavaAqui = tituloClavado(c);
       if (!clavaAqui && tituloEnDe) clavaAqui = clava(await tituloEnDe(c.id));
       if (!clavaAqui) continue;
@@ -1825,11 +2039,15 @@ export async function resolveFilms(rows, yearOf) {
       // {id} y reconstruir la página caducada pedía movieSummary de CADA
       // película: en las 1001, mil GETs a TMDB para repetir lo ya sabido.
       // v4: y la dirección corregida de las fichas rescatadas por el equipo.
+      // v5: para las filas SIN director, el año vuelve a contar (ventana
+      // asimétrica de tres años atrás y uno adelante) y una ficha sin fecha ya
+      // no es candidata. Sin subir esto sobrevivirían los aciertos falsos que
+      // destapó Sitges: «In the Light of the Moon» en una película de 2025.
       // OJO: esta caché dura un AÑO y NO la barre el bump de `festival`, así
       // que cuando cambian las reglas del emparejado hay que subir ESTE número
       // o los aciertos viejos —«Smultronstället» emparejado con su making-of—
       // sobreviven a la versión nueva.
-      const matchKey = `film_match:v4:${claveBase}`;
+      const matchKey = `film_match:v5:${claveBase}`;
       // corrección manual: ni búsqueda ni verificación, lo que dijo el usuario
       const override = overrides.has(claveBase) ? overrides.get(claveBase) : undefined;
       // Un año de vida, MUY por encima de los 30 días de la página: «este
@@ -2067,7 +2285,7 @@ async function buildEdition(key, f, year) {
     year,
     section,
     note,
-    source: `https://en.wikipedia.org/wiki/${page.replace(/ /g, '_')}`,
+    source: wikiUrl(page),
     fetchedAt: Date.now(),
     films,
     unresolved: films.filter((x) => !x.tmdb_id && !x.tv).length, // una serie sin ficha no es un fallo del emparejado
@@ -2206,8 +2424,66 @@ async function decorateLive(films) {
  */
 const AWARD_ROWS_TTL = DAY;
 
+/**
+ * EL PALMARÉS EMPAQUETADO CON LA APP.
+ *
+ * Los años cerrados no cambian: la Palma de 1978 es la de 1978 y su ficha de
+ * TMDB es la misma hoy que dentro de diez años. Preguntarle eso a Wikipedia y a
+ * TMDB en cada instalación nueva, cada vez que caduca una caché, es trabajo
+ * tirado — y era el trabajo CARO: reconstruir los treinta palmareses son unas
+ * cuatro mil búsquedas contra TMDB con su verificación de dirección, que es
+ * justo el proceso que se ha ido puliendo versión a versión.
+ *
+ * Así que se guarda hecho. `snapshot-palmares.mjs` corre los parsers y el
+ * emparejado de siempre sobre cada premio y escribe el resultado en
+ * `data/palmares-*.js` con el `tmdb_id` ya resuelto, igual que el dataset del
+ * Óscar lleva haciendo desde la 1.11. **Wikipedia se queda para lo que se
+ * mueve**: cada premio dice hasta qué año está empaquetado y de ahí en adelante
+ * —el año en curso, la temporada a medias, la edición recién fallada— manda la
+ * fuente viva, exactamente igual que antes.
+ *
+ * Tres cosas que esto arregla de propina:
+ *  - «Lo mejor del año» de un año viejo no toca la red: eran treinta artículos.
+ *  - Si Wikipedia falla o le cambian el molde a una tabla, lo viejo se sigue
+ *    sirviendo (el respaldo está en `getAwardRows`).
+ *  - Las correcciones manuales del usuario siguen mandando sobre todo esto,
+ *    porque se aplican después, en `resolveFilms`.
+ *
+ * Lo que hay que recordar: **un fallo empaquetado se queda hasta que se
+ * regenere**, y lo que alguien arregle en Wikipedia sobre un año viejo no llega
+ * solo. Se regenera con `npm run snapshot` en cada temporada de premios.
+ */
+const CLAVE_DE = new Map(Object.entries(REGISTRY).map(([k, f]) => [f, k]));
+
+/** Una fila empaquetada, devuelta a su forma de siempre. */
+const hidratar = (r) => ({
+  year: r.y,
+  title: r.t,
+  original_title: r.o ?? r.t,
+  director: r.d ?? null,
+  country: r.c ?? null,
+  tmdb_id: r.i ?? null,
+  winner: !!r.w,
+  ...(r.tv ? { tv: true } : {}),
+  ...(r.r ? { rank: r.r } : {}),
+  ...(r.x ? { tied: true } : {}),
+});
+
+/** Hasta qué año está empaquetado este premio (o null si no lo está). */
+export const empaquetadoHasta = (key) => (Number.isFinite(PALMARES[key]?.hasta) ? PALMARES[key].hasta : null);
+
+/** Las filas empaquetadas de un premio, o null si no hay. */
+export function filasEmpaquetadas(key, { keepAll = false } = {}) {
+  const snap = PALMARES[key];
+  if (!snap?.rows?.length) return null;
+  const rows = snap.rows.map(hidratar);
+  return keepAll ? rows : rows.filter((r) => r.winner).map(({ winner, ...r }) => r);
+}
+
 async function cachedAwardRows(f, sufijo, build) {
-  const key = `${cachePrefix('festival')}:awardrows:${sufijo}:${f.awardPage}`;
+  // el idioma va en la clave: dos artículos pueden llamarse igual en dos
+  // Wikipedias y no ser la misma lista
+  const key = `${cachePrefix('festival')}:awardrows:${sufijo}:${f.awardLang || 'en'}:${f.awardPage}`;
   const hit = cacheRead(key, AWARD_ROWS_TTL);
   if (hit?.rows) return hit.rows;
   const rows = await build();
@@ -2221,19 +2497,44 @@ async function cachedAwardRows(f, sufijo, build) {
  * secciones HERMANAS y la de Winners llega vacía: respaldo de página entera,
  * y que el parser descarte las tablas que no son de películas.
  */
-async function getAwardRows(f, { keepAll = false } = {}) {
-  return cachedAwardRows(f, keepAll ? 'todas' : 'ganadoras', async () => {
-    const meta = await wikiParse({ page: f.awardPage, prop: 'sections' });
+async function getAwardRows(f, { keepAll = false, hasta = null, sinPaquete = false } = {}) {
+  const key = sinPaquete ? null : CLAVE_DE.get(f);
+  const empaquetadas = key ? filasEmpaquetadas(key, { keepAll }) : null;
+  const corte = key ? empaquetadoHasta(key) : null;
+  // El año que se pide ya está empaquetado: ni una petición a Wikipedia. Es lo
+  // que hace que «Lo mejor de 1998» salga sin tocar la red.
+  if (empaquetadas && hasta != null && corte != null && hasta <= corte) return empaquetadas;
+
+  const vivas = async () => {
+    const lang = f.awardLang || 'en';
+    const meta = await wikiParse({ lang, page: f.awardPage, prop: 'sections' });
     const sec = (meta.sections || []).find((s) => f.awardSection.test(stripTags(s.line)));
     if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
-    const parsed = await wikiParse({ page: f.awardPage, section: String(sec.index), prop: 'text' });
-    const opciones = { keepAll, sinDirector: !!f.awardSinDirector };
+    const parsed = await wikiParse({ lang, page: f.awardPage, section: String(sec.index), prop: 'text' });
+    const opciones = { keepAll, sinDirector: !!f.awardSinDirector, columnas: f.awardColumns || null };
     let rows = parseWinnersTables(parsed.text, opciones);
     if (!rows.length) {
-      const full = await wikiParse({ page: f.awardPage, prop: 'text' });
+      const full = await wikiParse({ lang, page: f.awardPage, prop: 'text' });
       rows = parseWinnersTables(full.text, opciones);
     }
     return conEdicionesRecientes(f, rows, keepAll);
+  };
+
+  if (!empaquetadas) return cachedAwardRows(f, keepAll ? 'todas' : 'ganadoras', vivas);
+
+  return cachedAwardRows(f, keepAll ? 'todas' : 'ganadoras', async () => {
+    let recientes;
+    try {
+      recientes = await vivas();
+    } catch (err) {
+      // Wikipedia caída, artículo movido, molde cambiado: lo empaquetado se
+      // sigue sirviendo. Antes de tener esto, cualquiera de las tres dejaba el
+      // palmarés entero en un mensaje de error.
+      return empaquetadas;
+    }
+    // Cada tramo, de su fuente: lo cerrado del paquete —con su `tmdb_id` ya
+    // resuelto— y lo que va después, de Wikipedia.
+    return [...recientes.filter((r) => Number(r.year) > corte), ...empaquetadas];
   });
 }
 
@@ -2296,7 +2597,7 @@ async function buildAwardYear(key, f, year) {
     ? f.staticAward.filter((r) => r.year === year)
     : f.awardParse === 'cahiers'
       ? (await getCahiersRows(f)).filter((r) => r.year === year)
-      : (await getAwardRows(f, { keepAll: true })).filter((r) => r.year === year);
+      : (await getAwardRows(f, { keepAll: true, hasta: year })).filter((r) => r.year === year);
   if (!rows.length) {
     if (f.awardParse === 'cahiers' && year >= 1969 && year <= 1980) {
       throw new Error(`Cahiers no publicó top 10 entre 1969 y 1980: no hay lista de ${year}.`);
@@ -2317,7 +2618,7 @@ async function buildAwardYear(key, f, year) {
     note: null,
     source: f.staticAward
       ? 'https://www.wikidata.org/wiki/Q102427'
-      : `https://en.wikipedia.org/wiki/${f.awardPage.replace(/ /g, '_')}`,
+      : wikiUrl(f.awardPage, f.awardLang),
     fetchedAt: Date.now(),
     films,
     unresolved: films.filter((x) => !x.tmdb_id && !x.tv).length, // una serie sin ficha no es un fallo del emparejado
@@ -2358,7 +2659,7 @@ export async function festivalWinners(key, { refresh = false } = {}) {
   let base = refresh ? null : cacheRead(cacheKey, 30 * DAY);
   if (!base) {
     let rows;
-    let source = f.awardPage ? `https://en.wikipedia.org/wiki/${f.awardPage.replace(/ /g, '_')}` : null;
+    let source = f.awardPage ? wikiUrl(f.awardPage, f.awardLang) : null;
     let note = null;
     if (f.staticAward) {
       // solo las ganadoras del dataset (las nominadas viven en la vista por año)
@@ -2442,7 +2743,8 @@ export async function festivalYear(year, { refresh = false } = {}) {
       // pero la tabla del César va por año de gala (ver `anuarioOffset`)
       const enFuente = year + (REGISTRY[key].anuarioOffset || 0);
       try {
-        return { key, enFuente, rows: (await winnersRowsLight(key)).filter((r) => Number(r.year) === enFuente) };
+        const filas = await winnersRowsLight(key, { hasta: enFuente });
+        return { key, enFuente, rows: filas.filter((r) => Number(r.year) === enFuente) };
       } catch (err) {
         return { key, enFuente, rows: [], error: String(err.message || err) };
       }
@@ -2550,9 +2852,12 @@ export async function editionRowsLight(key, f, year) {
  * ya está cacheado se aprovecha; si no, las filas crudas cuestan una llamada a
  * Wikipedia que además queda cacheada un día para todo el mundo.
  */
-export async function winnersRowsLight(key) {
+export async function winnersRowsLight(key, { hasta = null } = {}) {
   const f = REGISTRY[key];
   if (!f) return [];
+  // el año que se pide ya está empaquetado con la app: ni caché ni red
+  const corte = empaquetadoHasta(key);
+  if (hasta != null && corte != null && hasta <= corte) return filasEmpaquetadas(key) || [];
   const full = cacheRead(`${cachePrefix('festival')}:${key}:palmares`, 30 * DAY);
   if (full?.films?.length) return full.films;
   if (f.staticAward) return f.staticAward.filter((r) => r.winner);
@@ -2564,6 +2869,48 @@ export async function winnersRowsLight(key) {
     return parseSundanceWinners(parsed.text, { ambito: f.sundanceAmbito || 'world' });
   }
   return getAwardRows(f);
+}
+
+/**
+ * Las filas de un premio traídas SIEMPRE de la fuente viva, sin mirar el
+ * paquete. La usa `snapshot-palmares.mjs` y solo ella: si el generador leyera
+ * el paquete anterior, regenerar no traería nunca nada nuevo.
+ */
+export async function filasVivasDePremio(key, { keepAll = true } = {}) {
+  const f = REGISTRY[key];
+  if (!f) return [];
+  if (f.staticAward) return f.staticAward; // ya es un dataset: no se reempaqueta
+  if (f.staticList) return [];
+  if (!f.awardPage) return [];
+  if (f.awardParse === 'cahiers') return getCahiersRows(f);
+  if (f.awardParse === 'sundanceList') {
+    const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
+    return parseSundanceWinners(parsed.text, { ambito: f.sundanceAmbito || 'world' })
+      .filter((r) => r.year >= (f.awardSinceYear ?? f.sinceYear))
+      .map((r) => ({ ...r, winner: true }));
+  }
+  const filas = await getAwardRows(f, { keepAll: keepAll && !!f.awardNominees, sinPaquete: true });
+  return f.awardNominees ? filas : filas.map((r) => ({ ...r, winner: true }));
+}
+
+/**
+ * Lo mismo, pero con las NOMINADAS incluidas cuando el premio las publica.
+ *
+ * Para el detector de emergentes una nominación al Goya, al César o al
+ * Guldbagge con una primera película es tan reveladora como el premio: entra en
+ * la terna quien acaba de llegar, lo gana quien ya está. Las filas salen de la
+ * misma caché diaria que el palmarés, así que ampliar el radar no cuesta ni una
+ * petición extra a Wikipedia.
+ *
+ * Devuelve las filas con `winner` marcado; los premios que solo publican
+ * ganadora caen en `winnersRowsLight` y todas vienen marcadas.
+ */
+export async function awardRowsLight(key) {
+  const f = REGISTRY[key];
+  if (!f) return [];
+  if (!f.awardNominees) return (await winnersRowsLight(key)).map((r) => ({ ...r, winner: true }));
+  if (f.staticAward) return f.staticAward;
+  return getAwardRows(f, { keepAll: true });
 }
 
 /**

@@ -1,5 +1,72 @@
 # Changelog
 
+## Beta 1.17 (1.0.17-beta) — 2026-08-11
+
+**Los palmareses cerrados vienen empaquetados con la app: Wikipedia se queda para lo que se mueve. Y entran Seminci y Sitges.**
+
+### El palmarés, guardado hecho
+
+Los años cerrados no cambian: la Palma de 1978 es la de 1978 y su ficha de TMDB es la misma hoy que dentro de diez años. Preguntarlo en cada instalación nueva, cada vez que caduca una caché, era trabajo tirado — y era el trabajo CARO, porque lo que se llevaba el tiempo no era Wikipedia sino las **cuatro mil búsquedas contra TMDB** con su verificación de dirección.
+
+Ahora se guarda hecho. `server/tools/snapshot-palmares.mjs` (`npm run snapshot`) corre los parsers y el emparejado de siempre sobre cada premio y escribe `server/src/data/palmares-2026.js` con el `tmdb_id` ya resuelto, igual que el dataset del Óscar desde la 1.11: **4.794 filas de 31 palmareses hasta 2024, 98,5 % con ficha**. Cada premio dice hasta qué año está cerrado y de ahí en adelante manda la fuente viva, así que la temporada en curso se sigue leyendo de Wikipedia como siempre.
+
+Medido en frío, con la caché entera vaciada:
+
+| | antes | ahora |
+|---|---|---|
+| «Lo mejor de 1998» | 13,7 s · 126 peticiones | **2,1 s · 42** |
+| Palmarés de Cannes | 27,5 s · 432 peticiones | **4,2 s · 111** |
+
+De propina: si Wikipedia falla, cambia el molde de una tabla o mueve un artículo, lo empaquetado se sigue sirviendo en vez de dejar el palmarés en un mensaje de error. Y las correcciones manuales del usuario siguen mandando sobre todo, porque se aplican después.
+
+Lo que hay que recordar, y por eso está escrito en el propio fichero: **un fallo empaquetado se queda hasta que se regenere**, y lo que alguien arregle en Wikipedia sobre un año viejo no llega solo. Se regenera con `npm run snapshot` en cada temporada de premios. Verificado antes de publicarlo: el paquete dice EXACTAMENTE lo mismo que la fuente viva en los 31 premios, fila a fila.
+
+### Seminci y Sitges, los dos que faltaban
+
+El registro pasa de 38 a 40 entradas.
+
+**Seminci**: 70 Espigas de Oro de 1958 a 2025, con dirección y país. Su tabla buena está en la Wikipedia **española** —la inglesa se conforma con una viñeta por año desde 1999 y sin dirección—, así que `wikiParse` acepta idioma (`awardLang`), y el idioma viaja hasta la clave de caché y el enlace de la fuente.
+
+**Sitges**: 46 ganadoras de 1972 a 2025. Su artículo pone cuatro premios en columnas de la misma tabla, donde «Best Director» no es quien dirige a la ganadora sino otro premio de otra película. Dejar que el parser lo adivinara habría dado *The Cremator* firmada por Robert Mulligan sin que nada chirriara, así que sus columnas van **declaradas** en el registro (`awardColumns`).
+
+### Cuatro fallos del parser que solo se ven metiendo tablas nuevas
+
+- **La rejilla**: el parser expandía el `colspan` dentro de una fila pero no arrastraba nada ENTRE filas, así que una celda con `rowspan` dejaba un hueco y las columnas de detrás se leían corridas. En Sitges era catastrófico y silencioso (1973 abre una celda de película vacía con `rowspan="5"`). Arreglarlo rellena **el país que faltaba en media Cannes y media Venecia** y endereza **28 filas viejas** que traían el título original metido en el campo de la dirección: la Concha de 1977, el Óscar de 1955, «Arirang», la Cámara de Oro de 2000 y catorce nominadas de Platform.
+- **El espacio de ancho cero**: la plantilla de referencias de la Wikipedia española deja un `&#8203;` pegado detrás de cada celda, y en JavaScript `\s` no lo toca, así que «1958» dejaba de parecer un año y la tabla entera se leía corrida. Se van solo los invisibles que no significan nada: el ZWNJ persa es letra y se queda (*دانه‌ی انجیر معابد*).
+- **El empate escrito con «&»**: dos títulos en cursiva en la misma celda. Parte el ex aequo de Sitges de 1994 y convierte la nominación de la EFA de 1994 —la trilogía de Kieślowski como un título imposible— en sus tres películas.
+- Una película heredada por `rowspan` ya no se apunta dos veces (los Globos de 1961 tenían cinco nominadas de comedia y cuatro de musical).
+
+### El emparejado sin dirección, con el año puesto
+
+Mirar las 46 fichas de Sitges una a una —que es la lección de la 1.15— destapó **cuatro emparejados falsos con cero «sin ficha»**: «In the Light of the Moon» (que es el otro nombre de *Ed Gein*, 2000) apuntaba a una película de 2025 que se llama igual, el «Ringu» de 1999 a la versión de televisión de 1995, «The Cremator» a un documental nepalí sin fecha y «The Invitation» a un corto sin fecha.
+
+Dos agujeros, los dos solo alcanzables en filas SIN dirección:
+
+- Una ficha **sin fecha** entraba en la ventana de año y encima ordenaba por delante de las fechadas, así que el homónimo fantasma le ganaba siempre a la película buena. Sin director no hay quien verifique: ahora no es candidata.
+- La segunda vuelta **sin ventana de año** aceptaba cualquier título clavado a cualquier distancia. Ahora va acotada y es asimétrica —hasta tres años atrás, uno hacia delante—, que es lo que un palmarés puede sostener: un premio no se lo lleva una película que aún no existe.
+
+Caché `film_match` v4 → v5: esa dura un año y no la barre el bump de `festival`, así que sin subirla habrían sobrevivido los aciertos falsos.
+
+### Directores emergentes: los palmareses también son radar
+
+El detector solo miraba **selecciones**. Ahora mira también **diez palmareses** que alcanzan primeras películas, empezando por la **Cámara de Oro**, que es literalmente el premio a la mejor ópera prima de Cannes y era la señal más pura que había en la app sin usar: entran también EFA, Mar del Plata, Óscar internacional, Goya, César, Seminci, Lola, Sitges y BAFTA.
+
+Fuera se quedan a propósito los que coronan carreras hechas (Óscar, Globos, los círculos de crítica de EE UU) y **el Guldbagge y el Donatello por una razón concreta**: su columna «Director(s)» lista productores, y metidos en el radar el detector fichaba a Mattias Nohrborg —productor— como promesa de la dirección sueca.
+
+El límite de obra sube de tres largos a **cinco**, y ahí apareció lo que no se veía: quien tiene cuatro o cinco películas casi nunca las ha hecho en ocho años, así que el filtro de la obra no llegaba a aplicarse porque le echaba antes la fecha del debut. Separadas las dos ventanas —el radar sigue leyendo ocho años de ediciones, la carrera puede haber empezado hasta doce atrás—, y con la guarda evidente: **quien ya ganó la Palma, el León o el Oso dejó de ser una promesa el día que lo ganó** (ganar la Cámara de Oro o Un Certain Regard es justo lo contrario).
+
+Medido contra TMDB real: de 33 emergentes a **47**, 18 con señal de palmarés. Arriba salen Alauda Ruiz de Azúa (Concha de Oro + Goya), Jeanne Herry (que solo llegaba por el César) y los ganadores de la Cámara de Oro.
+
+### Móvil
+
+- La tabla de los 30 archivos más pesados del Taller **se aplastaba** en vez de desbordar: el año se pegaba a la resolución («20041080») y el códec al tamaño. Ancho mínimo y a deslizar, que es para lo que estaba su contenedor. El mismo defecto estaba en la tabla de notas de Letterboxd de Visionado.
+- El botón «Pedir N a Radarr» llevaba `ml-auto`, que en el escritorio lo empuja a la derecha y en móvil, con la barra partida, lo dejaba sangrado a media línea.
+
+### Otros
+
+- El detector de emergentes traduce el nombre de sus fuentes al inglés (salía «RT crítica» con la interfaz en inglés), y hay un test que cruza la lista de nombres de la interfaz con el radar del servidor: es la clase de lista escrita a mano que en la 1.08 dejó una regla entera sin pintar.
+- Tests 277 → 296. Caché `festival` v14 → v16.
+
 ## Beta 1.16 (1.0.16-beta) — 2026-08-11
 
 **Cuando la lista de un premio se queda atrás, se mira la edición suelta. Y la dirección de las filas que no la traen sale de TMDB.**

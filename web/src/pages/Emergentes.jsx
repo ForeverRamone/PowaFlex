@@ -44,6 +44,22 @@ const NOMBRE_FESTIVAL = {
   orizzonti: 'Venecia · Orizzonti',
   perspectives: 'Berlinale · Perspectives',
   ssnuevos: 'S.S. · Nuevos Directores',
+  // los palmareses que también mira el radar (PESO_PREMIO en emergentes.js).
+  // Esta lista está escrita a mano y por eso hay un test que la cruza con el
+  // radar del servidor: la última vez que una lista así se quedó corta, una
+  // regla entera dejó de pintar sin que nada fallara.
+  camaradeoro: 'Cannes · Cámara de Oro',
+  efa: 'Cine Europeo (EFA)',
+  mardelplata: 'Mar del Plata',
+  oscarint: 'Óscar internacional',
+  goya: 'Premios Goya',
+  cesar: 'Premios César',
+  seminci: 'Seminci (Valladolid)',
+  donatello: 'David di Donatello',
+  guldbagge: 'Guldbagge (Suecia)',
+  lola: 'Lola (Alemania)',
+  sitges: 'Sitges',
+  bafta: 'BAFTA',
 };
 
 const ORDENES = {
@@ -67,7 +83,8 @@ function textoSenal(d) {
   if (d.clave === 'critica') {
     const f = x.mejor?.fuente;
     const nombre = f === 'metacritic' ? 'Metacritic' : f === 'rt_critic' ? 'RT crítica' : 'Σ';
-    return t('{fuente} {n} de media', { fuente: nombre, n: x.media });
+    // el nombre de la fuente también se traduce: en inglés salía «RT crítica»
+    return t('{fuente} {n} de media', { fuente: t(nombre), n: x.media });
   }
   if (d.clave === 'traccion') {
     return t('Letterboxd {nota} con {marcas} marcas', {
@@ -297,7 +314,7 @@ export default function Emergentes() {
       <PageHeader
         eyebrow={t('La caza')}
         title={t('Directores emergentes')}
-        subtitle={t('Quién puede ser un grande dentro de diez años. Sale de las tablas de selección oficial que PowaFlex ya tiene cacheadas —con las cinco secciones de debut, que es donde de verdad estrena quien empieza— y se puntúa de 0 a 100. Cada ficha enseña con qué datos puntuó.')}
+        subtitle={t('Quién puede ser un grande dentro de diez años. Sale de lo que PowaFlex ya tiene cacheado —las tablas de selección oficial, con las cinco secciones de debut que es donde de verdad estrena quien empieza, y los palmareses que alcanzan primeras películas, empezando por la Cámara de Oro— y se puntúa de 0 a 100. Cada ficha enseña con qué datos puntuó.')}
       />
 
       <div className="flex flex-wrap gap-2 items-center mb-3">

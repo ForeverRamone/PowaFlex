@@ -80,7 +80,13 @@ export const CACHE_VERSIONS = {
   // EDICIÓN suelta (el Guldbagge seguía en 2024 con la 61.ª ya publicada), y la
   // dirección de las filas que no la traen sale de TMDB. Lo cacheado antes no
   // tiene esos años ni esos nombres.
-  festival: 14,
+  // v15: las tablas se leen en REJILLA, con las celdas que se estiran hacia
+  // abajo (`rowspan`) puestas en todas las filas que ocupan. Lo cacheado antes
+  // trae las filas que heredaban una celda con las columnas corridas: el país
+  // vacío en media Cannes y en media Venecia, y 28 filas —los nominados de
+  // Platform, la Concha de 1977, el Óscar de 1955— con el título original en el
+  // campo de la dirección. Entran también Seminci y Sitges.
+  festival: 15,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

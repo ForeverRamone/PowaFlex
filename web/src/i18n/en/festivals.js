@@ -3,8 +3,8 @@ export default {
   'serie de televisión': 'TV series',
   'Es una serie de televisión: no tiene ficha de película en TMDB':
     'It is a TV series: it has no movie entry on TMDB',
-  'Las secciones oficiales de los grandes festivales (los seis de la vía Óscar, San Sebastián y Mar del Plata), el palmarés y las nominadas de los premios de cada año, los premios de la crítica gremial y los cánones.':
-    "The official selections of the major festivals (the six on the Oscar route plus San Sebastián and Mar del Plata), each year's winners and award nominees, the critics' association awards, and the canons.",
+  'Las secciones oficiales de los grandes festivales (los seis de la vía Óscar, San Sebastián, Mar del Plata, Seminci y Sitges), el palmarés y las nominadas de los premios de cada año, los premios de la crítica gremial y los cánones.':
+    "The official selections of the major festivals (the six on the Oscar route plus San Sebastián, Mar del Plata, Seminci and Sitges), each year's winners and award nominees, the critics' association awards, and the canons.",
   'Festivales': 'Festivals',
   'Premios': 'Awards',
   'Cánones': 'Canons',
@@ -85,6 +85,7 @@ export default {
   'Toronto · Premio del Público': 'Toronto · People’s Choice',
   'Globos de Oro · Drama': 'Golden Globes · Drama',
   'Globos de Oro · Comedia o musical': 'Golden Globes · Musical or Comedy',
+  'Seminci (Valladolid)': 'Seminci (Valladolid)',
   'Guldbagge (Suecia)': 'Guldbagge (Sweden)',
   'Lola (Alemania)': 'Lola (Germany)',
   'Asociaciones de críticos': 'Critics’ associations',
@@ -95,6 +96,8 @@ export default {
   'Críticos de Boston': 'Boston critics',
   'People’s Choice Award de Toronto': 'Toronto People’s Choice Award',
   'Ástor de Oro a la mejor película': 'Golden Ástor for Best Film',
+  'Espiga de Oro a la mejor película': 'Golden Spike for Best Film',
+  'Sitges a la mejor película': 'Sitges Award for Best Film',
   'Globo de Oro a la mejor película dramática': 'Golden Globe for Best Motion Picture – Drama',
   'Globo de Oro a la mejor película de comedia o musical':
     'Golden Globe for Best Motion Picture – Musical or Comedy',
