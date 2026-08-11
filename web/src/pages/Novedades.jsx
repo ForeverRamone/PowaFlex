@@ -25,6 +25,16 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.16',
+    fecha: '2026-08-11',
+    titular: 'Si la lista de un premio se queda atrás, se mira la edición de ese año',
+    puntos: [
+      'El Guldbagge de 2025 ya está: lo ganó «Eagles of the Republic» en enero. No aparecía porque la lista histórica de Wikipedia seguía terminando en 2024, aunque la edición de ese año llevaba meses con su propia página. Ahora, cuando la lista se queda atrás, se mira la edición suelta —y de paso salen también las nominadas de ese año.',
+      'Vale para el Goya, el BAFTA y los Critics’ Choice además del Guldbagge. Los tres tenían su lista al día, así que no cambia nada en ellos: solo se consulta lo que falta, y en cuanto alguien actualice la lista se deja de mirar.',
+      'El David di Donatello enseñaba sus 69 ganadoras sin un solo director, porque Wikipedia solo acredita a los productores. Ahora el nombre lo pone TMDB, así que ya se puede ver quién dirigió cada una y seguirle la pista con la estrella.',
+    ],
+  },
+  {
     label: 'Beta 1.15',
     fecha: '2026-08-11',
     titular: 'Tres arreglos del emparejado, vistos en el palmarés recién estrenado',

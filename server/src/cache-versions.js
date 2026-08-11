@@ -76,7 +76,11 @@ export const CACHE_VERSIONS = {
   // 404 de TMDB ya no aborta la resolución entera; y la dirección de las fichas
   // rescatadas por el equipo sale de TMDB, no de la celda que decía dirección y
   // traía productores. Lo cacheado antes lleva esos emparejados y esos nombres.
-  festival: 13,
+  // v14: cuando el artículo-lista de un premio se queda atrás se remata con la
+  // EDICIÓN suelta (el Guldbagge seguía en 2024 con la 61.ª ya publicada), y la
+  // dirección de las filas que no la traen sale de TMDB. Lo cacheado antes no
+  // tiene esos años ni esos nombres.
+  festival: 14,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

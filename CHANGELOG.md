@@ -1,5 +1,25 @@
 # Changelog
 
+## Beta 1.16 (1.0.16-beta) — 2026-08-11
+
+**Cuando la lista de un premio se queda atrás, se mira la edición suelta. Y la dirección de las filas que no la traen sale de TMDB.**
+
+### Norma nueva: manda la lista, pero la edición remata
+
+El artículo-lista de un premio se actualiza cuando alguien se acuerda. El del Guldbagge seguía terminando en 2024 mientras la 61.ª edición —*Eagles of the Republic*, enero de 2026— llevaba meses con su propio artículo. Donde la gente escribe primero es en la edición.
+
+Ahora, cuando la lista no llega al año que debería, se consulta el artículo de la edición de los años que faltan (hasta dos). La llave para leerlo es general y no depende del idioma ni del orden: esos artículos van con el mismo molde —una rejilla de categorías, cada una con un rótulo que **enlaza al artículo del premio**— y ese enlace es exactamente el `awardPage` que ya está en el registro. Dentro, una viñeta por película con la ganadora en negrita, así que se rescatan también las nominadas del año.
+
+Si el artículo no sigue ese molde no se devuelve nada y el año se queda como estaba: es un respaldo, no una fuente. Y solo se consulta lo que la lista NO tiene, así que en cuanto alguien la actualice estas peticiones dejan de hacerse solas.
+
+Activado en los cuatro premios cuyo artículo de edición se ha comprobado que encaja: **Guldbagge, Goya, BAFTA y Critics' Choice**. El Guldbagge pasa de 63 a 64 ganadoras y «Lo mejor de 2025» se queda sin ningún premio pendiente. Los otros tres tenían su lista al día, así que no añaden nada — que es justo lo que debe pasar.
+
+### La dirección, de TMDB, cuando la fila no la trae
+
+El David di Donatello acredita productores, no dirección, así que sus 69 ganadoras salían **sin un solo nombre** —y sin estrella que pulsar para seguir a nadie—. Lo mismo iba a pasar con las filas que salen del artículo de una edición. Ahora, cuando la fila no trae dirección y la ficha ya está emparejada, el nombre lo pone TMDB: 68 de las 69 del Donatello lo tienen. La ficha ya estaba pedida por el emparejado, así que no cuesta una petición más, y el nombre se guarda en la entrada de la caché por película para no volver a pedirlo.
+
+Caché `festival` v13 → v14. 277 tests.
+
 ## Beta 1.15 (1.0.15-beta) — 2026-08-11
 
 **Tres arreglos del emparejado que salieron de mirar el palmarés recién estrenado: el Ástor de 1959 apuntaba al making-of, «Paradise Is Burning» salía firmada por su productor y el Guldbagge de 2025 no está porque Wikipedia no lo ha escrito.**

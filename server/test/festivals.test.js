@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   REGISTRY, parseSelectionTable, parseSundanceWinners, parseWinnersTables, stripTags, directorsMatch, cleanTableTitle,
   parseCahiersTables, splitDirectors, elegirCandidato, faltaElTituloOriginal, esGrisNeutro, filaResaltada,
-  expandirColspan, partePorSalto, esSerieConocida, anuarioKeys,
+  expandirColspan, partePorSalto, esSerieConocida, anuarioKeys, parseEditionRows,
 } from '../src/festivals.js';
 import { mismoDiminutivo } from '../src/names.js';
 import { SIGHT_AND_SOUND_2022 } from '../src/data/sight-and-sound-2022.js';
@@ -480,6 +480,54 @@ test('la dirección casa aunque una fuente use el diminutivo', () => {
   assert.ok(directorsMatch('Rick Kaplan', ['Richard Kaplan']));
   // y sigue rechazando a otra persona con el mismo apellido
   assert.equal(directorsMatch('Thomas McCarthy', ['Anna McCarthy']), false);
+});
+
+// El artículo-lista de un premio se actualiza cuando alguien se acuerda: el del
+// Guldbagge seguía en 2024 con la 61.ª edición ya publicada. La llave para leer
+// la edición suelta es el ENLACE al artículo del premio, que ya está en el
+// REGISTRY: así no hay que reconocer el nombre de la categoría ni fiarse del
+// orden en que vengan.
+const EDICION_SUELTA = `
+<table class="wikitable">
+<tr>
+<td style="width:50%"><div><b><a href="/wiki/Guldbagge_Award_for_Best_Director" title="x">Best Director</a></b></div>
+<ul><li><b><a href="/wiki/Alguien">Alguien</a> – <i>Otra Película</i></b></li></ul></td>
+<td style="width:50%"><div><b><a href="/wiki/Guldbagge_Award_for_Best_Film" title="x">Best Film</a></b></div>
+<ul><li><b><i><a href="/wiki/Eagles">Eagles of the Republic</a></i> – Linus Stöhr Torell</b></li>
+<li><i><a href="/wiki/Kevlar">Kevlar Soul</a></i> – Ronny Fritsche</li>
+<li><i>Live a Little</i> – Marie Kjellson</li></ul></td>
+</tr>
+</table>`;
+
+test('cuando la lista se queda atrás, la edición suelta da su ganadora', () => {
+  const filas = parseEditionRows(EDICION_SUELTA, 'Guldbagge Award for Best Film', 2025);
+  assert.deepEqual(filas.map((r) => [r.title, r.winner]), [
+    ['Eagles of the Republic', true],
+    ['Kevlar Soul', false],
+    ['Live a Little', false],
+  ]);
+  assert.ok(filas.every((r) => r.year === 2025 && r.director === null));
+  // la categoría de al lado NO se confunde con esta
+  assert.deepEqual(parseEditionRows(EDICION_SUELTA, 'Guldbagge Award for Best Director', 2025).map((r) => r.title), [
+    'Otra Película',
+  ]);
+  // un premio que no está en el artículo no devuelve nada (es un respaldo, no
+  // una fuente: sin molde reconocible, el año se queda como estaba)
+  assert.deepEqual(parseEditionRows(EDICION_SUELTA, 'Goya Award for Best Film', 2025), []);
+  assert.deepEqual(parseEditionRows('<p>sin tablas</p>', 'Guldbagge Award for Best Film', 2025), []);
+});
+
+test('los artículos de edición se nombran por su ordinal', () => {
+  // comprobados contra Wikipedia: 60.ª Guldbagge y 39.º Goya son el cine de
+  // 2024; 78.ª BAFTA y 30.ª Critics’ Choice, también
+  assert.equal(REGISTRY.guldbagge.editionArticle(2025), '61st Guldbagge Awards');
+  assert.equal(REGISTRY.goya.editionArticle(2024), '39th Goya Awards');
+  assert.equal(REGISTRY.bafta.editionArticle(2024), '78th British Academy Film Awards');
+  assert.equal(REGISTRY.criticschoice.editionArticle(2024), "30th Critics' Choice Awards");
+  // y solo lo llevan las entradas cuyo artículo de edición sigue el molde
+  for (const [key, f] of Object.entries(REGISTRY)) {
+    if (f.editionArticle) assert.ok(f.awardPage, `${key} sin awardPage al que enlazar`);
+  }
 });
 
 // «Lo mejor del año» corta por un año TODO lo que tenga palmarés. Los cánones

@@ -312,6 +312,7 @@ export const REGISTRY = {
     sinceYear: 1986,
     awardPage: 'Goya Award for Best Film',
     awardSection: /^winners and nominees$/i,
+    editionArticle: (y) => `${nth(y - 1985)} Goya Awards`,
   },
   // El César es el ÚNICO cuya tabla va por año de GALA y no de película: la
   // fila «2026 (51.ª)» premia el cine francés de 2025, mientras que las del
@@ -337,6 +338,7 @@ export const REGISTRY = {
     sinceYear: 1948,
     awardPage: 'BAFTA Award for Best Film',
     awardSection: /^winners and nominees$/i,
+    editionArticle: (y) => `${nth(y - 1946)} British Academy Film Awards`,
   },
   efa: {
     name: 'Cine Europeo (EFA)',
@@ -412,6 +414,8 @@ export const REGISTRY = {
     sinceYear: 1963, // el año de las películas: el Guldbagge se falla en enero
     awardPage: 'Guldbagge Award for Best Film',
     awardSection: /^winners and nominees$/i,
+    // el artículo-lista se quedó en 2024 con la 61.ª edición ya publicada
+    editionArticle: (y) => `${nth(y - 1964)} Guldbagge Awards`,
   },
   // El Lola alemán solo publica ganadoras (oro), sin nominadas: palmarés y ya.
   // El artículo vive en «German Film Award for Best Fiction Film» (el título
@@ -490,6 +494,7 @@ export const REGISTRY = {
     sinceYear: 1995,
     awardPage: "Critics' Choice Movie Award for Best Picture",
     awardSection: /^winners and nominees$/i,
+    editionArticle: (y) => `${nth(y - 1994)} Critics' Choice Awards`,
   },
 };
 
@@ -979,6 +984,52 @@ export function parseWinnersTables(html, { keepAll = false, sinDirector = false 
     }
   }
   return out.sort((a, b) => b.year - a.year);
+}
+
+/**
+ * La ganadora (y las nominadas) de UNA edición suelta.
+ *
+ * El artículo-lista de un premio se actualiza cuando alguien se acuerda: el del
+ * Guldbagge seguía terminando en 2024 mientras la 61.ª edición —«Eagles of the
+ * Republic», enero de 2026— llevaba meses con su propio artículo. Donde la
+ * gente escribe primero es en la edición.
+ *
+ * Esos artículos van todos con el mismo molde: una rejilla de categorías, y
+ * cada categoría abre con un rótulo que ENLAZA al artículo del premio. Ese
+ * enlace es la llave —el mismo `awardPage` que ya está en el REGISTRY—, así que
+ * no hay que reconocer el nombre de la categoría en cada idioma ni fiarse del
+ * orden. Dentro, una viñeta por película con la ganadora en negrita.
+ *
+ * Si el artículo no sigue ese molde no se devuelve nada y el año se queda como
+ * estaba: es un respaldo, no una fuente.
+ */
+export function parseEditionRows(html, awardPage, year) {
+  const ruta = `/wiki/${String(awardPage).replace(/ /g, '_')}`;
+  const variantes = [ruta, ruta.replace(/'/g, '%27'), ruta.replace(/–/g, '%E2%80%93')];
+  for (const td of String(html || '').match(/<td[\s\S]*?<\/td>/gi) || []) {
+    const rotulo = (td.match(/<div[\s\S]*?<\/div>/i) || [])[0] || '';
+    if (!variantes.some((v) => rotulo.includes(`href="${v}"`))) continue;
+    const filas = (td.match(/<li[\s\S]*?<\/li>/gi) || [])
+      .map((li) => ({
+        // la ganadora va en negrita; el título, en cursiva (detrás va quien
+        // produce, que en estos artículos es lo que acompaña al título)
+        winner: /<b[\s>]/i.test(li),
+        title: cleanTableTitle(stripTags((li.match(/<i[\s\S]*?<\/i>/i) || [])[0] || '')),
+      }))
+      .filter((r) => r.title);
+    if (!filas.length) continue;
+    // sin negritas, manda la convención: la ganadora abre la lista
+    if (!filas.some((r) => r.winner)) filas[0].winner = true;
+    return filas.map((r) => ({
+      year,
+      title: r.title,
+      original_title: r.title,
+      director: null, // estos artículos acreditan producción, no dirección
+      country: null,
+      winner: r.winner,
+    }));
+  }
+  return [];
 }
 
 /**
@@ -1801,10 +1852,22 @@ export async function resolveFilms(rows, yearOf) {
             errors++; // ficha coja por la red: que no se cachee la página y se reintente
           }
         }
+        // La dirección corregida (ver `direccionReal`) viaja en la entrada. Si
+        // la fila no la trae y la entrada tampoco —porque se guardó antes de
+        // que se rellenara—, se completa aquí y se reescribe: si no, el David
+        // di Donatello se quedaba sin un solo nombre hasta que caducara una
+        // caché de un año.
+        let director = matchHit.director || r.director;
+        if (!director) {
+          const reales = await movieDirectors(matchHit.id).catch(() => null);
+          if (reales?.length) {
+            director = reales.join(', ');
+            if (override === undefined) cacheWrite(matchKey, { ...matchHit, director });
+          }
+        }
         films[idx] = {
           ...r,
-          // la dirección corregida (ver `direccionReal`) viaja en la entrada
-          director: matchHit.director || r.director,
+          director,
           tmdb_id: matchHit.id,
           poster_path: sum?.poster_path || null,
           date: sum?.date || null,
@@ -1870,8 +1933,13 @@ export async function resolveFilms(rows, yearOf) {
       // salía firmada por su productor, Nima Yousefi, y la dirige Mika
       // Gustafson. Va también a la caché por película, que dura un año: si no,
       // volvía el nombre malo en cuanto caducara la página.
+      // ...y también cuando la fila NO trae dirección: el David di Donatello
+      // lista productores, y las filas que salen del artículo de una edición
+      // suelta tampoco la traen. Sin esto se quedaban sin nombre que enseñar y
+      // sin estrella que pulsar. La ficha ya está pedida (la usó el emparejado),
+      // así que no cuesta una petición más.
       let direccionReal = null;
-      if (tmdbId && porEquipo && !fallosRed) {
+      if (tmdbId && !fallosRed && (porEquipo || !r.director)) {
         const reales = await movieDirectors(tmdbId).catch(() => null);
         if (reales?.length) direccionReal = reales.join(', ');
       }
@@ -2165,8 +2233,46 @@ async function getAwardRows(f, { keepAll = false } = {}) {
       const full = await wikiParse({ page: f.awardPage, prop: 'text' });
       rows = parseWinnersTables(full.text, opciones);
     }
-    return rows;
+    return conEdicionesRecientes(f, rows, keepAll);
   });
+}
+
+// Hasta dos años por delante de lo que llegue la lista: uno es el premio recién
+// fallado que nadie ha volcado todavía, y el segundo cubre el año que se saltó.
+// Más atrás no hay nada que rescatar y solo serían peticiones a artículos que
+// no existen.
+const ANIOS_DE_RESPALDO = 2;
+
+/**
+ * La lista del premio, rematada con las ediciones que aún no le han volcado.
+ *
+ * Regla de la casa (pedida por Ramón): manda el artículo-lista, pero si se ha
+ * quedado atrás se mira la edición suelta de los años que faltan. Solo se
+ * consulta lo que la lista NO tiene, así que en cuanto alguien la actualice
+ * estas peticiones dejan de hacerse solas.
+ *
+ * Va aquí dentro, en `getAwardRows`, para que lo aproveche todo lo que cuelga
+ * de él: el palmarés, las nominadas por año y «Lo mejor del año».
+ */
+async function conEdicionesRecientes(f, rows, keepAll) {
+  if (!f.editionArticle || !rows.length) return rows;
+  const ultimo = Math.max(...rows.map((r) => r.year));
+  const hasta = Math.min(new Date().getFullYear(), ultimo + ANIOS_DE_RESPALDO);
+  const extra = [];
+  for (let y = ultimo + 1; y <= hasta; y++) {
+    let parsed = null;
+    try {
+      parsed = await wikiParse({ page: f.editionArticle(y), prop: 'text' });
+    } catch {
+      continue; // esa edición aún no tiene artículo: nada que rescatar
+    }
+    const filas = parseEditionRows(parsed.text, f.awardPage, y);
+    if (!filas.length) continue;
+    extra.push(
+      ...(keepAll ? filas : filas.filter((r) => r.winner).map(({ winner, ...r }) => r))
+    );
+  }
+  return extra.length ? [...extra, ...rows].sort((a, b) => b.year - a.year) : rows;
 }
 
 /** El artículo de Cahiers entero, parseado con su parser propio. */
