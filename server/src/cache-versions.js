@@ -59,7 +59,19 @@ export const CACHE_VERSIONS = {
   // buscan contra TMDB ni cuentan como «sin casar»; y la segunda vuelta sin
   // ventana de año vale también para filas sin director (título clavado y
   // ficha con equipo). Lo cacheado antes tiene esas películas como «sin ficha».
-  festival: 11,
+  // v12: la ganadora ya no se detecta por «tiene fondo» sino por «tiene fondo
+  // CON TONO» (las tablas de Critics’ Choice y del Donatello van a rayas con un
+  // gris, y media lista de nominadas salía marcada como ganadora); los títulos
+  // pierden los símbolos de leyenda pegados («Nomadland ‡», «The Zone of
+  // Interest±»), que no casaban con ninguna ficha; y la fila de año se reconoce
+  // contando colspan (la de 2026 del premio alemán se apuntaba al año anterior
+  // con «2026» de título); un empate metido en una sola celda se desdobla en
+  // sus dos películas (Boston 2008); una tabla con columnas gemelas de comedia
+  // y musical se lee entera (Globos, 1958-1962); «Small Axe» se sirve como lo
+  // que es, una serie; y la comparación de dirección tolera los diminutivos
+  // ingleses («Tom» por «Thomas», «Rick» por «Richard»). Lo cacheado antes
+  // lleva esos fallos.
+  festival: 12,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

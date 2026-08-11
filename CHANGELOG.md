@@ -1,5 +1,53 @@
 # Changelog
 
+## Beta 1.14 (1.0.14-beta) — 2026-08-11
+
+**Trece premios nuevos en Festivales, la vista «Lo mejor del año» que cruza los treinta y ocho palmareses por un año, y seis fallos del parser de Wikipedia que solo se veían al meter tablas nuevas.**
+
+### Trece entradas nuevas: la crítica gremial y cuatro premios nacionales
+
+Partiendo del resumen anual de FilmAffinity, se comprobó uno a uno qué de lo que ofrece tiene detrás un artículo de Wikipedia con la forma que sabe leer `server/src/festivals.js`. De ahí salen trece entradas nuevas (de 25 a 38):
+
+- **Asociaciones de críticos** (grupo nuevo dentro de Premios): NBR, Círculo de Nueva York, Los Ángeles, Chicago, Boston y Critics' Choice. Es el bloque que faltaba: hasta ahora solo había academias de la industria, y estos son los que fallan primero y marcan la temporada.
+- **Premios nacionales**: Globos de Oro (drama y comedia/musical, como dos entradas), David di Donatello, Guldbagge y Lola.
+- **Festivales**: el **Premio del Público de Toronto** —el premio gordo del TIFF y el mejor pronóstico del Óscar que existe; la entrada `tiff` seguía el Platform Prize, que es la competición con jurado— y **Mar del Plata**.
+
+Se descartaron Sitges (una sola tabla con cuatro premios en columnas) y Seminci (viñetas, sin tabla), que necesitarían parser propio.
+
+### «Lo mejor del año»: el corte transversal
+
+La página se navegaba premio a premio. El cuarto rótulo de arriba cambia de modo y enseña **la ganadora de los treinta palmareses en un mismo año**, agrupada en Festivales / Secciones de debut / Premios / Crítica / Cánones, con el nombre del premio sobre cada cartel y el mismo selector de años de siempre (1927–2027, que es hasta donde llega el Óscar).
+
+Sale de lo que ya había: reaprovecha el palmarés cacheado de cada premio y, si no lo hay, trae del artículo solo las filas (cacheadas un día); el emparejado pasa por la misma caché por película. Un premio que falle no tumba el año —se queda fuera con su motivo— y los que aún no se han fallado salen por su nombre, que en el año en curso es información y no un hueco.
+
+**El César es el único cuya tabla va por año de gala** y no de película: su fila «2026 (51.ª)» premia el cine francés de 2025. La vista por premio se queda como está; en el anuario se lee con el desfase puesto y el rótulo lo dice («gala de 2026»). Se comprobó una por una que ninguna otra entrada lo necesita.
+
+Los rótulos que despliegan (Festivales / Premios / Cánones) dejan de ser botones con caja: abiertos se confundían con los premios que acababan de desplegar. Ahora son pestañas subrayadas, de otro rango visual.
+
+### Seis fallos del parser de Wikipedia que las tablas nuevas destaparon
+
+Ninguno era visible con los premios que ya había; todos afectaban también a los viejos en cuanto cambiara su artículo.
+
+1. **«Tiene fondo, luego ganó» era falso.** El sombreado de la ganadora no es un color fijo (#faeb86, #eedd82, #b0c4de, #ddbf5f), así que valía cualquier `background`. Pero Critics' Choice y el Donatello pintan sus filas **a rayas con un gris**, y media lista de nominadas salía marcada como ganadora un año sí y otro no. Ahora un gris neutro (r≈g≈b) es decoración y solo un color con tono es la marca (`esGrisNeutro`).
+2. **La fila de año exigía la tabla completa.** El premio alemán omite la columna del trofeo en casi todas sus filas: «1955» dejaba de reconocerse como año, pasaba a ser el **título** de la película de 1954 y el título original acababa en el campo del director. El discriminador es el mismo de siempre en este fichero —la cursiva—: una celda de título va en `<i>` o enlazada, una de año nunca. Así «1917» de nominada sigue siendo una película.
+3. **Los colspan descolocaban las columnas.** Una celda con `colspan` ocupa varias columnas y se contaba como una: ahora cada celda se coloca en todas las que ocupa (`expandirColspan`). Sin esto, la fila de 1959 de los Globos —que fusiona dirección y producción— sacaba el musical de ese año con el nombre de su director de título.
+4. **Un empate en una sola celda se perdía entero.** Boston 2008 mete *Slumdog Millionaire* y *WALL-E* partidos por `<br>`: el título quedaba en «Slumdog Millionaire , WALL-E» y no casaba con nada. Se desdobla por el salto de línea, que no puede aparecer dentro de un título (la coma sí). Con el cuidado de que un salto en la celda de **dirección** con un solo título es una codirección —la Palma de 1946 y la de 1956—: ahí no se parte nada.
+5. **Dos premios en columnas gemelas.** Los Globos de 1958-1962, cuando comedia y musical eran premios distintos, ponen dos pares (película, dirección) en la misma fila. Ahora se leen los dos: **de 69 películas a 79**.
+6. **El año sin nominadas desaparecía.** En una tabla mixta, el año que trae una sola película no va sombreado porque no hay nada de lo que distinguirla: Chicago 2004 se caía del palmarés sin dejar rastro. Y el rango «1971–1995 · Festival Cancelled» con el que Mar del Plata tapa los 25 inviernos que no se celebró entraba como si fuera una película.
+
+### Y tres del emparejado contra TMDB
+
+- **Un 404 abortaba la resolución entera.** La búsqueda de TMDB devuelve fichas fantasma —entradas borradas que su índice todavía sirve— y pedir sus créditos da 404. Como cualquier error se leía como corte de red, se abandonaba la película **con la candidata buena esperando detrás**: así se quedaron sin ficha *Der bewegte Mann* y *Die Artisten in der Zirkuskuppel*, las dos con su director exacto en la lista. Ahora un 404 salta esa candidata y sigue. De propina, esas páginas no se cacheaban nunca y repetían la ráfaga contra TMDB en cada visita.
+- **La columna «Director(s)» del Guldbagge trae productores** en los años recientes: *Triangle of Sadness* sale con Erik Hemmendorff y Philippe Bober, y ningún director casaba. Nueva vuelta de rescate: si el título es **clavado** y ningún director verifica, se comprueba contra producción y guion de esa ficha (`movieCrewNames`). Siguen siendo dos pruebas, así que no afloja la regla de «mejor sin ficha que la ficha de otra».
+- **Los diminutivos ingleses.** Wikipedia acredita «Thomas McCarthy» y «Rick Kaplan»; TMDB, «Tom» y «Richard». Lista en `names.js`, solo corto ↔ largo (dos diminutivos del mismo nombre no se dan por iguales).
+- Y lo que ganó un premio de cine y **no es cine** se marca como serie: *Small Axe*, premio de los críticos de Los Ángeles de 2020, es una antología de la BBC. Ni se busca en TMDB ni cuenta como emparejado fallido.
+
+**Resultado medido:** 1.999 películas en los 32 palmareses con ficha, **13 sin casar (0,65 %)** —y 11 de ellas son entradas viejas que esta versión no toca—. Los trece premios nuevos suman 806 películas con 2 sin casar.
+
+### Verificación
+
+Se ejecutó el parser anterior y el nuevo sobre el mismo HTML de los trece premios que ya existían: salida **idéntica byte a byte** salvo en el Óscar internacional, donde ocho títulos pierden un «‡» de leyenda que no debían llevar. 275 tests (14 nuevos), caché de festivales a v12.
+
 ## Beta 1.13 (1.0.13-beta) — 2026-08-10
 
 **Los nueve segundos de Visionado eran un índice que faltaba. Y de paso: React vivía dentro del paquete de las gráficas, Favoritos pedía a Wikipedia una pestaña que no estabas mirando, y ninguna espera decía ya por dónde iba.**

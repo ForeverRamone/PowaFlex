@@ -42,12 +42,20 @@ export function splitDirectors(s) {
  * estable —nada de pasar los Sets de Radarr o de seguidos: un Set nuevo
  * repintaría todo—, así que un cambio solo repinta las tarjetas afectadas.
  */
-const FestivalCard = memo(function FestivalCard({ f, dirs, inRadarr, followedStr, busyDir, onFollow, onEdit, onAdded }) {
+const FestivalCard = memo(function FestivalCard({ f, dirs, inRadarr, followedStr, busyDir, onFollow, onEdit, onAdded, label, labelTitle }) {
   // los seguidos de ESTA tarjeta llegan unidos con \n (un salto de línea no
   // puede aparecer dentro de un nombre): primitivo, estable mientras no cambie
   const followed = followedStr ? followedStr.split('\n') : [];
   return (
     <div>
+      {/* en «Lo mejor del año» la tarjeta llega sin contexto: lo que dice de
+          qué premio es esta película va ENCIMA del cartel, que es donde se lee
+          antes de mirar la foto */}
+      {label && (
+        <div className="text-[11px] font-semibold text-gold-400 uppercase tracking-wide leading-tight mb-1 truncate" title={labelTitle || label}>
+          {label}
+        </div>
+      )}
       {f.tmdb_id ? (
         <TmdbCard
           item={f}
@@ -124,6 +132,16 @@ const FestivalCard = memo(function FestivalCard({ f, dirs, inRadarr, followedStr
 // (menos de un tramo) no cambia nada visible.
 const TRAMO = 120;
 
+// Los grupos de «Lo mejor del año», en el orden en que se leen: primero quién
+// ganó dónde, luego quién premió qué. Mismos rótulos que el menú.
+const GRUPOS_ANUARIO = [
+  ['festival', 'Festivales'],
+  ['debut', 'Secciones de debut'],
+  ['premio', 'Premios'],
+  ['critica', 'Asociaciones de críticos'],
+  ['canon', 'Cánones'],
+];
+
 /**
  * Secciones oficiales de los seis festivales de la «vía festival» al Óscar
  * internacional: ganar su premio gordo clasifica una película no inglesa sin
@@ -140,6 +158,10 @@ export default function Festivals() {
   const [view, setView] = useState(() =>
     params.get('f') ? 'seleccion' : localStorage.getItem('festival_view') || 'seleccion'
   ); // seleccion | palmares
+  // «Lo mejor del año» es un modo aparte, no una vista de un premio: corta los
+  // treinta y tantos palmareses por un año en vez de recorrer uno entero. Un
+  // deep-link a un premio concreto (?f=…) manda sobre lo que hubiera guardado.
+  const [anuario, setAnuario] = useState(() => !params.get('f') && localStorage.getItem('festival_anuario') === '1');
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -176,7 +198,7 @@ export default function Festivals() {
   // edición sin cachear tarda mucho más que una cacheada, la parrilla podía
   // acabar enseñando un año distinto del que marca el desplegable.
   const peticion = useRef(0);
-  const load = (k = fest, y = year, v = view, refresh = false) => {
+  const load = (k = fest, y = year, v = view, refresh = false, anu = anuario) => {
     const mia = ++peticion.current;
     setLoading(true);
     setError(null);
@@ -184,7 +206,11 @@ export default function Festivals() {
     // las entradas de solo-palmarés (cánones, premios) no tienen ediciones:
     // se clique desde la vista que se clique, siempre va al palmarés
     const soloP = index?.festivals?.find((f) => f.key === k)?.onlyWinners;
-    const path = soloP || v === 'palmares' ? `/festivals/${k}/palmares` : `/festivals/${k}/${y}`;
+    const path = anu
+      ? `/festivals/anuario/${y}`
+      : soloP || v === 'palmares'
+        ? `/festivals/${k}/palmares`
+        : `/festivals/${k}/${y}`;
     api(`${path}${refresh ? '?refresh=1' : ''}`).then((r) => {
       if (mia !== peticion.current) return; // llegó tarde: ya se pidió otra cosa
       setLoading(false);
@@ -196,8 +222,9 @@ export default function Festivals() {
     localStorage.setItem('festival_key', fest);
     localStorage.setItem('festival_year', String(year));
     localStorage.setItem('festival_view', view);
-    load(fest, year, view);
-  }, [fest, year, view]);
+    localStorage.setItem('festival_anuario', anuario ? '1' : '0');
+    load(fest, year, view, false, anuario);
+  }, [fest, year, view, anuario]);
 
   const info = index?.festivals?.find((f) => f.key === fest);
   // las entradas de solo-palmarés (Sight & Sound) no tienen ediciones por año
@@ -207,17 +234,36 @@ export default function Festivals() {
   }, [soloPalmares, view]);
 
   // años del desplegable, de la edición que viene a la primera; al cambiar a
-  // un festival más joven (Busan), el año se recoloca solo dentro de su rango
+  // un festival más joven (Busan), el año se recoloca solo dentro de su rango.
+  // En «Lo mejor del año» el rango es el de TODOS los palmareses juntos, que
+  // llega hasta 1927 por el Óscar.
   const añoMax = (index?.currentYear || new Date().getFullYear()) + 1;
-  const añoMin = info?.sinceYear || 1946;
+  const añoMin = anuario ? index?.anuario?.sinceYear || 1927 : info?.sinceYear || 1946;
   const años = [];
   for (let y = añoMax; y >= añoMin; y--) años.push(y);
   useEffect(() => {
-    if (soloPalmares || !info) return;
+    if (!anuario && (soloPalmares || !info)) return;
     if (year < añoMin) setYear(añoMin);
     else if (year > añoMax) setYear(añoMax);
-  }, [fest, info, soloPalmares, year, añoMin, añoMax]);
-  const films = data?.films || [];
+  }, [fest, info, soloPalmares, year, añoMin, añoMax, anuario]);
+  // El modo cambia en el acto y la respuesta del modo nuevo llega un render
+  // después: mientras tanto, lo que hay en `data` es lo del modo ANTERIOR. Con
+  // eso se pintaba el anuario con la lista de un premio (y reventaba) o la
+  // parrilla de un premio con la lista del anuario, donde la misma película
+  // gana tres premios y las claves de React se repetían. No se pinta nada hasta
+  // que los datos son los del modo que se está mirando.
+  const datosDelModo = data && (anuario ? !!data.entries : !data.entries) ? data : null;
+  // «Lo mejor del año» llega agrupado por premio: se aplana conservando de
+  // cuál viene cada película, que es lo que hay que pintar sobre el cartel
+  const films = useMemo(
+    () =>
+      datosDelModo?.entries
+        ? datosDelModo.entries.flatMap((e) =>
+            e.films.map((f) => ({ ...f, awardName: e.name, awardTitle: e.award, awardGroup: e.group, galaYear: e.galaYear }))
+          )
+        : datosDelModo?.films || [],
+    [datosDelModo]
+  );
   // la dirección partida UNA vez por lista: splitDirectors son varios regex
   // por película y antes se recalculaba para las 1001 en cada render
   const dirsDe = useMemo(() => new Map(films.map((f) => [f, splitDirectors(f.director)])), [films]);
@@ -281,7 +327,9 @@ export default function Festivals() {
   };
 
   const fijarMatch = async (tmdbId) => {
-    const keyYear = view === 'palmares' ? editar.year : data?.year;
+    // la clave de la corrección lleva el año con el que se EMPAREJÓ, que en el
+    // palmarés y en «Lo mejor del año» es el de la fila, no el de la página
+    const keyYear = view === 'palmares' || anuario ? editar.matchYear ?? editar.year : data?.year;
     const r = await api('/festivals/match', {
       method: 'POST',
       body: { title: editar.title, year: keyYear, director: editar.director, tmdbId },
@@ -297,16 +345,20 @@ export default function Festivals() {
 
   // qué se está construyendo mientras se espera: el palmarés completo de un
   // premio o de un canon no se lee igual que la sección oficial de un año
-  const etiquetaCarga = soloPalmares || view === 'palmares'
-    ? t('Reconstruyendo el palmarés de {nombre}…', { nombre: t(info?.name || 'este premio') })
-    : t('Leyendo la selección de {festival} {y} en Wikipedia…', { festival: t(info?.name || 'este festival'), y: year });
+  const pintaAnuario = anuario && !!datosDelModo;
+
+  const etiquetaCarga = anuario
+    ? t('Reuniendo los palmareses de {y} en Wikipedia…', { y: year })
+    : soloPalmares || view === 'palmares'
+      ? t('Reconstruyendo el palmarés de {nombre}…', { nombre: t(info?.name || 'este premio') })
+      : t('Leyendo la selección de {festival} {y} en Wikipedia…', { festival: t(info?.name || 'este festival'), y: year });
 
   return (
     <div>
       <PageHeader
         eyebrow={t('La caza')}
         title={t('Festivales y premios')}
-        subtitle={t('Las secciones oficiales de los grandes festivales (los seis de la vía Óscar más San Sebastián), el palmarés y las nominadas de los premios de cada año, y los cánones de la crítica.')}
+        subtitle={t('Las secciones oficiales de los grandes festivales (los seis de la vía Óscar, San Sebastián y Mar del Plata), el palmarés y las nominadas de los premios de cada año, los premios de la crítica gremial y los cánones.')}
       />
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
@@ -315,19 +367,22 @@ export default function Festivals() {
           // subgrupo con su propio rótulo: son tres categorías a la vista, pero
           // sin mezclar las secciones de debut con la competición principal
           { key: 'festivales', label: 'Festivales', groups: [['festival', null], ['debut', 'Secciones de debut']] },
-          { key: 'premios', label: 'Premios', groups: [['premio', null]] },
+          // los premios de la crítica gremial van DENTRO de Premios con su
+          // rótulo, como las secciones de debut dentro de Festivales: son
+          // premios, pero no los vota una academia de la industria
+          { key: 'premios', label: 'Premios', groups: [['premio', null], ['critica', 'Asociaciones de críticos']] },
           { key: 'canones', label: 'Cánones', groups: [['canon', null]] },
         ].map((cat) => {
           const del = (index?.festivals || []).filter((f) => cat.groups.some(([g]) => g === f.group));
           if (!del.length) return null;
           const abierta = openCat === cat.key;
-          const activa = del.find((f) => f.key === fest);
+          const activa = !anuario && del.find((f) => f.key === fest);
           return (
             <div key={cat.key} className={`flex gap-2 items-center flex-wrap ${abierta ? 'w-full' : ''}`}>
               <button
                 onClick={() => setOpenCat(abierta ? null : cat.key)}
                 aria-expanded={abierta}
-                className={`btn-ghost ${activa ? '!border-gold-400 text-gold-400' : ''}`}
+                className={`btn-cat ${abierta || activa ? 'btn-cat-on' : ''}`}
               >
                 {abierta ? '▾' : '▸'} {t(cat.label)}
               </button>
@@ -347,10 +402,11 @@ export default function Festivals() {
                       <button
                         key={f.key}
                         onClick={() => {
+                          setAnuario(false);
                           setFest(f.key);
                           if (f.onlyWinners) setView('palmares');
                         }}
-                        className={fest === f.key ? 'btn-gold' : 'btn-ghost'}
+                        className={!anuario && fest === f.key ? 'btn-gold' : 'btn-ghost'}
                         title={t(f.award)}
                       >
                         {t(f.name)}
@@ -362,7 +418,16 @@ export default function Festivals() {
             </div>
           );
         })}
-        {view === 'seleccion' && (
+        {/* el cuarto rótulo no despliega nada: cambia de modo. Corta los treinta
+            y tantos palmareses por un año en vez de recorrer un premio entero */}
+        <button
+          onClick={() => { setAnuario(true); setOpenCat(null); }}
+          className={`btn-cat ${anuario ? 'btn-cat-on' : ''}`}
+          title={t('La ganadora de cada festival y cada premio, en un solo año')}
+        >
+          🏆 {t('Lo mejor del año')}
+        </button>
+        {(anuario || view === 'seleccion') && (
           <div className="flex items-center gap-1 ml-auto">
             <button className="btn-ghost !py-1" onClick={() => setYear((y) => y - 1)} title={t('Edición anterior')}>←</button>
             {/* desplegable en vez de campo numérico: el centro es clicable y
@@ -383,7 +448,14 @@ export default function Festivals() {
       </div>
 
       <div className="flex items-center gap-3 flex-wrap mb-4">
-        {!soloPalmares && (
+        {anuario && (
+          <span className="text-xs text-zinc-500">
+            {t('La ganadora de cada festival y cada premio en {y}, de {n} palmareses a la vez.', {
+              y: year, n: index?.anuario?.count || 0,
+            })}
+          </span>
+        )}
+        {!anuario && !soloPalmares && (
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => setView('seleccion')} className={`${view === 'seleccion' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
               {t(info?.editionLabel) || (info?.awardNominees ? t('Nominadas por año') : t('Sección oficial por año'))}
@@ -393,7 +465,7 @@ export default function Festivals() {
             </button>
           </div>
         )}
-        {info && (
+        {info && !anuario && (
           <span className="text-xs text-zinc-500">
             {/* «Canon:» solo para los cánones: la Cámara de Oro es solo-palmarés
                 pero es un PREMIO, no un canon */}
@@ -415,14 +487,16 @@ export default function Festivals() {
           packs de personas—, así que un porcentaje aquí sería inventado. */}
       {loading && <Spinner label={etiquetaCarga} />}
 
-      {data && (
+      {datosDelModo && (
         <>
           <div className="flex items-center gap-3 flex-wrap mb-3">
             <span className="text-sm text-zinc-400">
               <b className="text-gold-400">
-                {t(data.name)} {data.year ?? ''}
+                {pintaAnuario ? t('Lo mejor de {y}', { y: data.year }) : `${t(data.name)} ${data.year ?? ''}`}
               </b>{' '}
-              · {t(data.section) || t('todas las ganadoras ({award})', { award: t(data.award) })} · {t('{n} películas', { n: films.length })}
+              {pintaAnuario
+                ? t('{n} premios fallados', { n: data.entries.length })
+                : `· ${t(data.section) || t('todas las ganadoras ({award})', { award: t(data.award) })}`} · {t('{n} películas', { n: films.length })}
               {data.unresolved > 0 && (
                 <span className="text-zinc-500"> · {t('{n} sin casar con TMDB', { n: data.unresolved })}</span>
               )}
@@ -432,10 +506,12 @@ export default function Festivals() {
                 </span>
               )}
             </span>
-            <a href={data.source} target="_blank" rel="noreferrer" className="text-[11px] text-zinc-500 hover:text-gold-400 underline">
-              {t('fuente: Wikipedia')}
-            </a>
-            <button className="btn-ghost !py-1 text-xs" onClick={() => load(fest, year, view, true)}>{t('↻ Recargar')}</button>
+            {data.source && (
+              <a href={data.source} target="_blank" rel="noreferrer" className="text-[11px] text-zinc-500 hover:text-gold-400 underline">
+                {t('fuente: Wikipedia')}
+              </a>
+            )}
+            <button className="btn-ghost !py-1 text-xs" onClick={() => load(fest, year, view, true, anuario)}>{t('↻ Recargar')}</button>
             <div className="flex gap-2 ml-auto flex-wrap">
               {pendingDirs.length > 1 && (
                 <button className="btn-ghost" disabled={followAllBusy} onClick={followAll}
@@ -453,6 +529,20 @@ export default function Festivals() {
           {data.note && (
             <p className="text-xs text-sky-300 mb-3 max-w-3xl">ℹ️ {t(data.note)}</p>
           )}
+          {/* lo que TODAVÍA no ha fallado ese año (o que Wikipedia aún no ha
+              escrito) se dice con nombres y apellidos: en el año en curso es
+              media lista, y sin decirlo el hueco parece un fallo */}
+          {pintaAnuario && data.pendientes?.length > 0 && (
+            <p className="text-xs text-zinc-500 mb-3 max-w-3xl">
+              {t('Sin fallar todavía en {y}:', { y: data.year })}{' '}
+              {data.pendientes.map((p) => t(p.name)).join(' · ')}
+            </p>
+          )}
+          {pintaAnuario && data.fallos?.length > 0 && (
+            <p className="text-xs text-orange-300 mb-3 max-w-3xl">
+              ⚠️ {data.fallos.map((f) => `${t(f.name)}: ${t(f.error)}`).join(' · ')}
+            </p>
+          )}
 
           <div className="flex items-center gap-3 flex-wrap mb-2">
             <OwnFilterBar own={own} setOwn={setOwn} />
@@ -468,6 +558,43 @@ export default function Festivals() {
 
           {shown.length === 0 ? (
             <Empty>{films.length === 0 ? t('Sin películas en esta edición.') : t('Nada que enseñar con estos filtros.')}</Empty>
+          ) : pintaAnuario ? (
+            /* por grupos y con el nombre del premio sobre cada cartel: la
+               gracia de esta vista es saber QUIÉN premió qué, y una parrilla
+               plana de treinta carteles no lo dice */
+            GRUPOS_ANUARIO.map(([g, titulo]) => {
+              const suyas = shown.filter((f) => f.awardGroup === g);
+              if (!suyas.length) return null;
+              return (
+                <section key={g} className="mb-6">
+                  <h3 className="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">
+                    {t(titulo)} <span className="text-zinc-600">({suyas.length})</span>
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {suyas.map((f, i) => {
+                      const dirs = dirsDe.get(f) || [];
+                      return (
+                        <FestivalCard
+                          key={`${f.awardName}-${f.tmdb_id || f.title}-${i}`}
+                          f={f}
+                          dirs={dirs}
+                          label={t(f.awardName)}
+                          /* el César va por año de gala: se dice aquí en vez de
+                             dejar que parezca que la ficha trae otro año */
+                          labelTitle={f.galaYear ? `${t(f.awardTitle)} · ${t('gala de {y}', { y: f.galaYear })}` : t(f.awardTitle)}
+                          inRadarr={!!f.tmdb_id && radarrIds.has(f.tmdb_id)}
+                          followedStr={dirs.filter((d) => followedDirs.has(d)).join('\n')}
+                          busyDir={dirs.includes(dirBusy) ? dirBusy : null}
+                          onFollow={followDirector}
+                          onEdit={abrirEditor}
+                          onAdded={onAdded}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -506,7 +633,7 @@ export default function Festivals() {
           title={`${editar.title}${editar.director ? ` — ${editar.director}` : ''}`}
           initialQuery={editar.title || ''}
           searchPath={(term) =>
-            `/festivals/match-candidates?q=${encodeURIComponent(term)}&year=${(view === 'palmares' ? editar.year : data?.year) || ''}`}
+            `/festivals/match-candidates?q=${encodeURIComponent(term)}&year=${(view === 'palmares' || anuario ? editar.matchYear ?? editar.year : data?.year) || ''}`}
           subtitle={t('Busca en TMDB y elige la ficha correcta. La corrección se recuerda y manda sobre el emparejado automático.')}
           onPick={fijarMatch}
           onClear={editar.tmdb_id ? () => fijarMatch(null) : null}

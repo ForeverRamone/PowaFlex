@@ -794,6 +794,22 @@ export async function movieDirectors(tmdbId) {
   return Promise.all(crew.map((c) => (needsLatin(c.name) ? latinPersonName(c.id, c.name) : c.name)));
 }
 
+// Los oficios que las tablas de premios confunden con la dirección: la columna
+// «Director(s)» del Guldbagge trae PRODUCTORES en los años recientes (Erik
+// Hemmendorff por «Triangle of Sadness», Nima Yousefi por «Paradise Is
+// Burning»), y otras tablas ponen a quien firma el guion. Verificar contra
+// estos nombres rescata esas fichas sin aflojar la regla de oro: solo se
+// consulta cuando el título ya es clavado y ningún director ha casado.
+const OFICIOS_DE_APOYO =
+  /^(producer|executive producer|co-producer|associate producer|line producer|screenplay|writer|story|author|novel)$/i;
+
+/** Producción y guion de una ficha, para verificar cuando la dirección falla. */
+export async function movieCrewNames(tmdbId) {
+  const det = await movieDetail(tmdbId, { withCredits: true });
+  const crew = (det.credits?.crew || []).filter((c) => OFICIOS_DE_APOYO.test(c.job || ''));
+  return Promise.all(crew.map((c) => (needsLatin(c.name) ? latinPersonName(c.id, c.name) : c.name)));
+}
+
 /** Ficha mínima de una película (cartel, fecha, títulos), con la misma caché
  *  de 7 días que usa enrichRuntimes para no pedir dos veces lo mismo. */
 export async function movieSummary(tmdbId) {

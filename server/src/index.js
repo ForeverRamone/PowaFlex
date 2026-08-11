@@ -92,7 +92,7 @@ import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
 import { ROLES } from './roles.js';
 import { importImdbRatings, imdbInfo } from './imdb.js';
 import { listarCopias, hacerCopia, BACKUP_DIR } from './backup.js';
-import { festivalsIndex, festivalEdition, festivalWinners, festivalOverrideKey, festivalDirectorPacks } from './festivals.js';
+import { festivalsIndex, festivalEdition, festivalWinners, festivalYear, festivalOverrideKey, festivalDirectorPacks } from './festivals.js';
 import { DIRECTORS_2026 } from './data/directors-2026.js';
 import { dataHealth } from './datahealth.js';
 import { runFullRefresh, refreshStatus, refreshHistory, nightlyHealth } from './refresh.js';
@@ -381,6 +381,17 @@ app.post('/api/festivals/match', async (req, reply) => {
   // barato: el resto de emparejados sale de la caché film_match)
   db.prepare(`DELETE FROM tmdb_cache WHERE key LIKE 'festival:%'`).run();
   return { ok: true };
+});
+
+// lo mejor de un año: la ganadora de cada premio, de una vez. Va ANTES que
+// «/:key/:year» porque «anuario» encajaría como si fuera la clave de un premio.
+app.get('/api/festivals/anuario/:year', async (req, reply) => {
+  try {
+    return await festivalYear(Number(req.params.year), { refresh: req.query.refresh === '1' });
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
 });
 
 // palmarés histórico del premio que clasifica (antes que :year para no chocar)

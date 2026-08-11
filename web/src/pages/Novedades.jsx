@@ -25,6 +25,20 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.14',
+    fecha: '2026-08-11',
+    titular: 'Trece premios nuevos y una vista que enseña lo mejor de un año entero',
+    puntos: [
+      'Festivales y premios pasa de 25 a 38 entradas. Nuevas: los seis premios de la crítica de Estados Unidos (NBR, Nueva York, Los Ángeles, Chicago, Boston y Critics’ Choice), los Globos de Oro —drama y comedia por separado—, el David di Donatello italiano, el Guldbagge sueco, el Lola alemán, el Premio del Público de Toronto y Mar del Plata.',
+      'Y una vista nueva: «Lo mejor del año». En vez de ir premio a premio, eliges un año y ves de un vistazo quién ganó en los treinta palmareses, agrupados por festivales, premios y crítica, con el nombre del premio sobre cada cartel. Llega hasta 1927, que es donde empieza el Óscar.',
+      'El Premio del Público de Toronto es el premio gordo del festival y el mejor pronóstico del Óscar que hay (Nomadland, Green Book, La La Land, 12 años de esclavitud). Hasta ahora solo estaba el Platform Prize, que es la competición con jurado.',
+      'Media lista de nominadas de Critics’ Choice y del Donatello salía marcada como ganadora: sus tablas de Wikipedia van pintadas a rayas y el programa confundía la raya gris con el sombreado que marca a la ganadora. Ya no.',
+      'Triangle of Sadness se quedaba sin cartel en el palmarés del Guldbagge porque Wikipedia pone ahí a los productores en vez de a los directores. Ahora, cuando el título coincide exactamente y ningún director casa, se comprueba contra el equipo de producción y guion de esa misma ficha.',
+      'Otras seis películas se quedaban sin ficha por un fallo tonto: si TMDB devolvía en la búsqueda una entrada borrada, el programa lo tomaba por un corte de red y abandonaba la película, con la ficha buena esperando en la misma lista.',
+      'Y varias cosas más que estaban mal desde antes y no se veían: los Globos de comedia de 1958 a 1962 faltaban enteros, el Goya de 2004 de los críticos de Chicago desaparecía, y algunos títulos arrastraban símbolos («Nomadland ‡») que impedían encontrarlos.',
+    ],
+  },
+  {
     label: 'Beta 1.13',
     fecha: '2026-08-10',
     titular: 'Visionado tardaba nueve segundos por un índice que faltaba',

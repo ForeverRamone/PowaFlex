@@ -272,6 +272,27 @@ body {
     border: var(--border-w) solid var(--color-ink-600);
   }
 
+  /* Rótulo de categoría que despliega a otros botones (Festivales / Premios /
+     Cánones, en Festivales y premios). NO es un `btn-ghost`: abierto quedaba en
+     la misma fila y con la misma caja que los premios que acababa de desplegar,
+     y no había forma de saber cuál mandaba sobre cuál. Va sin caja y subrayado,
+     como una pestaña, para que se lea de otro rango. */
+  .btn-cat {
+    @apply px-1 py-2 text-xs font-semibold uppercase cursor-pointer bg-transparent
+           text-zinc-400 hover:text-zinc-100 transition-colors;
+    letter-spacing: 0.12em;
+    border: 0;
+    border-bottom: 2px solid var(--color-ink-600);
+    border-radius: 0;
+  }
+  .btn-cat:hover {
+    border-bottom-color: var(--color-zinc-500, #71717a);
+  }
+  .btn-cat-on {
+    @apply text-gold-400;
+    border-bottom-color: var(--color-gold-400);
+  }
+
   /* Poster tiles: quiet by default, lift on hover. Used by every grid. */
   .poster {
     @apply aspect-[2/3] rounded-lg overflow-hidden bg-ink-800 relative transition duration-200

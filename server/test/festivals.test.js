@@ -2,8 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   REGISTRY, parseSelectionTable, parseSundanceWinners, parseWinnersTables, stripTags, directorsMatch, cleanTableTitle,
-  parseCahiersTables, splitDirectors, elegirCandidato, faltaElTituloOriginal,
+  parseCahiersTables, splitDirectors, elegirCandidato, faltaElTituloOriginal, esGrisNeutro, filaResaltada,
+  expandirColspan, partePorSalto, esSerieConocida, anuarioKeys,
 } from '../src/festivals.js';
+import { mismoDiminutivo } from '../src/names.js';
 import { SIGHT_AND_SOUND_2022 } from '../src/data/sight-and-sound-2022.js';
 import { MIL_UNA_2021 } from '../src/data/1001-movies-2021.js';
 
@@ -314,6 +316,257 @@ test('parseWinnersTables: keepAll marca la ganadora entre las nominadas', () => 
     ['The Red Virgin', false],
   ]);
   assert.ok(todas.every((r) => r.year === 2024));
+});
+
+// --- lo que destaparon los premios de la crítica --------------------------------
+
+// «Tiene fondo, luego ganó» dejó de valer con Critics’ Choice y el David di
+// Donatello, que pintan sus tablas A RAYAS: media lista de nominadas salía
+// marcada como ganadora, un año sí y otro no. El gris es decoración.
+test('el gris de las rayas no es el sombreado de una ganadora', () => {
+  for (const gris of ['#eee', '#EEEEEE', '#f2f2f2', 'transparent', 'whitesmoke', '#bebebe']) {
+    assert.ok(esGrisNeutro(gris), gris);
+  }
+  for (const marca of ['#faeb86', '#eedd82', '#b0c4de', '#DDBF5F', '#efd']) {
+    assert.equal(esGrisNeutro(marca), false, marca);
+  }
+  assert.ok(filaResaltada('<tr style="background:#FAEB86"><td>Nomadland</td></tr>'));
+  assert.equal(filaResaltada('<tr style="background:#eee;"><td>Mank</td></tr>'), false);
+  assert.equal(filaResaltada('<tr><td>Minari</td></tr>'), false);
+  // el bgcolor suelto NO cuenta: tres filas del artículo de la Palma lo llevan
+  // como nota, y darlas por palmarés dejaba fuera a toda su década
+  assert.equal(filaResaltada('<tr bgcolor="#efd"><td>Taste of Cherry</td></tr>'), false);
+});
+
+// Chicago 2004 solo tiene ganadora, sin nominadas, y por eso el artículo no la
+// sombrea: desaparecía del palmarés sin dejar rastro.
+const TABLA_UN_SOLO_AÑO = `
+<table class="wikitable">
+<tr><th>Year</th><th>Winner and nominees</th><th>Director(s)</th></tr>
+<tr><td>2004</td><td><i><b><a href="/wiki/Sideways">Sideways</a></b></i></td><td>Alexander Payne</td></tr>
+<tr><td rowspan="2">2005</td><td style="background:#B0C4DE;"><i><b><a href="/wiki/Crash">Crash</a></b></i></td><td style="background:#B0C4DE;">Paul Haggis</td></tr>
+<tr><td><i><a href="/wiki/Brokeback_Mountain">Brokeback Mountain</a></i></td><td>Ang Lee</td></tr>
+</table>`;
+
+test('en una tabla mixta, el año con una sola película es su ganadora aunque no vaya sombreada', () => {
+  const ganadoras = parseWinnersTables(TABLA_UN_SOLO_AÑO);
+  assert.deepEqual(ganadoras.map((r) => [r.year, r.title]), [[2005, 'Crash'], [2004, 'Sideways']]);
+  const todas = parseWinnersTables(TABLA_UN_SOLO_AÑO, { keepAll: true });
+  assert.deepEqual(todas.map((r) => [r.title, r.winner]), [
+    ['Crash', true],
+    ['Brokeback Mountain', false],
+    ['Sideways', true],
+  ]);
+});
+
+// El premio alemán se deja la columna del trofeo en casi todas sus filas, y
+// exigir el ancho completo hacía que «1955» dejara de ser un año: pasaba a ser
+// el TÍTULO de la película de 1954 y el título original acababa de director.
+// La columna de película va en cursiva o enlazada; la del año, nunca.
+const TABLA_COLUMNA_QUE_FALTA = `
+<table class="wikitable">
+<tr><th>Year</th><th>English title</th><th>Original title</th><th>Director(s)</th><th>Trophy received</th></tr>
+<tr><td style="text-align:center;">1954</td><td><i><a href="/wiki/No_Way_Back">No Way Back</a></i></td><td><i>Weg ohne Umkehr</i></td><td>Victor Vicas</td><td>Golden Bowl</td></tr>
+<tr><td style="text-align:center;">1955</td><td><i><a href="/wiki/Canaris">Canaris: Master Spy</a></i></td><td><i>Canaris</i></td><td>Alfred Weidenmann</td></tr>
+<tr><td style="text-align:center;">2026</td><td colspan="2"><i><a href="/wiki/Luecke">Ach, diese Lücke</a></i></td><td>Simon Verhoeven</td></tr>
+</table>`;
+
+test('un año en <td> abre fila aunque la tabla se deje columnas por el camino', () => {
+  const rows = parseWinnersTables(TABLA_COLUMNA_QUE_FALTA);
+  assert.deepEqual(rows.map((r) => [r.year, r.title, r.director]), [
+    [2026, 'Ach, diese Lücke', 'Simon Verhoeven'],
+    [1955, 'Canaris: Master Spy', 'Alfred Weidenmann'],
+    [1954, 'No Way Back', 'Victor Vicas'],
+  ]);
+});
+
+// Los 25 inviernos que Mar del Plata no se celebró van en UNA fila, con el
+// rango en la columna del año: sin reconocerlo, «1971–1995» entraba en el
+// palmarés como si fuera una película.
+const TABLA_CON_RANGO = `
+<table class="wikitable">
+<tr><th>Year</th><th>Film</th><th>Original Title</th><th>Director</th><th>Country</th></tr>
+<tr><td>1970</td><td colspan="2"><i><a href="/wiki/Macunaima">Macunaíma</a></i></td><td>Joaquim Pedro de Andrade</td><td>Brazil</td></tr>
+<tr><td>1971–1995</td><td colspan="4" style="text-align:center;">Festival Cancelled </td></tr>
+<tr><td>1996</td><td><i><a href="/wiki/Dog">The Dog in the Manger</a></i></td><td><i>El perro del hortelano</i></td><td>Pilar Miró</td><td>Spain</td></tr>
+</table>`;
+
+test('un rango de años cancelados no se cuela como película', () => {
+  const rows = parseWinnersTables(TABLA_CON_RANGO);
+  assert.deepEqual(rows.map((r) => [r.year, r.title]), [[1996, 'The Dog in the Manger'], [1970, 'Macunaíma']]);
+});
+
+// Una celda con colspan ocupa VARIAS columnas: contarla como una sola descoloca
+// todo lo que viene detrás. La fila de 1959 de los Globos fusiona dirección y
+// producción, y sin esto el musical de ese año salía con el nombre de su
+// director de TÍTULO.
+test('expandirColspan pone cada celda en todas las columnas que ocupa', () => {
+  assert.deepEqual(expandirColspan(['<td>a</td>', '<td colspan="2">b</td>', '<td>c</td>']), [
+    '<td>a</td>', '<td colspan="2">b</td>', '<td colspan="2">b</td>', '<td>c</td>',
+  ]);
+  assert.deepEqual(expandirColspan([null, '<td>x</td>']), [null, '<td>x</td>']);
+});
+
+// Los Globos de 1958-1962, cuando comedia y musical eran dos premios distintos:
+// dos pares (película, dirección) en la misma fila. Sin leer los dos, esos cinco
+// años se quedaban fuera del palmarés enteros.
+const TABLA_COLUMNAS_GEMELAS = `
+<table class="wikitable">
+<tr><th>Year</th><th>Comedy</th><th>Director</th><th>Producer</th><th>Musical</th><th>Director</th><th>Producer</th></tr>
+<tr><td rowspan="2">1959</td><td><i><b>Some Like It Hot</b></i></td><td colspan="2">Billy Wilder</td><td><i><b>Porgy and Bess</b></i></td><td>Otto Preminger</td><td>Samuel Goldwyn</td></tr>
+<tr><td><i>But Not for Me</i></td><td>Walter Lang</td><td>William Perlberg</td><td><i>The Five Pennies</i></td><td>Melville Shavelson</td><td>Jack Rose</td></tr>
+</table>`;
+
+test('una tabla con columnas gemelas de comedia y musical se lee entera', () => {
+  const rows = parseWinnersTables(TABLA_COLUMNAS_GEMELAS);
+  assert.deepEqual(rows.map((r) => [r.year, r.title, r.director]), [
+    [1959, 'Some Like It Hot', 'Billy Wilder'],
+    [1959, 'Porgy and Bess', 'Otto Preminger'],
+    [1959, 'But Not for Me', 'Walter Lang'],
+    [1959, 'The Five Pennies', 'Melville Shavelson'],
+  ]);
+});
+
+// Boston 2008 mete su empate en UNA celda partida por <br>. Pero un <br> en la
+// celda de dirección con UN solo título es una codirección (la Palma de 1956):
+// ahí no se parte nada, o se perdía el segundo nombre.
+test('un empate en una sola celda se desdobla; una codirección no', () => {
+  const EMPATE = `
+<table class="wikitable">
+<tr><th>Year</th><th>Winner</th><th>Director(s)</th></tr>
+<tr><td>2008</td><td><i><b>Slumdog Millionaire</b></i><br /><i><b>WALL-E</b></i></td><td>Danny Boyle<br />Andrew Stanton</td></tr>
+</table>`;
+  assert.deepEqual(parseWinnersTables(EMPATE).map((r) => [r.title, r.director]), [
+    ['Slumdog Millionaire', 'Danny Boyle'],
+    ['WALL-E', 'Andrew Stanton'],
+  ]);
+  const CODIRECCION = `
+<table class="wikitable">
+<tr><th>Year</th><th>English title</th><th>Original title</th><th>Director</th></tr>
+<tr><td>1956</td><td><i>The Silent World</i></td><td><i>Le monde du silence</i></td><td>Jacques Cousteau<br />Louis Malle</td></tr>
+</table>`;
+  assert.deepEqual(parseWinnersTables(CODIRECCION).map((r) => [r.title, r.director]), [
+    ['The Silent World', 'Jacques Cousteau, Louis Malle'],
+  ]);
+  assert.equal(partePorSalto('<td>sin saltos</td>'), null);
+});
+
+// Los críticos de Los Ángeles premiaron en 2020 a «Small Axe», que es una
+// antología de la BBC. Buscarla en TMDB es gastar búsquedas para acabar en el
+// mismo sitio, y encima contarlo como emparejado fallido.
+test('lo que ganó un premio de cine y no es cine se marca como serie', () => {
+  assert.ok(esSerieConocida('Small Axe', 2020));
+  assert.equal(esSerieConocida('Small Axe', 2019), false);
+  assert.equal(esSerieConocida('Nomadland', 2020), false);
+  const LAFCA = `
+<table class="wikitable">
+<tr><th>Year</th><th>Film</th><th>Director</th></tr>
+<tr><td>2020</td><td><i><b>Small Axe</b></i></td><td>Steve McQueen</td></tr>
+</table>`;
+  assert.equal(parseWinnersTables(LAFCA)[0].tv, true);
+});
+
+// Wikipedia acredita «Thomas McCarthy» y «Rick Kaplan»; TMDB, «Tom» y
+// «Richard». Sin la lista, la verificación de dirección tumbaba el emparejado
+// de Spotlight y de The Eleanor Roosevelt Story.
+test('la dirección casa aunque una fuente use el diminutivo', () => {
+  assert.ok(mismoDiminutivo('tom', 'thomas'));
+  assert.ok(mismoDiminutivo('thomas', 'tom'));
+  assert.ok(mismoDiminutivo('rick', 'richard'));
+  // dos diminutivos del mismo nombre NO se dan por iguales
+  assert.equal(mismoDiminutivo('rick', 'dick'), false);
+  assert.equal(mismoDiminutivo('tom', 'timothy'), false);
+  assert.ok(directorsMatch('Thomas McCarthy', ['Tom McCarthy']));
+  assert.ok(directorsMatch('Rick Kaplan', ['Richard Kaplan']));
+  // y sigue rechazando a otra persona con el mismo apellido
+  assert.equal(directorsMatch('Thomas McCarthy', ['Anna McCarthy']), false);
+});
+
+// «Lo mejor del año» corta por un año TODO lo que tenga palmarés. Los cánones
+// fijos no van por años y las secciones sin premio utilizable no tienen
+// ganadora que dar: ni unos ni otras deben aparecer.
+test('el corte por año coge todo lo que tiene palmarés y nada más', () => {
+  const claves = anuarioKeys();
+  for (const k of ['cannes', 'oscar', 'cahiers', 'sundance', 'criticschoice', 'globosdrama', 'mardelplata']) {
+    assert.ok(claves.includes(k), `falta ${k}`);
+  }
+  for (const k of ['sightsound', 'mil1', 'busan', 'horizontes', 'quinzaine', 'orizzonti', 'perspectives', 'ssnuevos']) {
+    assert.equal(claves.includes(k), false, `sobra ${k}`);
+  }
+  // el César es el único que va por año de GALA: su fila 2026 es el cine de 2025
+  assert.equal(REGISTRY.cesar.anuarioOffset, 1);
+  for (const k of claves) {
+    if (k !== 'cesar') assert.ok(!REGISTRY[k].anuarioOffset, `${k} no debería llevar desfase`);
+  }
+});
+
+// ...y la contrapartida: una nominada TITULADA con cuatro cifras sigue siendo
+// una película, porque su celda va en cursiva y enlazada.
+const TABLA_TITULO_QUE_ES_UN_AÑO = `
+<table class="wikitable">
+<tr><th>Year</th><th>English title</th><th>Original title</th><th>Director(s)</th></tr>
+<tr><td rowspan="2">2019</td><td style="background:#faeb86"><i><b>Parasite</b></i></td><td style="background:#faeb86"><i>기생충</i></td><td style="background:#faeb86">Bong Joon-ho</td></tr>
+<tr><td><i><a href="/wiki/1917_(2019_film)">1917</a></i></td><td><i>1917</i></td><td>Sam Mendes</td></tr>
+</table>`;
+
+test('una nominada que se llama «1917» no se convierte en un año', () => {
+  const todas = parseWinnersTables(TABLA_TITULO_QUE_ES_UN_AÑO, { keepAll: true });
+  assert.deepEqual(todas.map((r) => [r.year, r.title, r.winner]), [
+    [2019, 'Parasite', true],
+    [2019, '1917', false],
+  ]);
+});
+
+// El David di Donatello es el único que no publica dirección: lista
+// productores. Sin `sinDirector` su tabla entera se descartaba.
+const TABLA_SIN_DIRECTOR = `
+<table class="wikitable">
+<tr><th>Year</th><th>Film</th><th>Producer(s)</th></tr>
+<tr><td rowspan="3">2020 (66th)</td></tr>
+<tr><td style="background:#DDBF5F"><i><b>Hidden Away</b></i></td><td style="background:#DDBF5F">Carlo Degli Esposti</td></tr>
+<tr style="background:#eee;"><td><i>Hammamet</i></td><td>Agostino Saccà</td></tr>
+</table>`;
+
+test('un premio sin columna de dirección solo se lee si su entrada lo pide', () => {
+  assert.deepEqual(parseWinnersTables(TABLA_SIN_DIRECTOR), []);
+  const todas = parseWinnersTables(TABLA_SIN_DIRECTOR, { keepAll: true, sinDirector: true });
+  assert.deepEqual(todas.map((r) => [r.year, r.title, r.winner]), [
+    [2020, 'Hidden Away', true],
+    [2020, 'Hammamet', false],
+  ]);
+  assert.ok(todas.every((r) => r.director === null));
+  assert.ok(REGISTRY.donatello.awardSinDirector, 'el Donatello es quien lo pide');
+});
+
+// Los premios de la crítica cuelgan símbolos del título para remitir a su
+// leyenda («‡ = ganó también el Óscar»). Pegados, no casan con nada en TMDB.
+test('cleanTableTitle quita los símbolos de leyenda, pero no el asterisco de M*A*S*H', () => {
+  assert.equal(cleanTableTitle('Nomadland ‡'), 'Nomadland');
+  assert.equal(cleanTableTitle('One Battle After Another≈'), 'One Battle After Another');
+  assert.equal(cleanTableTitle('The Zone of Interest±'), 'The Zone of Interest');
+  assert.equal(cleanTableTitle('M*A*S*H'), 'M*A*S*H');
+});
+
+// Los trece premios nuevos: cada uno tiene artículo y sección de Wikipedia, y
+// ninguno promete una vista por año que su fuente no sepa servir.
+test('los premios de la crítica y los nacionales nuevos están completos', () => {
+  const CRITICA = ['nbr', 'nyfcc', 'lafca', 'chicago', 'boston', 'criticschoice'];
+  for (const key of CRITICA) assert.equal(REGISTRY[key].group, 'critica', key);
+  const NUEVOS = [
+    ...CRITICA, 'globosdrama', 'globoscomedia', 'donatello', 'guldbagge', 'lola', 'tiffpublico', 'mardelplata',
+  ];
+  for (const key of NUEVOS) {
+    const f = REGISTRY[key];
+    assert.ok(f, key);
+    assert.ok(f.awardPage && f.awardSection, `${key} sin artículo de palmarés`);
+    assert.ok(!f.article, `${key} no tiene ediciones que listar`);
+    // o palmarés solo, o palmarés + nominadas por año: nunca las dos banderas
+    assert.equal(!!f.onlyWinners, !f.awardNominees, `${key} con las dos vistas a la vez`);
+    assert.ok(f.sinceYear >= 1932 && f.sinceYear <= new Date().getFullYear(), `${key} sinceYear=${f.sinceYear}`);
+  }
+  // los que sí son festivales van con los festivales, no con los premios
+  assert.equal(REGISTRY.tiffpublico.group, undefined);
+  assert.equal(REGISTRY.mardelplata.group, undefined);
 });
 
 // El artículo de Cahiers: una tabla por década, años como filas-cabecera,

@@ -16,9 +16,9 @@
 import { db, cacheRead, cacheWrite } from './db.js';
 import { mapPool, cedeElHilo } from './pool.js';
 import { cachePrefix } from './cache-versions.js';
-import { foldName, normName } from './names.js';
+import { foldName, normName, mismoDiminutivo } from './names.js';
 import {
-  searchMovieCandidates, movieDirectors, movieSummary, findPersonInfo, latinizeNames,
+  searchMovieCandidates, movieDirectors, movieCrewNames, movieSummary, findPersonInfo, latinizeNames,
   personCredits, englishTitle, searchPersonCandidates, TMDB_CONCURRENCY,
   setBuildProgress, clearBuildProgress,
 } from './tmdb.js';
@@ -109,6 +109,20 @@ export const REGISTRY = {
     awardPage: 'Platform Prize',
     awardSection: /^competition$/i,
   },
+  // Toronto no tiene jurado en su sección grande: su premio gordo lo vota el
+  // PÚBLICO, y es el mejor pronóstico del Óscar que existe (Nomadland, Green
+  // Book, La La Land, 12 años de esclavitud, El discurso del rey…). La entrada
+  // `tiff` sigue el Platform Prize, que es la competición con jurado; sin esta
+  // faltaba justo lo que hace famoso a Toronto. Solo palmarés: la tabla lista
+  // la ganadora sombreada con sus dos finalistas por año, desde 1978.
+  tiffpublico: {
+    name: 'Toronto · Premio del Público',
+    award: 'People’s Choice Award de Toronto',
+    onlyWinners: true,
+    sinceYear: 1978,
+    awardPage: "Toronto International Film Festival People's Choice Award",
+    awardSection: /^winners$/i,
+  },
   busan: {
     name: 'Busan (BIFF)',
     award: 'Busan Award – Best Film',
@@ -130,6 +144,18 @@ export const REGISTRY = {
     sinceYear: 1953,
     awardPage: 'Golden Shell',
     awardSection: /^winners$/i,
+  },
+  // El festival de clase A de América Latina, y la puerta por la que pasa el
+  // cine argentino y brasileño antes de llegar a Europa. Wikipedia no tabula
+  // sus ediciones, pero sí el palmarés completo del Ástor de Oro desde 1954,
+  // con título original y país.
+  mardelplata: {
+    name: 'Mar del Plata',
+    award: 'Ástor de Oro a la mejor película',
+    onlyWinners: true,
+    sinceYear: 1959, // el primer Ástor de Oro; las ediciones de 1954-58 no lo dieron
+    awardPage: 'Mar del Plata International Film Festival',
+    awardSection: /^golden [aá]stor winners$/i,
   },
   horizontes: {
     name: 'S.S. · Horizontes Latinos',
@@ -287,11 +313,18 @@ export const REGISTRY = {
     awardPage: 'Goya Award for Best Film',
     awardSection: /^winners and nominees$/i,
   },
+  // El César es el ÚNICO cuya tabla va por año de GALA y no de película: la
+  // fila «2026 (51.ª)» premia el cine francés de 2025, mientras que las del
+  // Goya, el BAFTA o el Óscar ya vienen por año de película. Su vista por año
+  // se queda como está —quien busca «César 2025» busca la gala de 2025—, pero
+  // en «Lo mejor del año», que compara un mismo año entre premios, se lee con
+  // el desfase puesto.
   cesar: {
     name: 'Premios César',
     award: 'César a la mejor película',
     group: 'premio',
     awardNominees: true,
+    anuarioOffset: 1,
     sinceYear: 1976,
     awardPage: 'César Award for Best Film',
     awardSection: /^winners and nominees$/i,
@@ -333,6 +366,131 @@ export const REGISTRY = {
     awardPage: 'List of Academy Award winners and nominees for Best International Feature Film',
     awardSection: /^winners and nominees$/i,
   },
+  globosdrama: {
+    name: 'Globos de Oro · Drama',
+    award: 'Globo de Oro a la mejor película dramática',
+    group: 'premio',
+    awardNominees: true,
+    sinceYear: 1943, // el año de las PELÍCULAS; la primera gala fue en 1944
+    awardPage: 'Golden Globe Award for Best Motion Picture – Drama',
+    awardSection: /^winners and nominees$/i,
+  },
+  // La otra mitad del premio: los Globos parten la mejor película en dos desde
+  // 1951. Su artículo titula la sección «Winners and nominations» (el de drama,
+  // «Winners and Nominees»), y entre 1958 y 1962 —cuando comedia y musical eran
+  // DOS premios distintos— la tabla los pone en columnas gemelas: el parser
+  // busca una sola columna de película y esos cinco años (más 1953, sin premio)
+  // se quedan sin servir. Se ofrecen igual desde 1951, porque el resto de esa
+  // década sí está y un «Wikipedia no tiene nominadas de 1959» dice la verdad.
+  globoscomedia: {
+    name: 'Globos de Oro · Comedia o musical',
+    award: 'Globo de Oro a la mejor película de comedia o musical',
+    group: 'premio',
+    awardNominees: true,
+    sinceYear: 1951,
+    awardPage: 'Golden Globe Award for Best Motion Picture – Musical or Comedy',
+    awardSection: /^winners and nominations$/i,
+  },
+  // El David di Donatello es el ÚNICO cuya tabla no lleva columna de dirección:
+  // lista productores. Por eso `awardSinDirector`, que a cambio obliga al
+  // emparejado a exigir título clavado contra TMDB.
+  donatello: {
+    name: 'David di Donatello',
+    award: 'David di Donatello a la mejor película',
+    group: 'premio',
+    awardNominees: true,
+    awardSinDirector: true,
+    sinceYear: 1969,
+    awardPage: 'David di Donatello for Best Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  guldbagge: {
+    name: 'Guldbagge (Suecia)',
+    award: 'Guldbagge a la mejor película',
+    group: 'premio',
+    awardNominees: true,
+    sinceYear: 1963, // el año de las películas: el Guldbagge se falla en enero
+    awardPage: 'Guldbagge Award for Best Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  // El Lola alemán solo publica ganadoras (oro), sin nominadas: palmarés y ya.
+  // El artículo vive en «German Film Award for Best Fiction Film» (el título
+  // por el que se le conoce, «Deutscher Filmpreis», redirige ahí).
+  lola: {
+    name: 'Lola (Alemania)',
+    award: 'Deutscher Filmpreis: Lola de Oro a la mejor película',
+    group: 'premio',
+    onlyWinners: true,
+    sinceYear: 1951,
+    awardPage: 'German Film Award for Best Fiction Film',
+    awardSection: /^list of winning films$/i,
+  },
+
+  // --- LOS PREMIOS DE LA CRÍTICA GREMIAL --------------------------------------
+  //
+  // Las academias nacionales (Goya, César, BAFTA, Óscar) votan por gremios de
+  // la industria; estos los votan CRÍTICOS, y se fallan entre diciembre y
+  // enero, antes que ninguna academia. Por eso llevan décadas siendo el
+  // termómetro de la temporada: la lista de la crítica de Nueva York o de Los
+  // Ángeles adelanta lo que van a hacer los premios grandes, y a menudo se
+  // desmarca (Boston y Los Ángeles premian cine que el Óscar ni nomina).
+  //
+  // Cuatro de los seis solo publican ganadora. Chicago y Critics’ Choice sí
+  // llevan nominadas, con la ganadora sombreada en la misma tabla.
+  nbr: {
+    name: 'NBR (crítica de EE UU)',
+    award: 'National Board of Review a la mejor película',
+    group: 'critica',
+    onlyWinners: true,
+    sinceYear: 1932,
+    awardPage: 'National Board of Review Award for Best Film',
+    awardSection: /^winners$/i,
+  },
+  nyfcc: {
+    name: 'Críticos de Nueva York',
+    award: 'New York Film Critics Circle a la mejor película',
+    group: 'critica',
+    onlyWinners: true,
+    sinceYear: 1935,
+    awardPage: 'New York Film Critics Circle Award for Best Film',
+    awardSection: /^winners$/i,
+  },
+  lafca: {
+    name: 'Críticos de Los Ángeles',
+    award: 'Los Angeles Film Critics Association a la mejor película',
+    group: 'critica',
+    onlyWinners: true,
+    sinceYear: 1975,
+    awardPage: 'Los Angeles Film Critics Association Award for Best Film',
+    awardSection: /^winners$/i,
+  },
+  chicago: {
+    name: 'Críticos de Chicago',
+    award: 'Chicago Film Critics Association a la mejor película',
+    group: 'critica',
+    awardNominees: true,
+    sinceYear: 1988,
+    awardPage: 'Chicago Film Critics Association Award for Best Film',
+    awardSection: /^winners$/i,
+  },
+  boston: {
+    name: 'Críticos de Boston',
+    award: 'Boston Society of Film Critics a la mejor película',
+    group: 'critica',
+    onlyWinners: true,
+    sinceYear: 1980,
+    awardPage: 'Boston Society of Film Critics Award for Best Film',
+    awardSection: /^winners$/i,
+  },
+  criticschoice: {
+    name: 'Critics’ Choice',
+    award: 'Critics’ Choice Movie Award a la mejor película',
+    group: 'critica',
+    awardNominees: true,
+    sinceYear: 1995,
+    awardPage: "Critics' Choice Movie Award for Best Picture",
+    awardSection: /^winners and nominees$/i,
+  },
 };
 
 // Ediciones que se salieron del molde, casi todas por la pandemia: o no hubo
@@ -350,9 +508,29 @@ const SPECIAL_EDITIONS = {
   },
 };
 
+/**
+ * Las entradas que saben decir QUIÉN ganó en un año concreto: las que tienen
+ * palmarés, sea artículo de premio, dataset empaquetado o parser propio. Fuera
+ * quedan los cánones fijos (Sight & Sound y las 1001 no van por años) y las
+ * secciones sin premio utilizable en Wikipedia (Busan, Horizontes y las de
+ * debut), que solo saben listar su selección.
+ */
+export function anuarioKeys() {
+  return Object.entries(REGISTRY)
+    .filter(([, f]) => !f.staticList && (f.awardPage || f.staticAward))
+    .map(([key]) => key);
+}
+
 export function festivalsIndex() {
+  const claves = anuarioKeys();
   return {
     currentYear: new Date().getFullYear(),
+    // para el desplegable de «Lo mejor del año»: hasta dónde llega hacia atrás
+    // el más viejo de los palmareses (el Óscar, 1927)
+    anuario: {
+      count: claves.length,
+      sinceYear: Math.min(...claves.map((k) => REGISTRY[k].awardSinceYear ?? REGISTRY[k].sinceYear ?? 9999)),
+    },
     festivals: Object.entries(REGISTRY).map(([key, f]) => ({
       key,
       name: f.name,
@@ -414,6 +592,16 @@ export function stripTags(html) {
 }
 
 /**
+ * Los símbolos que las tablas cuelgan del título para remitir a su leyenda:
+ * la daga de siempre y los que traen los premios de la crítica —«Nomadland ‡»
+ * (también ganó el Óscar) en Critics’ Choice, «One Battle After Another≈» y
+ * «The Zone of Interest±» en Los Ángeles—. Pegados al título no casan con
+ * ninguna ficha de TMDB. El asterisco NO está: hay títulos que lo llevan
+ * dentro («M*A*S*H»).
+ */
+const MARCA_DE_LEYENDA = /[†‡±≈]/g;
+
+/**
  * Limpia un título de celda de tabla: marcadores de premio («Alpha (QP)»), el
  * «(ex-æquo)» de los empates de BAFTA, dagas, y los paréntesis finales con el
  * título original que las tablas viejas pegan en la misma celda («Ballad of a
@@ -422,13 +610,51 @@ export function stripTags(html) {
  */
 export function cleanTableTitle(s) {
   if (!s) return null;
-  let t = String(s).replace(/†/g, '').trim();
+  const sinMarcas = String(s).replace(MARCA_DE_LEYENDA, '').trim();
+  let t = sinMarcas;
   for (let i = 0; i < 3; i++) {
     const pelado = t.replace(/\s*\([^()]*\)$/, '').trim();
     if (pelado === t || !pelado) break;
     t = pelado;
   }
-  return t || String(s).replace(/†/g, '').trim();
+  return t || sinMarcas;
+}
+
+/**
+ * ¿Es este color el gris de decorar y no la marca de una ganadora?
+ *
+ * El sombreado del palmarés no es un color fijo —#faeb86 (BAFTA, EFA,
+ * Platform), #eedd82 (Goya, César), #b0c4de (Óscar internacional), #ddbf5f
+ * (David di Donatello)—, así que la regla siempre ha sido «tiene fondo, luego
+ * ganó». Pero algunas tablas pintan las filas A RAYAS con un gris (#eee en
+ * Critics’ Choice y en Donatello) y con esa regla media lista de nominadas
+ * salía marcada como ganadora, un año sí y otro no. Un gris neutro (r≈g≈b) es
+ * decoración; un color con tono es la marca.
+ */
+export function esGrisNeutro(color) {
+  const c = String(color || '').trim().toLowerCase();
+  if (/^(transparent|inherit|initial|unset|none|white|whitesmoke|gainsboro|silver|(?:light|dark)?gr[ae]y)$/.test(c)) return true;
+  const hex = c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if (!hex) return false;
+  const h = hex[1];
+  const [r, g, b] =
+    h.length === 3 ? [...h].map((x) => parseInt(x + x, 16)) : [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return Math.max(r, g, b) - Math.min(r, g, b) <= 8;
+}
+
+/**
+ * ¿Va esta fila sombreada como ganadora? Solo cuenta el `background` de un
+ * atributo `style`, que es lo que ha marcado siempre a las ganadoras: el
+ * `bgcolor="#efd"` suelto de tres filas del artículo de la Palma es otra cosa
+ * (una nota de la tabla) y darlo por palmarés dejaría fuera a toda su década,
+ * porque una tabla con parte de las filas resaltadas se lee como «ganadora
+ * entre nominadas». Los `<style>` que Wikipedia mete dentro de las celdas de
+ * referencias traen colores que no pintan ninguna fila: fuera antes de mirar.
+ */
+export function filaResaltada(row) {
+  const src = String(row || '').replace(/<style[\s\S]*?<\/style>/gi, '');
+  if (/#faeb86|#eedd82/i.test(src)) return true;
+  return [...src.matchAll(/background(?:-color)?\s*:\s*([^;"']+)/gi)].some((m) => !esGrisNeutro(m[1]));
 }
 
 /**
@@ -456,6 +682,58 @@ export function cleanTableTitle(s) {
  * cursiva, es un título y la que falta es otra columna; si no, es el nombre de
  * quien dirige y hay que recolocar.
  */
+/**
+ * Cómo se llama la columna de la película. Cada familia de artículos la titula
+ * a su manera: «English title» en los festivales, «Film» en casi todos los
+ * premios, «Winner» en los críticos de EE UU, «Winner and nominees» en los de
+ * Chicago, y «Comedy»/«Musical» en los Globos de 1958-1962, cuando eran dos
+ * premios distintos en columnas gemelas.
+ */
+const RX_COLUMNA_TITULO = /english title|^film\b|^title|^winner|^comedy$|^musical$/;
+
+/**
+ * Las celdas que traen VARIAS películas (o varios nombres) partidas por un
+ * salto de línea. Devuelve null cuando no hay salto, que es el caso normal:
+ * así quien llama se queda con la celda de siempre y no hay nada que cambiar.
+ *
+ * El corte es el `<br>` del HTML y no la coma del texto ya limpio: hay títulos
+ * con coma dentro y ninguno con salto de línea.
+ */
+/**
+ * Las celdas de una fila puestas cada una en TODAS las columnas que ocupa: una
+ * celda con `colspan="2"` aparece dos veces. Sin esto, la posición de la celda
+ * y el índice de su columna dejan de coincidir en cuanto una fila fusiona dos
+ * campos, y todo lo que viene detrás se lee corrido.
+ */
+export function expandirColspan(rawCells) {
+  return rawCells.flatMap((c) => {
+    const n = Number((String(c ?? '').match(/colspan\s*=\s*"?(\d+)/i) || [])[1]) || 1;
+    return new Array(Math.min(n, 12)).fill(c);
+  });
+}
+
+export function partePorSalto(rawCell) {
+  if (!rawCell || !/<br\s*\/?>/i.test(rawCell)) return null;
+  const trozos = String(rawCell)
+    .split(/<br\s*\/?>/i)
+    .map((x) => stripTags(x).trim())
+    .filter(Boolean);
+  return trozos.length > 1 ? trozos : null;
+}
+
+/**
+ * Lo que estos palmareses premiaron y NO es una película. Los críticos de Los
+ * Ángeles dieron su premio de 2020 a «Small Axe», que es una antología de la
+ * BBC en cinco capítulos: buscarla en TMDB es gastar búsquedas para acabar en
+ * el mismo «sin ficha» y encima contarlo como fallo del emparejado. Marcada
+ * como serie, la interfaz lo dice —igual que con el «Twin Peaks» de Sight &
+ * Sound— y deja de parecer un hueco.
+ */
+const NO_SON_PELICULAS = new Set(['small axe|2020']);
+
+export const esSerieConocida = (title, year) =>
+  NO_SON_PELICULAS.has(`${String(title || '').trim().toLowerCase()}|${year}`);
+
 export function faltaElTituloOriginal(rawCells, headers, idxOrig) {
   if (idxOrig < 0 || rawCells.length >= headers.length) return false;
   const enOrig = rawCells[idxOrig];
@@ -539,7 +817,7 @@ export function parseSelectionTable(html, { all = false } = {}) {
  * se recoloca aquí. Devuelve filas {year, title, original_title, director,
  * country}, de la más reciente a la más antigua.
  */
-export function parseWinnersTables(html, { keepAll = false } = {}) {
+export function parseWinnersTables(html, { keepAll = false, sinDirector = false } = {}) {
   const out = [];
   const tables = String(html || '').match(/<table[^>]*wikitable[\s\S]*?<\/table>/gi) || [];
   for (const t of tables) {
@@ -547,77 +825,157 @@ export function parseWinnersTables(html, { keepAll = false } = {}) {
     if (rows.length < 2) continue;
     const headers = (rows[0].match(/<th[\s\S]*?<\/th>/gi) || []).map((c) => stripTags(c).toLowerCase());
     const idxYear = headers.findIndex((h) => /year/.test(h));
-    const idxTitle = headers.findIndex((h) => /english title|^film\b|^title/.test(h));
+    const columnasTitulo = headers.map((h, i) => (RX_COLUMNA_TITULO.test(h) ? i : -1)).filter((i) => i >= 0);
+    const columnasDir = headers.map((h, i) => (/director/.test(h) ? i : -1)).filter((i) => i >= 0);
     const idxOrig = headers.findIndex((h) => /original title/.test(h));
-    const idxDir = headers.findIndex((h) => /director/.test(h));
     const idxCountry = headers.findIndex((h) => /countr/.test(h));
-    if (idxYear === -1 || idxDir === -1 || idxTitle === -1) continue;
+    if (idxYear === -1 || !columnasTitulo.length) continue;
+    // Casi todas las tablas traen UNA columna de película. La de los Globos de
+    // 1958-1962, cuando comedia y musical eran DOS premios distintos, trae dos
+    // pares (película, dirección) en la misma fila: se leen los dos, porque los
+    // dos ganaron ese año. Cada título se empareja con la primera columna de
+    // dirección que tiene a su derecha.
+    const gemelas = columnasTitulo.length > 1 && columnasDir.length >= columnasTitulo.length;
+    const parejas = gemelas
+      ? columnasTitulo.map((ti) => ({ ti, di: columnasDir.find((d) => d > ti) ?? -1 }))
+      : [{ ti: columnasTitulo[0], di: columnasDir[0] ?? -1 }];
+    // sin columna de dirección la tabla no sirve —es la que verifica el
+    // emparejado—, salvo que el premio no la tenga a propósito: el David di
+    // Donatello lista productores, y sin director el emparejado exige título
+    // clavado (ver `resolveFilms`)
+    if (parejas.some((p) => p.di === -1) && !sinDirector) continue;
 
     let lastYear = null;
     const delTable = [];
     for (const row of rows.slice(1)) {
       const rawCells = row.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || [];
-      let cells = rawCells.map(stripTags);
-      if (!cells.length) continue;
+      const crudas = rawCells.map(stripTags);
+      if (!crudas.length) continue;
       // El año abre la fila de la ganadora — como <th> (Palma), como <td
       // rowspan> que abraza a las nominadas (Goya, BAFTA) o con adorno
       // («2020 (35th)»)— y desaparece en ex aequo y nominadas. OJO con las
       // películas tituladas «1917»: un año pelado en <td> solo cuenta si la
       // fila trae TODAS las columnas (las nominadas van a una de menos).
-      const y0 = cells[0].match(/^((?:19|20)\d{2})\b/);
+      const y0 = crudas[0].match(/^((?:19|20)\d{2})\b/);
+      // «trae todas las columnas» hay que contarlo con los colspan puestos: la
+      // fila de 2026 del premio alemán es «2026 | <td colspan=2>título |
+      // director», tres celdas para cuatro columnas, y contando celdas a pelo
+      // dejaba de ser fila de año — la película se apuntaba al año anterior con
+      // «2026» de título.
+      const ancho = rawCells.reduce((n, c) => n + (Number((c.match(/colspan\s*=\s*"?(\d+)/i) || [])[1]) || 1), 0);
+      // Hay tablas que se dejan columnas por el camino en casi todas sus filas
+      // (el premio alemán omite la del trofeo salvo en los años en que cambió
+      // de nombre), y ahí exigir el ancho completo dejaba de reconocer el año:
+      // «1955» pasaba a ser el TÍTULO de la película de 1954 y todo se corría
+      // una columna, con el título original de director. El discriminador es
+      // el mismo de siempre: una celda de título va en cursiva o enlazada, y
+      // una de año, nunca — así «1917» de nominada sigue siendo una película.
+      const primeraEsTitulo = /<i[\s>]|<a\s/i.test(rawCells[0] || '');
       const esFilaDeAño =
         !!y0 &&
         (/^<th/i.test(rawCells[0]) ||
           /rowspan/i.test(rawCells[0]) ||
-          /^(?:19|20)\d{2}\s*[([]/.test(cells[0]) ||
-          (/^(?:19|20)\d{2}$/.test(cells[0]) && cells.length === headers.length));
+          /^(?:19|20)\d{2}\s*[([]/.test(crudas[0]) ||
+          // el rango va en la columna del año igual que un año suelto: es como
+          // Mar del Plata tapa los 25 inviernos que no se celebró («1971–1995 ·
+          // Festival Cancelled»), y sin reconocerlo esa fila se colaba en el
+          // palmarés como una película titulada «1971–1995»
+          (/^(?:19|20)\d{2}(?:\s*[–—-]\s*(?:19|20)\d{2})?$/.test(crudas[0]) &&
+            (ancho === headers.length || !primeraEsTitulo)));
       // el HTML alineado con las columnas, para poder mirar la cursiva de la
       // celda que caería en el título original
       let rawAlineado = rawCells;
       if (esFilaDeAño) {
         lastYear = Number(y0[1]);
-        cells = [String(lastYear), ...cells.slice(1)];
       } else {
-        cells = [String(lastYear ?? ''), ...cells];
         rawAlineado = [null, ...rawCells]; // la del año no viene en el HTML
       }
+      // Cada celda, en TODAS las columnas que ocupa: la fila de 1959 de los
+      // Globos mete «Billy Wilder» en dirección y producción de una vez con un
+      // colspan, y contando celdas a pelo lo que viene detrás se lee corrido —
+      // el musical de ese año salía con el nombre del director de título.
+      const rawPorColumna = expandirColspan(rawAlineado);
+      const cells = rawPorColumna.map((c) => (c == null ? '' : stripTags(c)));
+      cells[0] = String(lastYear ?? '');
       // ¿Sin celda de título original, o sin celda de PAÍS? En las tablas de
       // premio el país va con `rowspan` a menudo, así que la fila corta es lo
       // normal y suponer que falta el título original corría las columnas: el
       // director acababa con el título original dentro y la película se quedaba
       // sin ficha. Lo decide la cursiva.
-      const sinOriginal = faltaElTituloOriginal(rawAlineado, headers, idxOrig);
+      const sinOriginal = faltaElTituloOriginal(rawPorColumna, headers, idxOrig);
+      const columna = (i) => (sinOriginal && i > idxOrig ? i - 1 : i);
       const cell = (i) => {
         if (i < 0) return null;
-        const j = sinOriginal && i > idxOrig ? i - 1 : i;
+        const j = columna(i);
         return j < cells.length ? cells[j] : null;
       };
-      const director = cell(idxDir);
-      const title = cleanTableTitle(cell(idxTitle));
-      // años sin premio (COVID, festival cancelado) vienen sin director
-      if (!lastYear || !title || !director) continue;
-      delTable.push({
-        // el artículo del Platform Prize lista la sección ENTERA con la
-        // ganadora sombreada: si la tabla resalta filas, solo esas son palmarés
-        highlighted: /background\s*:|#faeb86|#eedd82/i.test(row),
-        film: {
-          year: lastYear,
-          title,
-          original_title: sinOriginal ? title : cleanTableTitle(cell(idxOrig)) || title,
-          director,
-          country: cell(idxCountry),
-        },
-      });
+      // el HTML de esa misma celda, para poder mirar por dentro (los <br> que
+      // parten un empate en dos películas)
+      const cellRaw = (i) => {
+        if (i < 0) return null;
+        const j = columna(i);
+        return j < rawPorColumna.length ? rawPorColumna[j] : null;
+      };
+      if (!lastYear) continue;
+      for (const { ti, di } of parejas) {
+        // Una nota que abarca la fila entera («No awards given», «Festival
+        // Cancelled» de los 25 inviernos que Mar del Plata no se celebró) cae
+        // con su colspan en la columna del título Y en la de la dirección: es
+        // LA MISMA celda, y una película nunca lo es.
+        if (di >= 0 && cellRaw(ti) && cellRaw(ti) === cellRaw(di)) continue;
+        // Boston 2008 mete su empate —Slumdog Millionaire y WALL-E— en UNA
+        // celda partida por <br>, con los dos directores igual. Sin desdoblarlo
+        // el título quedaba en «Slumdog Millionaire , WALL-E» y se perdían las
+        // dos películas; se parte por el salto, que no puede aparecer dentro de
+        // un título, y no por la coma, que sí.
+        const titulos = partePorSalto(cellRaw(ti)) || [cell(ti)];
+        // La dirección solo se parte si el TÍTULO se partió: un salto en la
+        // celda de dirección casi siempre es una CODIRECCIÓN de una sola
+        // película —la Palma de 1946 (Ipsen y Lauritzen) y la de 1956
+        // (Cousteau y Malle)— y partirla dejaba fuera al segundo nombre.
+        const directores = titulos.length > 1 ? partePorSalto(cellRaw(di)) || [cell(di)] : [cell(di)];
+        for (let k = 0; k < titulos.length; k++) {
+          const title = cleanTableTitle(titulos[k]);
+          // con un solo nombre para varias películas (codirección compartida),
+          // ese nombre vale para todas
+          const director = directores.length === titulos.length ? directores[k] : directores[0] || null;
+          // años sin premio (COVID, festival cancelado) vienen sin director
+          if (!title || (!director && !sinDirector)) continue;
+          delTable.push({
+            // el artículo del Platform Prize lista la sección ENTERA con la
+            // ganadora sombreada: si la tabla resalta filas, solo esas son palmarés
+            highlighted: filaResaltada(row),
+            film: {
+              year: lastYear,
+              title,
+              original_title:
+                titulos.length > 1 || sinOriginal ? title : cleanTableTitle(cell(idxOrig)) || title,
+              director: director || null,
+              country: cell(idxCountry),
+              // lo que ganó un premio de cine y NO es cine se marca aquí: ni se
+              // busca en TMDB ni cuenta como emparejado fallido
+              ...(esSerieConocida(title, lastYear) ? { tv: true } : {}),
+            },
+          });
+        }
+      }
     }
     const hi = delTable.filter((r) => r.highlighted);
     // tabla mixta (ganadora sombreada entre nominadas) vs tabla de solo
     // ganadoras (Palme): en la mixta, «winner» es el sombreado; en la de solo
     // ganadoras lo son todas
     const mixta = hi.length && hi.length < delTable.length;
+    // ...salvo el año que en una tabla mixta trae UNA sola película: entonces
+    // no hay nada de lo que distinguirla y el artículo no la sombrea. Le pasa
+    // a 2004 en los críticos de Chicago, que sin esto desaparecía del palmarés
+    // sin dejar rastro: ni ganadora, ni nominada, ni error.
+    const porAño = new Map();
+    for (const r of delTable) porAño.set(r.film.year, (porAño.get(r.film.year) || 0) + 1);
+    const ganó = (r) => !mixta || r.highlighted || porAño.get(r.film.year) === 1;
     if (keepAll) {
-      for (const r of delTable) out.push({ ...r.film, winner: mixta ? r.highlighted : true });
+      for (const r of delTable) out.push({ ...r.film, winner: ganó(r) });
     } else {
-      for (const r of mixta ? hi : delTable) out.push(r.film);
+      for (const r of delTable) if (ganó(r)) out.push(r.film);
     }
   }
   return out.sort((a, b) => b.year - a.year);
@@ -982,6 +1340,9 @@ const mismoToken = (a, b) => {
   // por el corto («Theodor» por «Th.»), nunca al revés. Al hacerlo simétrico,
   // «Carla Theron» pasaba por «Carl Th. Dreyer» — lo cazó su test.
   if (a === b || b.startsWith(a)) return true;
+  // «Tom» por «Thomas», «Rick» por «Richard»: dos formas del mismo nombre de
+  // pila que ninguna de las reglas de parecido junta (ver names.js)
+  if (mismoDiminutivo(a, b)) return true;
   if (a === `${b}s` || b === `${a}s`) return true;
   const da = sinDobles(a);
   const dbb = sinDobles(b);
@@ -1084,7 +1445,25 @@ export function festivalOverrideKey(title, year, director) {
  *
  * `dirsDe` devuelve los directores de un candidato, o null si la red falló.
  */
-export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, tituloEnDe = null) {
+/**
+ * Lo que devuelve `dirsDe` cuando la ficha NO EXISTE (404 de TMDB), que no es
+ * lo mismo que un corte de red.
+ *
+ * La búsqueda de TMDB devuelve a veces fichas fantasma —entradas borradas que
+ * su índice todavía sirve—, y pedir sus créditos da 404. Como cualquier error
+ * se traducía a «null», eso se leía como fallo de red y ABORTABA la resolución
+ * entera de esa película: la candidata buena venía detrás y ya no se llegaba a
+ * mirar. Así se quedaron sin ficha «Der bewegte Mann» (Lola 1995) y «Die
+ * Artisten in der Zirkuskuppel» (Lola 1969), con su ficha correcta y su
+ * director exacto en la lista. Y de propina, la página no se cacheaba nunca:
+ * cada visita repetía la ráfaga entera contra TMDB.
+ */
+export const FICHA_FANTASMA = Symbol('TMDB 404');
+
+/** ¿Este error es un 404 (ficha que ya no existe) y no un corte de red? */
+export const esFichaFantasma = (err) => /\b404\b/.test(String(err?.message || err || ''));
+
+export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, tituloEnDe = null, equipoDe = null) {
   // el estreno puede bailar un año respecto al festival; sin fecha aún
   // (película recién anunciada) también vale como candidata.
   // Si el año de la fila viniera roto, filtrar por ventana descartaría a TODOS
@@ -1140,6 +1519,7 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
       fallosRed = true;
       break;
     }
+    if (dirs === FICHA_FANTASMA) continue; // ficha borrada que la búsqueda aún sirve
     if (dirs.length) {
       // Sin director en la fila no hay contra qué verificar (directorsMatch
       // pasa por diseño), así que la ÚNICA prueba que queda es el título: se
@@ -1201,6 +1581,7 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
         fallosRed = true;
         break;
       }
+      if (dirs === FICHA_FANTASMA) continue;
       if (dirs.length && directorsMatch(row.director, dirs)) {
         tmdbId = c.id;
         break;
@@ -1226,7 +1607,36 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
         fallosRed = true;
         break;
       }
+      if (dirs === FICHA_FANTASMA) continue;
       if (dirs.length) {
+        tmdbId = c.id;
+        break;
+      }
+    }
+  }
+
+  // ÚLTIMA VUELTA CON PRUEBA: ¿y si la columna no era de dirección?
+  //
+  // La tabla del Guldbagge titula su columna «Director(s)» y en los años
+  // recientes mete PRODUCTORES: «Triangle of Sadness» sale con Erik Hemmendorff
+  // y Philippe Bober, que son sus productores, y ningún director casaba jamás.
+  // Con la película más conocida del palmarés quedándose sin ficha, la
+  // alternativa a esto era darla por perdida.
+  //
+  // No afloja la regla de oro —mejor sin ficha que la ficha de otra—, porque
+  // sigue habiendo DOS pruebas: el título tiene que ser clavado (ni «contiene»
+  // ni internacional) y el nombre tiene que estar acreditado de verdad en esa
+  // ficha, en producción o en guion. Que otra película del mismo título y del
+  // mismo año tenga en su equipo a alguien que se llama igual es mucho pedir.
+  if (!tmdbId && !fallosRed && row.director && equipoDe) {
+    for (const c of enVentana.filter(tituloClavado)) {
+      const equipo = await equipoDe(c.id);
+      if (equipo === null) {
+        fallosRed = true;
+        break;
+      }
+      if (equipo === FICHA_FANTASMA) continue;
+      if (equipo.length && directorsMatch(row.director, equipo)) {
         tmdbId = c.id;
         break;
       }
@@ -1410,8 +1820,10 @@ export async function resolveFilms(rows, yearOf) {
       }
       let { tmdbId, fallosRed } = await elegirCandidato(
         r, y, cands, inLib,
-        (id) => movieDirectors(id).catch(() => null),
-        (id) => englishTitle(id).catch(() => null)
+        // un 404 es una ficha fantasma (saltar), cualquier otro fallo es red (abortar)
+        (id) => movieDirectors(id).catch((e) => (esFichaFantasma(e) ? FICHA_FANTASMA : null)),
+        (id) => englishTitle(id).catch(() => null),
+        (id) => movieCrewNames(id).catch((e) => (esFichaFantasma(e) ? FICHA_FANTASMA : null))
       );
       // por título no ha salido: se prueba por la filmografía de su director
       if (!tmdbId && !fallosRed && r.director) {
@@ -1712,10 +2124,11 @@ async function getAwardRows(f, { keepAll = false } = {}) {
     const sec = (meta.sections || []).find((s) => f.awardSection.test(stripTags(s.line)));
     if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
     const parsed = await wikiParse({ page: f.awardPage, section: String(sec.index), prop: 'text' });
-    let rows = parseWinnersTables(parsed.text, { keepAll });
+    const opciones = { keepAll, sinDirector: !!f.awardSinDirector };
+    let rows = parseWinnersTables(parsed.text, opciones);
     if (!rows.length) {
       const full = await wikiParse({ page: f.awardPage, prop: 'text' });
-      rows = parseWinnersTables(full.text, { keepAll });
+      rows = parseWinnersTables(full.text, opciones);
     }
     return rows;
   });
@@ -1850,6 +2263,117 @@ export async function festivalWinners(key, { refresh = false } = {}) {
     if (!base.resolveErrors) cacheWrite(cacheKey, base);
   }
   return { ...base, films: await decorateLive(base.films) };
+}
+
+// --- lo mejor del año ----------------------------------------------------------
+
+// A Wikipedia se le piden los palmareses que falten de cuatro en cuatro: la
+// primera visita a un año sin cachear son ~30 artículos, y una ráfaga de treinta
+// peticiones a la vez se gana un 429 con toda la razón.
+const ANUARIO_CONCURRENCY = 4;
+
+/**
+ * El corte transversal: quién ganó QUÉ en un año, en los treinta y tantos
+ * palmareses a la vez. Es la vista que la página no tenía —se navegaba premio a
+ * premio— y la que contesta de un vistazo «¿qué pasó en 2025?».
+ *
+ * Sale casi gratis de lo que ya hay: `winnersRowsLight` aprovecha el palmarés
+ * completo si está cacheado y, si no, trae del artículo solo las filas (que
+ * quedan cacheadas un día para todo el mundo). El emparejado contra TMDB pasa
+ * por la misma caché por película que el resto, así que un año cuyos premios ya
+ * se han mirado no gasta ni una búsqueda.
+ *
+ * Un premio que falle —artículo movido, red caída— no tumba el año: se queda
+ * fuera con su motivo, y los que aún no han fallado ese año salen aparte como
+ * `pendientes`, que en el año en curso es información y no un hueco.
+ */
+export async function festivalYear(year, { refresh = false } = {}) {
+  if (!Number.isInteger(year)) throw new Error('Año no válido');
+  const cacheKey = `${cachePrefix('festival')}:anuario:${year}`;
+  // un año cerrado ya no cambia; el que corre y el que viene se van completando
+  // a lo largo de la temporada de premios
+  const ttl = year >= new Date().getFullYear() - 1 ? DAY : 30 * DAY;
+  let base = refresh ? null : cacheRead(cacheKey, ttl);
+  if (!base) {
+    const claves = anuarioKeys();
+    const traidas = await mapPool(claves, ANUARIO_CONCURRENCY, async (key) => {
+      // el año que hay que buscar EN LA FUENTE: para casi todas es el mismo,
+      // pero la tabla del César va por año de gala (ver `anuarioOffset`)
+      const enFuente = year + (REGISTRY[key].anuarioOffset || 0);
+      try {
+        return { key, enFuente, rows: (await winnersRowsLight(key)).filter((r) => Number(r.year) === enFuente) };
+      } catch (err) {
+        return { key, enFuente, rows: [], error: String(err.message || err) };
+      }
+    });
+
+    // el emparejado, de una sola tacada para todo el año: así comparte pool y
+    // caché en vez de resolverse premio a premio
+    const planas = traidas.flatMap((x) => x.rows.map((r) => ({ key: x.key, r })));
+    // el año del emparejado es el de la FILA, no el de la página: así la clave
+    // (título + año + dirección) es la misma que en el palmarés y comparten
+    // caché y correcciones manuales — con el desfase del César no lo sería
+    const { films, errors } = await resolveFilms(planas.map((x) => x.r), (r) => r.year);
+    const porEntrada = new Map();
+    films.forEach((f, i) => {
+      const k = planas[i].key;
+      if (!porEntrada.has(k)) porEntrada.set(k, []);
+      // La fila del César dice 2026 porque es su año de GALA, pero la película
+      // es de 2025 y con ese año se pintaría la ficha. Manda el año de TMDB, y
+      // el de la fila viaja aparte porque es el que forma la clave de las
+      // correcciones manuales.
+      // Fuera la bandera de ganadora: aquí TODAS lo son, cada una de lo suyo, y
+      // el 🏆 solo sobre las que traen la bandera de su palmarés (el Óscar, que
+      // viene de un dataset con nominadas) hacía parecer que las demás no.
+      const { winner, ...pelicula } = f;
+      porEntrada.get(k).push(
+        REGISTRY[k].anuarioOffset
+          ? { ...pelicula, matchYear: pelicula.year, year: pelicula.date ? Number(pelicula.date.slice(0, 4)) : year }
+          : pelicula
+      );
+    });
+
+    const entries = [];
+    const pendientes = [];
+    const fallos = [];
+    for (const { key, enFuente, error } of traidas) {
+      const f = REGISTRY[key];
+      const suyas = porEntrada.get(key) || [];
+      if (error) fallos.push({ key, name: f.name, error });
+      else if (suyas.length) {
+        entries.push({
+          key,
+          name: f.name,
+          award: f.award,
+          group: f.group || 'festival',
+          // solo cuando la fuente lo indexa por otro año (César): la interfaz
+          // lo dice en vez de dejar que parezca un error
+          galaYear: enFuente === year ? null : enFuente,
+          films: suyas,
+        });
+      } else if (enFuente >= (f.awardSinceYear ?? f.sinceYear ?? 0)) {
+        // dentro de su historia pero sin ganadora: o no se ha fallado todavía
+        // (el año en curso) o Wikipedia aún no lo ha escrito
+        pendientes.push({ key, name: f.name });
+      }
+    }
+    base = {
+      year,
+      entries,
+      pendientes,
+      fallos,
+      total: entries.reduce((n, e) => n + e.films.length, 0),
+      fetchedAt: Date.now(),
+      unresolved: films.filter((x) => !x.tmdb_id && !x.tv).length,
+      resolveErrors: errors,
+    };
+    // con fallos de red no se cachea: se reintenta en la siguiente visita
+    if (!errors) cacheWrite(cacheKey, base);
+  }
+  // lo vivo (tengo/vista/notas) se pega al servir, como en el resto de vistas
+  const planas = await decorateLive(base.entries.flatMap((e) => e.films));
+  let i = 0;
+  return { ...base, entries: base.entries.map((e) => ({ ...e, films: e.films.map(() => planas[i++]) })) };
 }
 
 // --- directores habituales de la última década ---------------------------------
