@@ -138,4 +138,6 @@ export default {
     'Drops from the list anyone who, with these filters on, offers no film at all',
   '{n} personas escondidas: con estos filtros no ofrecen ninguna película.':
     '{n} people hidden: with these filters they offer no film at all.',
+
+  'Más avalada (premios y cánones)': 'Most backed (awards and canons)',
 };

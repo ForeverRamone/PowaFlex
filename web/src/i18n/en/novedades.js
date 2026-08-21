@@ -5,6 +5,28 @@
 // en/app.js, y el titular «Festivales y premios» de la Alpha 0.9.5 ya existe
 // como nombre de página en en/app.js: aquí no se repiten.
 export default {
+  // ── Beta 1.19 ──────────────────────────────────────────────────────────────
+  'Cada película dice ya en cuántos premios y cánones está, y entran veinticinco fuentes nuevas':
+    'Every film now tells you how many awards and canons it is in, and twenty-five new sources arrive',
+  'La ficha de cualquier película te dice ahora quién la respalda: «Avalada por 8 fuentes · 5 ganados», con Cannes, el Óscar, el BAFTA o el puesto que ocupa en Sight & Sound. Hasta ahora se podía ir de un premio a sus películas, pero no al revés, y esa es la pregunta que importa cuando dudas entre dos huecos.':
+    'Any film page now tells you who backs it: “Backed by 8 sources · 5 won”, with Cannes, the Oscar, the BAFTA or its position in Sight & Sound. Until now you could go from an award to its films, but not the other way round — and that is the question that matters when you are choosing between two gaps.',
+  'En las parrillas, las películas avaladas por dos fuentes o más llevan su marca sobre el cartel. Y en Descubrir huecos hay un orden nuevo, «Más avalada», para poner primero lo que respaldan más premios y cánones en vez de lo que tiene mejor nota.':
+    'In the grids, films backed by two or more sources carry a mark on their poster. And Discover gaps has a new sort, “Most backed”, to put what more awards and canons stand behind first, instead of what simply scores higher.',
+  'En la ficha de una persona se ve cuánta de su obra está avalada y cuánta de esa parte tienes tú, con las fuentes que la respaldan.':
+    'A person’s page shows how much of their work is backed and how much of that you own, along with the sources behind it.',
+  'Todo esto no gasta ni una consulta: sale de los palmareses que ya viajan dentro de la aplicación, con su ficha de TMDB emparejada desde la versión pasada.':
+    'None of this costs a single request: it comes from the award lists that already ship inside the app, with their TMDB match done since the last version.',
+  'Veinticinco fuentes nuevas, de cuarenta a sesenta y cinco. Festivales: Locarno, Rotterdam y Karlovy Vary. Los segundos premios de Cannes, Venecia y Berlín, más la Queer Palm, colgados de su festival en el menú. Academias y crítica: NSFC, Independent Spirit, BIFA, Lumière, Ariel, Cóndor de Plata, Golden Horse, Blue Dragon y Kinema Junpo, el canon japonés desde 1926. Y tres categorías más del Óscar: dirección, animación y documental.':
+    'Twenty-five new sources, from forty to sixty-five. Festivals: Locarno, Rotterdam and Karlovy Vary. The runner-up prizes of Cannes, Venice and Berlin, plus the Queer Palm, nested under their festival in the menu. Academies and critics: NSFC, Independent Spirit, BIFA, Lumière, Ariel, Silver Condor, Golden Horse, Blue Dragon and Kinema Junpo, the Japanese canon since 1926. And three more Oscar categories: directing, animation and documentary.',
+  'Animación y documental pasan a ser su propia categoría, porque son dos circuitos aparte: entran Annecy, los premios Annie y el IDFA de Ámsterdam. Quien quiere completar animación internacional no puede guiarse por el Óscar.':
+    'Animation and documentary become their own category, because they are two separate circuits: Annecy, the Annie Awards and Amsterdam’s IDFA join in. Anyone completing international animation cannot go by the Oscars.',
+  'Tres catálogos nuevos entre los cánones: el de Criterion (1.176 películas por número de espina), las 100 del AFI y el National Film Registry de la Biblioteca del Congreso (714 largometrajes y documentales conservados por su valor cultural).':
+    'Three new catalogues among the canons: Criterion’s (1,176 films by spine number), the AFI 100 and the Library of Congress’s National Film Registry (714 features and documentaries preserved for their cultural value).',
+  '«Lo mejor del año» se queda exactamente como estaba, con sus 32 fuentes: es la vista que consulta todos los palmareses de golpe al abrir un año nuevo, y meterle veinticinco más habría multiplicado lo que tarda.':
+    '“Best of the year” stays exactly as it was, with its 32 sources: it is the view that queries every award list at once when you open a new year, and adding twenty-five more would have multiplied how long it takes.',
+  'El índice se rellena solo. Cada noche se encienden unas cuantas fuentes de las que aún no aportan nada, sin pasarse del presupuesto, hasta que están todas; los catálogos grandes van al final de la cola para no comerse el turno de los demás.':
+    'The index fills itself in. Every night a few of the sources that do not contribute yet are switched on, within budget, until they all are; the big catalogues go last in the queue so they do not eat everyone else’s turn.',
+
   // ── Beta 1.18 ──────────────────────────────────────────────────────────────
   'Los nombres que faltaban en los palmareses, y las filmografías al día':
     'The names missing from the award lists, and filmographies kept current',

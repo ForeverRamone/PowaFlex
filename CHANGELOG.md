@@ -1,5 +1,71 @@
 # Changelog
 
+## Beta 1.19 (1.0.19-beta) — 2026-08-21
+
+**El índice al revés: cada película dice ahora en cuántos palmareses y cánones está. Y veinticinco fuentes nuevas, de Locarno a Criterion, sin tocar «Lo mejor del año».**
+
+### Los avales: de la película a los premios
+
+PowaFlex sabía ir de un premio a sus películas. Al revés, no. Y esa es la pregunta del completismo: entre dos huecos con una Σ parecida, ¿cuál pesa más? Una nota de 78 la tiene cualquier estreno correcto; estar en Cannes, en el César y en Sight & Sound, no.
+
+La respuesta ya estaba pagada desde la 1.17. El paquete de palmareses que viaja con la app son 4.794 filas con el `tmdb_id` **ya resuelto de origen**, así que darle la vuelta al índice no cuesta ni una petición a la red:
+
+```
+3.434 películas indexadas · 33 fuentes · 6 ms de construcción · 1.000 consultas en 2 ms
+```
+
+Se ve en cuatro sitios: la **ficha de película** (los chips, con 🏆 en lo ganado y el puesto en los cánones), una **marca sobre el cartel** en cualquier parrilla a partir de dos avales, un **orden nuevo en Descubrir huecos** («Más avalada») y un **resumen en la ficha de persona** («N de M avaladas por un premio o un canon», con qué fuentes).
+
+El índice suma tres procedencias y nunca resta: el paquete —el suelo, disponible en cualquier instalación sin abrir nada—, los datasets fijos, y las filas de cualquier premio ya consultado. Por eso una película puede pasar de 3 a 4 avales: es información nueva, no una corrección. Y la interfaz dice hasta qué año llega el paquete, para que «sin avales» no se lea como «no la premió nadie».
+
+Detalles de implementación que explican la forma del módulo: el mapa de emparejados se lee con **una sola consulta** (fila a fila serían ~6.000 lecturas puntuales); las correcciones manuales mandan, y una corregida a «ninguna» retira el aval; estar en un canon **no cuenta como premio ganado**, porque un puesto no es un trofeo; y `avales.js` no se importa desde `tmdb.js` —haría ciclo entre los tres módulos— sino que se engancha en la ruta.
+
+### El índice se rellena solo, de noche
+
+Las fuentes que no vienen empaquetadas solo aportan cuando sus filas están emparejadas con TMDB, y eso pasa al abrir su palmarés. Dejarlo así habría significado pasearse a mano por veinticinco páginas.
+
+Paso nuevo del pase nocturno, **«Rellenar el índice de premios y cánones»**: abre las que aún no aportan nada, a plazos y acotado por dos frenos —seis fuentes y 900 películas por noche—, así que converge en unas pocas noches sin encadenar veinte reconstrucciones de golpe. Los catálogos gordos van al final de la cola: Criterion son 1.176 películas y por el mismo precio se encienden seis premios enteros. Una fuente que se intenta y sigue sin aportar **no se reintenta hasta la semana siguiente**, para que la única que no puede aprovechar el presupuesto no se lo coma. El paso se salta solo en cuanto no queda nada frío.
+
+### Veinticinco fuentes nuevas: el registro pasa de 40 a 65
+
+Todas verificadas contra Wikipedia **con el parser de la casa antes de escribir una sola entrada**, y comprobadas después por el camino real de la aplicación: 22 de 22 sirven palmarés, 1.463 ganadoras nuevas.
+
+**Festivales**: Locarno (94 Leopardos desde 1946), Rotterdam (75 Tigres) y Karlovy Vary (59 Globos de Cristal).
+
+**Los segundos premios de los tres grandes**, donde está media historia del cine europeo que nunca se llevó el premio gordo: Grand Prix de Cannes (67), Gran Premio del Jurado de Venecia (72) y de Berlín (69), más la Queer Palm (17). Van colgados de su festival en el menú.
+
+**Academias y crítica**: NSFC —el tercero en discordia de la crítica estadounidense—, Independent Spirit, BIFA, Lumière (el premio francés de la prensa, que se falla un mes antes que el César), Ariel, Cóndor de Plata, Golden Horse, Blue Dragon y Kinema Junpo, que es el canon japonés de verdad, con la mejor película de cada año desde 1926.
+
+**Tres categorías más del Óscar**: dirección —el otro canon institucional, y a menudo no coincide con mejor película—, animación y documental, que es donde el Óscar sí manda porque casi ningún premio grande las cubre.
+
+**Animación y documental**, dos grupos nuevos porque son dos circuitos aparte: Annecy, los Annie y el IDFA. Quien quiere completar animación internacional no se guía por el Óscar.
+
+**Nada de esto entra en «Lo mejor del año»**, que sigue exactamente con sus 32 fuentes. Esa vista consulta todos sus palmareses al abrir un año sin cachear, y ampliarla habría multiplicado su tiempo de carga. Hay una prueba que fija el número: si alguien añade algo sin marcarlo, la suite salta.
+
+### Tres catálogos que no van por año
+
+Criterion, el AFI y el registro estadounidense tienen tablas excelentes, pero no van «año de premio → película» sino por puesto o por ingreso, y por ahí el parser de palmareses no sacaba ni una fila. Parser nuevo, `parseListaTabulada`, que lee por cabecera con las columnas declaradas en el registro:
+
+- **Criterion Collection**: 1.176 películas por número de espina, todas con dirección. No es un canon crítico, es un catálogo, y por eso vale tanto: lo que Criterion restaura y edita es la señal más fiable de «esto merece que lo busques en condiciones».
+- **AFI · 100 películas**: las 100 exactas por su puesto de 2007, con un filtro que deja fuera las 23 que estaban en la lista de 1998 y se cayeron.
+- **National Film Registry**: 714 largometrajes y documentales conservados por la Biblioteca del Congreso, lo último admitido primero. El filtro descarta cortos, noticiarios y películas caseras: sin él eran 925, con más de doscientas que TMDB no puede casar.
+
+Estos tres **no se empaquetan** con la app: no tienen año de premio que cortar, y congelar un catálogo que crece cada mes sería mentir.
+
+De propina, dos cosas del lector de Wikipedia: `awardSection: null` para los artículos cuyas tablas están en la entradilla y no en una sección (el Cóndor argentino, que antes obligaba a poner un regex falso para caer en el respaldo), y el asterisco **final** de un título se quita —Criterion marca así lo descatalogado— pero el de dentro se respeta, que si no «M*A*S*H» se quedaba sin nombre.
+
+### Una trampa que casi cuela
+
+El generador del paquete usaba `anuarioKeys()` para decidir qué empaquetar. Con las veintidós entradas nuevas marcadas «fuera del anuario», `npm run snapshot` las habría dejado fuera **justo a ellas**, que son las que más falta les hace. Ahora hay `empaquetables()` (53 claves) separado de `anuarioKeys()` (32), con una prueba que cruza las dos listas.
+
+### Lo que NO se hizo, y por qué
+
+No hay refactor de `Festival → Edición → Sección → Premio` como esquema relacional. PowaFlex no tiene esquema de premios: el registro es un objeto de configuración y lo demás es JSON cacheado, así que no hay dónde añadir un nivel. Lo útil de esa idea —que el Grand Prix se lea colgando de Cannes en vez de suelto entre sesenta botones— es el campo `parent`, y eso sí está. TSPDT-1000 y el Sight & Sound histórico se quedan fuera hasta que haya fuente: sus artículos no tienen tablas, y meterlos habría sido inventarse el dataset.
+
+### Números
+
+Pruebas 319 → **322** (`avales.test.js`, `listas-tabuladas.test.js`). Registro de festivales y premios: 40 → **65** entradas. «Lo mejor del año»: 32, igual que antes.
+
 ## Beta 1.18 (1.0.18-beta) — 2026-08-21
 
 **Media «Lo mejor del año» estaba sin un solo nombre a quien seguir, y las filmografías podían llevar una semana viejas. Además: las notas que faltan en Estrenos se vuelven a pedir solas, el Dashboard cuenta qué ha bajado el robot y por quién, y Cine venidero separa lo que dirige tu gente de lo que solo interpreta.**

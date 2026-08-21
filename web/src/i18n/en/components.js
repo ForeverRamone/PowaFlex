@@ -168,4 +168,13 @@ export default {
     'Pick its TMDB entry. That\'s where the ratings, the cast and its people\'s completism come from. The correction is remembered and survives Plex syncs.',
   'Quitar la corrección y volver a lo que diga Plex': 'Remove the correction and go back to whatever Plex says',
   'Lucha libre y eventos': 'Wrestling and live events',
+
+  // avales: en qué palmareses y en qué cánones está una película
+  'Avalada por {n} fuentes': 'Backed by {n} sources',
+  '{n} ganados': '{n} won',
+  'ganadora': 'winner',
+  'Palmareses hasta {y}; los años posteriores aparecen al abrir cada premio.':
+    'Award lists up to {y}; later years show up once you open each award.',
+  'En {n} palmareses o cánones{ganados}': 'In {n} award lists or canons{ganados}',
+  ' · {n} ganados': ' · {n} won',
 };

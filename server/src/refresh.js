@@ -11,6 +11,7 @@ import { watchFestivalEditions } from './festivals.js';
 import { detectarEmergentes, emergentesNecesitaRefresco } from './emergentes.js';
 import { importImdbRatings, imdbNecesitaRefresco } from './imdb.js';
 import { hacerCopia, copiasActivadas } from './backup.js';
+import { calentarAvales, fuentesFrias } from './avales.js';
 
 /**
  * The whole "make PowaFlex current" routine, in dependency order: library first,
@@ -155,6 +156,25 @@ function buildSteps({ includeAutoRadarr }) {
       run: async () => {
         const r = await watchFestivalEditions();
         return r.checked ? `${r.checked} ediciones comprobadas · ${r.found} publicadas` : 'todo visto ya';
+      },
+    },
+    {
+      // Detrás de la vigía de festivales, que es cuando las cachés de Wikipedia
+      // están calientes. Enciende a plazos las fuentes que aún no aportan nada
+      // al índice de avales: sin esto, las veintidós entradas nuevas y los
+      // catálogos solo contarían para quien se pasara a mano por cada palmarés.
+      key: 'avales',
+      label: 'Rellenar el índice de premios y cánones',
+      enabled: () => has('tmdb_key') && fuentesFrias().length > 0,
+      skipNote: () =>
+        has('tmdb_key') ? 'al día: todas las fuentes están en el índice' : 'sin configurar',
+      run: async () => {
+        const r = await calentarAvales();
+        if (r.errores.length) {
+          // no es un fallo del paso: los premios que sí entraron cuentan
+          return `${r.hechas} fuentes · ${r.peliculas} películas · quedan ${r.quedan} · ⚠️ ${r.errores.slice(0, 2).join(' · ')}`;
+        }
+        return `${r.hechas} fuentes nuevas · ${r.peliculas} películas · quedan ${r.quedan}`;
       },
     },
     {

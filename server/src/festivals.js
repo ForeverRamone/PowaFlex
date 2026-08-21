@@ -193,6 +193,90 @@ export const REGISTRY = {
     awardSinDirector: true,
     awardColumns: { title: /^best film$/, director: null },
   },
+  // --- LOS TRES FESTIVALES QUE FALTABAN DEL CIRCUITO -------------------------
+  //
+  // Locarno, Rotterdam y Karlovy Vary son, con los tres grandes, el esqueleto
+  // del circuito europeo de autor: por el Leopardo, el Tigre y el Globo de
+  // Cristal pasa cine que no llega a Cannes ni a Venecia y que después no se
+  // distribuye en ninguna parte. Los tres entran solo por palmarés (sus
+  // ediciones no están tabuladas) y NINGUNO entra en «Lo mejor del año»: ver
+  // `fueraDelAnuario`.
+  locarno: {
+    name: 'Locarno',
+    award: 'Leopardo de Oro',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1946,
+    awardPage: 'Golden Leopard',
+    awardSection: /^winners$/i,
+  },
+  rotterdam: {
+    name: 'Rotterdam (IFFR)',
+    award: 'Tiger Award',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1995, // el Tiger nació en la 24.ª edición
+    awardPage: 'Tiger Award',
+    awardSection: /^tiger award winners$/i,
+  },
+  karlovyvary: {
+    name: 'Karlovy Vary',
+    award: 'Globo de Cristal (Gran Premio)',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1948,
+    awardPage: 'Crystal Globe (Karlovy Vary International Film Festival)',
+    awardSection: /^crystal globe winners/i,
+  },
+
+  // --- LOS SEGUNDOS PREMIOS DE LOS TRES GRANDES ------------------------------
+  //
+  // El Grand Prix de Cannes, el Gran Premio del Jurado de Venecia y el Oso de
+  // Plata del jurado de Berlín son el «subcampeón» de cada festival, y ahí está
+  // media historia del cine europeo que nunca se llevó el premio gordo. Van con
+  // `parent` puesto para que el menú los cuelgue de su festival en vez de
+  // soltar tres entradas más en la lista.
+  cannesgp: {
+    name: 'Cannes · Grand Prix',
+    award: 'Grand Prix: el segundo premio de la competición oficial',
+    parent: 'cannes',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1967,
+    awardPage: 'Grand Prix (Cannes Film Festival)',
+    awardSection: /^winners$/i,
+  },
+  veneciagp: {
+    name: 'Venecia · Gran Premio del Jurado',
+    award: 'Gran Premio del Jurado: el segundo premio de la Mostra',
+    parent: 'venecia',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1951,
+    awardPage: 'Grand Jury Prize (Venice Film Festival)',
+    awardSection: /^winners$/i,
+  },
+  berlinalegp: {
+    name: 'Berlinale · Gran Premio del Jurado',
+    award: 'Oso de Plata, Gran Premio del Jurado',
+    parent: 'berlinale',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1965,
+    awardPage: 'Silver Bear Grand Jury Prize',
+    awardSection: /^winners$/i,
+  },
+  queerpalm: {
+    name: 'Cannes · Queer Palm',
+    award: 'Queer Palm: cine LGTBIQ+ de todas las secciones de Cannes',
+    parent: 'cannes',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 2010,
+    awardPage: 'Queer Palm',
+    awardSection: /^winners$/i,
+  },
+
   horizontes: {
     name: 'S.S. · Horizontes Latinos',
     award: 'Premio Horizontes',
@@ -322,6 +406,71 @@ export const REGISTRY = {
     staticNote:
       'Las 1001 del libro (15.ª edición, 2021), en su orden cronológico. Cuatro bloques que el libro trata como una sola entrada (Toy Story, El Señor de los Anillos, Iván el Terrible y Olympia) aparecen con su primera película.',
   },
+  // --- LOS CATÁLOGOS Y CANONES TABULADOS ------------------------------------
+  //
+  // No van por año de premio sino por PUESTO o por INGRESO, así que los lee
+  // `parseListaTabulada` (ver `awardParse: 'lista'`). Los tres quedan fuera de
+  // «Lo mejor del año»: no tienen ganadora anual que cortar.
+  //
+  // Criterion no es un canon crítico: es un CATÁLOGO, y por eso vale tanto para
+  // el completismo. Lo que Criterion restaura y edita es la señal más fiable
+  // que existe de «esta película merece que la busques en condiciones».
+  criterion: {
+    name: 'Criterion Collection',
+    award: 'El catálogo de Criterion por número de espina: el mayor trabajo de recuperación del cine en edición doméstica',
+    group: 'canon',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    awardPage: 'List of films in the Criterion Collection',
+    awardParse: 'lista',
+    listaColumnas: {
+      puesto: /^spine/,
+      titulo: /^film$/,
+      año: /release year/,
+      direccion: /^director/,
+    },
+  },
+  afi100: {
+    name: 'AFI · 100 películas',
+    award: 'AFI’s 100 Years…100 Movies: el canon del cine estadounidense, en su edición del décimo aniversario (2007)',
+    group: 'canon',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    awardPage: "AFI's 100 Years...100 Movies",
+    awardParse: 'lista',
+    listaColumnas: {
+      titulo: /^film$/,
+      año: /release year/,
+      direccion: /^director/,
+      puesto: /2007 rank/,
+      // la tabla lleva las dos ediciones: sin este filtro entrarían también las
+      // 23 que estaban en la lista de 1998 y se cayeron en 2007, sin puesto que
+      // enseñar y arrastradas al final de la parrilla
+      filtro: { columna: /2007 rank/, vale: /\d/ },
+    },
+  },
+  // El canon INSTITUCIONAL estadounidense: la Biblioteca del Congreso admite
+  // 25 películas al año «cultural, histórica o estéticamente significativas» y
+  // se compromete a conservarlas. Del registro se leen los largometrajes y los
+  // documentales: los noticiarios, las películas caseras y los cortos
+  // industriales que también incluye no tienen ficha que buscar en TMDB, y
+  // llenarían la parrilla de huecos imposibles.
+  nfr: {
+    name: 'National Film Registry',
+    award: 'Biblioteca del Congreso de EE UU: cine conservado por su valor cultural, histórico o estético (25 al año desde 1989)',
+    group: 'canon',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    awardPage: 'National Film Registry',
+    awardParse: 'lista',
+    listaColumnas: {
+      titulo: /film title/,
+      año: /year of release/,
+      orden: /year of induction/,
+      filtro: { columna: /film type/, vale: /feature|documentary/i, no: /short subject/i },
+    },
+  },
+
   // El otro canon de la crítica: el top 10 que Cahiers du Cinéma publica cada
   // año desde 1951 (con el paréntesis de 1969-1980, cuando la revista dejó de
   // votar listas). Va por año como los premios, pero lo que se enseña es la
@@ -466,6 +615,182 @@ export const REGISTRY = {
     awardSection: /^list of winning films$/i,
   },
 
+  // --- LAS ACADEMIAS QUE FALTABAN, Y LAS OTRAS CATEGORÍAS DEL ÓSCAR ----------
+  //
+  // Todos entran FUERA de «Lo mejor del año» (`fueraDelAnuario`): esa vista
+  // corta treinta y tantos palmareses por un año y cada entrada nueva es una
+  // consulta más en un año sin cachear.
+  //
+  // Las tres categorías del Óscar que se suman aquí no son mejor película: son
+  // DIRECCIÓN (que es el otro canon institucional, y a menudo no coincide),
+  // ANIMACIÓN y DOCUMENTAL, que es donde el Óscar sí manda porque casi ningún
+  // otro premio grande las cubre. Las dos últimas acreditan productores en vez
+  // de dirección, como el Donatello: `awardSinDirector`, y el nombre lo pone
+  // TMDB al resolver.
+  oscardireccion: {
+    name: 'Óscar · dirección',
+    award: 'Óscar a la mejor dirección',
+    group: 'premio',
+    parent: 'oscar',
+    awardNominees: true,
+    fueraDelAnuario: true,
+    sinceYear: 1927,
+    awardPage: 'Academy Award for Best Director',
+    awardSection: /^winners and nominees$/i,
+  },
+  oscaranimacion: {
+    name: 'Óscar · animación',
+    award: 'Óscar a la mejor película de animación',
+    group: 'animacion',
+    parent: 'oscar',
+    awardNominees: true,
+    awardSinDirector: true,
+    fueraDelAnuario: true,
+    sinceYear: 2001, // la categoría nació con Shrek
+    awardPage: 'Academy Award for Best Animated Feature',
+    awardSection: /^winners and nominees$/i,
+  },
+  oscardocumental: {
+    name: 'Óscar · documental',
+    award: 'Óscar al mejor largometraje documental',
+    group: 'documental',
+    parent: 'oscar',
+    awardNominees: true,
+    awardSinDirector: true,
+    fueraDelAnuario: true,
+    sinceYear: 1942,
+    awardPage: 'Academy Award for Best Documentary Feature',
+    awardSection: /^winners and nominees$/i,
+  },
+  spirit: {
+    name: 'Independent Spirit',
+    award: 'Independent Spirit Award a la mejor película',
+    group: 'premio',
+    awardNominees: true,
+    fueraDelAnuario: true,
+    sinceYear: 1985,
+    awardPage: 'Independent Spirit Award for Best Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  // El artículo del BIFA lista productores en la columna de dirección, igual
+  // que el Donatello: el nombre bueno lo pone TMDB.
+  bifa: {
+    name: 'BIFA (Reino Unido)',
+    award: 'British Independent Film Award a la mejor película británica independiente',
+    group: 'premio',
+    awardNominees: true,
+    awardSinDirector: true,
+    fueraDelAnuario: true,
+    sinceYear: 1998,
+    awardPage: 'British Independent Film Award for Best British Independent Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  // El OTRO premio francés: el César lo vota la academia y el Lumière la prensa
+  // internacional destacada en París, y se falla un mes antes.
+  lumiere: {
+    name: 'Premios Lumière (Francia)',
+    award: 'Premio Lumière a la mejor película',
+    group: 'premio',
+    awardNominees: true,
+    fueraDelAnuario: true,
+    sinceYear: 1996,
+    awardPage: 'Lumière Award for Best Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  ariel: {
+    name: 'Ariel (México)',
+    award: 'Ariel a la mejor película',
+    group: 'premio',
+    awardNominees: true,
+    fueraDelAnuario: true,
+    sinceYear: 1945,
+    awardPage: 'Ariel Award for Best Picture',
+    awardSection: /^award results$/i,
+  },
+  // El artículo del Cóndor NO tiene secciones: sus tablas están en la
+  // entradilla, así que `awardSection: null` lee la página entera (ver
+  // `getAwardRows`). La lista de Wikipedia se queda en 2020.
+  condor: {
+    name: 'Cóndor de Plata (Argentina)',
+    award: 'Cóndor de Plata a la mejor película',
+    group: 'premio',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1943,
+    awardPage: 'Silver Condor Award for Best Film',
+    awardSection: null,
+  },
+  goldenhorse: {
+    name: 'Golden Horse (Taiwán)',
+    award: 'Caballo de Oro a la mejor película: el premio grande del cine en chino',
+    group: 'premio',
+    awardNominees: true,
+    fueraDelAnuario: true,
+    sinceYear: 1962,
+    awardPage: 'Golden Horse Award for Best Feature Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  bluedragon: {
+    name: 'Blue Dragon (Corea)',
+    award: 'Blue Dragon a la mejor película',
+    group: 'premio',
+    awardNominees: true,
+    fueraDelAnuario: true,
+    sinceYear: 1963,
+    awardPage: 'Blue Dragon Film Award for Best Film',
+    awardSection: /^winners and nominees$/i,
+  },
+  // El canon japonés por excelencia: la revista Kinema Junpo lleva desde 1926
+  // eligiendo la mejor película del año, y su lista es la referencia con la que
+  // se discute el cine japonés — muy por delante del Japan Academy Prize.
+  kinemajunpo: {
+    name: 'Kinema Junpo (Japón)',
+    award: 'Kinema Junpo a la mejor película del año',
+    group: 'premio',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1926,
+    awardPage: 'Kinema Junpo Award for Best Film of the Year',
+    awardSection: /^winners$/i,
+  },
+
+  // --- ANIMACIÓN Y DOCUMENTAL: donde el canon general no llega ---------------
+  //
+  // Dos grupos propios porque son dos circuitos aparte. Quien quiera completar
+  // animación internacional no puede depender del Óscar (una categoría desde
+  // 2001, y anglosajona), y el documental vive casi entero fuera de los premios
+  // generalistas.
+  annecy: {
+    name: 'Annecy',
+    award: 'Cristal y premios principales del largometraje de animación',
+    group: 'animacion',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1960,
+    awardPage: 'Annecy International Animation Film Festival',
+    awardSection: /^features$/i,
+  },
+  annie: {
+    name: 'Annie Awards',
+    award: 'Annie al mejor largometraje de animación',
+    group: 'animacion',
+    awardNominees: true,
+    fueraDelAnuario: true,
+    sinceYear: 1992,
+    awardPage: 'Annie Award for Best Animated Feature',
+    awardSection: /^winners and nominees$/i,
+  },
+  idfa: {
+    name: 'IDFA (Ámsterdam)',
+    award: 'Premios principales del festival de documental más grande del mundo',
+    group: 'documental',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1988,
+    awardPage: 'International Documentary Film Festival Amsterdam',
+    awardSection: /^award winners$/i,
+  },
+
   // --- LOS PREMIOS DE LA CRÍTICA GREMIAL --------------------------------------
   //
   // Las academias nacionales (Goya, César, BAFTA, Óscar) votan por gremios de
@@ -522,6 +847,19 @@ export const REGISTRY = {
     awardPage: 'Boston Society of Film Critics Award for Best Film',
     awardSection: /^winners$/i,
   },
+  // El tercero en discordia de la crítica estadounidense, junto a Nueva York y
+  // Los Ángeles: la National Society of Film Critics es la más cinéfila de las
+  // tres y la que más se desmarca del consenso de la temporada.
+  nsfc: {
+    name: 'NSFC (crítica de EE UU)',
+    award: 'National Society of Film Critics a la mejor película',
+    group: 'critica',
+    onlyWinners: true,
+    fueraDelAnuario: true,
+    sinceYear: 1966,
+    awardPage: 'National Society of Film Critics Award for Best Film',
+    awardSection: /^winners$/i,
+  },
   criticschoice: {
     name: 'Critics’ Choice',
     award: 'Critics’ Choice Movie Award a la mejor película',
@@ -558,7 +896,27 @@ const SPECIAL_EDITIONS = {
  */
 export function anuarioKeys() {
   return Object.entries(REGISTRY)
-    .filter(([, f]) => !f.staticList && (f.awardPage || f.staticAward))
+    .filter(([, f]) => !f.staticList && !f.fueraDelAnuario && (f.awardPage || f.staticAward))
+    .map(([key]) => key);
+}
+
+/**
+ * Qué premios se pueden EMPAQUETAR con `npm run snapshot`.
+ *
+ * No es la misma lista que `anuarioKeys()`, y confundirlas costaba caro: desde
+ * que hay entradas marcadas `fueraDelAnuario` —para que «Lo mejor del año» no
+ * se dispare al abrir un año sin cachear—, reutilizar aquella aquí habría
+ * dejado sin empaquetar justo las veintidós entradas nuevas, que son las que
+ * más falta les hace.
+ *
+ * Fuera quedan los datasets que ya viven en el árbol (el Óscar, los cánones
+ * fijos) y las LISTAS ORDENADAS (Criterion, AFI, el registro estadounidense):
+ * esas no van por año de premio, así que el corte `hasta` no significa nada
+ * sobre ellas y empaquetarlas sería congelar un catálogo que crece cada mes.
+ */
+export function empaquetables() {
+  return Object.entries(REGISTRY)
+    .filter(([, f]) => f.awardPage && !f.staticAward && !f.staticList && f.awardParse !== 'lista')
     .map(([key]) => key);
 }
 
@@ -577,6 +935,10 @@ export function festivalsIndex() {
       name: f.name,
       award: f.award,
       group: f.group || 'festival',
+      // de qué entrada cuelga: el Grand Prix cuelga de Cannes, el Óscar a la
+      // dirección del Óscar. El menú los pone justo detrás de su padre en vez
+      // de soltarlos sueltos en una lista de sesenta botones.
+      parent: f.parent || null,
       sinceYear: f.sinceYear ?? null,
       onlyWinners: !!f.onlyWinners,
       awardNominees: !!f.awardNominees,
@@ -1489,6 +1851,78 @@ export function parseCahiersTables(html) {
  * front (que pinta una estrella de seguir por persona). El filtro de longitud
  * tira restos de puntuación, no nombres reales.
  */
+/**
+ * UN ARTÍCULO-LISTA QUE NO VA POR AÑO DE PREMIO.
+ *
+ * Los palmareses se leen «año → película»: esa es la forma que entiende
+ * `parseWinnersTables`. Pero los CATÁLOGOS y los CÁNONES tabulados van por otra
+ * cosa —el número de espina de Criterion, el puesto del AFI, el año en que la
+ * Biblioteca del Congreso admitió una película en su registro— y por ahí el
+ * parser de premios no saca ni una fila: busca una columna de año que en estas
+ * tablas significa el año de ESTRENO, no el del galardón.
+ *
+ * Este lee por CABECERA, que es lo único estable entre las tres: se le dice qué
+ * columna es el título, cuál el año de estreno, cuál la dirección y cuál el
+ * puesto, y devuelve las filas en la forma de siempre. `orden` es una columna
+ * por la que ordenar de mayor a menor sin pintarla (el año de inclusión del
+ * registro estadounidense: lo último admitido, primero). `filtro` descarta por
+ * el valor de una columna, que es como el registro separa los largometrajes de
+ * los noticiarios y las películas caseras.
+ *
+ * Puro y exportado: se puede poner a prueba con una tabla de mentira.
+ */
+export function parseListaTabulada(html, spec = {}) {
+  const out = [];
+  for (const tabla of String(html || '').match(/<table[\s\S]*?<\/table>/g) || []) {
+    const filas = tabla.match(/<tr[^>]*>[\s\S]*?<\/tr>/g) || [];
+    if (filas.length < 3) continue;
+    const celdas = (fila) =>
+      [...fila.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)].map((m) => cleanTableTitle(stripTags(m[1])));
+    const headers = celdas(filas[0]).map((h) => h.toLowerCase());
+    const col = (re) => (re ? headers.findIndex((h) => re.test(h)) : -1);
+    const iTitulo = col(spec.titulo);
+    const iAño = col(spec.año);
+    if (iTitulo < 0 || iAño < 0) continue; // no es la tabla que buscamos
+    const iDir = col(spec.direccion);
+    const iPuesto = col(spec.puesto);
+    const iOrden = col(spec.orden);
+    const iFiltro = col(spec.filtro?.columna);
+
+    for (const fila of filas.slice(1)) {
+      const c = celdas(fila);
+      // una fila de cabecera repetida a mitad de tabla no es una película
+      if (c.length < headers.length - 1) continue;
+      // el asterisco FINAL es una llamada a la leyenda («descatalogada», en
+      // Criterion), no parte del título. `cleanTableTitle` no lo toca a
+      // propósito porque hay títulos con asteriscos DENTRO («M*A*S*H»); aquí,
+      // pegado al final, no puede ser otra cosa.
+      const title = (c[iTitulo] || '').replace(/\s*\*+$/, '').trim();
+      const year = Number(String(c[iAño]).match(/\d{4}/)?.[0]);
+      if (!title || !Number.isFinite(year)) continue;
+      if (iFiltro >= 0 && spec.filtro) {
+        const valor = c[iFiltro] || '';
+        if (spec.filtro.vale && !spec.filtro.vale.test(valor)) continue;
+        if (spec.filtro.no && spec.filtro.no.test(valor)) continue;
+      }
+      const puesto = iPuesto >= 0 ? Number(String(c[iPuesto]).match(/\d+/)?.[0]) : null;
+      out.push({
+        year,
+        title,
+        original_title: title,
+        director: iDir >= 0 ? c[iDir] || null : null,
+        country: null,
+        rank: Number.isFinite(puesto) ? puesto : null,
+        orden: iOrden >= 0 ? Number(String(c[iOrden]).match(/\d{4}/)?.[0]) || null : null,
+      });
+    }
+  }
+  // por puesto si lo hay; si no, por la columna de orden (lo más reciente
+  // primero, como en cualquier palmarés); y si tampoco, se deja como venía
+  if (out.some((r) => r.rank != null)) out.sort((a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9));
+  else if (out.some((r) => r.orden != null)) out.sort((a, b) => (b.orden ?? 0) - (a.orden ?? 0) || b.year - a.year);
+  return out;
+}
+
 export function splitDirectors(s) {
   const parts = String(s || '')
     .split(/,|;|&| and | y /i)
@@ -2523,12 +2957,21 @@ async function getAwardRows(f, { keepAll = false, hasta = null, sinPaquete = fal
 
   const vivas = async () => {
     const lang = f.awardLang || 'en';
-    const meta = await wikiParse({ lang, page: f.awardPage, prop: 'sections' });
-    const sec = (meta.sections || []).find((s) => f.awardSection.test(stripTags(s.line)));
-    if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
-    const parsed = await wikiParse({ lang, page: f.awardPage, section: String(sec.index), prop: 'text' });
     const opciones = { keepAll, sinDirector: !!f.awardSinDirector, columnas: f.awardColumns || null };
-    let rows = parseWinnersTables(parsed.text, opciones);
+    // `awardSection: null` = el artículo NO tiene sección: sus tablas están en
+    // la entradilla, antes del primer titular (el Cóndor de Plata argentino es
+    // así, y su índice de secciones solo lista «References»). Antes esto se
+    // apañaba poniendo un regex que casara con una sección cualquiera para caer
+    // en el respaldo de página entera, que es justo el tipo de truco que luego
+    // nadie entiende.
+    let rows = [];
+    if (f.awardSection) {
+      const meta = await wikiParse({ lang, page: f.awardPage, prop: 'sections' });
+      const sec = (meta.sections || []).find((x) => f.awardSection.test(stripTags(x.line)));
+      if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
+      const parsed = await wikiParse({ lang, page: f.awardPage, section: String(sec.index), prop: 'text' });
+      rows = parseWinnersTables(parsed.text, opciones);
+    }
     if (!rows.length) {
       const full = await wikiParse({ lang, page: f.awardPage, prop: 'text' });
       rows = parseWinnersTables(full.text, opciones);
@@ -2593,6 +3036,19 @@ async function conEdicionesRecientes(f, rows, keepAll) {
 }
 
 /** El artículo de Cahiers entero, parseado con su parser propio. */
+/**
+ * Las filas de una lista tabulada (Criterion, AFI, el registro estadounidense),
+ * con la misma caché de 30 días que el resto de palmareses.
+ */
+async function getListaRows(f) {
+  return cachedAwardRows(f, 'lista', async () => {
+    const parsed = await wikiParse({ lang: f.awardLang || 'en', page: f.awardPage, prop: 'text' });
+    const rows = parseListaTabulada(parsed.text, f.listaColumnas || {});
+    if (!rows.length) throw new Error(`El artículo «${f.awardPage}» no tiene una lista tabulada reconocible.`);
+    return rows;
+  });
+}
+
 async function getCahiersRows(f) {
   return cachedAwardRows(f, 'cahiers', async () => {
     const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
@@ -2701,6 +3157,9 @@ export async function festivalWinners(key, { refresh = false } = {}) {
       const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
       rows = parseSundanceWinners(parsed.text, { ambito: f.sundanceAmbito || 'world' })
         .filter((r) => r.year >= (f.awardSinceYear ?? f.sinceYear));
+    } else if (f.awardParse === 'lista') {
+      rows = await getListaRows(f);
+      note = f.listaNota || null;
     } else {
       rows = await getAwardRows(f);
     }
@@ -2880,6 +3339,7 @@ export async function winnersRowsLight(key, { hasta = null } = {}) {
   if (f.staticList) return [];
   if (!f.awardPage) return []; // Busan, Horizontes y las secciones de debut
   if (f.awardParse === 'cahiers') return (await getCahiersRows(f)).filter((r) => r.rank === 1);
+  if (f.awardParse === 'lista') return getListaRows(f);
   if (f.awardParse === 'sundanceList') {
     const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
     return parseSundanceWinners(parsed.text, { ambito: f.sundanceAmbito || 'world' });
@@ -2899,6 +3359,7 @@ export async function filasVivasDePremio(key, { keepAll = true } = {}) {
   if (f.staticList) return [];
   if (!f.awardPage) return [];
   if (f.awardParse === 'cahiers') return getCahiersRows(f);
+  if (f.awardParse === 'lista') return (await getListaRows(f)).map((r) => ({ ...r, winner: true }));
   if (f.awardParse === 'sundanceList') {
     const parsed = await wikiParse({ page: f.awardPage, prop: 'text' });
     return parseSundanceWinners(parsed.text, { ambito: f.sundanceAmbito || 'world' })

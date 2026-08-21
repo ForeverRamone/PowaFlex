@@ -144,4 +144,65 @@ export default {
     'The extended list of the critics’ poll (264 films, ties included), ordered by rank. It is renewed every decade: next one in 2032.',
   'Edición cancelada por la pandemia: no hubo competición ni premios, solo una «Selección Oficial 2020» simbólica. Esta es esa lista.':
     'Edition cancelled by the pandemic: there was no competition and no awards, only a symbolic “Official Selection 2020”. This is that list.',
+
+  // ── entradas nuevas (Beta 1.19): festivales, academias y los circuitos de
+  // animación y documental. Los nombres propios (Locarno, Annecy, Annie
+  // Awards, Independent Spirit) no se traducen: caen solos en su forma.
+  'Animación y documental': 'Animation and documentary',
+  'Animación': 'Animation',
+  'Rotterdam (IFFR)': 'Rotterdam (IFFR)',
+  'Leopardo de Oro': 'Golden Leopard',
+  'Tiger Award': 'Tiger Award',
+  'Globo de Cristal (Gran Premio)': 'Crystal Globe (Grand Prix)',
+  'Cannes · Grand Prix': 'Cannes · Grand Prix',
+  'Grand Prix: el segundo premio de la competición oficial': 'Grand Prix: the runner-up of the official competition',
+  'Venecia · Gran Premio del Jurado': 'Venice · Grand Jury Prize',
+  'Gran Premio del Jurado: el segundo premio de la Mostra': 'Grand Jury Prize: the runner-up of the Mostra',
+  'Berlinale · Gran Premio del Jurado': 'Berlinale · Grand Jury Prize',
+  'Oso de Plata, Gran Premio del Jurado': 'Silver Bear, Grand Jury Prize',
+  'Cannes · Queer Palm': 'Cannes · Queer Palm',
+  'Queer Palm: cine LGTBIQ+ de todas las secciones de Cannes': 'Queer Palm: LGBTQ+ cinema from every Cannes section',
+  'Óscar · dirección': 'Oscar · directing',
+  'Óscar a la mejor dirección': 'Best Director Oscar',
+  'Óscar · animación': 'Oscar · animation',
+  'Óscar a la mejor película de animación': 'Best Animated Feature Oscar',
+  'Óscar · documental': 'Oscar · documentary',
+  'Óscar al mejor largometraje documental': 'Best Documentary Feature Oscar',
+  'Independent Spirit Award a la mejor película': 'Independent Spirit Award for Best Film',
+  'BIFA (Reino Unido)': 'BIFA (United Kingdom)',
+  'British Independent Film Award a la mejor película británica independiente':
+    'British Independent Film Award for Best British Independent Film',
+  'Premios Lumière (Francia)': 'Lumière Awards (France)',
+  'Premio Lumière a la mejor película': 'Lumière Award for Best Film',
+  'Ariel (México)': 'Ariel (Mexico)',
+  'Ariel a la mejor película': 'Ariel for Best Picture',
+  'Cóndor de Plata (Argentina)': 'Silver Condor (Argentina)',
+  'Cóndor de Plata a la mejor película': 'Silver Condor for Best Film',
+  'Golden Horse (Taiwán)': 'Golden Horse (Taiwan)',
+  'Caballo de Oro a la mejor película: el premio grande del cine en chino':
+    'Golden Horse for Best Feature Film: the big award of Chinese-language cinema',
+  'Blue Dragon (Corea)': 'Blue Dragon (South Korea)',
+  'Blue Dragon a la mejor película': 'Blue Dragon for Best Film',
+  'Kinema Junpo (Japón)': 'Kinema Junpo (Japan)',
+  'Kinema Junpo a la mejor película del año': 'Kinema Junpo for Best Film of the Year',
+  'Cristal y premios principales del largometraje de animación':
+    'Cristal and the main animated-feature awards',
+  'Annie al mejor largometraje de animación': 'Annie for Best Animated Feature',
+  'IDFA (Ámsterdam)': 'IDFA (Amsterdam)',
+  'Premios principales del festival de documental más grande del mundo':
+    "Main awards of the world's largest documentary festival",
+  'NSFC (crítica de EE UU)': 'NSFC (US critics)',
+  'National Society of Film Critics a la mejor película': 'National Society of Film Critics Award for Best Film',
+  // los tres catálogos/cánones tabulados
+  'Criterion Collection': 'Criterion Collection',
+  'El catálogo de Criterion por número de espina: el mayor trabajo de recuperación del cine en edición doméstica':
+    'The Criterion catalogue by spine number: the biggest home-video film-recovery effort there is',
+  'AFI · 100 películas': 'AFI · 100 Movies',
+  'AFI’s 100 Years…100 Movies: el canon del cine estadounidense, en su edición del décimo aniversario (2007)':
+    "AFI's 100 Years…100 Movies: the American film canon, in its tenth-anniversary edition (2007)",
+  'National Film Registry': 'National Film Registry',
+  'Biblioteca del Congreso de EE UU: cine conservado por su valor cultural, histórico o estético (25 al año desde 1989)':
+    'US Library of Congress: films preserved for their cultural, historical or aesthetic value (25 a year since 1989)',
+  'Sesenta y cinco fuentes: las secciones oficiales de los grandes festivales, el palmarés y las nominadas de los premios de cada año, la crítica gremial, los circuitos de animación y documental, y los cánones y catálogos (Sight & Sound, las 1001, el AFI, Criterion y el registro estadounidense).':
+    'Sixty-five sources: the official selections of the major festivals, the winners and nominees of each yearly award, the critics\u2019 associations, the animation and documentary circuits, and the canons and catalogues (Sight & Sound, the 1001, the AFI, Criterion and the US registry).',
 };

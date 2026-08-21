@@ -132,6 +132,32 @@ const FestivalCard = memo(function FestivalCard({ f, dirs, inRadarr, followedStr
 // (menos de un tramo) no cambia nada visible.
 const TRAMO = 120;
 
+/**
+ * Las entradas del menú, con cada «hija» pegada a su padre.
+ *
+ * Un premio puede colgar de otro (`parent`): el Grand Prix de Cannes, el Óscar
+ * a la dirección del Óscar. Al pasar de 40 a 62 entradas, dejarlas en el orden
+ * del fichero convertía la categoría de Premios en un muro de botones donde no
+ * se veía qué tenía que ver con qué. Las huérfanas conservan su orden.
+ */
+function ordenaPorPadre(lista) {
+  const hijas = new Map();
+  for (const f of lista) {
+    if (!f.parent) continue;
+    if (!hijas.has(f.parent)) hijas.set(f.parent, []);
+    hijas.get(f.parent).push(f);
+  }
+  const out = [];
+  for (const f of lista) {
+    if (f.parent && lista.some((x) => x.key === f.parent)) continue; // ya irá detrás de su padre
+    // el ↳ solo cuando el padre está a la vista: el Óscar a la animación vive
+    // en el grupo de Animación, donde el Óscar a la mejor película no está, y
+    // una flecha que no cuelga de nada se lee como un fallo de pintado
+    out.push(f, ...(hijas.get(f.key) || []).map((h) => ({ ...h, colgada: true })));
+  }
+  return out;
+}
+
 // Los grupos de «Lo mejor del año», en el orden en que se leen: primero quién
 // ganó dónde, luego quién premió qué. Mismos rótulos que el menú.
 const GRUPOS_ANUARIO = [
@@ -358,7 +384,7 @@ export default function Festivals() {
       <PageHeader
         eyebrow={t('La caza')}
         title={t('Festivales y premios')}
-        subtitle={t('Las secciones oficiales de los grandes festivales (los seis de la vía Óscar, San Sebastián, Mar del Plata, Seminci y Sitges), el palmarés y las nominadas de los premios de cada año, los premios de la crítica gremial y los cánones.')}
+        subtitle={t('Sesenta y cinco fuentes: las secciones oficiales de los grandes festivales, el palmarés y las nominadas de los premios de cada año, la crítica gremial, los circuitos de animación y documental, y los cánones y catálogos (Sight & Sound, las 1001, el AFI, Criterion y el registro estadounidense).')}
       />
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
@@ -371,6 +397,10 @@ export default function Festivals() {
           // rótulo, como las secciones de debut dentro de Festivales: son
           // premios, pero no los vota una academia de la industria
           { key: 'premios', label: 'Premios', groups: [['premio', null], ['critica', 'Asociaciones de críticos']] },
+          // animación y documental son dos circuitos aparte, no una categoría
+          // más de los premios generalistas: quien completa animación no se
+          // guía por el Óscar, se guía por Annecy
+          { key: 'generos', label: 'Animación y documental', groups: [['animacion', 'Animación'], ['documental', 'Documental']] },
           { key: 'canones', label: 'Cánones', groups: [['canon', null]] },
         ].map((cat) => {
           const del = (index?.festivals || []).filter((f) => cat.groups.some(([g]) => g === f.group));
@@ -393,7 +423,10 @@ export default function Festivals() {
                 </button>
               )}
               {abierta && cat.groups.map(([g, sub]) => {
-                const propias = del.filter((f) => f.group === g);
+                // cada entrada, justo detrás de aquella de la que cuelga: el
+                // Grand Prix pegado a Cannes, el Óscar a la dirección pegado al
+                // Óscar. Sin esto, sesenta botones en orden de fichero.
+                const propias = ordenaPorPadre(del.filter((f) => f.group === g));
                 if (!propias.length) return null;
                 return (
                   <div key={g} className="flex gap-2 items-center flex-wrap">
@@ -406,10 +439,10 @@ export default function Festivals() {
                           setFest(f.key);
                           if (f.onlyWinners) setView('palmares');
                         }}
-                        className={!anuario && fest === f.key ? 'btn-gold' : 'btn-ghost'}
+                        className={`${!anuario && fest === f.key ? 'btn-gold' : 'btn-ghost'} ${f.colgada ? '!text-xs opacity-80' : ''}`}
                         title={t(f.award)}
                       >
-                        {t(f.name)}
+                        {f.colgada ? '↳ ' : ''}{t(f.name)}
                       </button>
                     ))}
                   </div>

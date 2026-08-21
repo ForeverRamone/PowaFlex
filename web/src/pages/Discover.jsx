@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, lazy, Suspense } from 'react';
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid, X, Layers, EyeOff, UserX } from 'lucide-react';
 import {
   Spinner, Progreso, useCargaProgresiva, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts, PageHeader, Signature, Select,
-  MinScoreBar, passesScore, useMinScore } from '../components.jsx';
+  MinScoreBar, passesScore, useMinScore, useAvales, conAval } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 import { t, locale } from '../i18n.js';
@@ -45,9 +45,9 @@ const visibleMissing = (p, show, minScore, dismissed, ocultarRadarr = false, rad
       passesScore(f, minScore)
   );
 
-function GapCard({ f, radarrIds, addRadarrId, onDismiss, person }) {
+function GapCard({ f, radarrIds, addRadarrId, onDismiss, person, avales }) {
   return (
-    <TmdbCard item={f}>
+    <TmdbCard item={conAval(f, avales)}>
       {person && (
         <Link to={`/personas/${person.id}?role=${person.role || 'director'}`} className="text-[11px] text-zinc-500 hover:text-gold-400 truncate block">
           {person.name}
@@ -72,7 +72,7 @@ function GapCard({ f, radarrIds, addRadarrId, onDismiss, person }) {
   );
 }
 
-function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, addRadarrId, ocultarRadarr, ocultarVacios }) {
+function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, addRadarrId, ocultarRadarr, ocultarVacios, avales }) {
   const shown = visibleMissing(p, show, minScore, dismissed, ocultarRadarr, radarrIds);
   const alive = (p.missing || []).filter((f) => !dismissed.has(f.tmdb_id));
   const hidden = alive.length - shown.length;
@@ -117,7 +117,7 @@ function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, 
       <div className="max-w-sm mb-4"><ProgressBar pct={p.pct} /></div>
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
         {shown.map((f) => (
-          <GapCard key={f.tmdb_id} f={f} radarrIds={radarrIds} addRadarrId={addRadarrId} onDismiss={onDismiss} />
+          <GapCard key={f.tmdb_id} f={f} radarrIds={radarrIds} addRadarrId={addRadarrId} onDismiss={onDismiss} avales={avales} />
         ))}
       </div>
     </section>
@@ -136,17 +136,25 @@ const FILM_SORTS = {
   reciente: { label: 'Más recientes', fn: (a, b) => String(b.date || '').localeCompare(String(a.date || '')) },
   antigua: { label: 'Más antiguas', fn: (a, b) => String(a.date || '').localeCompare(String(b.date || '')) },
   titulo: { label: 'Título (A-Z)', fn: (a, b) => a.title.localeCompare(b.title) },
+  // el orden que solo esta página puede dar: qué hueco está respaldado por más
+  // premios y cánones. A igualdad de avales, mandan los ganados.
+  avales: {
+    label: 'Más avalada (premios y cánones)',
+    fn: (a, b) => (b.avales?.total || 0) - (a.avales?.total || 0) || (b.avales?.ganados || 0) - (a.avales?.ganados || 0),
+  },
 };
 
 /** All missing films of everyone, in one grid — no person-by-person scrolling. */
-function FilmGrid({ people, show, minScore, dismissed, onDismiss, radarrIds, addRadarrId, sort, ocultarRadarr }) {
+function FilmGrid({ people, show, minScore, dismissed, onDismiss, radarrIds, addRadarrId, sort, ocultarRadarr, avales }) {
   const byId = new Map();
   for (const p of people) {
     for (const f of visibleMissing(p, show, minScore, dismissed, ocultarRadarr, radarrIds)) {
       if (!byId.has(f.tmdb_id)) byId.set(f.tmdb_id, { ...f, _person: { id: p.id, name: p.name, role: p.role } });
     }
   }
-  const films = [...byId.values()].sort(FILM_SORTS[sort]?.fn || FILM_SORTS.score.fn);
+  // los avales entran ANTES de ordenar: si no, «más avalada» ordenaría por un
+  // campo que la tarjeta pinta pero la lista no tiene
+  const films = [...byId.values()].map((f) => conAval(f, avales)).sort(FILM_SORTS[sort]?.fn || FILM_SORTS.score.fn);
   const pendingIds = films.filter((f) => !radarrIds.has(f.tmdb_id)).map((f) => f.tmdb_id);
 
   if (!films.length) return <Empty>{t('Nada que rellenar con estos filtros.')}</Empty>;
@@ -168,6 +176,7 @@ function FilmGrid({ people, show, minScore, dismissed, onDismiss, radarrIds, add
             key={f.tmdb_id}
             f={f}
             person={f._person}
+            avales={avales}
             radarrIds={radarrIds}
             addRadarrId={addRadarrId}
             onDismiss={onDismiss}
@@ -216,6 +225,15 @@ function GapsView({
     });
   };
   useEffect(() => { load(); }, [endpoint]);
+
+  // En cuántos palmareses y cánones está cada hueco: una sola petición para
+  // toda la página. Va AQUÍ, antes de los `return` de error y de carga, porque
+  // `useAvales` es un hook y no puede quedar detrás de una salida temprana.
+  const idsVisibles = useMemo(
+    () => [...new Set((data?.people || []).flatMap((p) => (p.missing || []).map((f) => f.tmdb_id).filter(Boolean)))],
+    [data]
+  );
+  const avales = useAvales(idsVisibles);
 
   // walk the ranking further down (top tabs only)
   const loadMore = () => {
@@ -333,7 +351,7 @@ function GapsView({
             <FilmGrid
               people={sortedPeople} show={show} minScore={minScore} dismissed={dismissed}
               onDismiss={onDismiss} radarrIds={radarrIds} addRadarrId={addRadarrId} sort={filmSort}
-              ocultarRadarr={ocultarRadarr}
+              ocultarRadarr={ocultarRadarr} avales={avales}
             />
           ) : (
             <>
@@ -342,7 +360,7 @@ function GapsView({
                   key={p.id} p={p} role={role} show={show} minScore={minScore}
                   dismissed={dismissed} onDismiss={onDismiss}
                   radarrIds={radarrIds} addRadarrId={addRadarrId}
-                  ocultarRadarr={ocultarRadarr} ocultarVacios={ocultarVacios}
+                  ocultarRadarr={ocultarRadarr} ocultarVacios={ocultarVacios} avales={avales}
                 />
               ))}
               {/* la cuenta de quién se ha escondido: sin ella, «ocultar a quien

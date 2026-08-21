@@ -258,7 +258,7 @@ export default function PersonDetail() {
         {corrector}
       </div>
     );
-  const { stats, items } = facetas[active];
+  const { stats, items, avales: avalesFaceta } = facetas[active];
 
   // En la ficha de un/a documentalista (o de quien filma conciertos), su obra
   // principal no puede llegar escondida por el filtro global de tipos: aquí
@@ -369,6 +369,24 @@ export default function PersonDetail() {
                 {stats.documentarian ? t(' (incluye documentales: es documentalista)') : ''}
                 {stats.concertFilmmaker ? t(' (incluye conciertos: los filma a menudo)') : ''}
                 {stats.excludedFromCompletion > 0 && t(' · {n} fuera del cómputo (cortos, TV, docs, conciertos o dirección coral)', { n: stats.excludedFromCompletion })}
+              </div>
+            )}
+            {/* EL OTRO COMPLETISMO: no cuántas de sus películas tienes, sino
+                cuántas de las que un palmarés o un canon respaldan. En una
+                filmografía de treinta títulos, esas son las que de verdad
+                duelen si faltan. */}
+            {avalesFaceta?.conAval > 0 && (
+              <div className="text-[11px] text-zinc-500 mt-2">
+                <span className="text-zinc-300">
+                  {t('{tuyas} de {total} avaladas por un premio o un canon', {
+                    tuyas: avalesFaceta.tuyasConAval,
+                    total: avalesFaceta.conAval,
+                  })}
+                </span>
+                {avalesFaceta.fuentes.length > 0 && (
+                  <span> · {avalesFaceta.fuentes.slice(0, 6).map((f) => `${t(f.name)} (${f.n})`).join(' · ')}</span>
+                )}
+                {avalesFaceta.fuentes.length > 6 && t(' y {n} más', { n: avalesFaceta.fuentes.length - 6 })}
               </div>
             )}
             {stats.upcoming > 0 && (

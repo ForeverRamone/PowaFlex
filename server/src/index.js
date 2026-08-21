@@ -90,6 +90,7 @@ import {
   aprobarPendiente, rechazarPendiente, resolverTodasLasPendientes, cuantasPendientes, enviosDeFavoritos,
 } from './rules.js';
 import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
+import { avalesDe, conteoAvales, indiceAvales, avalesDeFilmografia } from './avales.js';
 import { ROLES } from './roles.js';
 import { importImdbRatings, imdbInfo } from './imdb.js';
 import { listarCopias, hacerCopia, BACKUP_DIR } from './backup.js';
@@ -570,7 +571,23 @@ app.get('/api/movies/:id', async (req, reply) => {
     reply.code(404);
     return { error: 'No encontrada' };
   }
-  return m;
+  // los avales van también en la ficha de lo que YA tienes: saber que esa
+  // película que llevas años sin ver está en cinco palmareses es media razón
+  // para ponerla esta noche
+  return { ...m, avales: m.tmdb_id ? avalesDe(m.tmdb_id) : null };
+});
+
+/**
+ * Cuántos avales tiene cada película de una parrilla. Va por POST porque una
+ * pantalla de huecos manda tranquilamente 300 ids, y eso no cabe en una URL.
+ */
+app.post('/api/avales', async (req, reply) => {
+  const ids = Array.isArray(req.body?.tmdbIds) ? req.body.tmdbIds.map(Number).filter(Boolean) : [];
+  if (!ids.length) {
+    reply.code(400);
+    return { error: 'Faltan los ids' };
+  }
+  return { conteo: conteoAvales(ids.slice(0, 2000)), hasta: indiceAvales().hasta };
 });
 
 /**
@@ -1030,11 +1047,28 @@ app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
  * cualquier pantalla: se resuelve AL PULSAR, no al pintar la lista, así que
  * enlazar doscientos nombres no cuesta ni una petición hasta que se usa uno.
  */
+/**
+ * Los avales se enganchan AQUÍ y no dentro de `perfilDesde` a propósito:
+ * `avales.js` lee del REGISTRY de festivales, que a su vez tira de `tmdb.js`.
+ * Importarlo desde tmdb.js cerraría un ciclo entre los tres módulos, y esto es
+ * un adorno de la respuesta, no parte de construir la filmografía.
+ */
+function conAvales(perfil) {
+  if (!perfil?.roles) return perfil;
+  for (const faceta of Object.values(perfil.roles)) {
+    const items = faceta.items || [];
+    const conteo = conteoAvales(items.map((i) => i.tmdb_id).filter(Boolean));
+    for (const i of items) if (conteo[i.tmdb_id]) i.avales = conteo[i.tmdb_id];
+    faceta.avales = avalesDeFilmografia(items);
+  }
+  return perfil;
+}
+
 app.get('/api/people/:id/filmography', async (req, reply) => {
   try {
     const wantRole = asRole(req.query.role);
     const ref = String(req.params.id || '');
-    if (/^tmdb:/i.test(ref)) return await filmographyProfileByTmdb(ref.slice(5), wantRole);
+    if (/^tmdb:/i.test(ref)) return conAvales(await filmographyProfileByTmdb(ref.slice(5), wantRole));
     if (/^nombre:/i.test(ref)) {
       const nombre = decodeURIComponent(ref.slice(7)).trim();
       if (!nombre) {
@@ -1045,9 +1079,9 @@ app.get('/api/people/:id/filmography', async (req, reply) => {
       // pulsar «Steve McQueen» saldría la ficha del actor de Bullitt
       const info = await resolveCatalogDirector(fichaDeCatalogo(nombre));
       if (!info?.id) return { person: { id: null, name: nombre, tmdb_id: null }, matched: false, roles: {} };
-      return await filmographyProfileByTmdb(info.id, wantRole);
+      return conAvales(await filmographyProfileByTmdb(info.id, wantRole));
     }
-    return await filmographyProfile(Number(ref), wantRole);
+    return conAvales(await filmographyProfile(Number(ref), wantRole));
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -1129,6 +1163,9 @@ app.get('/api/media/:tmdbId', async (req, reply) => {
     await latinizeNames([...directors, ...cast]);
     return {
       tmdb_id: tmdbId,
+      // en qué palmareses y en qué cánones está: se lee del índice en memoria,
+      // sin una sola petición (ver avales.js)
+      avales: avalesDe(tmdbId),
       title: det.title,
       original_title: det.original_title,
       year: det.release_date ? Number(det.release_date.slice(0, 4)) : null,

@@ -25,6 +25,22 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.19',
+    fecha: '2026-08-21',
+    titular: 'Cada película dice ya en cuántos premios y cánones está, y entran veinticinco fuentes nuevas',
+    puntos: [
+      'La ficha de cualquier película te dice ahora quién la respalda: «Avalada por 8 fuentes · 5 ganados», con Cannes, el Óscar, el BAFTA o el puesto que ocupa en Sight & Sound. Hasta ahora se podía ir de un premio a sus películas, pero no al revés, y esa es la pregunta que importa cuando dudas entre dos huecos.',
+      'En las parrillas, las películas avaladas por dos fuentes o más llevan su marca sobre el cartel. Y en Descubrir huecos hay un orden nuevo, «Más avalada», para poner primero lo que respaldan más premios y cánones en vez de lo que tiene mejor nota.',
+      'En la ficha de una persona se ve cuánta de su obra está avalada y cuánta de esa parte tienes tú, con las fuentes que la respaldan.',
+      'Todo esto no gasta ni una consulta: sale de los palmareses que ya viajan dentro de la aplicación, con su ficha de TMDB emparejada desde la versión pasada.',
+      'Veinticinco fuentes nuevas, de cuarenta a sesenta y cinco. Festivales: Locarno, Rotterdam y Karlovy Vary. Los segundos premios de Cannes, Venecia y Berlín, más la Queer Palm, colgados de su festival en el menú. Academias y crítica: NSFC, Independent Spirit, BIFA, Lumière, Ariel, Cóndor de Plata, Golden Horse, Blue Dragon y Kinema Junpo, el canon japonés desde 1926. Y tres categorías más del Óscar: dirección, animación y documental.',
+      'Animación y documental pasan a ser su propia categoría, porque son dos circuitos aparte: entran Annecy, los premios Annie y el IDFA de Ámsterdam. Quien quiere completar animación internacional no puede guiarse por el Óscar.',
+      'Tres catálogos nuevos entre los cánones: el de Criterion (1.176 películas por número de espina), las 100 del AFI y el National Film Registry de la Biblioteca del Congreso (714 largometrajes y documentales conservados por su valor cultural).',
+      '«Lo mejor del año» se queda exactamente como estaba, con sus 32 fuentes: es la vista que consulta todos los palmareses de golpe al abrir un año nuevo, y meterle veinticinco más habría multiplicado lo que tarda.',
+      'El índice se rellena solo. Cada noche se encienden unas cuantas fuentes de las que aún no aportan nada, sin pasarse del presupuesto, hasta que están todas; los catálogos grandes van al final de la cola para no comerse el turno de los demás.',
+    ],
+  },
+  {
     label: 'Beta 1.18',
     fecha: '2026-08-21',
     titular: 'Los nombres que faltaban en los palmareses, y las filmografías al día',

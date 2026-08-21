@@ -153,4 +153,9 @@ export default {
   '⟳ Actualizar desde TMDB': '⟳ Refresh from TMDB',
   'Vuelve a pedir su filmografía a TMDB ahora mismo, sin esperar a la actualización de esta noche. Cine venidero y los huecos se rehacen en la siguiente visita.':
     'Ask TMDB for their filmography right now, without waiting for tonight’s update. Upcoming cinema and the gaps rebuild on your next visit.',
+
+  // el otro completismo: cuánta de su obra avalada tienes
+  '{tuyas} de {total} avaladas por un premio o un canon':
+    '{tuyas} of {total} backed by an award or a canon',
+  ' y {n} más': ' and {n} more',
 };

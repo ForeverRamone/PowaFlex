@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { REGISTRY, anuarioKeys, filasVivasDePremio, resolveFilms } from '../src/festivals.js';
+import { REGISTRY, empaquetables, filasVivasDePremio, resolveFilms } from '../src/festivals.js';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (nombre, pordefecto) => {
@@ -47,11 +47,10 @@ const comprimir = (f, row) => ({
   ...(row.tied ? { x: 1 } : {}),
 });
 
-const claves = (SOLO || anuarioKeys()).filter((k) => {
-  const f = REGISTRY[k];
-  // los datasets que ya viven en el árbol (el Óscar) no se reempaquetan
-  return f && !f.staticAward && !f.staticList && f.awardPage;
-});
+// `empaquetables()` y NO `anuarioKeys()`: son dos listas distintas desde que
+// hay premios que se sirven pero se quedan fuera de «Lo mejor del año». Ver la
+// explicación en festivals.js.
+const claves = (SOLO || empaquetables()).filter((k) => REGISTRY[k]);
 
 console.log(`Empaquetando ${claves.length} palmareses hasta ${HASTA}…\n`);
 const salida = {};

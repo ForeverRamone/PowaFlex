@@ -725,6 +725,21 @@ export function TmdbCard({ item, badge, children }) {
           </div>
         )}
         <WatchedStar watched={item.watched} />
+        {/* CUÁNTAS FUENTES la avalan, sobre el cartel. Es el dato que la nota
+            no da: entre dos huecos con Σ parecida, el que está en cinco
+            palmareses no es lo mismo que el que no está en ninguno. Solo a
+            partir de dos, que con una la esquina se llena de ruido. */}
+        {item.avales?.total > 1 && (
+          <span
+            title={t('En {n} palmareses o cánones{ganados}', {
+              n: item.avales.total,
+              ganados: item.avales.ganados ? t(' · {n} ganados', { n: item.avales.ganados }) : '',
+            })}
+            className="on-art bottom-1.5 left-1.5 tabular font-semibold"
+          >
+            {item.avales.ganados > 0 ? '🏆' : '◆'} {item.avales.total}
+          </span>
+        )}
         {/* "in Plex" is information, not decoration: a dot, not a green frame */}
         {item.owned && !badge && (
           <span
@@ -1278,6 +1293,37 @@ export function Subpestanas({ id, pestanas, param = 'tab', className = '', child
 
 // Radarr snapshot ids from the local cache (no network round-trip per page).
 // Returns [set, addOne] so buttons can optimistically mark films as queued.
+/**
+ * CUÁNTOS AVALES tiene cada película de una parrilla, en una sola petición.
+ *
+ * Va por el cliente y no dentro de la respuesta de cada página a propósito: las
+ * parrillas de huecos están CACHEADAS media jornada, y el índice de avales
+ * crece cada vez que abres un palmarés nuevo. Metido en la caché, el número se
+ * habría quedado congelado hasta que caducara la página.
+ *
+ * Devuelve un objeto vacío mientras carga: la tarjeta simplemente no pinta la
+ * marca hasta que llega, sin hueco reservado ni salto.
+ */
+export function useAvales(tmdbIds) {
+  const [mapa, setMapa] = useState({});
+  // la clave estable evita relanzar la petición en cada render: los ids son los
+  // mismos aunque el array sea nuevo
+  const clave = tmdbIds.length ? `${tmdbIds.length}:${tmdbIds[0]}:${tmdbIds[tmdbIds.length - 1]}` : '';
+  useEffect(() => {
+    if (!tmdbIds.length) return setMapa({});
+    let vivo = true;
+    api('/avales', { method: 'POST', body: { tmdbIds } }).then((r) => {
+      if (vivo && r?.conteo) setMapa(r.conteo);
+    });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clave]);
+  return mapa;
+}
+
+/** Pega los avales a una película para que la tarjeta pinte su marca. */
+export const conAval = (f, mapa) => (mapa?.[f.tmdb_id] ? { ...f, avales: mapa[f.tmdb_id] } : f);
+
 export function useRadarrIds() {
   const [ids, setIds] = useState(new Set());
   useEffect(() => {
@@ -1498,6 +1544,7 @@ function toViewModel({ ratingKey, movie, media }) {
       tmdb_id: movie.tmdb_id,
       imdb_id: movie.imdb_id,
       tmdbLocked: !!movie.tmdb_locked,
+      avales: movie.avales || null,
       owned: {
         rating_key: ratingKey, resolution: movie.resolution, hdr: movie.hdr, video_codec: movie.video_codec,
         user_rating: movie.user_rating, view_count: movie.view_count, file_path: movie.file_path,
@@ -1522,7 +1569,63 @@ function toViewModel({ ratingKey, movie, media }) {
     imdb_id: m.imdb_id,
     owned: m.owned,
     inRadarr: m.inRadarr,
+    avales: m.avales || null,
   };
+}
+
+/**
+ * LOS AVALES DE UNA PELÍCULA: en qué palmareses y en qué cánones está.
+ *
+ * Es el índice al revés del resto de la app —de la película a los premios, no
+ * del premio a las películas— y contesta la pregunta que ninguna nota contesta:
+ * entre dos huecos, ¿cuál pesa más? Una Σ de 78 la tiene cualquier estreno
+ * correcto; estar en Cannes, en el César y en Sight & Sound, no.
+ *
+ * El 🏆 distingue haber GANADO de haber estado nominada o seleccionada, y los
+ * cánones llevan su puesto cuando lo tienen (Sight & Sound, Cahiers).
+ */
+export function Avales({ avales, className = '', max = 0 }) {
+  const [todo, setTodo] = useState(false);
+  if (!avales?.total) return null;
+  const lista = todo || !max ? avales.lista : avales.lista.slice(0, max);
+  const COLOR = {
+    canon: 'text-sky-300',
+    critica: 'text-zinc-300',
+    animacion: 'text-orange-300',
+    documental: 'text-emerald-300',
+  };
+  return (
+    <div className={className}>
+      <div className="text-[11px] text-zinc-500 mb-1">
+        {t('Avalada por {n} fuentes', { n: avales.total })}
+        {avales.ganados > 0 && <span className="text-gold-400"> · {t('{n} ganados', { n: avales.ganados })}</span>}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {lista.map((a) => (
+          <span
+            key={`${a.key}-${a.year}`}
+            className={`badge-quiet ${a.winner ? 'text-gold-400' : COLOR[a.group] || 'text-zinc-400'}`}
+            title={`${t(a.name)}${a.year ? ` · ${a.year}` : ''}${a.winner ? ` · ${t('ganadora')}` : ''}`}
+          >
+            {a.winner ? '🏆 ' : ''}{t(a.name)}
+            {a.rank ? ` #${a.rank}` : a.year ? <span className="text-zinc-600"> {a.year}</span> : ''}
+          </span>
+        ))}
+        {max > 0 && !todo && avales.lista.length > max && (
+          <button className="badge-quiet text-zinc-500 hover:text-gold-400" onClick={() => setTodo(true)}>
+            {t('+{n} más', { n: avales.lista.length - max })}
+          </button>
+        )}
+      </div>
+      {/* el paquete de palmareses llega hasta su año de corte: decirlo evita
+          leer «sin avales» como «no la premió nadie» en una película reciente */}
+      {avales.hasta && (
+        <div className="text-[11px] text-zinc-600 mt-1">
+          {t('Palmareses hasta {y}; los años posteriores aparecen al abrir cada premio.', { y: avales.hasta })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Single unified movie "ficha" for both owned and not-owned films (#2).
@@ -1618,6 +1721,7 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
                 {owned?.view_count > 0 && <span className="text-gold-400">{t('★ Vista {n}×', { n: owned.view_count })}</span>}
               </div>
               <RatingsChips ratings={vm.ratings} movie={vm} className="mt-2" />
+              <Avales avales={vm.avales} className="mt-3" max={10} />
               {vm.overview && <p className="text-sm text-zinc-300 mt-3 leading-relaxed">{vm.overview}</p>}
               <div className="mt-3 text-sm">
                 {vm.directors.length > 0 && (
