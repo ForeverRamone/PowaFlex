@@ -158,4 +158,15 @@ export default {
   '{tuyas} de {total} avaladas por un premio o un canon':
     '{tuyas} of {total} backed by an award or a canon',
   ' y {n} más': ' and {n} more',
+
+  // sin enriquecimiento demográfico no hay continente ni país que filtrar: en
+  // vez de dos desplegables vacíos, lo que hay que hacer para tenerlos
+  'Sin datos demográficos todavía: no hay continente ni país que filtrar.':
+    'No demographic data yet: there is no continent or country to filter by.',
+  'Consíguelos en Ajustes → «Actualizar estado vital» →':
+    'Get them in Settings → “Update life status” →',
+
+  // «Seguir a los 10 primeros»: en inglés «Follow the top 10» ya lo dice entero,
+  // así que esta coletilla se traduce a nada y la interfaz no deja un hueco
+  'primeros': '',
 };

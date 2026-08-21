@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import {
   Spinner, Progreso, useCargaProgresiva, ErrorBox, Empty, ProgressBar, MovieModal, MediaModal,
@@ -8,6 +8,60 @@ import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 import { useChartTheme } from '../charts.js';
 import { t } from '../i18n.js';
+
+/**
+ * Cuántas filas entran de golpe en una lista larga.
+ *
+ * Aquí las listas no son de veinte títulos: una de MDBList trae cinco mil y el
+ * reto clásico de Letterboxd mil y pico, y todas se pintaban ENTERAS dentro de
+ * un recuadro de 384 px de alto donde caben doce filas. Medido con una lista de
+ * 5.000: 21.257 nodos en el DOM para enseñar doce. El resto entra al bajar,
+ * como la parrilla de Festivales.
+ */
+const TRAMO = 100;
+
+/**
+ * Recuadro con scroll que pinta su contenido por tramos.
+ *
+ * OJO con el `root` del observador: estas listas NO scrollean con la página,
+ * scrollean dentro de su propia caja. Un observador contra la ventana no se
+ * entera de que el usuario está bajando ahí dentro y el tramo siguiente no
+ * entraba nunca. El sentinel va dentro de la caja, y la caja es el root.
+ *
+ * `reinicio` es la dependencia que devuelve la lista al primer tramo: cambiar
+ * de vista («me faltan» ↔ «las tengo») tiene que empezar arriba otra vez, no
+ * heredar los quince tramos que llevaba abierta la anterior.
+ */
+function CajaPorTramos({ items, reinicio, children, className = '', alto = 'max-h-96' }) {
+  const [tramos, setTramos] = useState(1);
+  const caja = useRef(null);
+  const sentinel = useRef(null);
+  useEffect(() => {
+    setTramos(1);
+    if (caja.current) caja.current.scrollTop = 0;
+  }, [reinicio]);
+  const pintados = items.slice(0, tramos * TRAMO);
+  const faltan = pintados.length < items.length;
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !faltan) return;
+    // margen generoso: el tramo siguiente entra antes de que el hueco se vea
+    const io = new IntersectionObserver(
+      (entradas) => entradas.some((e) => e.isIntersecting) && setTramos((n) => n + 1),
+      { root: caja.current, rootMargin: '400px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [faltan, tramos, items.length]);
+  return (
+    <div ref={caja} className={`${alto} overflow-y-auto ${className}`}>
+      {children(pintados)}
+      {/* fuera del contenedor con `divide-y`: dentro se llevaba una línea
+          divisoria suya y parecía una fila vacía al final de la lista */}
+      {faltan && <div ref={sentinel} className="h-4" aria-hidden="true" />}
+    </div>
+  );
+}
 
 // --- Letterboxd completista rings -------------------------------------------
 
@@ -155,18 +209,22 @@ function ChallengeDetail({ listId, onChanged }) {
       {shown.length === 0 ? (
         <Empty>{view === 'missing' ? t('¡Lista completa! 🏆') : view === 'unwatched' ? t('Todas vistas 👁️') : t('Ninguna todavía.')}</Empty>
       ) : (
-        <div className="max-h-96 overflow-y-auto card divide-y divide-ink-800">
-          {shown.map((i, idx) => (
-            <ChallengeRow
-              key={`${i.tmdb_id || i.title}-${idx}`}
-              listId={listId}
-              item={i}
-              radarrIds={radarrIds}
-              onAdded={addRadarrId}
-              onOpenOwned={setSelected}
-            />
-          ))}
-        </div>
+        <CajaPorTramos items={shown} reinicio={view} className="card">
+          {(pintados) => (
+            <div className="divide-y divide-ink-800">
+              {pintados.map((i, idx) => (
+                <ChallengeRow
+                  key={`${i.tmdb_id || i.title}-${idx}`}
+                  listId={listId}
+                  item={i}
+                  radarrIds={radarrIds}
+                  onAdded={addRadarrId}
+                  onOpenOwned={setSelected}
+                />
+              ))}
+            </div>
+          )}
+        </CajaPorTramos>
       )}
       {selected && <MovieModal id={selected} onClose={() => setSelected(null)} />}
     </div>
@@ -251,8 +309,8 @@ function LbWatchlist({ summary }) {
       {missing.length === 0 ? (
         <Empty>{t('Tu watchlist entera está en Plex. 🏆')}</Empty>
       ) : (
-        <div className="max-h-96 overflow-y-auto">
-          {missing.map((m, i) => (
+        <CajaPorTramos items={missing} reinicio={missing.length}>
+          {(pintados) => pintados.map((m, i) => (
             <div key={i} className="flex items-center justify-between py-1 border-b border-ink-800 text-sm gap-2">
               <span className="text-zinc-200 min-w-0 truncate">
                 {m.title} <span className="text-zinc-500">({m.year ?? t('¿?')})</span>
@@ -269,20 +327,20 @@ function LbWatchlist({ summary }) {
               </span>
             </div>
           ))}
-        </div>
+        </CajaPorTramos>
       )}
       {owned.length > 0 && (
         <details className="mt-3">
           <summary className="text-sm text-zinc-400 cursor-pointer hover:text-zinc-200">
             {t('Ver las {n} de tu watchlist que ya tienes', { n: owned.length })}
           </summary>
-          <div className="max-h-64 overflow-y-auto mt-2">
-            {owned.map((m, i) => (
+          <CajaPorTramos items={owned} reinicio={owned.length} alto="max-h-64" className="mt-2">
+            {(pintados) => pintados.map((m, i) => (
               <div key={i} className="py-1 border-b border-ink-800 text-sm text-zinc-300">
                 ✓ {m.title} <span className="text-zinc-500">({m.year})</span>
               </div>
             ))}
-          </div>
+          </CajaPorTramos>
         </details>
       )}
     </div>
@@ -439,17 +497,21 @@ function ListDetail({ listId, onChanged }) {
       {shown.length === 0 ? (
         <Empty>{view === 'missing' ? t('¡Lista completa! 🏆') : t('Ninguna todavía.')}</Empty>
       ) : (
-        <div className="max-h-96 overflow-y-auto card divide-y divide-ink-800">
-          {shown.map((i) => (
-            <MdbRow
-              key={i.tmdb_id}
-              item={i}
-              radarrIds={radarrIds}
-              onAdded={addRadarrId}
-              onOpenOwned={setSelected}
-            />
-          ))}
-        </div>
+        <CajaPorTramos items={shown} reinicio={view} className="card">
+          {(pintados) => (
+            <div className="divide-y divide-ink-800">
+              {pintados.map((i) => (
+                <MdbRow
+                  key={i.tmdb_id}
+                  item={i}
+                  radarrIds={radarrIds}
+                  onAdded={addRadarrId}
+                  onOpenOwned={setSelected}
+                />
+              ))}
+            </div>
+          )}
+        </CajaPorTramos>
       )}
       {selected && <MovieModal id={selected} onClose={() => setSelected(null)} />}
     </div>

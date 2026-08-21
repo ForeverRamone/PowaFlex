@@ -19,6 +19,7 @@ import { cachePrefix } from './cache-versions.js';
 import { foldName, normName, mismoDiminutivo } from './names.js';
 import {
   searchMovieCandidates, movieDirectors, movieCrewNames, movieSummary, findPersonInfo, latinizeNames,
+  nombresDeDireccion, esSerieEnTmdb,
   personCredits, englishTitle, searchPersonCandidates, TMDB_CONCURRENCY,
   setBuildProgress, clearBuildProgress,
 } from './tmdb.js';
@@ -2135,14 +2136,14 @@ export function festivalOverrideKey(title, year, director) {
  * avales lo lee también, y tenerlo escrito en dos sitios ya se pagó una vez —al
  * subir la versión aquí, allí se seguía leyendo la anterior en silencio.
  */
-export const CLAVE_MATCH = 'film_match:v6:';
+export const CLAVE_MATCH = 'film_match:v7:';
 
 export const FICHA_FANTASMA = Symbol('TMDB 404');
 
 /** ¿Este error es un 404 (ficha que ya no existe) y no un corte de red? */
 export const esFichaFantasma = (err) => /\b404\b/.test(String(err?.message || err || ''));
 
-export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, tituloEnDe = null, equipoDe = null) {
+export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, tituloEnDe = null, equipoDe = null, aliasDe = null) {
   // el estreno puede bailar un año respecto al festival; sin fecha aún
   // (película recién anunciada) también vale como candidata.
   // Si el año de la fila viniera roto, filtrar por ventana descartaría a TODOS
@@ -2406,6 +2407,43 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
     }
   }
 
+  // ¿Y SI TMDB LLAMA DE OTRA MANERA A ESA PERSONA?
+  //
+  // TMDB guarda a John Woo como «Wu Yu-Sheng» —la transcripción mandarina de
+  // 吳宇森— y «John Woo» vive solo entre sus alias. No es una variante de
+  // transliteración que se pueda plegar comparando letras: son dos nombres
+  // distintos de la misma persona, y ninguna regla de parecido los va a unir.
+  // Con «The Killer», «Hard Boiled» y «Last Hurrah for Chivalry» pasaba lo
+  // mismo: la ficha correcta estaba ahí, con 925 votos y el título clavado, y
+  // se rechazaba por el nombre. Es el pan de cada día del cine asiático, donde
+  // el nombre con el que se distribuye en occidente no es el que TMDB guarda.
+  //
+  // No afloja la regla de oro: siguen exigiéndose DOS pruebas, el título
+  // clavado y que el nombre de la fila sea UNO DE LOS NOMBRES de quien dirige
+  // esa ficha. Cuesta una petición por persona y solo se paga cuando todo lo
+  // demás ya ha fallado.
+  if (!tmdbId && !fallosRed && row.director && aliasDe) {
+    for (const c of enVentana) {
+      // El título clavado puede vivir SOLO en el internacional: TMDB titula
+      // «The Killer» de John Woo como «The Killer (El asesino)» en castellano y
+      // «喋血雙雄» de original, así que ninguno de los dos clava — y el inglés
+      // sí. Es la misma tolerancia que ya se aplica a las filas sin dirección.
+      let clavaAqui = tituloClavado(c);
+      if (!clavaAqui && tituloEnDe) clavaAqui = clava(await tituloEnDe(c.id));
+      if (!clavaAqui) continue;
+      const nombres = await aliasDe(c.id);
+      if (nombres === null) {
+        fallosRed = true;
+        break;
+      }
+      if (nombres === FICHA_FANTASMA) continue;
+      if (nombres.length && directorsMatch(row.director, nombres)) {
+        tmdbId = c.id;
+        break;
+      }
+    }
+  }
+
   // ÚLTIMA VUELTA CON PRUEBA: ¿y si la columna no era de dirección?
   //
   // La tabla del Guldbagge titula su columna «Director(s)» y en los años
@@ -2658,7 +2696,8 @@ export async function resolveFilms(rows, yearOf) {
         // un 404 es una ficha fantasma (saltar), cualquier otro fallo es red (abortar)
         (id) => movieDirectors(id).catch((e) => (esFichaFantasma(e) ? FICHA_FANTASMA : null)),
         (id) => englishTitle(id).catch(() => null),
-        (id) => movieCrewNames(id).catch((e) => (esFichaFantasma(e) ? FICHA_FANTASMA : null))
+        (id) => movieCrewNames(id).catch((e) => (esFichaFantasma(e) ? FICHA_FANTASMA : null)),
+        (id) => nombresDeDireccion(id).catch((e) => (esFichaFantasma(e) ? FICHA_FANTASMA : null))
       );
       // por título no ha salido: se prueba por la filmografía de su director
       if (!tmdbId && !fallosRed && r.director) {
@@ -2671,6 +2710,14 @@ export async function resolveFilms(rows, yearOf) {
           }
         );
       }
+      // Antes de dar la fila por perdida: ¿no será que NO es una película? Los
+      // catálogos editan miniseries (Criterion tiene cinco) y los cánones las
+      // votan. Cuesta una búsqueda y solo se paga aquí, con todo lo demás ya
+      // fallado; a cambio, la interfaz dice «serie de televisión» en vez de
+      // dejar un hueco mudo que parece un fallo del emparejado.
+      let esSerie = false;
+      if (!tmdbId && !fallosRed) esSerie = await esSerieEnTmdb(r.title, y).catch(() => false);
+
       let sum = null;
       let fichaCoja = false;
       if (tmdbId) {
@@ -2709,6 +2756,7 @@ export async function resolveFilms(rows, yearOf) {
       if (fallosRed || fichaCoja) errors++;
       films[idx] = {
         ...r,
+        ...(esSerie ? { tv: true } : {}),
         director: direccionReal || r.director,
         tmdb_id: tmdbId,
         poster_path: sum?.poster_path || null,

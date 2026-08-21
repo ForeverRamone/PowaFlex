@@ -98,7 +98,11 @@ export const CACHE_VERSIONS = {
   // clave el título: se miran todos y decide el volumen de votos, y si no hay
   // ganador claro no se elige ninguno. Lo cacheado antes tiene emparejada la
   // «Flow» equivocada (había cuatro de 2024) y las de su clase.
-  festival: 17,
+  // v18: cuando la dirección no casa se miran los ALIAS de quien dirige la
+  // ficha candidata (TMDB guarda a John Woo como «Wu Yu-Sheng»), siempre con el
+  // título clavado. Lo cacheado antes tiene sin ficha «The Killer», «Hard
+  // Boiled» y compañía — el pan de cada día del cine asiático.
+  festival: 18,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

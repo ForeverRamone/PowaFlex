@@ -122,4 +122,15 @@ export default {
   ' · el resto se descarga solo cada noche dentro del cupo diario (te quedan {n} peticiones hoy)':
     ' · the rest downloads on its own each night within the daily quota (you have {n} requests left today)',
   'Ajustes →': 'Settings →',
+
+  // resumen de la salud de los datos (Beta 1.22)
+  '✓ Las {n} auditorías salen limpias: no hay nada que revisar.':
+    '✓ All {n} audits come back clean: there is nothing to review.',
+  '{n} de {total} auditorías tienen algo que revisar:':
+    '{n} of {total} audits have something to review:',
+  'Sin ficha de TMDB': 'No TMDB entry',
+  'Identidades repetidas': 'Duplicate identities',
+  'Letterboxd sin emparejar': 'Unmatched Letterboxd entries',
+  'Peticiones zombis': 'Zombie requests',
+  'Emparejados sin demostrar': 'Unproven matches',
 };

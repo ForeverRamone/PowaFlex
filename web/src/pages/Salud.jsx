@@ -11,11 +11,53 @@ import { t, locale } from '../i18n.js';
  * locales (cero red) con el remedio al lado.
  */
 function Auditoria({ title, total, ok, children, hint }) {
+  // La pista explica qué hacer con el problema: cuando NO hay problema sobra, y
+  // sobraba mucho. Con la biblioteca sana de arriba (tres auditorías limpias) se
+  // leían tres párrafos seguidos sobre cosas que no pasan antes de llegar a las
+  // 244 peticiones zombis y las 4.200 identidades sin demostrar, que era lo
+  // único que pedía atención. Limpia, la auditoría es una línea.
   return (
     <Section title={`${total > 0 ? '⚠️' : '✓'} ${title} ${total > 0 ? `(${total})` : ''}`}>
-      {hint && <p className="text-xs text-zinc-500 mb-2 max-w-3xl">{hint}</p>}
-      {total === 0 ? <p className="text-sm text-emerald-400">{ok}</p> : children}
+      {total === 0 ? (
+        <p className="text-sm text-emerald-400">{ok}</p>
+      ) : (
+        <>
+          {hint && <p className="text-xs text-zinc-500 mb-2 max-w-3xl">{hint}</p>}
+          {children}
+        </>
+      )}
     </Section>
+  );
+}
+
+/**
+ * Lo primero que hay que poder contestar al entrar: ¿tengo algo que revisar y
+ * qué es? Con seis auditorías seguidas y sin resumen había que recorrer la
+ * página entera para saberlo, y las que están bien ocupan lo mismo que las que
+ * no. Aquí van las que tienen algo, con su cifra; si no hay ninguna, una línea.
+ */
+function Resumen({ auditorias }) {
+  const conAlgo = auditorias.filter(([, n]) => n > 0);
+  if (!conAlgo.length) {
+    return (
+      <p className="text-sm text-emerald-400 mb-6">
+        {t('✓ Las {n} auditorías salen limpias: no hay nada que revisar.', { n: auditorias.length })}
+      </p>
+    );
+  }
+  return (
+    <div className="card p-4 mb-6">
+      <p className="text-sm text-zinc-300 mb-2">
+        {t('{n} de {total} auditorías tienen algo que revisar:', { n: conAlgo.length, total: auditorias.length })}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {conAlgo.map(([label, n]) => (
+          <span key={label} className="badge-quiet !text-xs !py-1 !px-2">
+            {label} <b className="text-orange-300 tabular">{n.toLocaleString(locale())}</b>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -87,6 +129,16 @@ export default function Salud({ embedded = false }) {
   if (fallo) return <ErrorBox error={fallo} />;
   if (!data) return <Progreso {...carga} />;
 
+  // Nombres cortos para el resumen: el título completo de cada auditoría lleva
+  // su explicación dentro y en una fila de etiquetas no se lee ninguno.
+  const auditorias = [
+    [t('Sin ficha de TMDB'), data.sinTmdb.total],
+    [t('Identidades repetidas'), data.tmdbRepetido.total],
+    [t('Letterboxd sin emparejar'), data.lbSinEmparejar.total],
+    [t('Peticiones zombis'), data.radarrZombis.total],
+    [t('Emparejados sin demostrar'), data.personasSinVerificar.total],
+  ];
+
   return (
     <div>
       {!embedded && (
@@ -96,6 +148,8 @@ export default function Salud({ embedded = false }) {
           subtitle={t('Auditorías locales de la base de datos: huérfanos, homónimos y peticiones zombis, cada uno con su remedio al lado.')}
         />
       )}
+
+      <Resumen auditorias={auditorias} />
 
       <Auditoria
         title={t('Películas sin ficha de TMDB')}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, lazy, Suspense } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard, Drama, Search, Scissors, X } from 'lucide-react';
@@ -26,6 +26,12 @@ const ROLES_INICIALES = [
 // el endpoint no lleva verbo de conteo: solo dirección e interpretación tienen
 // uno propio, el resto cuenta «películas» a secas
 const VERBOS = { director: 'dirigidas', actor: 'interpretadas' };
+
+// dirección e interpretación van emparejadas: es la otra cara del atajo
+// Eastwood, y solo entre esas dos se ofrece «seguirle TAMBIÉN como…».
+// Fuera del componente porque no cierra sobre nada, y así los manejadores que
+// la usan pueden tener una referencia estable sin arrastrarla como dependencia.
+const parejaDe = (r) => (r === 'director' ? 'actor' : 'director');
 
 // A TMDB person tile with a star to add/remove from favorites.
 function SuggestionCard({ person, trackedIds, onAdd, onRemove }) {
@@ -66,8 +72,15 @@ const Avatar = ({ person, size = 'w-12 h-12' }) =>
     </span>
   );
 
-/** One favorite: who they are, what you have of theirs, and what you're missing. */
-function FavoriteCard({ p, role, faceta, verbo, crossFacet, alsoOther, selectable, selected, onSelect, onRemove, onAddOtherFacet }) {
+/**
+ * One favorite: who they are, what you have of theirs, and what you're missing.
+ *
+ * Memorizada porque la lista es larga —seguir a varios centenares de personas
+ * es lo normal en esta casa— y casi ningún render la cambia: marcar UNA casilla
+ * de «Podar» o teclear una letra en el filtro repintaba las 600. Medido con
+ * 600 seguidos: 29 ms por casilla y 15.306 nodos en pie.
+ */
+const FavoriteCard = memo(function FavoriteCard({ p, role, faceta, verbo, crossFacet, alsoOther, selectable, selected, onSelect, onRemove, onAddOtherFacet }) {
   const gaps = p.gaps;
   const complete = gaps === 0;
   return (
@@ -157,7 +170,7 @@ function FavoriteCard({ p, role, faceta, verbo, crossFacet, alsoOther, selectabl
       </div>
     </div>
   );
-}
+});
 
 // accent palette per curated pack (#9)
 // `borderL` pinta SOLO el filete izquierdo: con `border-<color>` a secas, y las
@@ -303,9 +316,6 @@ export default function Favorites() {
   const roleVerb = (r) => t(VERBOS[r] || 'películas');
   const faceta = roleLabel(role).toLowerCase();
   const secundarios = roles.filter((r) => !r.principal);
-  // dirección e interpretación van emparejadas: es la otra cara del atajo
-  // Eastwood, y solo entre esas dos se ofrece «seguirle TAMBIÉN como…»
-  const parejaDe = (r) => (r === 'director' ? 'actor' : 'director');
   // el catálogo de directores en activo, plegado por defecto para no alargar
   // la pestaña; /directores (ruta vieja) llega aquí con ?add=activos y lo abre
   const [params, setParams] = useSearchParams();
@@ -356,7 +366,10 @@ export default function Favorites() {
   const [confirmClear, setConfirmClear] = useState(false);
 
   const [loadError, setLoadError] = useState(null);
-  const aplicarSalud = (r) => {
+  // Referencias estables: estas dos viajan dentro de los manejadores que reciben
+  // las tarjetas, y una tarjeta memorizada solo se salta el render si sus props
+  // son las MISMAS. Una función nueva por render deja el memo en adorno.
+  const aplicarSalud = useCallback((r) => {
     if (Array.isArray(r?.people)) {
       setTracked(r.people);
       setHealth(r.cached || {});
@@ -364,8 +377,8 @@ export default function Favorites() {
     } else if (Array.isArray(r)) setTracked(r);
     // si no, el spinner se quedaba girando indefinidamente sin decir nada
     else setLoadError(r?.error || t('No se han podido cargar tus favoritos'));
-  };
-  const loadTracked = () => api('/tracked/health').then(aplicarSalud);
+  }, []);
+  const loadTracked = useCallback(() => api('/tracked/health').then(aplicarSalud), [aplicarSalud]);
 
   // Lo ÚNICO que hace falta para pintar la pestaña que se abre. Lo de «Añadir»
   // —sugerencias, cánones y los habituales de festival— se pide al abrir esa
@@ -440,7 +453,7 @@ export default function Favorites() {
 
   useEffect(() => { setSelected(new Set()); setPruneMode(false); }, [role]);
   // la ✕ de una tarjeta quita SOLO la faceta de la lista que estás viendo
-  const removeFav = async (p) => {
+  const removeFav = useCallback(async (p) => {
     setTracked((prev) => prev.filter((t) => !(t.id === p.id && (t.role || 'director') === role)));
     const r = await api(`/tracked/${p.id}?role=${p.role || role}`, { method: 'DELETE' });
     // la tarjeta ya se quitó en optimista: si el borrado falló, loadTracked la
@@ -448,15 +461,15 @@ export default function Favorites() {
     if (r?.error) { toast(`⚠️ ${t(r.error)}`, 'error'); return loadTracked(); }
     toast(t('{nombre} fuera de {faceta}', { nombre: p.name, faceta }));
     loadTracked();
-  };
+  }, [role, faceta, loadTracked]);
   // seguirle también en la otra faceta, sin dejar esta
-  const addOtherFacet = async (p) => {
+  const addOtherFacet = useCallback(async (p) => {
     const next = parejaDe(p.role || 'director');
     const r = await api(`/tracked/${p.id}`, { method: 'POST', body: { role: next } });
     if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     toast(t('⭐ {nombre} también en {faceta}', { nombre: p.name, faceta: next === 'director' ? t('directores/as') : t('actores/actrices') }), 'success');
     loadTracked();
-  };
+  }, [loadTracked]);
 
   const clearAll = async () => {
     if (!confirmClear) {
@@ -487,37 +500,61 @@ export default function Favorites() {
       loadTracked();
     } else toast(`⚠️ ${t(r.error || 'error')}`, 'error');
   };
-  const toggleSelected = (id) =>
+  const toggleSelected = useCallback((id) =>
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
-    });
+    }), []);
 
-  if (loadError) return <ErrorBox error={loadError} />;
-  if (!tracked) return <Progreso {...carga} />;
-
-  // everything below is scoped to the active role — no mixed counts, ever
-  const roleFavs = tracked.filter((t) => (t.role || 'director') === role);
-  const counts = Object.fromEntries(
-    roles.map((r) => [r.key, tracked.filter((fav) => (fav.role || 'director') === r.key).length])
-  );
-  const FAV_SORTS = {
+  // Todo lo derivado va MEMORIZADO y por encima de los returns tempraneros (las
+  // reglas de los hooks no admiten otra cosa). No es purismo: quien sigue a
+  // varios centenares de personas recorría la lista entera —filtrar, contar,
+  // ORDENAR— en cada render, y aquí hay renders que no cambian ni una tarjeta,
+  // como marcar una casilla de «Podar» o escribir una letra en el filtro.
+  const FAV_SORTS = useMemo(() => ({
     titulos: { label: t('Más {verbo} en tu Plex', { verbo: roleVerb(role) }), fn: (a, b) => (b.movies || 0) - (a.movies || 0) },
     huecos: { label: t('Más huecos'), fn: (a, b) => (b.gaps ?? -1) - (a.gaps ?? -1) },
     completismo: { label: t('Menos completos'), fn: (a, b) => (a.pct ?? 101) - (b.pct ?? 101) },
     aporte: { label: t('Menos aporte'), fn: (a, b) => ((a.gaps ?? 0) + (a.upcoming ?? 0)) - ((b.gaps ?? 0) + (b.upcoming ?? 0)) },
     nombre: { label: t('Nombre (A-Z)'), fn: (a, b) => a.name.localeCompare(b.name) },
-  };
-  const shownFavs = roleFavs
-    .filter((t) => !favSearch.trim() || t.name.toLowerCase().includes(favSearch.trim().toLowerCase()))
-    .sort(FAV_SORTS[favSort]?.fn || FAV_SORTS.titulos.fn);
+  }), [role]);
+  // everything below is scoped to the active role — no mixed counts, ever
+  const roleFavs = useMemo(
+    () => (tracked || []).filter((t) => (t.role || 'director') === role),
+    [tracked, role]
+  );
+  const counts = useMemo(
+    () => Object.fromEntries(roles.map((r) => [r.key, (tracked || []).filter((fav) => (fav.role || 'director') === r.key).length])),
+    [tracked, roles]
+  );
+  const shownFavs = useMemo(
+    () => roleFavs
+      .filter((t) => !favSearch.trim() || t.name.toLowerCase().includes(favSearch.trim().toLowerCase()))
+      .sort(FAV_SORTS[favSort]?.fn || FAV_SORTS.titulos.fn),
+    [roleFavs, favSearch, favSort, FAV_SORTS]
+  );
+  // Quién está seguido TAMBIÉN en la otra faceta, resuelto de una vez.
+  // Antes cada tarjeta preguntaba `tracked.some(...)` por su cuenta: con la
+  // lista dentro del bucle que la pinta, el trabajo crecía al cuadrado. Con 600
+  // seguidos eran 360.000 comparaciones por render; con este conjunto, 600.
+  const idsOtraFaceta = useMemo(() => {
+    const pareja = parejaDe(role);
+    return new Set((tracked || []).filter((f) => (f.role || 'director') === pareja).map((f) => f.id));
+  }, [tracked, role]);
+  const resumen = useMemo(() => ({
+    deceasedCount: roleFavs.filter((t) => t.deathday).length,
+    totalGaps: roleFavs.reduce((n, t) => n + (t.gaps || 0), 0),
+    completeCount: roleFavs.filter((t) => t.gaps === 0).length,
+    peliculas: roleFavs.reduce((n, t) => n + (t.movies || 0), 0),
+    // "calculado" per facet: the other facet's cache says nothing about this one
+    anyComputed: roleFavs.some((t) => t.gaps != null),
+  }), [roleFavs]);
+  const { deceasedCount, totalGaps, completeCount, anyComputed } = resumen;
   const noContribution = (t) => t.gaps === 0 && (t.upcoming ?? 0) === 0;
-  const deceasedCount = roleFavs.filter((t) => t.deathday).length;
-  const totalGaps = roleFavs.reduce((n, t) => n + (t.gaps || 0), 0);
-  const completeCount = roleFavs.filter((t) => t.gaps === 0).length;
-  // "calculado" per facet: the other facet's cache says nothing about this one
-  const anyComputed = roleFavs.some((t) => t.gaps != null);
+
+  if (loadError) return <ErrorBox error={loadError} />;
+  if (!tracked) return <Progreso {...carga} />;
 
   return (
     <div>
@@ -582,7 +619,7 @@ export default function Favorites() {
                 <div className="text-xs text-zinc-500">{t('{faceta} que sigues', { faceta })}</div>
               </div>
               <div className="card p-3">
-                <div className="text-xl font-bold text-zinc-200">{roleFavs.reduce((n, t) => n + (t.movies || 0), 0)}</div>
+                <div className="text-xl font-bold text-zinc-200">{resumen.peliculas}</div>
                 <div className="text-xs text-zinc-500">{t('{verbo} suyas en tu Plex', { verbo: roleVerb(role) })}</div>
               </div>
               <div className="card p-3">
@@ -677,7 +714,7 @@ export default function Favorites() {
                     faceta={faceta}
                     verbo={roleVerb(role)}
                     crossFacet={info(role).principal}
-                    alsoOther={tracked.some((fav) => fav.id === p.id && (fav.role || 'director') === parejaDe(role))}
+                    alsoOther={idsOtraFaceta.has(p.id)}
                     selectable={pruneMode}
                     selected={selected.has(p.id)}
                     onSelect={toggleSelected}

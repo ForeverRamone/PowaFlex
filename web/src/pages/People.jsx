@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
 import { Star, Clapperboard } from 'lucide-react';
 import { PersonCard, Empty, PageHeader, Select, DeathBadge, Progreso, useCargaProgresiva } from '../components.jsx';
@@ -33,7 +33,7 @@ function TmdbPersonCard({ person, seguido, onFollow, onUnfollow }) {
       <button
         onClick={() => (seguido ? onUnfollow(person) : onFollow(person))}
         title={seguido ? t('Quitar de favoritos') : t('Añadir a favoritos')}
-        className={`text-lg cursor-pointer shrink-0 ${seguido ? 'text-gold-400' : 'text-zinc-600 hover:text-gold-400'}`}
+        className={`btn-estrella ${seguido ? 'text-gold-400' : 'text-zinc-600 hover:text-gold-400'}`}
       >
         ★
       </button>
@@ -235,7 +235,11 @@ export default function People() {
           </button>
         ))}
         {secundarios.length > 0 && (
-          <div className="flex flex-wrap gap-2 items-center border-l border-ink-700 pl-3 ml-1">
+          // el filete vertical separa los oficios menores de los dos que mandan.
+          // En 375 px el grupo se parte en dos líneas y el filete se quedaba
+          // colgando a la izquierda de las dos, como un palo suelto: ahí el
+          // grupo baja a su propia fila y el «y también» ya separa por sí solo.
+          <div className="flex flex-wrap gap-2 items-center border-l border-ink-700 pl-3 ml-1 max-sm:basis-full max-sm:border-l-0 max-sm:pl-0 max-sm:ml-0">
             <span className="text-xs text-zinc-600">{t('y también')}</span>
             {secundarios.map((r) => (
               <button
@@ -265,14 +269,29 @@ export default function People() {
             options={[['female', t('Mujer')], ['male', t('Hombre')], ['other', t('No binario')]]} />
           <Select value={f.life} onChange={setFilter('life')} placeholder={t('Vivo/fallecido')}
             options={[['alive', t('Vivos')], ['dead', t('Fallecidos')]]} />
-          <Select value={f.continent} onChange={setFilter('continent')} placeholder={t('Continente')}
-            options={(opts?.continents || []).map((c) => [c, c])} />
-          <Select value={f.country} onChange={setFilter('country')} placeholder={t('País (nacimiento)')}
-            options={(opts?.countries || []).map((c) => [c, c])} />
+          {/* Continente y país salen del enriquecimiento demográfico: sin él,
+              los dos desplegables se pintaban vacíos y no hacían nada al
+              abrirlos. Un control mudo es peor que ninguno, así que en su sitio
+              va lo que hay que hacer para que existan. */}
+          {opts?.enriched === 0 ? (
+            <span className="text-xs text-zinc-500">
+              {t('Sin datos demográficos todavía: no hay continente ni país que filtrar.')}{' '}
+              <Link to="/ajustes?tab=fuentes" className="text-gold-400 hover:underline">
+                {t('Consíguelos en Ajustes → «Actualizar estado vital» →')}
+              </Link>
+            </span>
+          ) : (
+            <>
+              <Select value={f.continent} onChange={setFilter('continent')} placeholder={t('Continente')}
+                options={(opts?.continents || []).map((c) => [c, c])} />
+              <Select value={f.country} onChange={setFilter('country')} placeholder={t('País (nacimiento)')}
+                options={(opts?.countries || []).map((c) => [c, c])} />
+            </>
+          )}
           {(f.gender || f.life || f.continent || f.country) && (
             <button className="btn-ghost" onClick={() => setF({ gender: '', life: '', continent: '', country: '' })}>{t('✕ Limpiar filtros')}</button>
           )}
-          {opts && (
+          {opts && opts.enriched > 0 && (
             <span className="text-xs text-zinc-500 ml-auto">
               {t('Datos demográficos de {n} personas · amplíalos en Ajustes → «Actualizar estado vital»', { n: opts.enriched.toLocaleString(locale()) })}
             </span>
@@ -287,7 +306,9 @@ export default function People() {
           <div className="flex items-center gap-2 ml-auto flex-wrap">
             <span className="text-xs text-zinc-400 whitespace-nowrap">{t('Seguir a los')}</span>
             <input type="number" min="1" max="1000" className="input !w-20 text-center !py-1" value={topN} onChange={(e) => setTopN(e.target.value)} />
-            <span className="text-xs text-zinc-400 whitespace-nowrap">{t('primeros')}</span>
+            {/* en inglés «Follow the top 10» ya está dicho y la clave traduce a
+                cadena vacía: sin esto quedaba un hueco de flex detrás del campo */}
+            {t('primeros') && <span className="text-xs text-zinc-400 whitespace-nowrap">{t('primeros')}</span>}
             <button className="btn-gold !py-1 text-xs inline-flex items-center gap-1.5" onClick={bulkAdd}>
               <Star size={12} strokeWidth={2} /> {t('Revisar y añadir')}
             </button>

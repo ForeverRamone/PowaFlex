@@ -88,26 +88,31 @@ export default function WatchStats() {
 
       {/* watched counter (#1) */}
       {s && (
+        // Los cuatro contadores llevan la misma tipografía que los del
+        // Dashboard (.stat-*, index.css): estaban escritos a mano con text-2xl
+        // font-bold y quedaban de otra familia que los de la página de entrada,
+        // siendo la misma cifra de la misma colección. El color de la cifra sí
+        // significa algo y por eso se mantiene encima de la clase.
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <div className="card p-4">
-            <div className="text-2xl font-bold text-gold-400">{s.total.toLocaleString(locale())}</div>
-            <div className="text-sm text-zinc-400 mt-1">{t('Marcadas como vistas')}</div>
-            <div className="text-xs text-zinc-500 mt-1">{s.library ? t('{pct}% de tu biblioteca', { pct: Math.round((s.total / s.library) * 100) }) : t('sin biblioteca sincronizada')}</div>
+            <div className="stat-cifra text-gold-400">{s.total.toLocaleString(locale())}</div>
+            <div className="stat-rotulo">{t('Marcadas como vistas')}</div>
+            <div className="stat-nota">{s.library ? t('{pct}% de tu biblioteca', { pct: Math.round((s.total / s.library) * 100) }) : t('sin biblioteca sincronizada')}</div>
           </div>
           <div className="card p-4">
-            <div className="text-2xl font-bold text-zinc-200">{s.plex.toLocaleString(locale())}</div>
-            <div className="text-sm text-zinc-400 mt-1">{t('Vistas en Plex')}</div>
-            <div className="text-xs text-zinc-500 mt-1">{t('con reproducción registrada')}</div>
+            <div className="stat-cifra">{s.plex.toLocaleString(locale())}</div>
+            <div className="stat-rotulo">{t('Vistas en Plex')}</div>
+            <div className="stat-nota">{t('con reproducción registrada')}</div>
           </div>
           <div className="card p-4">
-            <div className="text-2xl font-bold text-orange-300">{s.lbInLibrary.toLocaleString(locale())}</div>
-            <div className="text-sm text-zinc-400 mt-1">{t('Solo por Letterboxd')}</div>
-            <div className="text-xs text-zinc-500 mt-1">{t('en tu biblioteca, sin verlas en Plex')}</div>
+            <div className="stat-cifra text-orange-300">{s.lbInLibrary.toLocaleString(locale())}</div>
+            <div className="stat-rotulo">{t('Solo por Letterboxd')}</div>
+            <div className="stat-nota">{t('en tu biblioteca, sin verlas en Plex')}</div>
           </div>
           <div className="card p-4">
-            <div className="text-2xl font-bold text-zinc-200">{s.lbTotal.toLocaleString(locale())}</div>
-            <div className="text-sm text-zinc-400 mt-1">{t('Total en Letterboxd')}</div>
-            <div className="text-xs text-zinc-500 mt-1">
+            <div className="stat-cifra">{s.lbTotal.toLocaleString(locale())}</div>
+            <div className="stat-rotulo">{t('Total en Letterboxd')}</div>
+            <div className="stat-nota">
               {s.lbUnmatched > 0
                 ? t('{n} sin emparejar con tu Plex', { n: s.lbUnmatched.toLocaleString(locale()) })
                 : t('todas emparejadas')}
@@ -254,8 +259,12 @@ export default function WatchStats() {
               <tbody>
                 {lbCompare.slice(0, 200).map((m) => (
                   <tr key={m.rating_key} className="border-b border-ink-800">
-                    <td className="py-1.5 pr-3 text-zinc-200">
-                      <button className="hover:text-gold-400 text-left" onClick={() => setSelected(m.rating_key)}>{m.title}</button>
+                    {/* el relleno vertical lo pone el botón, no la celda: así
+                        el título ocupa la fila entera y en el móvil llega a los
+                        40 px de alto sin que en el escritorio la tabla de 200
+                        filas se estire */}
+                    <td className="pr-3 text-zinc-200">
+                      <button className="hover:text-gold-400 text-left block w-full py-1.5 max-sm:py-2.5 cursor-pointer" onClick={() => setSelected(m.rating_key)}>{m.title}</button>
                     </td>
                     <td className="text-zinc-500 pr-3 whitespace-nowrap">{m.year}</td>
                     <td className="text-right text-gold-400 pr-3 whitespace-nowrap">{m.lb?.toFixed(1)}</td>

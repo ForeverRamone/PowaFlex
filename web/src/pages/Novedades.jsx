@@ -25,6 +25,22 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.22',
+    fecha: '2026-08-21',
+    titular: 'Las fichas que no cuadraban en Criterion, y las esperas que ya dicen cuánto llevan',
+    puntos: [
+      'Varias fichas de los cánones nuevos no cuadraban con su película, y la causa no era la que parecía: TMDB guarda a John Woo con su nombre en mandarín, «Wu Yu-Sheng», y «John Woo» vive solo entre sus alias. Como la comprobación exige que el nombre de quien dirige coincida, «The Killer», «Hard Boiled» y «Last Hurrah for Chivalry» se quedaban sin ficha teniéndola delante. Ahora, cuando todo lo demás falla, se miran también los alias — sin aflojar la regla de oro: el título tiene que clavar igualmente.',
+      'Otras cinco no eran películas. Criterion edita también miniseries —«Fishing with John», «Tanner ’88», «The Underground Railroad»—, y ahí no había nada que emparejar: no tienen ficha de película en TMDB ni la van a tener. Antes dejaban un hueco mudo que parecía un fallo; ahora la aplicación lo pregunta y lo dice. En el catálogo de Criterion, de quince fichas sin casar a ocho.',
+      'Las ocho que quedan son erratas de la propia Wikipedia («Harikari» por Harakiri, «The Wages for Fear», «Berlin Alexanderplantz») y un dato mal puesto: «The Flight of the Phoenix» aparece atribuida a Robert Altman y la dirigió Robert Aldrich. Para eso está el ✎ de cada ficha, que recuerda tu corrección para siempre.',
+      'Las esperas dicen ya cuánto llevan. La rueda que gira solo estaba en las barras sin porcentaje, pero un porcentaje puede quedarse clavado media espera —las cuatro consultas del Dashboard salen a la vez y vuelven a la vez— y una barra vacía e inmóvil es justo lo que hace pensar que se ha colgado. Ahora la rueda y el reloj están en las dos, a los doce segundos se explica por qué no hay porcentaje, y el 100 % ya no dice «Listo» mientras todavía queda ordenar y pintar.',
+      'Y una barra ya no enseña el progreso de otra tarea. El servidor tiene una sola casilla de progreso para doce trabajos distintos, así que si el pase nocturno estaba traduciendo títulos cuando abrías Cine venidero, lo que veías debajo del rótulo del calendario era el pase nocturno. Ahora cada espera puede pedir la suya, y cuando no puede, la barra dice de qué tarea sale el número.',
+      'Biblioteca, Listas y Favoritos se repintaban enteras con cualquier cambio. Con 780 tarjetas cargadas, cada tecla en la caja de buscar costaba 35 ms; una lista de MDBList de cinco mil títulos ponía 21.257 elementos en pantalla para enseñar doce filas; y marcar una casilla en Favoritos con 600 personas seguidas repintaba las 600. Las tres van ya por partes.',
+      'El motor de React se bajaba otra vez con cada actualización de la aplicación: por un nombre mal puesto en el troceado del empaquetado, sus 264 KB viajaban pegados al código de la app en vez de ir aparte. Ahora se reaprovecha entre versiones.',
+      'Salud de los datos abre con un resumen —«2 de 5 auditorías tienen algo que revisar»— y un atajo a cada una, en vez de seis bloques seguidos sin jerarquía en los que había que bajar hasta el final para saber si pasaba algo.',
+      'Y en el móvil, los objetivos que se quedaban pequeños para el pulgar: las pestañas de oficio de Personas estaban en 28 píxeles de alto y la ★ de seguir era el objetivo más pequeño de su página. Los botones de la casa suben a 40 y la estrella crece de caja sin crecer de icono.',
+    ],
+  },
+  {
     label: 'Beta 1.21',
     fecha: '2026-08-21',
     titular: 'La ficha equivocada de «Flow», y las notas que llevaban meses racionadas',

@@ -58,11 +58,19 @@ export default {
   // Spinner / Progreso
   'Cargando…': 'Loading…',
   'Progreso de carga': 'Loading progress',
+  'Progreso': 'Progress',
   '{n} de {total}': '{n} of {total}',
+  '{done} de {total}': '{done} of {total}',
   // en castellano el símbolo lleva espacio delante; en inglés, no
   '{pct} %': '{pct}%',
   'Llevamos {s} s': '{s}s so far',
   'Listo': 'Done',
+  // el 100 % no es el final: los datos están, la página aún no
+  'Datos completos · montando la página…': 'Data in · building the page…',
+  'Esta consulta va de una pieza: el servidor no dice por dónde va, así que no hay porcentaje que enseñar. Sigue en marcha.':
+    'This one runs in a single piece: the server never says how far along it is, so there is no honest percentage to show. It is still running.',
+  'El porcentaje no se mueve porque cada paso salta de golpe al terminar, no poco a poco. Sigue en marcha.':
+    'The percentage sits still because each step jumps when it finishes, rather than creeping up. It is still running.',
 
   // Subpestanas
   'Secciones de la página': 'Page sections',
@@ -135,6 +143,14 @@ export default {
 
   // BuildProgress
   'Construyendo desde TMDB…': 'Building from TMDB…',
+  '{label} — datos completos, montando la respuesta…': '{label} — data in, assembling the response…',
+  // /api/build-progress tiene una sola casilla para doce tareas: si la espera no
+  // dice cuál es la suya, el número se atribuye a la que de verdad esté corriendo
+  'Tarea del servidor en marcha: {tarea}': 'Server task running: {tarea}',
+  'El servidor todavía no ha dicho por dónde va, así que un porcentaje aquí sería inventado. Sigue en marcha.':
+    'The server has not reported its position yet, so any percentage here would be made up. It is still running.',
+  'El servidor ya ha recorrido la lista entera; ahora la ordena, la guarda en caché y la manda. Sigue en marcha.':
+    'The server has been through the whole list; now it sorts it, caches it and sends it over. It is still running.',
 
   // TypeFilterBar
   'Mostrar:': 'Show:',

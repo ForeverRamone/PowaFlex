@@ -114,3 +114,50 @@ test('una ficha sin créditos sigue siendo el último recurso, no el primero', a
   const { tmdbId } = await elegirCandidato(row, 2026, cands, SIN_LIB, dirsFijos({ 3: [] }));
   assert.equal(tmdbId, 3, 'sin nadie con créditos que lo demuestre, el título clavado basta');
 });
+
+// --- CUANDO TMDB LLAMA DE OTRA MANERA A QUIEN DIRIGE -------------------------
+//
+// TMDB guarda a John Woo como «Wu Yu-Sheng» —la transcripción mandarina de
+// 吳宇森— y «John Woo» vive solo entre sus alias. No es una variante de
+// transliteración que se pueda plegar comparando letras: son dos nombres
+// distintos de la misma persona. Con «The Killer», «Hard Boiled» y «Last Hurrah
+// for Chivalry» de Criterion delante, la ficha correcta estaba ahí y se
+// rechazaba por el nombre.
+
+const aliasFijos = (mapa) => async (id) => mapa[id] ?? [];
+
+test('el alias de quien dirige rescata la ficha, con el título clavado', async () => {
+  const row = { title: 'Hard Boiled', original_title: 'Hard Boiled', director: 'John Woo' };
+  const cands = [{ id: 11782, title: 'Hard Boiled', original_title: '辣手神探', date: '1992-04-16', votes: 971 }];
+  const sinAlias = await elegirCandidato(row, 1992, cands, SIN_LIB, dirsFijos({ 11782: ['Wu Yu-Sheng'] }));
+  assert.equal(sinAlias.tmdbId, null, 'sin mirar los alias, el nombre no casa y se pierde');
+
+  const conAlias = await elegirCandidato(
+    row, 1992, cands, SIN_LIB, dirsFijos({ 11782: ['Wu Yu-Sheng'] }), null, null,
+    aliasFijos({ 11782: ['吳宇森', 'Wu Yu-Sheng', 'John Y. Woo', 'John Woo'] })
+  );
+  assert.equal(conAlias.tmdbId, 11782);
+});
+
+test('el alias NO vale sin el título clavado: siguen siendo dos pruebas', async () => {
+  const row = { title: 'Una Película Suya', original_title: 'Una Película Suya', director: 'John Woo' };
+  const cands = [{ id: 5, title: 'Otra Cosa Distinta', original_title: 'Otra Cosa Distinta', date: '1992-01-01', votes: 900 }];
+  const { tmdbId } = await elegirCandidato(
+    row, 1992, cands, SIN_LIB, dirsFijos({ 5: ['Wu Yu-Sheng'] }), null, null,
+    aliasFijos({ 5: ['John Woo'] })
+  );
+  assert.equal(tmdbId, null, 'que dirija esa persona no basta si el título no es el que buscamos');
+});
+
+test('el título clavado del alias puede estar solo en el internacional', async () => {
+  // «The Killer» de John Woo es «The Killer (El asesino)» en castellano y
+  // «喋血雙雄» de original: ninguno de los dos clava, y el inglés sí
+  const row = { title: 'The Killer', original_title: 'The Killer', director: 'John Woo' };
+  const cands = [{ id: 10835, title: 'The Killer (El asesino)', original_title: '喋血雙雄', date: '1989-03-24', votes: 925 }];
+  const { tmdbId } = await elegirCandidato(
+    row, 1989, cands, SIN_LIB, dirsFijos({ 10835: ['Wu Yu-Sheng'] }),
+    enFijos({ 10835: 'The Killer' }), null,
+    aliasFijos({ 10835: ['Wu Yu-Sheng', 'John Woo'] })
+  );
+  assert.equal(tmdbId, 10835);
+});

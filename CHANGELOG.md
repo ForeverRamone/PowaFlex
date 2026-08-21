@@ -1,5 +1,59 @@
 # Changelog
 
+## Beta 1.22 (1.0.22-beta) — 2026-08-21
+
+**Las fichas que no cuadraban en Criterion, y una pasada de cuatro revisiones a la velocidad, al diseño y a las esperas.**
+
+### Criterion: de quince fichas sin casar a ocho
+
+Medido sobre las 1.176 del catálogo, con claves reales. Tres causas distintas, y ninguna era la que parecía:
+
+**TMDB llama de otra manera a quien dirige.** Guarda a John Woo como «Wu Yu-Sheng» —la transcripción mandarina de 吳宇森— y «John Woo» vive solo entre sus alias. No es una variante de transliteración que se pueda plegar comparando letras: son dos nombres distintos de la misma persona, y ninguna regla de parecido los va a unir. La ficha correcta de «The Killer» estaba ahí, con 925 votos y su título, y se rechazaba por el nombre. Ahora, cuando todo lo demás ha fallado, se miran los alias de quien dirige la ficha candidata — exigiendo igualmente el título clavado, así que siguen siendo dos pruebas y no se afloja la regla de oro. Rescata «The Killer», «Hard Boiled» y «Last Hurrah for Chivalry», y es el pan de cada día del cine asiático, donde el nombre con el que una película se distribuye en occidente casi nunca es el que TMDB guarda.
+
+**El título clavado puede vivir solo en el internacional.** «The Killer» es «The Killer (El asesino)» en castellano y «喋血雙雄» de original: ninguno de los dos coincide con lo que dice el catálogo, y el inglés sí.
+
+**Cinco de las que fallaban no son películas.** Criterion edita miniseries —«Fishing with John», «Tanner '88», «The Underground Railroad»—, y ahí no había nada que arreglar: no tienen ficha de película en TMDB ni la van a tener. Antes dejaban un hueco mudo que parecía un fallo del emparejado. Ahora, cuando una fila se queda sin ficha, se le pregunta a TMDB si eso es una serie y la interfaz lo dice. Cuesta una búsqueda y solo se paga por lo que ya ha fallado: doce de 1.176. Mejora también el registro estadounidense (23 → 20 sin ficha) y el IDFA.
+
+Las ocho que quedan son erratas de la propia Wikipedia («Harikari» por Harakiri, «Vengence is Mine», «The Wages **for** Fear», «Berlin Alexanderplantz») y un dato mal puesto: «The Flight of the Phoenix» aparece atribuida a Robert Altman y la dirigió Robert Aldrich. Para eso está el ✎ de cada ficha, que recuerda la corrección para siempre.
+
+Cachés `festival` v17 → **v18** y `film_match` v6 → **v7**.
+
+### El motor de React ya no se rebaja en cada despliegue
+
+El troceado del empaquetado nombraba `react-dom`, pero la aplicación no importa ese módulo: importa `react-dom/client`, que es otro. Nadie lo reclamaba, así que sus 264 KB —el motor de React entero— caían en el trozo del índice, junto al código de la app. Se veía en que el trozo «react» pesaba 51 KB y era react-router al 94 %. No cambia lo que se baja la primera vez, pero sí lo que se reaprovecha: con el motor dentro del índice, tocar una línea de la aplicación obligaba a volver a bajarlo entero. Ahora el índice son 265 KB y React 233, cada uno por su lado.
+
+### Tres páginas que se repintaban enteras
+
+Medido con la biblioteca de 12.400 películas, que es donde esto se ve:
+
+- **Biblioteca**: cada «Cargar más» añade sesenta tarjetas a las que ya están, y cualquier cambio de estado —teclear en la caja de buscar es uno por tecla— reconciliaba todas. Con 780 tarjetas: 35 ms por tecla y 80 ms por «Cargar más». Ahora la tarjeta va memorizada y los manejadores son estables, que es lo que hace que el memo sirva de algo.
+- **Listas y retos**: una lista de MDBList trae cinco mil títulos y se pintaban enteros dentro de un recuadro donde caben doce filas. Medido con una de 5.000: **21.257 nodos para enseñar doce**. Ahora entran por tramos, como la parrilla de Festivales — con el detalle de que estas listas no scrollean con la página sino dentro de su propia caja, así que el observador va contra la caja y no contra la ventana.
+- **Favoritos**: seguir a varios centenares de personas es lo normal aquí, y marcar una sola casilla de «Podar» repintaba las 600. Medido con 600 seguidos: 29 ms por casilla.
+
+### Las esperas dicen ya cuánto llevan y cuánto queda
+
+Era el encargo literal: que nadie piense que se ha quedado pillado. Tres cosas que solo se ven mirando esperas de verdad:
+
+1. **La rueda giraba solo en las barras sin porcentaje.** Pero un porcentaje cierto puede estar clavado media espera —las cuatro consultas del Dashboard salen a la vez y vuelven a la vez, así que la barra se pasaba veinticinco segundos en el 0 % sin un píxel de movimiento— y una barra vacía e inmóvil es exactamente lo que hace pensar que se ha colgado. Ahora la rueda y el reloj están en las dos.
+2. **Nadie explicaba por qué no había porcentaje.** A los doce segundos se dice.
+3. **El 100 % no es el final**: quien lo enseña todavía tiene que ordenar, cachear y pintar. Decía «Listo» y se quedaba ahí; ahora dice que sigue en marcha.
+
+Y se arregla un fallo de diseño que venía de lejos: `/api/build-progress` tiene **una casilla para doce tareas**. Si el pase nocturno estaba traduciendo títulos cuando alguien abría Cine venidero, lo que se pintaba era el progreso del pase nocturno debajo del rótulo del calendario. Ahora una espera puede nombrar la tarea cuyo progreso sí es el suyo, y cuando no puede, la barra se sigue enseñando pero **atribuida**: la nota dice de qué tarea sale el número. Además el sondeo de ese endpoint se comparte: con dos esperas en pantalla eran dos peticiones por segundo pidiendo lo mismo.
+
+De propina, las cifras redondas cuando la espera son minutos: «247 de 1.001» dice mucho más que «25 %», que no aclara si son mil o diez.
+
+### Salud de los datos, y el pulgar
+
+**Salud** abre ahora con un resumen: «2 de 5 auditorías tienen algo que revisar», con un atajo a cada una. Antes había seis auditorías seguidas sin jerarquía y las que están bien ocupaban lo mismo que las que no, así que había que recorrer la página entera para saber si pasaba algo. Y cuando una auditoría sale limpia, su explicación de qué hacer sobra: se queda en una línea.
+
+**Áreas táctiles en el móvil.** Medido a 375 px: las pestañas de oficio de Personas se quedaban en 28 px de alto y el enlace de Salud a «Calidad y disco» en 25 — la mitad de lo que hay que acertar con el pulgar. Los botones de la casa suben a 40 px por debajo de `sm`, y la ★ de seguir —que era el objetivo más pequeño de su página, 18 × 28 px repetido sesenta veces— crece de caja sin crecer de icono.
+
+**Y los contadores de Visionado se parecen por fin a los del Dashboard**: estaban escritos a mano con otra tipografía, siendo la misma cifra de la misma colección.
+
+### Números
+
+Pruebas 336 → **339**. Cachés: `festival` v18, `film_match` v7.
+
 ## Beta 1.21 (1.0.21-beta) — 2026-08-21
 
 **«Flow» apuntaba a otra película, y las notas de MDBList llevaban meses racionadas a 900 al día teniendo 25.000.**

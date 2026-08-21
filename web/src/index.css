@@ -272,6 +272,71 @@ body {
     border: var(--border-w) solid var(--color-ink-600);
   }
 
+  /* --- Mínimo táctil en el móvil ---------------------------------------------
+     Los botones de la casa son compactos a propósito, y los menores llevan
+     además `!py-1`: en el escritorio, con ratón, funciona. Medido en 375 px,
+     las pestañas de oficio de Personas se quedaban en 28 px de alto y el enlace
+     a «Calidad y disco» de Salud en 25 — la mitad de lo que hay que acertar con
+     el pulgar. Los 40 px son los mismos que `.subpestana` ya exigía; aquí valen
+     para todo lo que se pulsa. Solo por debajo de `sm`, para no engordar la
+     interfaz de escritorio, y con `inline-flex` porque si no el alto de más se
+     va todo debajo del texto en vez de repartirse. */
+  @media (max-width: 640px) {
+    .btn,
+    .btn-gold,
+    .btn-ghost,
+    .chip {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+
+  /* Enlace que remata el título de una sección («Ver más →», «Ajustes →»). El
+     Dashboard lo escribía a mano siete veces con las mismas cuatro clases, y en
+     el móvil quedaba en 16 px de alto: es un salto a otra página, se pulsa, y
+     necesita el mismo mínimo táctil que un botón. */
+  .link-seccion {
+    @apply text-xs text-gold-400 shrink-0 cursor-pointer;
+  }
+  .link-seccion:hover {
+    @apply underline;
+  }
+  @media (max-width: 640px) {
+    .link-seccion {
+      @apply inline-flex items-center;
+      min-height: 40px;
+    }
+  }
+
+  /* La ★ de seguir a alguien. Es la acción principal de cualquier parrilla de
+     gente y era el objetivo más pequeño de su página: 18 × 28 px, sesenta veces
+     en Personas. El icono no crece; crece su caja. */
+  .btn-estrella {
+    @apply text-lg cursor-pointer shrink-0 transition-colors inline-flex items-center justify-center;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  /* Bloque de contador: cifra grande, rótulo y apostilla. `StatCard` lo pinta
+     en el Dashboard y Visionado lo tenía copiado a mano con OTRA tipografía
+     (text-2xl font-bold en vez de la de titulares), así que los dos contadores
+     de la misma colección no se parecían en nada. El color de la cifra se pone
+     encima con una utilidad cuando significa algo (naranja = te falta algo). */
+  .stat-cifra {
+    @apply font-display text-3xl text-zinc-100 leading-none;
+    /* `.tabular` es una clase de la casa, no una utilidad de Tailwind: no se
+       puede aplicar con @apply, así que aquí va su regla directamente */
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-rotulo {
+    @apply text-sm text-zinc-400 mt-2;
+  }
+  .stat-nota {
+    @apply text-xs text-zinc-500 mt-1;
+  }
+
   /* Rótulo de categoría que despliega a otros botones (Festivales / Premios /
      Cánones, en Festivales y premios). NO es un `btn-ghost`: abierto quedaba en
      la misma fila y con la misma caja que los premios que acababa de desplegar,

@@ -179,7 +179,7 @@ export default function Dashboard() {
       {captures?.length > 0 && (
         <Section
           title={t('🎬 Capturadas esta semana ({n})', { n: captures.length })}
-          action={<Link to="/taller?tab=calidad" className="text-xs text-gold-400 hover:underline">{t('Pendientes →')}</Link>}
+          action={<Link to="/taller?tab=calidad" className="link-seccion">{t('Pendientes →')}</Link>}
         >
           <div className="card divide-y divide-ink-800 max-h-72 overflow-y-auto">
             {captures.map((c) => (
@@ -208,7 +208,7 @@ export default function Dashboard() {
       {autoEnviadas?.length > 0 && (
         <Section
           title={t('🤖 El automático las bajó por ti ({n} en 30 días)', { n: autoEnviadas.length })}
-          action={<Link to="/ajustes?tab=automatismos" className="text-xs text-gold-400 hover:underline">{t('Automatismos →')}</Link>}
+          action={<Link to="/ajustes?tab=automatismos" className="link-seccion">{t('Automatismos →')}</Link>}
         >
           <div className="card divide-y divide-ink-800 max-h-72 overflow-y-auto">
             {porPersona(autoEnviadas).map(([quien, pelis]) => (
@@ -236,17 +236,17 @@ export default function Dashboard() {
       {/* recent activity (#8) */}
       {recent && (
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
-          <Section title={t('Últimas añadidas a Plex')} action={<Link to="/biblioteca?sort=added" className="text-xs text-gold-400 hover:underline">{t('Ver más →')}</Link>}>
+          <Section title={t('Últimas añadidas a Plex')} action={<Link to="/biblioteca?sort=added" className="link-seccion">{t('Ver más →')}</Link>}>
             <RecentStrip items={recent.recentlyAdded} onSelect={setSelected} kind="added" />
           </Section>
-          <Section title={t('Últimas vistas')} action={<Link to="/visionado" className="text-xs text-gold-400 hover:underline">{t('Ver más →')}</Link>}>
+          <Section title={t('Últimas vistas')} action={<Link to="/visionado" className="link-seccion">{t('Ver más →')}</Link>}>
             {recent.recentlyWatched?.length ? (
               <RecentStrip items={recent.recentlyWatched} onSelect={setSelected} kind="watched" />
             ) : (
               <Empty>{t('Sin visionados de Plex ni de Letterboxd todavía. Configura tu RSS en «Letterboxd».')}</Empty>
             )}
           </Section>
-          <Section title={t('Últimas peticiones a Radarr')} action={<Link to="/ajustes?tab=automatismos" className="text-xs text-gold-400 hover:underline">{t('Ajustes →')}</Link>}>
+          <Section title={t('Últimas peticiones a Radarr')} action={<Link to="/ajustes?tab=automatismos" className="link-seccion">{t('Ajustes →')}</Link>}>
             {recent.radarrRecent?.length ? (
               <div className="card divide-y divide-ink-800 max-h-[420px] overflow-y-auto">
                 {recent.radarrRecent.map((m, i) => (
@@ -275,7 +275,7 @@ export default function Dashboard() {
       <div className="grid lg:grid-cols-2 gap-6">
         <Section
           title={t('Directores/as con más películas')}
-          action={<Link to="/personas" className="text-xs text-gold-400 hover:underline">{t('Ver todos →')}</Link>}
+          action={<Link to="/personas" className="link-seccion">{t('Ver todos →')}</Link>}
         >
           <div className="grid sm:grid-cols-2 gap-2">
             {directors.map((p) => <PersonCard key={p.id} person={p} role="director" />)}
@@ -283,7 +283,7 @@ export default function Dashboard() {
         </Section>
         <Section
           title={t('Actores/actrices con más películas')}
-          action={<Link to="/personas?role=actor" className="text-xs text-gold-400 hover:underline">{t('Ver todos →')}</Link>}
+          action={<Link to="/personas?role=actor" className="link-seccion">{t('Ver todos →')}</Link>}
         >
           <div className="grid sm:grid-cols-2 gap-2">
             {actors.map((p) => <PersonCard key={p.id} person={p} role="actor" />)}

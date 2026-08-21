@@ -879,6 +879,45 @@ export async function movieSummary(tmdbId) {
   };
 }
 
+/**
+ * ¿ESTO NO SERÁ UNA SERIE?
+ *
+ * Un catálogo de cine se cuela de vez en cuando: Criterion edita «Fishing with
+ * John», «Tanner '88», «Berlin Alexanderplatz» y «The Underground Railroad», que
+ * son miniseries; Sight & Sound metió «Twin Peaks: The Return»; los críticos de
+ * Los Ángeles premiaron «Small Axe». Ninguna tiene ficha de PELÍCULA en TMDB ni
+ * la va a tener, así que buscarlas era acabar siempre en el mismo hueco mudo —y
+ * contarlo como fallo del emparejado, que es peor: no hay nada que arreglar.
+ *
+ * Hasta aquí eso se apañaba con una lista escrita a mano (`NO_SON_PELICULAS`),
+ * que solo cubre lo que alguien se acordó de apuntar. Preguntarlo cuesta UNA
+ * búsqueda, y solo se paga por las filas que ya se han quedado sin ficha: doce
+ * de las 1.176 de Criterion. Con el título exacto y el año encajando, la
+ * interfaz puede decir «serie de televisión» en vez de dejar un hueco.
+ */
+export async function esSerieEnTmdb(title, year) {
+  if (!title) return false;
+  const key = `tv_check:${String(title).toLowerCase()}:${year || ''}`;
+  const cached = cacheRead(key, 30 * DAY);
+  if (cached) return !!cached.tv;
+  try {
+    const data = await tmdbGet('/search/tv', { query: title }, { cacheKey: null });
+    const buscado = normTitle(title);
+    const tv = (data.results || []).some((r) => {
+      const mismoTitulo = normTitle(r.name) === buscado || normTitle(r.original_name) === buscado;
+      if (!mismoTitulo) return false;
+      if (!Number.isFinite(year) || !r.first_air_date) return true;
+      // margen amplio a propósito: una miniserie de varios años se fecha por su
+      // estreno y el catálogo puede apuntar cualquiera de ellos
+      return Math.abs(Number(String(r.first_air_date).slice(0, 4)) - year) <= 2;
+    });
+    cacheWrite(key, { tv });
+    return tv;
+  } catch {
+    return false; // sin red no se afirma nada: se queda como estaba
+  }
+}
+
 /** Deterministic TMDB id from an IMDb id (Plex guids carry it), cached. */
 export async function findByImdbId(imdbId) {
   if (!imdbId) return null;
@@ -1023,6 +1062,38 @@ export async function latinPersonName(tmdbId, name) {
   } catch {
     return name;
   }
+}
+
+/**
+ * TODOS LOS NOMBRES por los que TMDB conoce a la dirección de una película.
+ *
+ * Existe por un caso que no arregla ninguna comparación de nombres: TMDB guarda
+ * a John Woo como **«Wu Yu-Sheng»** —la transcripción mandarina de 吳宇森— y
+ * «John Woo» vive solo en sus alias. No es una variante de transliteración que
+ * se pueda plegar: son dos nombres distintos de la misma persona. Con «The
+ * Killer» y «Hard Boiled» delante, la ficha correcta estaba ahí, con 925 votos,
+ * y se rechazaba porque el nombre no casaba.
+ *
+ * `latinPersonName` no lo cubre: solo mira los alias cuando el nombre está en
+ * otro alfabeto, y «Wu Yu-Sheng» ya es latino.
+ *
+ * Se usa SOLO cuando la verificación normal ha fallado (ver `elegirCandidato`):
+ * en el camino bueno costaría una petición por película y no aporta nada.
+ */
+export async function nombresDeDireccion(tmdbId) {
+  const det = await movieDetail(tmdbId, { withCredits: true });
+  const crew = (det.credits?.crew || []).filter((c) => c.job === 'Director');
+  const nombres = [];
+  for (const c of crew) {
+    nombres.push(c.name);
+    try {
+      const persona = await personDetails(c.id);
+      for (const alias of persona?.also_known_as || []) if (alias) nombres.push(alias);
+    } catch {
+      // sin alias esta persona aporta solo su nombre: no es motivo para abortar
+    }
+  }
+  return nombres;
 }
 
 /**

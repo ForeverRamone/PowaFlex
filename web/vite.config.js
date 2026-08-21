@@ -34,8 +34,19 @@ export default defineConfig({
         // 415 KB para arrancar React. Declarando React aparte, cada uno va a lo
         // suyo: react se baja siempre porque hace falta siempre, y recharts
         // solo cuando de verdad hay una gráfica que pintar.
+        //
+        // Y OJO con la segunda trampa, que es la misma con otra ropa: la lista
+        // de arriba nombra PAQUETES, y lo que se resuelve es el módulo de
+        // entrada de cada uno. La app no importa `react-dom`, importa
+        // `react-dom/client`, que es OTRO módulo: no lo reclamaba nadie y sus
+        // 264 KB —el motor de React entero— caían en el trozo del índice, junto
+        // al código de la app. Se veía en que `react` pesaba 51 KB y era
+        // react-router al 94 %. No cambia lo que se baja la primera vez (los
+        // dos trozos son de carga inmediata), pero sí lo que se REAPROVECHA:
+        // con el motor dentro del índice, tocar una línea de la app obligaba a
+        // volver a bajarlo entero en cada despliegue.
         manualChunks: {
-          react: ['react', 'react-dom', 'react-router-dom'],
+          react: ['react', 'react-dom', 'react-dom/client', 'react-router-dom'],
           recharts: ['recharts'],
         },
       },

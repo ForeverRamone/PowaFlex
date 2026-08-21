@@ -43,6 +43,10 @@ export default {
 
   // ── integraciones ──
   'Falta la API key de TMDB en Ajustes': 'The TMDB API key is missing in Settings',
+  // el que suelta tmdb.js al pedir cualquier cosa sin clave: es el que ve quien
+  // abre una ficha de persona sin haber configurado TMDB, y salía en castellano
+  // incrustado en una frase inglesa
+  'TMDB no configurado (falta API key)': 'TMDB is not configured (API key missing)',
 
   // ── imágenes ──
   'sin imagen': 'no image',

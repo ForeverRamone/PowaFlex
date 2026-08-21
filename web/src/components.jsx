@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { api, fmtDuration, tmdbImg, ratingLinks, primaryRating } from './api.js';
@@ -404,11 +404,13 @@ export function RatingsChips({ ratings, movie, className = '' }) {
 }
 
 /**
- * Segundos transcurridos desde que arrancó una espera. Solo corre mientras
- * `activo`: es lo único REAL que se puede enseñar cuando no hay porcentaje que
- * medir, y no tiene sentido pagar un temporizador cuando sí lo hay.
+ * Segundos transcurridos desde que arrancó una espera. Corre siempre que la
+ * espera esté en pantalla, TAMBIÉN cuando hay porcentaje: un porcentaje puede
+ * ser cierto y no moverse en treinta segundos (cuatro consultas lanzadas a la
+ * vez vuelven casi juntas, así que la barra del Dashboard se pasaba la espera
+ * entera clavada en el 0 %), y entonces el único dato vivo en pantalla es este.
  */
-function useSegundos(activo) {
+function useSegundos(activo = true) {
   const [segundos, setSegundos] = useState(0);
   useEffect(() => {
     if (!activo) return undefined;
@@ -418,6 +420,28 @@ function useSegundos(activo) {
   }, [activo]);
   return segundos;
 }
+
+/**
+ * Cuántos segundos lleva `valor` sin cambiar. Sirve para distinguir «va lento»
+ * de «parece muerto»: mientras el número se mueve no hace falta decir nada, y
+ * en cuanto se queda quieto un rato hay que explicar que sigue vivo.
+ */
+function useQuietoDesde(valor) {
+  const [quieto, setQuieto] = useState(0);
+  useEffect(() => {
+    setQuieto(0);
+    const reloj = setInterval(() => setQuieto((n) => n + 1), 1000);
+    return () => clearInterval(reloj);
+  }, [valor]);
+  return quieto;
+}
+
+// A los cuatro segundos el reloj ya informa; antes solo mete ruido. A los doce,
+// quien sigue mirando merece que le expliquen POR QUÉ no hay más que enseñar.
+const SEGUNDOS_RELOJ = 4;
+const SEGUNDOS_EXPLICACION = 12;
+// Un porcentaje que no se mueve en seis segundos ya parece congelado.
+const SEGUNDOS_CLAVADA = 6;
 
 const estadoVacio = (lista) => ({
   // arrancar en 0 % y no en «sin porcentaje»: con dos o más peticiones el
@@ -542,23 +566,59 @@ export function useCargaProgresiva(pasos, deps = []) {
  * INDETERMINADA —sin aria-valuenow, que es justo como se declara «no sé cuánto
  * queda»— y, pasados unos segundos, los que llevamos: eso sí es un dato real y
  * responde a «¿se ha colgado?». El porcentaje aparece en cuanto hay 2+ pasos.
+ *
+ * LAS TRES COSAS QUE SE ARREGLARON MIRANDO ESPERAS DE VERDAD (12.400 películas):
+ *
+ *  1. La rueda giraba SOLO en las barras indeterminadas. Pero un porcentaje
+ *     cierto puede estar clavado media espera —las cuatro consultas del
+ *     Dashboard salen a la vez y vuelven a la vez, así que la barra se pasaba
+ *     veinticinco segundos en el 0 % sin un solo píxel de movimiento—, y una
+ *     barra vacía e inmóvil es EXACTAMENTE lo que hace pensar que se ha colgado.
+ *     Ahora la rueda y el reloj están en las dos.
+ *  2. Nadie explicaba por qué no había porcentaje. A los doce segundos se dice.
+ *  3. El 100 % no es el final: quien lo enseña todavía tiene que montar la
+ *     página. Decía «Listo» y se quedaba ahí. Ahora dice que aún queda.
+ *
+ * `detalle` es el tamaño de la tarea en cifras redondas («247 de 1.001»), que
+ * dice mucho más que un porcentaje cuando la espera son minutos; `nota` es una
+ * línea libre debajo (de qué tarea del servidor sale el número, por ejemplo).
  */
-export function Progreso({ pct = null, paso = null, indice = 0, total = 0, label = null, className = '' }) {
+export function Progreso({
+  pct = null, paso = null, indice = 0, total = 0,
+  label = null, detalle = null, nota = null, explicacion = null, className = '',
+}) {
   const indeterminado = pct == null;
-  const segundos = useSegundos(indeterminado);
+  const segundos = useSegundos();
   const valor = indeterminado ? null : Math.max(0, Math.min(100, Math.round(pct)));
-  // sin paso pendiente y al 100 % ya no queda nada: decir «Cargando…» ahí sería
-  // exactamente el spinner mudo que veníamos a quitar
+  const quieto = useQuietoDesde(valor);
+  // el contador ha llegado al final pero esto sigue en pantalla: el servidor ha
+  // terminado su parte y falta la nuestra (ordenar, pintar 12.400 fichas). Es
+  // el momento exacto en que se piensa que se ha colgado, así que se nombra
+  const rematando = valor === 100;
   const texto = paso
     ? (total > 1 ? `${t('{n} de {total}', { n: indice, total })} · ${paso}` : paso)
-    : valor === 100
-      ? t('Listo')
+    : rematando
+      ? t('Datos completos · montando la página…')
       : label || t('Cargando…');
+  // por qué no hay más que enseñar, cuando la espera se alarga y toca decirlo.
+  // Quien monta la espera puede traer su propio motivo (BuildProgress lo hace:
+  // el suyo no es «esta consulta va de una pieza» sino «el servidor aún no ha
+  // dicho por dónde va»), y si no, estos dos cubren los dos casos normales
+  const porQue =
+    indeterminado && segundos >= SEGUNDOS_EXPLICACION
+      ? explicacion || t('Esta consulta va de una pieza: el servidor no dice por dónde va, así que no hay porcentaje que enseñar. Sigue en marcha.')
+      : !indeterminado && !rematando && quieto >= SEGUNDOS_CLAVADA
+        ? explicacion || t('El porcentaje no se mueve porque cada paso salta de golpe al terminar, no poco a poco. Sigue en marcha.')
+        : null;
   return (
     <div className={`progreso ${className}`}>
       <div className="progreso-cabeza">
-        {indeterminado && <span className="progreso-rueda" aria-hidden="true" />}
+        {/* la rueda es la prueba de vida y va SIEMPRE: es lo único que se mueve
+            cuando el porcentaje se queda quieto (y con «reduce motion» no se
+            mueve nada, por eso además está el reloj de abajo, que es texto) */}
+        <span className="progreso-rueda" aria-hidden="true" />
         <span className="progreso-paso">{texto}</span>
+        {detalle && <span className="shrink-0 text-xs text-zinc-500 tabular">{detalle}</span>}
         {valor != null && <span className="progreso-pct tabular">{t('{pct} %', { pct: valor })}</span>}
       </div>
       <div
@@ -568,16 +628,23 @@ export function Progreso({ pct = null, paso = null, indice = 0, total = 0, label
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={valor ?? undefined}
-        aria-valuetext={texto}
+        // el texto es lo que salva el 100 %: «100 %» a secas le dice a un lector
+        // de pantalla que ya está, y todavía no está
+        aria-valuetext={detalle ? `${texto} · ${detalle}` : texto}
       >
+        {/* al 100 % la barra se queda LLENA a propósito: los datos sí están
+            enteros. Que aún queda trabajo lo dicen la rueda y el rótulo */}
         <div
           className={`progreso-barra ${indeterminado ? 'progreso-barra-indet' : ''}`}
           style={indeterminado ? undefined : { width: `${valor}%` }}
         />
       </div>
-      {/* antes de cuatro segundos el contador solo mete ruido */}
-      {indeterminado && segundos >= 4 && (
-        <div className="progreso-nota tabular">{t('Llevamos {s} s', { s: segundos })}</div>
+      {(nota || porQue || segundos >= SEGUNDOS_RELOJ) && (
+        <div className="progreso-nota">
+          {nota && <div>{nota}</div>}
+          {segundos >= SEGUNDOS_RELOJ && <div className="tabular">{t('Llevamos {s} s', { s: segundos })}</div>}
+          {porQue && <div className="mt-1 text-zinc-600">{porQue}</div>}
+        </div>
       )}
     </div>
   );
@@ -585,9 +652,10 @@ export function Progreso({ pct = null, paso = null, indice = 0, total = 0, label
 
 // La espera de una sola petición, ahora por dentro un Progreso indeterminado.
 // Sigue recibiendo `label` y nada más: hay 28 usos vivos y las páginas migran
-// a useCargaProgresiva de una en una.
-export function Spinner({ label = t('Cargando…') }) {
-  return <Progreso label={label} total={1} />;
+// a useCargaProgresiva de una en una. `detalle` y `nota` van de paso para quien
+// sí sepa el tamaño de lo que está esperando.
+export function Spinner({ label = t('Cargando…'), detalle = null, nota = null }) {
+  return <Progreso label={label} total={1} detalle={detalle} nota={nota} />;
 }
 
 /**
@@ -936,14 +1004,39 @@ export function PersonCard({ person, role, follow = null }) {
   );
 }
 
-export function ProgressBar({ pct }) {
+/**
+ * La barra pelada. Tiene DOS oficios distintos y por eso no lleva texto puesto:
+ * mide una espera (el envío en bloque a Radarr, el escaneo de sagas) pero
+ * también mide una proporción quieta que no espera a nada (el % de filmografía
+ * que tienes de alguien). Quien la usa pone el rótulo que corresponda al lado.
+ *
+ * Lo que sí lleva de serie es el papel de barra de progreso ante un lector de
+ * pantalla, que antes no tenía: era un div decorativo y quien no ve la pantalla
+ * no se enteraba de que había un progreso. Y el valor se acota por los dos
+ * lados: un `pct` negativo o un NaN —una división por un total que aún es 0—
+ * escribía `width: NaN%` y dejaba la barra pintada al azar.
+ *
+ * `done`/`total` son opcionales y añaden el «247 de 1.001» debajo, que es lo
+ * único que da idea del tamaño cuando la espera son minutos.
+ */
+export function ProgressBar({ pct, done = null, total = null, label = null }) {
+  const valor = Number.isFinite(Number(pct)) ? Math.max(0, Math.min(100, Number(pct))) : 0;
+  const cifras = done != null && total != null ? t('{done} de {total}', { done, total }) : null;
   return (
-    <div className="h-2 bg-ink-800 rounded-full overflow-hidden">
+    <>
       <div
-        className="h-full bg-gold-400 transition-all"
-        style={{ width: `${Math.min(100, pct)}%` }}
-      />
-    </div>
+        className="h-2 bg-ink-800 rounded-full overflow-hidden"
+        role="progressbar"
+        aria-label={label || t('Progreso')}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(valor)}
+        aria-valuetext={cifras || undefined}
+      >
+        <div className="h-full bg-gold-400 transition-all" style={{ width: `${valor}%` }} />
+      </div>
+      {cifras && <div className="text-[11px] text-zinc-500 mt-1 tabular">{cifras}</div>}
+    </>
   );
 }
 
@@ -1173,28 +1266,116 @@ export function SkeletonGrid({ n = 20 }) {
   );
 }
 
-// Polls /build-progress so long TMDB-building pages show a real bar (#5).
-export function BuildProgress({ label = t('Construyendo desde TMDB…') }) {
-  const [p, setP] = useState(null);
+/**
+ * La espera de una tarea LARGA del servidor: armar el calendario, cruzar
+ * filmografías con TMDB, resolver un canon entero. El servidor va publicando
+ * {done, total} en /api/build-progress y aquí se pinta la barra de verdad.
+ *
+ * EL FALLO DE DISEÑO QUE HAY QUE TENER EN LA CABEZA: ese endpoint tiene UNA
+ * casilla para DOCE tareas (calendar, discover:gaps/favoritos/absent, canon,
+ * justwatch, radarr-bulk, festival:packs, verify-people, titles:movies,
+ * titles:people, english_titles). Si el pase nocturno está traduciendo títulos
+ * cuando alguien abre Cine venidero, lo que se pintaba era el progreso del pase
+ * nocturno debajo del rótulo del calendario: un porcentaje que no tenía nada
+ * que ver con lo que se estaba esperando. Eso es peor que no enseñar barra, y
+ * es el mismo fallo por el que Estrenos acabó con una barra indeterminada.
+ *
+ * `job` (una clave o varias) es el remedio: nombra la tarea cuyo progreso SÍ es
+ * el de esta espera y todo lo demás se ignora. Sin `job` la barra se sigue
+ * enseñando —quitarla sería perder información buena el 90 % de las veces— pero
+ * ATRIBUIDA: la nota dice de qué tarea del servidor sale el número, de modo que
+ * un «Añadiendo a Radarr» debajo de «Construyendo el calendario» se lee como lo
+ * que es.
+ *
+ * Y cuando no hay nada que contar —la tarea aún no ha arrancado, o sencillamente
+ * no publica— se cae a un Progreso indeterminado con su etiqueta, su rueda y su
+ * reloj. Antes ahí quedaba una ruedecita muda y una frase, sin nada que se
+ * moviera ni ninguna señal de cuánto llevábamos.
+ */
+/**
+ * EL SONDEO DE `/api/build-progress`, en UN solo sitio.
+ *
+ * Cada `<BuildProgress>` montado abría su propio `setInterval` contra el mismo
+ * endpoint. Con dos esperas a la vez en pantalla —pasa en Descubrir, que pinta
+ * una por pestaña— eran dos peticiones por segundo pidiendo exactamente lo
+ * mismo. Aquí se pregunta una vez y el resultado se reparte.
+ *
+ * Devuelve `null` cuando no hay ninguna tarea activa, que es lo que
+ * `BuildProgress` interpreta como «no puedo dar porcentaje».
+ */
+const oyentesDeTarea = new Set();
+let sondeoDeTarea = null;
+let ultimaTarea = null;
+
+function useTareaDelServidor(cadaMs = 900) {
+  const [tarea, setTarea] = useState(ultimaTarea);
   useEffect(() => {
-    const t = setInterval(() => {
-      api('/build-progress').then((r) => setP(r && r.active ? r : null)).catch(() => {});
-    }, 900);
-    return () => clearInterval(t);
-  }, []);
+    const avisar = (t) => setTarea(t);
+    oyentesDeTarea.add(avisar);
+    if (!sondeoDeTarea) {
+      const preguntar = () =>
+        api('/build-progress')
+          .then((r) => {
+            ultimaTarea = r && r.active ? r : null;
+            for (const o of oyentesDeTarea) o(ultimaTarea);
+          })
+          .catch(() => {});
+      preguntar(); // sin esto, la primera barra tarda casi un segundo en existir
+      sondeoDeTarea = setInterval(preguntar, cadaMs);
+    }
+    return () => {
+      oyentesDeTarea.delete(avisar);
+      // el último que se va apaga la luz: si no, el sondeo seguiría vivo toda
+      // la sesión aunque no quede ninguna espera en pantalla
+      if (!oyentesDeTarea.size && sondeoDeTarea) {
+        clearInterval(sondeoDeTarea);
+        sondeoDeTarea = null;
+        ultimaTarea = null;
+      }
+    };
+  }, [cadaMs]);
+  return tarea;
+}
+
+export function BuildProgress({ label = t('Construyendo desde TMDB…'), job = null, className = '' }) {
+  const p = useTareaDelServidor(900);
+
+  const claves = job == null ? null : [].concat(job);
+  const cuenta = p && p.total > 0 && (!claves || claves.includes(p.job));
+  // el servidor ha recorrido su lista entera y esto sigue en pantalla: le queda
+  // ordenar, cachear y mandar la respuesta, y a la página pintarla. La barra al
+  // 100 % sin que pase nada es justo la que hace pensar que se ha colgado
+  const rematando = cuenta && p.done >= p.total;
+
+  if (!cuenta || rematando) {
+    return (
+      <Progreso
+        className={className}
+        total={1}
+        label={rematando ? t('{label} — datos completos, montando la respuesta…', { label }) : label}
+        explicacion={
+          rematando
+            ? t('El servidor ya ha recorrido la lista entera; ahora la ordena, la guarda en caché y la manda. Sigue en marcha.')
+            : t('El servidor todavía no ha dicho por dónde va, así que un porcentaje aquí sería inventado. Sigue en marcha.')
+        }
+      />
+    );
+  }
   return (
-    <div className="py-12 max-w-md mx-auto text-center">
-      <div className="flex items-center gap-3 justify-center text-zinc-400 mb-4">
-        <div className="w-5 h-5 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
-        {label}
-      </div>
-      {p && p.total > 0 && (
-        <>
-          <ProgressBar pct={Math.round((p.done / p.total) * 100)} />
-          <div className="text-xs text-zinc-500 mt-2">{p.label} · {p.done} / {p.total}</div>
-        </>
-      )}
-    </div>
+    <Progreso
+      className={className}
+      label={label}
+      pct={Math.round((p.done / p.total) * 100)}
+      // las cifras redondas dicen mucho más que el porcentaje cuando la espera
+      // son minutos: «247 de 1.001» se entiende, «25 %» no dice si son mil o diez
+      detalle={t('{done} de {total}', { done: p.done, total: p.total })}
+      nota={
+        claves
+          ? p.label
+          // sin `job` no se puede jurar que la tarea sea la nuestra: se dice cuál es
+          : t('Tarea del servidor en marcha: {tarea}', { tarea: p.label })
+      }
+    />
   );
 }
 
