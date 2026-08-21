@@ -756,6 +756,70 @@ export function cacheRead(key, maxAgeMs) {
   }
 }
 
+/**
+ * PODA DE LA BASE: fuera lo que ya no puede leer nadie.
+ *
+ * Hasta aquí, de `tmdb_cache` solo se borraban dos cosas: lo que quedaba
+ * obsoleto al subir una versión de caché, y lo que se invalidaba a mano. Lo que
+ * simplemente CADUCA no lo borraba nadie, así que la tabla crecía de forma
+ * monótona —fichas de películas, filmografías, búsquedas de personas,
+ * proveedores— y con ella la copia de seguridad de cada noche.
+ *
+ * Los plazos de abajo no son un número al azar. Todas las lecturas de caché de
+ * la aplicación pasan un TTL (no hay ni una `cacheRead` sin plazo), y el más
+ * largo de todos es el año del emparejado por película (`film_match:`); el
+ * siguiente son los 180 días de la edición de un festival ya pasado. Con ese
+ * margen, lo que se borra aquí es lo que NINGUNA lectura podría aceptar ya.
+ *
+ * Devuelve qué se ha tirado, para poder decirlo en el histórico del pase.
+ */
+const PODA = [
+  // el emparejado por película vive un año: se le da margen de sobra
+  { patron: 'film_match:%', dias: 400 },
+  // todo lo demás caduca como mucho a los 180 días
+  { patron: null, dias: 200 },
+];
+
+export function podarCaches() {
+  const borradas = {};
+  let total = 0;
+  for (const { patron, dias } of PODA) {
+    const corte = Date.now() - dias * 24 * 3600 * 1000;
+    const n = patron
+      ? db.prepare('DELETE FROM tmdb_cache WHERE key LIKE ? AND fetched_at < ?').run(patron, corte).changes
+      : db
+          .prepare("DELETE FROM tmdb_cache WHERE key NOT LIKE 'film_match:%' AND fetched_at < ?")
+          .run(corte).changes;
+    if (n) borradas[patron || 'el resto'] = n;
+    total += n;
+  }
+  // Los avisos del Dashboard de hace medio año no los va a leer nadie, y son la
+  // otra tabla que solo crecía. Seis meses: el Dashboard mira catorce días.
+  const eventos = db
+    .prepare('DELETE FROM app_events WHERE created_at < ?')
+    .run(Date.now() - 180 * 24 * 3600 * 1000).changes;
+  // El log de reglas se poda dentro de la pasada de Radarr, pero SOLO si hay
+  // reglas activas: al apagarlas todas, lo último se quedaba ahí para siempre.
+  const reglas = db
+    .prepare('DELETE FROM radarr_rule_log WHERE at < ?')
+    .run(Date.now() - 30 * 24 * 3600 * 1000).changes;
+  return { cache: total, detalle: borradas, eventos, reglas };
+}
+
+/**
+ * Compactar el fichero. Borrar filas en SQLite deja las páginas libres DENTRO
+ * del fichero: la base no encoge, y la copia nocturna sigue pesando lo mismo.
+ * Solo se hace cuando de verdad ha caído bastante (compactar bloquea la base y
+ * necesita espacio temporal, y no vale la pena por cuatro filas).
+ */
+export function compactar() {
+  const antes = db.prepare('PRAGMA page_count').get()['page_count'];
+  db.exec('VACUUM');
+  const despues = db.prepare('PRAGMA page_count').get()['page_count'];
+  const tam = db.prepare('PRAGMA page_size').get()['page_size'];
+  return { liberado: Math.max(0, (antes - despues) * tam) };
+}
+
 export function cacheWrite(key, value) {
   cacheSet.run(key, JSON.stringify(value), Date.now());
 }

@@ -1,17 +1,18 @@
-import { db, getSetting, setSetting } from './db.js';
+import { db, getSetting, setSetting, podarCaches, compactar } from './db.js';
 import { runSync, syncStatus } from './plex.js';
 import { rematchLetterboxd, resolveUnmatchedLb, importLetterboxdRss } from './letterboxd.js';
 import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames, syncPersonChanges, invalidarFilmografiasSeguidas } from './tmdb.js';
-import { syncRatings } from './mdblist.js';
+import { syncRatings, refrescarListasGuardadas } from './mdblist.js';
 import { radarrSyncMovies, checkDigitalReleases } from './radarr.js';
 import { runRadarrRules, hayReglasActivas } from './rules.js';
-import { scanSagas } from './saga.js';
-import { favoritesGaps } from './discover.js';
+import { scanSagas, enrichSagaStats } from './saga.js';
+import { favoritesGaps, libraryGaps, absentGreats } from './discover.js';
 import { watchFestivalEditions } from './festivals.js';
 import { detectarEmergentes, emergentesNecesitaRefresco } from './emergentes.js';
 import { importImdbRatings, imdbNecesitaRefresco } from './imdb.js';
 import { hacerCopia, copiasActivadas } from './backup.js';
 import { calentarAvales, fuentesFrias } from './avales.js';
+import { releases, RELEASE_KINDS } from './releases.js';
 
 /**
  * The whole "make PowaFlex current" routine, in dependency order: library first,
@@ -111,6 +112,21 @@ function buildSteps({ includeAutoRadarr }) {
         const r = await syncRatings(); // resolves to mdbSyncStatus
         if (r?.error) throw new Error(r.error);
         return `${r?.done ?? 0} de ${r?.total ?? 0} películas con nota`;
+      },
+    },
+    {
+      // detrás de las notas, que comparten el cupo diario de MDBList
+      key: 'listas',
+      label: 'Refrescar tus listas de MDBList',
+      enabled: () => has('mdblist_key') && db.prepare('SELECT COUNT(*) n FROM mdb_lists').get().n > 0,
+      skipNote: () => (has('mdblist_key') ? 'no tienes listas guardadas' : 'sin configurar'),
+      run: async () => {
+        const r = await refrescarListasGuardadas();
+        if (!r.candidatas) return 'todas al día (se refrescan cada 7 días)';
+        const bits = [`${r.hechas} de ${r.candidatas} refrescadas`];
+        if (r.quedan) bits.push(`quedan ${r.quedan}`);
+        if (r.errores.length) bits.push(`⚠️ ${r.errores.slice(0, 2).join(' · ')}`);
+        return bits.join(' · ');
       },
     },
     {
@@ -232,10 +248,76 @@ function buildSteps({ includeAutoRadarr }) {
       },
     },
     {
+      /**
+       * LAS PÁGINAS CARAS, calientes por la mañana.
+       *
+       * Estrenos y las parrillas de biblioteca de Descubrir eran las únicas que
+       * nadie tocaba de noche: se reconstruían en la primera visita del día, y
+       * son justo las más lentas —el cruce de filmografías completo, y las dos
+       * pestañas de plataformas de Estrenos, que además traen el «dónde verla»
+       * de cada película.
+       *
+       * Cada tarea va con su try/catch (que falle TMDB en una no puede dejar
+       * las otras sin hacer) y el paso entero se corta al llegar al tope de
+       * tiempo: esto es un lujo, no puede comerse la ventana nocturna. Lo que
+       * no entra hoy sigue reconstruyéndose al visitarlo, como siempre.
+       */
+      key: 'calentar',
+      label: 'Dejar listas las páginas más lentas',
+      enabled: () => has('tmdb_key'),
+      run: async () => {
+        const TOPE_MS = 8 * 60 * 1000;
+        const t0 = Date.now();
+        const tareas = [
+          ...Object.keys(RELEASE_KINDS).map((kind) => ({
+            nombre: kind,
+            hacer: () => releases({ kind, window: 30, refresh: true }),
+          })),
+          { nombre: 'directores top', hacer: () => libraryGaps({ role: 'director', refresh: true }) },
+          { nombre: 'actores top', hacer: () => libraryGaps({ role: 'actor', refresh: true }) },
+          { nombre: 'grandes ausentes', hacer: () => absentGreats({ refresh: true }) },
+        ];
+        const hechas = [];
+        const aMedias = [];
+        const fallos = [];
+        let cortado = false;
+        for (const t of tareas) {
+          if (Date.now() - t0 > TOPE_MS) { cortado = true; break; }
+          try {
+            const r = await t.hacer();
+            // `releases` no LANZA cuando TMDB corta a mitad: devuelve lo que
+            // pudo con sus `errors` dentro. Sin mirarlos, una noche con TMDB
+            // caído habría dicho «7 de 7 listas» dejando siete listas cojas
+            // cacheadas, que es justo la mentira que no puede contar un paso.
+            if (r?.errors?.length) aMedias.push(t.nombre);
+            else hechas.push(t.nombre);
+          } catch (err) {
+            fallos.push(`${t.nombre}: ${String(err.message || err).slice(0, 60)}`);
+          }
+        }
+        const bits = [`${hechas.length} de ${tareas.length} listas`];
+        if (aMedias.length) bits.push(`${aMedias.length} a medias (TMDB cortó): ${aMedias.join(', ')}`);
+        if (cortado) bits.push('cortado por tiempo, el resto se hará al visitarlo');
+        if (fallos.length) bits.push(`⚠️ ${fallos.slice(0, 2).join(' · ')}`);
+        return bits.join(' · ');
+      },
+    },
+    {
       key: 'sagas',
       label: 'Avanzar el escaneo de sagas',
       enabled: () => has('tmdb_key'),
-      run: async () => `${(await scanSagas({ budget: 800 }))?.scanned ?? 0} analizadas`,
+      run: async () => {
+        const r = await scanSagas({ budget: 800 });
+        // El escaneo dice qué película pertenece a qué colección; las CIFRAS de
+        // «te faltan N de esta saga» las rellena `enrichSagaStats`, y hasta aquí
+        // no la llamaba nadie de noche: esa caché dura siete días y solo se
+        // refrescaba pulsando el botón de la página. Una saga a la que le entra
+        // una película nueva seguía diciendo el número viejo.
+        const st = await enrichSagaStats().catch(() => null);
+        const bits = [`${r?.scanned ?? 0} analizadas`];
+        if (st?.done) bits.push(`${st.done} sagas recontadas`);
+        return bits.join(' · ');
+      },
     },
     {
       // Va detrás de festivalWatch, del calendario y de los huecos a propósito:
@@ -260,6 +342,30 @@ function buildSteps({ includeAutoRadarr }) {
         if (r.aviso) bits.push(r.aviso);
         if (conError.length) throw new Error(bits.join(' · '));
         return bits.join(' · ');
+      },
+    },
+    {
+      /**
+       * Antes de la copia a propósito: no tiene sentido guardar cada noche
+       * medio giga de caché que ya no puede leer nadie. Ver `podarCaches`.
+       */
+      key: 'limpieza',
+      label: 'Podar la caché y compactar la base',
+      enabled: () => true,
+      run: async () => {
+        const r = podarCaches();
+        const bits = [];
+        if (r.cache) bits.push(`${r.cache.toLocaleString('es-ES')} entradas de caché caducadas`);
+        if (r.eventos) bits.push(`${r.eventos} avisos viejos`);
+        if (r.reglas) bits.push(`${r.reglas} líneas del log de reglas`);
+        // Compactar solo cuando de verdad ha caído bastante: borrar filas deja
+        // las páginas libres DENTRO del fichero, así que sin esto la base no
+        // encoge nunca — pero compactar bloquea, y por cuatro filas no compensa.
+        if (r.cache >= 2000) {
+          const { liberado } = compactar();
+          bits.push(`${(liberado / 1048576).toFixed(0)} MB liberados del fichero`);
+        }
+        return bits.length ? bits.join(' · ') : 'nada que podar';
       },
     },
     {

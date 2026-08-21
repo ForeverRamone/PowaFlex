@@ -461,6 +461,45 @@ export async function addList({ url = null, mdbId = null, name = null, slug = nu
   return { listId: tx(), items: items.length };
 }
 
+/**
+ * REFRESCAR LAS LISTAS GUARDADAS, de noche y a plazos.
+ *
+ * Una lista de MDBList no es una foto: muchas son dinámicas («lo mejor de este
+ * año», «lo más votado del mes») y cambian solas. Hasta aquí solo se
+ * refrescaban pulsando el botón de cada una, así que una lista añadida en enero
+ * seguía enseñando lo de enero.
+ *
+ * Se hace a plazos por dos motivos: cada lista cuesta peticiones del cupo
+ * diario, y refrescar quince de golpe una noche dejaría a las notas sin
+ * presupuesto. Con `dias` se refresca solo lo que lleva parado ese tiempo, y
+ * `max` acota cuántas por pasada.
+ */
+export async function refrescarListasGuardadas({ dias = 7, max = 3 } = {}) {
+  if (!hayClaveMdblist()) return { candidatas: 0, hechas: 0, errores: [] };
+  const corte = Date.now() - dias * 24 * 3600 * 1000;
+  const viejas = db
+    .prepare(
+      `SELECT mdb_id, name, slug, user_name FROM mdb_lists
+       WHERE COALESCE(refreshed_at, 0) < ? ORDER BY COALESCE(refreshed_at, 0) LIMIT ?`
+    )
+    .all(corte, Math.max(1, max));
+  const errores = [];
+  let hechas = 0;
+  for (const l of viejas) {
+    try {
+      await addList({ mdbId: l.mdb_id, name: l.name, slug: l.slug, userName: l.user_name });
+      hechas++;
+    } catch (err) {
+      // una lista borrada en MDBList no puede parar a las demás
+      errores.push(`${l.name}: ${String(err.message || err)}`);
+    }
+  }
+  const pendientes = db
+    .prepare('SELECT COUNT(*) n FROM mdb_lists WHERE COALESCE(refreshed_at, 0) < ?')
+    .get(corte).n;
+  return { candidatas: viejas.length, hechas, quedan: pendientes, errores };
+}
+
 export function savedLists() {
   return db
     .prepare(

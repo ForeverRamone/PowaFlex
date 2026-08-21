@@ -1,5 +1,41 @@
 # Changelog
 
+## Beta 1.20 (1.0.20-beta) — 2026-08-21
+
+**Auditoría del pase nocturno: ocho cosas que nadie mantenía. La caché de TMDB no se podaba NUNCA, las cifras de las sagas se quedaban viejas y las listas de MDBList no se refrescaban solas.**
+
+Salió de una pregunta directa: ¿el «Actualizar todo» de Ajustes cubre de verdad todo lo que la app necesita? Repasando los diecinueve pasos contra el inventario de todo lo que se cachea o se deriva, la respuesta era «casi». Estos son los huecos, arreglados.
+
+### La caché de TMDB no se podaba nunca
+
+El más gordo, y el más silencioso. De `tmdb_cache` solo se borraban dos cosas: lo que quedaba obsoleto al subir una versión de caché, y lo que se invalidaba a mano. **Lo que simplemente caduca no lo borraba nadie.** Todas las familias que no son de página —fichas de películas, filmografías, búsquedas de personas, proveedores, emparejados— se quedaban ahí para siempre, así que la base crecía de forma monótona y la copia de seguridad de cada noche se llevaba el bulto entero.
+
+Paso nuevo, **«Podar la caché y compactar la base»**, justo antes de la copia. Los plazos no son un número al azar: todas las lecturas de caché de la aplicación pasan un TTL —no hay ni una `cacheRead` sin plazo— y el más largo es el año del emparejado por película; el siguiente, los 180 días de la edición de un festival pasado. De ahí los 400 días para `film_match:` y los 200 para el resto, que dejan semanas de colchón por si algún día se alarga un plazo sin acordarse de esto. Lo que se borra es lo que **ninguna** lectura podría aceptar ya.
+
+Y compacta. Borrar filas en SQLite deja las páginas libres dentro del fichero: sin compactar, la base no encoge y la copia sigue pesando lo mismo. Solo se hace cuando de verdad ha caído bastante (2.000 entradas), porque compactar bloquea y por cuatro filas no compensa.
+
+De paso, las otras dos tablas que solo crecían: los avisos del Dashboard de más de seis meses, y el log de reglas, que se podaba **solo si había reglas activas** — al apagarlas todas, lo último se quedaba ahí para siempre.
+
+### Las cifras de las sagas no se rehacían de noche
+
+El paso de sagas llamaba a `scanSagas` —qué película pertenece a qué colección— pero **nunca a `enrichSagaStats`**, que es la que rellena «te faltan N de esta saga». Esa caché dura siete días y solo se refrescaba pulsando el botón dentro de la página, así que una saga a la que le entraba una película seguía diciendo el número viejo. Ahora van las dos.
+
+### Las listas de MDBList no se refrescaban solas
+
+Solo había ruta manual. Y son justo las listas que cambian por su cuenta: una lista dinámica añadida en enero seguía enseñando lo de enero. Paso nuevo, a plazos: se refresca lo que lleva más de siete días parado, tres por pasada como mucho, porque cada lista gasta del mismo cupo diario que las notas y refrescar quince de golpe una noche dejaría a las notas sin presupuesto.
+
+### Las páginas más lentas, listas por la mañana
+
+Estrenos y las parrillas de biblioteca de Descubrir eran las únicas que nadie tocaba de noche: se reconstruían en la primera visita del día, y son las más lentas que tiene la app —el cruce de filmografías completo, y las dos pestañas de plataformas de Estrenos, que además traen el «dónde verla» de cada película.
+
+Paso nuevo que las deja hechas: las cuatro pestañas de Estrenos, los huecos de directores y de actores, y los grandes ausentes. Cada tarea con su propio try/catch —que falle una no puede dejar las otras sin hacer— y el paso entero se corta a los ocho minutos: esto es un lujo, no puede comerse la ventana nocturna.
+
+Con un detalle que importa: `releases` **no lanza** cuando TMDB corta a mitad, devuelve lo que pudo con sus errores dentro. Sin mirarlos, una noche con TMDB caído habría dicho «7 de 7 listas» dejando siete listas cojas cacheadas. Ahora distingue las que salieron enteras de las que salieron a medias, y lo dice.
+
+### Números
+
+Pruebas 322 → **328** (`mantenimiento.test.js`). El pase nocturno pasa de 19 a **22 pasos**. El cron y el botón siguen llamando exactamente a la misma rutina, así que no pueden divergir.
+
 ## Beta 1.19 (1.0.19-beta) — 2026-08-21
 
 **El índice al revés: cada película dice ahora en cuántos palmareses y cánones está. Y veinticinco fuentes nuevas, de Locarno a Criterion, sin tocar «Lo mejor del año».**

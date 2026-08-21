@@ -5,6 +5,22 @@
 // en/app.js, y el titular «Festivales y premios» de la Alpha 0.9.5 ya existe
 // como nombre de página en en/app.js: aquí no se repiten.
 export default {
+  // ── Beta 1.20 ──────────────────────────────────────────────────────────────
+  'El pase nocturno se ocupa ya de todo: poda la base, recuenta las sagas y deja listas las páginas lentas':
+    'The nightly job now takes care of everything: it prunes the database, recounts the sagas and gets the slow pages ready',
+  'La caché de TMDB no se limpiaba nunca. Lo que caducaba se quedaba en la base para siempre, así que crecía sin parar y cada copia de seguridad nocturna se llevaba el bulto entero. Ahora se poda lo que ya no puede leer nadie —con semanas de margen sobre el plazo más largo de la aplicación— y, cuando cae bastante, se compacta el fichero para que la base encoja de verdad.':
+    'The TMDB cache was never cleaned. Whatever expired stayed in the database forever, so it kept growing and every nightly backup carried the whole load. Now what nobody can read any more is pruned — with weeks of margin over the app’s longest expiry — and, when enough of it goes, the file is compacted so the database actually shrinks.',
+  'Las cifras de «te faltan N de esta saga» no se rehacían de noche: el escaneo sí, los números no. Una saga a la que le entraba una película seguía diciendo el número viejo hasta que abrías su página y pulsabas el botón. Ya se recalculan solas.':
+    'The “you are missing N of this saga” figures were not rebuilt at night: the scan was, the numbers were not. A saga that gained a film kept showing the old number until you opened its page and pressed the button. They now recalculate on their own.',
+  'Tus listas de MDBList tampoco se refrescaban solas, y muchas son dinámicas: una lista añadida en enero seguía enseñando lo de enero. Ahora se refrescan por turnos, las que llevan más de una semana paradas, sin comerse el cupo diario que necesitan las notas.':
+    'Your MDBList lists were not refreshed on their own either, and many of them are dynamic: a list added in January still showed January’s contents. They now refresh in turns — the ones idle for over a week — without eating the daily quota the ratings need.',
+  'Estrenos y las parrillas de Directores/as top, Actores/actrices top y Grandes ausentes eran las únicas páginas que nadie preparaba de noche: se reconstruían en la primera visita del día, y son las más lentas de la aplicación. Ahora amanecen hechas.':
+    'New releases and the Top directors, Top actors and Great absentees grids were the only pages nobody prepared at night: they rebuilt on the day’s first visit, and they are the slowest in the app. They now wake up ready.',
+  'Y si TMDB se cae a media madrugada, el histórico lo dice en vez de cantar un «todo listo» con media faena a medias.':
+    'And if TMDB goes down mid-run, the history says so instead of claiming “all done” with half the work left short.',
+  'Con esto, el «Actualizar todo» de Ajustes pasa de diecinueve a veintidós pasos. El automático de cada noche y el botón siguen siendo exactamente la misma rutina, así que no pueden acabar haciendo cosas distintas.':
+    'With this, “Refresh everything” in Settings goes from nineteen to twenty-two steps. The nightly job and the button are still the exact same routine, so they cannot end up doing different things.',
+
   // ── Beta 1.19 ──────────────────────────────────────────────────────────────
   'Cada película dice ya en cuántos premios y cánones está, y entran veinticinco fuentes nuevas':
     'Every film now tells you how many awards and canons it is in, and twenty-five new sources arrive',
