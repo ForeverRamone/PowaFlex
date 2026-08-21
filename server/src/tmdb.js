@@ -712,7 +712,11 @@ export function ordenarCandidatos(list, title, year = null) {
 export async function searchMovieCandidates(title, year = null) {
   if (!title) return [];
   // v4: vuelta en inglés siempre, años vecinos y orden por año antes de cortar
-  const key = `movie_cands4:${title.toLowerCase()}:${year || ''}`;
+  // v5: cada candidato lleva su volumen de votos. Es GRATIS —viene en la misma
+  // respuesta de búsqueda— y es lo único que separa a la película premiada del
+  // homónimo que nadie ha visto cuando el título coincide exacto (ver
+  // `elegirSinDireccion` en festivals.js).
+  const key = `movie_cands5:${title.toLowerCase()}:${year || ''}`;
   const cached = cacheRead(key, 30 * DAY);
   if (cached) return cached.list || [];
   try {
@@ -722,7 +726,14 @@ export async function searchMovieCandidates(title, year = null) {
       for (const r of results || []) {
         if (!r?.id || seen.has(r.id)) continue;
         seen.add(r.id);
-        list.push({ id: r.id, title: r.title, original_title: r.original_title, date: r.release_date || null, poster_path: r.poster_path || null });
+        list.push({
+          id: r.id,
+          title: r.title,
+          original_title: r.original_title,
+          date: r.release_date || null,
+          poster_path: r.poster_path || null,
+          votes: r.vote_count ?? 0,
+        });
       }
     };
     const buscar = async (params) => add((await tmdbGet('/search/movie', { query: title, ...params }, { cacheKey: null })).results);

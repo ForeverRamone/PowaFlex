@@ -30,6 +30,7 @@
 import { db, cacheRead, getSetting, setSetting } from './db.js';
 import {
   REGISTRY, festivalOverrideKey, staticListRows, filasEmpaquetadas, empaquetadoHasta, festivalWinners,
+  CLAVE_MATCH,
 } from './festivals.js';
 import { cachePrefix } from './cache-versions.js';
 
@@ -49,7 +50,7 @@ let memo = null;
  * encima, porque mandan sobre el emparejado automático en todas partes.
  */
 function mapaDeEmparejados() {
-  const prefijo = 'film_match:v5:';
+  const prefijo = CLAVE_MATCH;
   const mapa = new Map();
   const corte = Date.now() - 365 * 24 * 3600 * 1000;
   for (const r of db

@@ -47,9 +47,38 @@ function dailyBudget() {
   const tier = getSetting('mdblist_tier') || 'auto';
   if (tier === 'free') return 900;
   if (tier === 'supporter') return 20000;
-  // auto: use the limit reported by /user (cached in settings by mdbTest callers)
+  // auto: el límite que declara /user, guardado por `asegurarLimiteDiario`
   const cached = Number(getSetting('mdblist_detected_limit') || 0);
   return cached > 1000 ? Math.floor(cached * 0.8) : 900;
+}
+
+/**
+ * AVERIGUAR EL CUPO DE VERDAD, sin que nadie tenga que pulsar nada.
+ *
+ * El modo «auto» decide el presupuesto diario con `mdblist_detected_limit`… que
+ * hasta aquí solo se escribía al pulsar «Probar» en Ajustes. Quien no lo
+ * pulsara nunca —que es lo normal— se quedaba con el suelo de 900 peticiones al
+ * día TENIENDO una cuenta supporter de 25.000: el barrido de notas de una
+ * biblioteca grande se lo come entero, y a partir de ahí todo lo demás (las
+ * reglas, Estrenos, los festivales) contestaba «agotado el cupo diario» el
+ * resto de la jornada. Desde fuera, eso se ve como que las notas «no funcionan».
+ *
+ * Se pregunta UNA vez al día, en el primer sitio que vaya a gastar. Si falla se
+ * reintenta mañana y mientras tanto sigue valiendo el suelo conservador.
+ */
+async function asegurarLimiteDiario() {
+  if ((getSetting('mdblist_tier') || 'auto') !== 'auto' || !hayClaveMdblist()) return;
+  const hoy = today();
+  if (getSetting('mdblist_limit_at') === hoy) return;
+  setSetting('mdblist_limit_at', hoy); // aunque falle: una vez al día, no una por petición
+  try {
+    const u = await mdbFetch('/user');
+    addUsage(1);
+    const limite = Number(u.api_requests ?? 0);
+    if (limite > 0) setSetting('mdblist_detected_limit', String(limite));
+  } catch {
+    // sin respuesta hoy, el suelo de 900 sigue en pie
+  }
 }
 
 function usage() {
@@ -90,9 +119,15 @@ export const hayClaveMdblist = () => !!getSetting('mdblist_key');
  * sin explicación es indistinguible de una avería.
  */
 export async function refrescarNotasDeReglas(items, { maxFetch = 200, caducaMs = 3 * 24 * 3600 * 1000 } = {}) {
+  await asegurarLimiteDiario();
   const ids = [...new Set(items.map((i) => i.tmdb_id).filter(Boolean))];
-  if (!ids.length) return { pedidas: 0, motivo: null };
-  if (!hayClaveMdblist()) return { pedidas: 0, motivo: 'sin_api_key' };
+  // La forma es SIEMPRE la misma —con `pendientes` y `recibidas`— aunque no se
+  // pida nada: quien llama distingue así «no había nada que pedir» de «se pidió
+  // y no vino», que para la persona que pulsa el botón son cosas distintas y
+  // hasta ahora salían con el mismo mensaje.
+  const vacío = (motivo = null) => ({ pedidas: 0, recibidas: 0, pendientes: 0, motivo });
+  if (!ids.length) return vacío();
+  if (!hayClaveMdblist()) return vacío('sin_api_key');
 
   const marcador = ids.map(() => '?').join(',');
   const frescas = new Set(
@@ -103,9 +138,9 @@ export async function refrescarNotasDeReglas(items, { maxFetch = 200, caducaMs =
       .map((r) => r.tmdb_id)
   );
   const pendientes = ids.filter((id) => !frescas.has(id));
-  if (!pendientes.length) return { pedidas: 0, motivo: null };
+  if (!pendientes.length) return vacío();
   const presupuesto = remainingBudget();
-  if (presupuesto <= 0) return { pedidas: 0, motivo: 'sin_presupuesto' };
+  if (presupuesto <= 0) return { ...vacío('sin_presupuesto'), pendientes: pendientes.length };
 
   const aPedir = pendientes.slice(0, Math.min(maxFetch, presupuesto));
   // `recibidas` es la diferencia entre «se pidieron cuatro» y «vinieron cuatro».
@@ -117,11 +152,12 @@ export async function refrescarNotasDeReglas(items, { maxFetch = 200, caducaMs =
       recibidas += (await fetchRatingsBatch(aPedir.slice(i, i + 100))).length;
     }
   } catch (err) {
-    return { pedidas: 0, recibidas: 0, motivo: err.rateLimited ? 'sin_presupuesto' : String(err.message || err) };
+    return { ...vacío(err.rateLimited ? 'sin_presupuesto' : String(err.message || err)), pendientes: pendientes.length };
   }
   return {
     pedidas: aPedir.length,
     recibidas,
+    pendientes: pendientes.length,
     motivo: pendientes.length > aPedir.length ? 'quedan_para_manana' : null,
   };
 }
@@ -246,6 +282,7 @@ export async function syncRatings() {
   Object.assign(mdbSyncStatus, { running: true, total: 0, done: 0, error: null, rateLimited: false, finishedAt: null });
   try {
     apiKey();
+    await asegurarLimiteDiario();
     const cutoff = Date.now() - WEEK;
     const pending = db
       .prepare(
@@ -310,6 +347,7 @@ export async function enrichWithScores(items, { fetchMissing = true, maxFetch = 
   if (fetchMissing) {
     try {
       apiKey();
+      await asegurarLimiteDiario();
       const missing = ids.filter((id) => !rows.has(id)).slice(0, Math.min(maxFetch, remainingBudget()));
       for (let i = 0; i < missing.length; i += 100) {
         for (const p of await fetchRatingsBatch(missing.slice(i, i + 100))) {

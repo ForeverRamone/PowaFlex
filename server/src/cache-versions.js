@@ -94,7 +94,11 @@ export const CACHE_VERSIONS = {
   // empaquetados) también preguntan a TMDB quién dirige cuando su tabla no lo
   // dice. Lo cacheado antes tiene sin un solo nombre a Sundance, a Sitges y al
   // Donatello: sin nombre que leer y sin estrella que pulsar.
-  festival: 16,
+  // v17: las filas SIN dirección ya no se quedan con el primer candidato que
+  // clave el título: se miran todos y decide el volumen de votos, y si no hay
+  // ganador claro no se elige ninguno. Lo cacheado antes tiene emparejada la
+  // «Flow» equivocada (había cuatro de 2024) y las de su clase.
+  festival: 17,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

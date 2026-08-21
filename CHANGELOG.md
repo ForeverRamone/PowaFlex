@@ -1,5 +1,46 @@
 # Changelog
 
+## Beta 1.21 (1.0.21-beta) — 2026-08-21
+
+**«Flow» apuntaba a otra película, y las notas de MDBList llevaban meses racionadas a 900 al día teniendo 25.000.**
+
+Dos fallos que Ramón vio en producción y que se confirmaron midiendo con claves reales, no deduciendo.
+
+### La ficha equivocada, y por qué era invisible
+
+El Óscar de animación de 2024 enseñaba una «Flow» que no era la de Gints Zilbalodis. Y no era mala suerte: es una clase entera de fallo.
+
+La tabla del Óscar de animación no tiene columna de dirección, igual que la del Donatello, la de Sitges, la del BIFA o el registro estadounidense. Sin dirección, la única prueba que le queda al emparejado es el título — y en TMDB hay **cuatro** películas de 2024 que se llaman «Flow». La buena es justo la que NO clava: se titula «Straume» de original y «Flow, un mundo que salvar» en castellano, porque a TMDB se le pregunta en castellano. Las tres que clavaban eran desconocidas, y ganaba la primera de la lista.
+
+Lo peor no es el fallo, es que **se camuflaba solo**: desde la 1.18 la dirección de esas filas se rellena desde TMDB, así que la ficha equivocada salía con su director equivocado y todo cuadraba por dentro. Ninguna comprobación automática lo veía, porque comparar la dirección con la que acaba de dar TMDB es compararla consigo misma.
+
+Dos reglas nuevas, solo para las filas sin dirección (donde hay director, `directorsMatch` ya desempata y no se toca nada):
+
+1. **Se miran todos los candidatos, no el primero.** Entre los que claven el título decide el **volumen de votos**, que es lo único que separa a una premiada de su homónima. Medido: Flow 2.997 votos contra 25, 0 y 0; «Crash» 3.962 contra 3 y 2; «Heat» 8.579 contra 16 y 3. No es ajustado, son órdenes de magnitud. Y el título internacional cuenta como prueba de pleno derecho, no como rescate de última hora.
+2. **Si no hay ganador claro, no se elige ninguno.** Mejor sin ficha que la ficha de otra.
+
+Con un matiz que costó encontrar: el título **clavado** y el que solo **contiene** al de la fila no son la misma prueba. Mezclados, «All In: The Story of Auburn's Undefeated 2010 Season» empataba con la «Undefeated» que ganó el Óscar de documental y bloqueaba el desempate. Ahora son dos niveles y solo se baja al segundo si el primero está vacío.
+
+Medido sobre las fuentes sin dirección: el Óscar de animación se queda en 0 sin ficha (y con la Flow correcta), el de documental en 2, el BIFA en 0, Sitges en 3 y el Donatello en 1 — los mismos de antes. El registro estadounidense pasa de 19 a 23 sin ficha de 714, y una de las cuatro nuevas es «Dracula» de 1931, que existe **dos veces** ese año (la de Browning y la versión española de Melford): ahí no adivinar es exactamente lo correcto.
+
+Caché `festival` v16 → **v17** y `film_match` v5 → **v6**, que es la que dura un año: sin subirla, la Flow equivocada habría sobrevivido doce meses. De paso, el prefijo de esa caché deja de estar escrito en dos sitios (`CLAVE_MATCH`): ya se pagó una vez que el índice de avales siguiera leyendo la versión anterior en silencio.
+
+### Las notas de MDBList, racionadas a 900 teniendo 25.000
+
+El botón «Actualizar notas» de Estrenos no iba, y la causa no estaba en el botón.
+
+El presupuesto diario en modo «automático» sale de `mdblist_detected_limit`… que hasta hoy **solo se escribía al pulsar «Probar» en Ajustes**. Quien no lo pulsara nunca —lo normal— se quedaba con el suelo conservador de **900 peticiones al día teniendo una cuenta supporter de 25.000**. Con una biblioteca grande, el barrido nocturno de notas se come esas 900 él solo y a partir de ahí todo lo demás —las reglas, Estrenos, los festivales— contesta «agotado el cupo diario» el resto de la jornada. Desde fuera eso se ve exactamente como que las notas no funcionan.
+
+Ahora el cupo se pregunta **una vez al día**, en el primer sitio que vaya a gastar, sin que nadie tenga que pulsar nada. Medido en la cuenta real: de **817 peticiones disponibles a 19.915**.
+
+### Y el botón dice ahora qué ha hecho
+
+«Ninguna nota nueva» metía en el mismo saco tres cosas que no se parecen: que no quedaba nada por pedir, que se preguntó y MDBList no conoce esas películas, y que algo va mal. Un botón que contesta lo mismo pase lo que pase se lee como un botón roto. Ahora distingue las tres, y cuando dice que MDBList no tiene ficha de una película es porque se preguntó de verdad y no vino nada — que es el caso de los estrenos españoles más recientes.
+
+### Números
+
+Pruebas 328 → **336** (`emparejado-sin-direccion.test.js`, con el caso Flow, el de Undefeated y el de los dos Dráculas).
+
 ## Beta 1.20 (1.0.20-beta) — 2026-08-21
 
 **Auditoría del pase nocturno: ocho cosas que nadie mantenía. La caché de TMDB no se podaba NUNCA, las cifras de las sagas se quedaban viejas y las listas de MDBList no se refrescaban solas.**

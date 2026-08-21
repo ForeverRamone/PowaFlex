@@ -143,7 +143,15 @@ async function ponerNotas(films, { forzar = false } = {}) {
   // se pidieron y no vino NI UNA: o MDBList aún no las tiene, o la clave ya no
   // vale. Callarlo dejaba las dos cosas con la misma cara («0 notas nuevas»).
   const motivo = notas.motivo || (notas.pedidas > 0 && notas.recibidas === 0 ? 'sin_respuesta' : null);
-  return { pedidas: notas.pedidas, recibidas: notas.recibidas ?? 0, motivo, nuevas: ahora - antes };
+  return {
+    pedidas: notas.pedidas,
+    recibidas: notas.recibidas ?? 0,
+    // cuántas de las visibles siguen sin Σ después de la pasada: es lo que
+    // convierte un «no ha pasado nada» en una respuesta
+    sinNota: films.filter((f) => f.mdb?.score == null).length,
+    motivo,
+    nuevas: ahora - antes,
+  };
 }
 
 export async function releases({ kind = 'cine-es', window = 30, refresh = false, refrescarNotas = false } = {}) {

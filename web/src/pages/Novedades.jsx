@@ -25,6 +25,18 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.21',
+    fecha: '2026-08-21',
+    titular: 'La ficha equivocada de «Flow», y las notas que llevaban meses racionadas',
+    puntos: [
+      'El Óscar de animación de 2024 enseñaba una «Flow» que no era la de Gints Zilbalodis. En TMDB hay cuatro películas de 2024 que se llaman así, y la buena es justo la que no coincide de nombre: se llama «Straume» de original y «Flow, un mundo que salvar» en castellano. Cuando la tabla de un premio no dice quién dirige, el título es la única pista y ganaba la primera de la lista.',
+      'Ahora, en esos casos, se miran todos los candidatos y decide cuál tiene volumen de público real: la premiada tiene miles de votos y su homónima desconocida tiene cero. Y si no hay una ganadora clara, no se elige ninguna: mejor una ficha vacía que la ficha de otra película.',
+      'Esto afecta a los premios cuya tabla no lista dirección —el Óscar de animación y el de documental, el David di Donatello, Sitges, el BIFA y el registro estadounidense— y era especialmente traicionero porque la ficha equivocada salía con el director de esa ficha equivocada, así que todo parecía cuadrar.',
+      'Las notas de MDBList estaban racionadas a 900 peticiones al día aunque tu cuenta permita 25.000. El límite de verdad solo se detectaba si pulsabas «Probar» en Ajustes; si no, la aplicación se ponía el suelo más conservador y el barrido nocturno se lo comía entero, dejando sin notas al resto del día. Ahora se comprueba solo una vez al día: de 817 peticiones disponibles a 19.915.',
+      'Y el botón «Actualizar notas» ya cuenta qué ha hecho. Antes decía «ninguna nota nueva» tanto si no quedaba nada por pedir como si MDBList no conoce esas películas o como si algo iba mal; ahora distingue los tres casos.',
+    ],
+  },
+  {
     label: 'Beta 1.20',
     fecha: '2026-08-21',
     titular: 'El pase nocturno se ocupa ya de todo: poda la base, recuenta las sagas y deja listas las páginas lentas',

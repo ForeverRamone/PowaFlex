@@ -7,7 +7,7 @@ import fs from 'node:fs';
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'powaflex-avales-'));
 
 const { db, cacheWrite, setSetting } = await import('../src/db.js');
-const { REGISTRY, festivalOverrideKey } = await import('../src/festivals.js');
+const { REGISTRY, festivalOverrideKey, CLAVE_MATCH } = await import('../src/festivals.js');
 const { cachePrefix } = await import('../src/cache-versions.js');
 const { avalesDe, conteoAvales, avalesDeFilmografia, indiceAvales, fuentesFrias } = await import('../src/avales.js');
 
@@ -64,7 +64,7 @@ test('las filas cacheadas de un premio suman avales, resolviendo por film_match'
   const f = REGISTRY.locarno || REGISTRY.cannes;
   const fila = { year: 1999, title: 'Una Inventada Del Test', director: 'Fulano De Tal' };
   const clave = festivalOverrideKey(fila.title, fila.year, fila.director);
-  cacheWrite(`film_match:v5:${clave}`, { id: 88800011 });
+  cacheWrite(`${CLAVE_MATCH}${clave}`, { id: 88800011 });
   cacheWrite(
     `${cachePrefix('festival')}:awardrows:ganadoras:${f.awardLang || 'en'}:${f.awardPage}`,
     { rows: [fila] }
@@ -78,7 +78,7 @@ test('las filas cacheadas de un premio suman avales, resolviendo por film_match'
 test('una corrección manual a «ninguna» se lleva el aval por delante', () => {
   const fila = { year: 1998, title: 'Otra Del Test', director: 'Mengano De Cual' };
   const clave = festivalOverrideKey(fila.title, fila.year, fila.director);
-  cacheWrite(`film_match:v5:${clave}`, { id: 88800022 });
+  cacheWrite(`${CLAVE_MATCH}${clave}`, { id: 88800022 });
   const f = REGISTRY.karlovyvary || REGISTRY.venecia;
   cacheWrite(
     `${cachePrefix('festival')}:awardrows:ganadoras:${f.awardLang || 'en'}:${f.awardPage}`,

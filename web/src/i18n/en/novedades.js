@@ -5,6 +5,20 @@
 // en/app.js, y el titular «Festivales y premios» de la Alpha 0.9.5 ya existe
 // como nombre de página en en/app.js: aquí no se repiten.
 export default {
+  // ── Beta 1.21 ──────────────────────────────────────────────────────────────
+  'La ficha equivocada de «Flow», y las notas que llevaban meses racionadas':
+    'The wrong entry for “Flow”, and the ratings that had been rationed for months',
+  'El Óscar de animación de 2024 enseñaba una «Flow» que no era la de Gints Zilbalodis. En TMDB hay cuatro películas de 2024 que se llaman así, y la buena es justo la que no coincide de nombre: se llama «Straume» de original y «Flow, un mundo que salvar» en castellano. Cuando la tabla de un premio no dice quién dirige, el título es la única pista y ganaba la primera de la lista.':
+    'The 2024 Best Animated Feature Oscar showed a “Flow” that was not Gints Zilbalodis’s. TMDB has four 2024 films by that name, and the right one is precisely the one whose name does not match: its original title is “Straume”. When an award’s table does not say who directed, the title is the only clue and the first on the list won.',
+  'Ahora, en esos casos, se miran todos los candidatos y decide cuál tiene volumen de público real: la premiada tiene miles de votos y su homónima desconocida tiene cero. Y si no hay una ganadora clara, no se elige ninguna: mejor una ficha vacía que la ficha de otra película.':
+    'Now every candidate is considered and real audience volume decides: the award winner has thousands of votes and its unknown namesake has none. And if there is no clear winner, none is picked: better an empty entry than another film’s.',
+  'Esto afecta a los premios cuya tabla no lista dirección —el Óscar de animación y el de documental, el David di Donatello, Sitges, el BIFA y el registro estadounidense— y era especialmente traicionero porque la ficha equivocada salía con el director de esa ficha equivocada, así que todo parecía cuadrar.':
+    'This affects awards whose tables list no director — the animation and documentary Oscars, the David di Donatello, Sitges, the BIFA and the US registry — and it was especially treacherous because the wrong entry came with that wrong entry’s director, so everything looked consistent.',
+  'Las notas de MDBList estaban racionadas a 900 peticiones al día aunque tu cuenta permita 25.000. El límite de verdad solo se detectaba si pulsabas «Probar» en Ajustes; si no, la aplicación se ponía el suelo más conservador y el barrido nocturno se lo comía entero, dejando sin notas al resto del día. Ahora se comprueba solo una vez al día: de 817 peticiones disponibles a 19.915.':
+    'MDBList ratings were rationed to 900 requests a day even though your account allows 25,000. The real limit was only detected if you pressed “Test” in Settings; otherwise the app assumed the most conservative floor and the nightly sweep ate it whole, leaving nothing for the rest of the day. It is now checked once a day on its own: from 817 available requests to 19,915.',
+  'Y el botón «Actualizar notas» ya cuenta qué ha hecho. Antes decía «ninguna nota nueva» tanto si no quedaba nada por pedir como si MDBList no conoce esas películas o como si algo iba mal; ahora distingue los tres casos.':
+    'And the “Refresh scores” button now says what it did. It used to answer “no new scores” whether there was nothing left to ask for, or MDBList does not know those films, or something was wrong; it now tells the three apart.',
+
   // ── Beta 1.20 ──────────────────────────────────────────────────────────────
   'El pase nocturno se ocupa ya de todo: poda la base, recuenta las sagas y deja listas las páginas lentas':
     'The nightly job now takes care of everything: it prunes the database, recounts the sagas and gets the slow pages ready',

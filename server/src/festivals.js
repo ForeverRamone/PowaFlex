@@ -2130,6 +2130,13 @@ export function festivalOverrideKey(title, year, director) {
  * director exacto en la lista. Y de propina, la página no se cacheaba nunca:
  * cada visita repetía la ráfaga entera contra TMDB.
  */
+/**
+ * El prefijo de la caché de emparejado por película, EXPORTADO: el índice de
+ * avales lo lee también, y tenerlo escrito en dos sitios ya se pagó una vez —al
+ * subir la versión aquí, allí se seguía leyendo la anterior en silencio.
+ */
+export const CLAVE_MATCH = 'film_match:v6:';
+
 export const FICHA_FANTASMA = Symbol('TMDB 404');
 
 /** ¿Este error es un 404 (ficha que ya no existe) y no un corte de red? */
@@ -2204,7 +2211,81 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
   let fallosRed = false;
   let porEquipo = false;
   const sinCreditos = [];
-  for (const c of enVentana) {
+
+  /**
+   * LA FILA SIN DIRECCIÓN: no vale quedarse con el primero que clave el título.
+   *
+   * El caso que lo destapó es «Flow», el Óscar de animación de 2024. Su tabla no
+   * tiene columna de dirección, así que la única prueba es el título — y en TMDB
+   * hay CUATRO películas de 2024 que se llaman Flow. La buena, la letona de
+   * Gints Zilbalodis, es justo la que NO clava: se titula «Straume» de original
+   * y «Flow, un mundo que salvar» en español, porque a TMDB se le pregunta en
+   * castellano. Las tres que clavaban eran desconocidas, y ganaba la primera de
+   * la lista. Peor todavía: desde la 1.18 la dirección se rellena DESDE TMDB, así
+   * que la ficha equivocada salía con su director equivocado y todo cuadraba.
+   *
+   * Con la dirección en la fila esto no pasa (`directorsMatch` desempata), así
+   * que el cambio se queda aquí. Dos reglas:
+   *
+   *  1. **Se miran todos, no el primero.** Se juntan los que clavan y se elige
+   *     por VOLUMEN DE VOTOS, que es lo único que separa a una premiada de su
+   *     homónima. Medido: Flow 2.997 votos contra 25, 0 y 0; «Crash» 3.962
+   *     contra 3 y 2; «Heat» 8.579 contra 16 y 3. No es ajustado: son órdenes
+   *     de magnitud.
+   *  2. **Si no hay un ganador claro, no se elige ninguno.** Mejor sin ficha que
+   *     la ficha de otra, que es la regla de la casa desde la 1.11.
+   *
+   * El título inglés cuesta una petición por candidato, así que solo se consulta
+   * cuando hace falta: si lo que clava en castellano ya es una película con
+   * cuerpo, no hay nada que dirimir.
+   */
+  const VOTOS_CON_CUERPO = 100; // por debajo de esto, una premiada no es creíble
+  const VECES_PARA_GANAR = 10; // el ganador tiene que sacarle un orden de magnitud
+  const votos = (c) => Number(c.votes) || 0;
+  const mandaDeSobra = (lista) =>
+    lista.length === 1 ||
+    (lista.length > 1 &&
+      votos(lista[0]) >= VOTOS_CON_CUERPO &&
+      votos(lista[0]) >= Math.max(1, votos(lista[1])) * VECES_PARA_GANAR);
+
+  if (!row.director) {
+    const porVotos = (a, b) => votos(b) - votos(a) || distAño(a) - distAño(b);
+    // DOS NIVELES, y no se mezclan: el título CLAVADO es una prueba, y que el
+    // título de la ficha CONTENGA al de la fila (la tolerancia de subtítulo)
+    // es un indicio. Metidos en el mismo saco, «All In: The Story of Auburn's
+    // Undefeated 2010 Season» empataba con la «Undefeated» que ganó el Óscar y
+    // bloqueaba el desempate por votos: dos candidatos, ninguno dominante,
+    // ninguna ficha. Solo se baja al segundo nivel si el primero está vacío.
+    let clavados = enVentana.filter(tituloClavado);
+    if (tituloEnDe && !mandaDeSobra(clavados.sort(porVotos))) {
+      // el título internacional es tan clavado como los otros dos: se consulta
+      // cuando lo que hay no convence, que es cuando merece la petición
+      const yaEstán = new Set(clavados.map((c) => c.id));
+      for (const c of enVentana) {
+        if (yaEstán.has(c.id)) continue;
+        if (clava(await tituloEnDe(c.id))) clavados.push(c);
+      }
+    }
+    clavados.sort(porVotos);
+    const finalistas = clavados.length
+      ? clavados
+      : enVentana.filter(tituloBastaSinDirector).sort(porVotos);
+    if (mandaDeSobra(finalistas)) {
+      // la ficha ganadora tiene que ser una ficha de verdad, no un esbozo sin
+      // créditos: la misma puerta que guardaba el bucle de siempre
+      const dirs = await dirsDe(finalistas[0].id);
+      if (dirs === null) fallosRed = true;
+      else if (dirs === FICHA_FANTASMA) sinCreditos.push(finalistas[0]);
+      else if (dirs.length) tmdbId = finalistas[0].id;
+      else sinCreditos.push(finalistas[0]);
+    }
+  }
+
+  // El bucle de siempre, SOLO para las filas que traen dirección: ahí el primero
+  // que casa nombre y título es la respuesta, y seguir mirando sería gastar
+  // peticiones. Las que no la traen ya se han decidido arriba, y si allí no hubo
+  // un ganador claro siguen su camino por las vueltas de abajo.
+  for (const c of row.director ? enVentana : []) {
     // null = fallo de red (no «sin créditos»). Se ABORTA la resolución de esta
     // película: seguir probando dejaría ganar a un candidato peor solo porque
     // al bueno le tocó el 429, y encima se cachearía como válido.
@@ -2477,11 +2558,15 @@ export async function resolveFilms(rows, yearOf) {
       // asimétrica de tres años atrás y uno adelante) y una ficha sin fecha ya
       // no es candidata. Sin subir esto sobrevivirían los aciertos falsos que
       // destapó Sitges: «In the Light of the Moon» en una película de 2025.
+      // v6: y esas mismas filas sin director eligen ahora por volumen de votos
+      // entre todos los que claven el título, en vez de quedarse con el primero
+      // (ver `elegirSinDireccion`). Sin subirlo, la «Flow» equivocada del Óscar
+      // de animación sobreviviría un año entero en esta caché.
       // OJO: esta caché dura un AÑO y NO la barre el bump de `festival`, así
       // que cuando cambian las reglas del emparejado hay que subir ESTE número
       // o los aciertos viejos —«Smultronstället» emparejado con su making-of—
       // sobreviven a la versión nueva.
-      const matchKey = `film_match:v5:${claveBase}`;
+      const matchKey = `${CLAVE_MATCH}${claveBase}`;
       // corrección manual: ni búsqueda ni verificación, lo que dijo el usuario
       const override = overrides.has(claveBase) ? overrides.get(claveBase) : undefined;
       // Un año de vida, MUY por encima de los 30 días de la página: «este

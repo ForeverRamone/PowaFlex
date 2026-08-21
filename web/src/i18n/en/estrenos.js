@@ -65,4 +65,11 @@ export default {
     'There are still scores to fetch: press again in a while',
   'MDBList no ha devuelto ninguna: o aún no las tiene, o la clave ya no vale':
     'MDBList returned none: either it does not have them yet, or the key no longer works',
+  // los tres «no ha entrado ninguna nota», que no son lo mismo
+  'MDBList todavía no tiene ficha de esas películas': 'MDBList has no entry for those films yet',
+  'Ya tenían nota todas las de esta lista': 'Everything on this list already had a score',
+  'Nada que pedir: las {n} sin nota se preguntaron hace nada':
+    'Nothing to ask for: the {n} without a score were checked moments ago',
+  'Preguntadas {n}: MDBList las conoce pero aún no les ha puesto nota':
+    'Asked for {n}: MDBList knows them but has not scored them yet',
 };

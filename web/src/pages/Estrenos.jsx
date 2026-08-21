@@ -40,8 +40,30 @@ const MOTIVO_NOTAS = {
   sin_api_key: 'Sin clave de MDBList no hay notas Σ: ponla en Ajustes',
   sin_presupuesto: 'Agotado el cupo diario de MDBList: se completan mañana',
   quedan_para_manana: 'Quedan notas por pedir: pulsa otra vez en un rato',
-  sin_respuesta: 'MDBList no ha devuelto ninguna: o aún no las tiene, o la clave ya no vale',
+  // si se llegó a preguntar es que la clave funciona: lo que falla es que
+  // MDBList no tiene ficha de esos estrenos todavía
+  sin_respuesta: 'MDBList todavía no tiene ficha de esas películas',
 };
+
+/**
+ * QUÉ DECIR CUANDO NO HA ENTRADO NINGUNA NOTA.
+ *
+ * «Ninguna nota nueva» a secas mete en el mismo saco tres cosas que no se
+ * parecen en nada: que no quedaba nada por pedir, que se preguntó y MDBList no
+ * conoce esas películas, y que algo va mal (sin clave, sin cupo). Un botón que
+ * contesta lo mismo pase lo que pase se lee como un botón roto.
+ */
+function resumenDeNotas(notas) {
+  if (!notas) return { texto: 'Ninguna nota nueva: MDBList aún no las tiene', tipo: 'info' };
+  if (notas.nuevas > 0) return { texto: t('✓ {n} notas nuevas', { n: notas.nuevas }), tipo: 'success' };
+  if (MOTIVO_NOTAS[notas.motivo]) return { texto: t(MOTIVO_NOTAS[notas.motivo]), tipo: 'error' };
+  if (!notas.sinNota) return { texto: t('Ya tenían nota todas las de esta lista'), tipo: 'info' };
+  if (!notas.pedidas) return { texto: t('Nada que pedir: las {n} sin nota se preguntaron hace nada', { n: notas.sinNota }), tipo: 'info' };
+  return {
+    texto: t('Preguntadas {n}: MDBList las conoce pero aún no les ha puesto nota', { n: notas.pedidas }),
+    tipo: 'info',
+  };
+}
 
 function fmtFecha(iso) {
   if (!iso) return t('sin fecha');
@@ -158,11 +180,8 @@ export default function Estrenos() {
       if (notas) {
         // decir lo que ha pasado: «0 nuevas» con el cupo agotado y «0 nuevas»
         // porque ya estaban todas son cosas MUY distintas
-        const n = d.notas?.nuevas || 0;
-        const motivo = MOTIVO_NOTAS[d.notas?.motivo];
-        if (n > 0) toast(t('✓ {n} notas nuevas', { n }), 'success');
-        else if (motivo) toast(`⚠️ ${t(motivo)}`, 'error');
-        else toast(t('Ninguna nota nueva: MDBList aún no las tiene'), 'info');
+        const { texto, tipo } = resumenDeNotas(d.notas);
+        toast(tipo === 'error' ? `⚠️ ${texto}` : texto, tipo);
       }
     });
   };
