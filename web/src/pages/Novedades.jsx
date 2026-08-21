@@ -25,6 +25,20 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.18',
+    fecha: '2026-08-21',
+    titular: 'Los nombres que faltaban en los palmareses, y las filmografías al día',
+    puntos: [
+      'En «Lo mejor del año», Sundance, Sitges y el David di Donatello salían con cartel y con nota pero sin un solo nombre debajo: ni a quién leer ni una estrella que pulsar para seguirle. Sus tablas de Wikipedia no dicen quién dirige, y desde la versión pasada esas películas entraban por un atajo que se saltaba la pregunta a TMDB. Ya la hace.',
+      'Si sigues a alguien y TMDB le apunta una película nueva, ahora aparece al día siguiente. Su filmografía se guardaba una semana entera, así que un estreno recién añadido podía tardar todo ese tiempo en salir en su ficha, en Cine venidero y en los huecos. Cada noche se vuelve a leer entera la de toda la gente a la que sigues.',
+      'Y si no quieres esperar a la noche, su ficha tiene un botón nuevo: «Actualizar desde TMDB» vuelve a pedirla en ese momento.',
+      'Las películas sin nota de Estrenos dejan de quedarse sin nota para siempre. Un estreno se mira el día que se anuncia, cuando todavía no lo ha votado nadie, y esa respuesta vacía se quedaba guardada. Ahora se vuelve a preguntar cada pocos días, y hay un botón «Actualizar notas» para pedirlas todas ya. Arriba te dice cuántas siguen sin Σ.',
+      'El Dashboard tiene un cuadro nuevo: qué películas te ha bajado solo el automático en los últimos treinta días, agrupadas por el director o directora por quien entró cada una, y si ya han llegado o siguen esperando. «Últimas peticiones a Radarr» sigue estando debajo, pero ahí se mezcla todo: lo que mandas a mano, lo de las reglas de festivales y lo de este pase.',
+      'En Descubrir huecos, dos interruptores nuevos: esconder lo que ya está en Radarr —que ya está decidido y llegará— y esconder a quien, con los filtros que tienes puestos, no ofrece ninguna película. Los dos se recuerdan y se quitan con «Limpiar filtros».',
+      'Cine venidero separa por fin lo que dirige tu gente de lo que solo interpreta. Son dos cosas distintas: lo primero es lo que el pase automático puede bajar solo, y lo segundo es para mirar y elegir a mano. Tres botones arriba, con su recuento, y una etiqueta en cada ficha.',
+    ],
+  },
+  {
     label: 'Beta 1.17',
     fecha: '2026-08-11',
     titular: 'Los palmareses viejos vienen dentro de la app: Wikipedia se queda para lo que se mueve',

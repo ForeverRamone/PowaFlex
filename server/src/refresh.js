@@ -1,7 +1,7 @@
 import { db, getSetting, setSetting } from './db.js';
 import { runSync, syncStatus } from './plex.js';
 import { rematchLetterboxd, resolveUnmatchedLb, importLetterboxdRss } from './letterboxd.js';
-import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames, syncPersonChanges } from './tmdb.js';
+import { getCalendarCached, enrichPeopleLife, normalizeLibraryTitles, normalizePeopleNames, syncPersonChanges, invalidarFilmografiasSeguidas } from './tmdb.js';
 import { syncRatings } from './mdblist.js';
 import { radarrSyncMovies, checkDigitalReleases } from './radarr.js';
 import { runRadarrRules, hayReglasActivas } from './rules.js';
@@ -186,8 +186,13 @@ function buildSteps({ includeAutoRadarr }) {
       label: 'Detectar filmografías cambiadas en TMDB',
       enabled: () => has('tmdb_key'),
       run: async () => {
+        // A TUS FAVORITOS se les tira la filmografía SIEMPRE, sin mirar el feed
+        // de cambios: es lo único que garantiza que un estreno recién metido en
+        // TMDB aparezca al día siguiente en su ficha y en Cine venidero. El feed
+        // se sigue usando para el resto de la biblioteca, que son miles.
+        const míos = invalidarFilmografiasSeguidas();
         const r = await syncPersonChanges();
-        return `${r.changed} cambios en TMDB · ${r.invalidated} fichas tuyas a refrescar`;
+        return `${míos.seguidos} favoritos a releer · ${r.changed} cambios en TMDB · ${r.invalidated} fichas más a refrescar`;
       },
     },
     {

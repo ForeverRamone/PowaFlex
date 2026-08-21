@@ -301,6 +301,50 @@ export async function syncPersonChanges() {
   return { pages: page, changed, invalidated };
 }
 
+/**
+ * Tira la filmografía cacheada de UNA persona (por su id de TMDB), para que la
+ * siguiente lectura la pida de nuevo. Lo usan el botón «Actualizar desde TMDB»
+ * de su ficha y el barrido nocturno de favoritos.
+ */
+export function olvidarFilmografia(tmdbPersonId, { tambienLaFicha = true } = {}) {
+  const id = Number(tmdbPersonId);
+  if (!id) return 0;
+  const del = db.prepare('DELETE FROM tmdb_cache WHERE key LIKE ?');
+  const n = del.run(`person_credits:${id}:%`).changes;
+  // la ficha (foto, biografía, fecha de fallecimiento) se tira solo cuando lo
+  // pide una persona: el barrido nocturno no la toca porque el paso de «estado
+  // vital», que corre unos minutos antes, acaba de refrescarla
+  if (tambienLaFicha) del.run(`person:${id}:%`);
+  return n;
+}
+
+/**
+ * Las filmografías de TU GENTE se releen cada noche, sin esperar a que caduquen.
+ *
+ * `personCredits` cachea siete días y `syncPersonChanges` solo adelanta ese
+ * plazo para quien aparezca en el feed global de cambios de TMDB — un feed que
+ * no siempre recoge «le han añadido una película». Con eso, un estreno nuevo de
+ * alguien a quien sigues podía tardar una semana en asomar por su ficha, por
+ * Cine venidero y por los huecos, y quedaba como si la app no se enterara.
+ *
+ * A quien sigues son unas decenas o unos cientos: una petición por cabeza y por
+ * noche, en los pasos que ya recorren esa misma lista. Al resto de la
+ * biblioteca (miles de personas) NO se le hace esto: ahí los siete días siguen
+ * siendo lo razonable.
+ */
+export function invalidarFilmografiasSeguidas() {
+  const ids = db
+    .prepare(
+      `SELECT DISTINCT p.tmdb_id FROM tracked_people t JOIN people p ON p.id = t.person_id
+       WHERE p.tmdb_id IS NOT NULL AND p.deathday IS NULL`
+    )
+    .all()
+    .map((r) => r.tmdb_id);
+  let invalidated = 0;
+  for (const id of ids) if (olvidarFilmografia(id, { tambienLaFicha: false })) invalidated++;
+  return { seguidos: ids.length, invalidated };
+}
+
 export async function personDetails(tmdbPersonId) {
   return tmdbGet(
     `/person/${tmdbPersonId}`,
@@ -1408,6 +1452,15 @@ export async function buildCalendar({ topDirectors = 0, topActors = 0, pastDays 
 
       ev.people = dirEntries;
       if (topActor) ev.people.push({ id: topActor.id, tmdb_id: topActor.tmdb_id, name: topActor.name, credit: 'Actúa' });
+      // POR QUÉ está esta película aquí: porque sigues a quien la DIRIGE, o
+      // porque sigues a alguien del reparto (o del resto de oficios). No se
+      // puede deducir de `people`, que siempre lleva al director REAL de la
+      // ficha aunque no lo sigas: por ahí, una película que entró por su
+      // actriz se leía como si fuera cosa de su dirección. Y la diferencia
+      // importa, porque el pase automático se configura por oficio.
+      ev.porDireccion = ev.followedDirectors.length > 0;
+      // los nombres tuyos que la traen, para poder decirlo en la ficha
+      ev.porQuien = [...ev.followedDirectors, ...ev.followedActors].map((x) => x.name);
       delete ev.followedDirectors;
       delete ev.followedActors;
     }

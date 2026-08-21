@@ -37,6 +37,7 @@ import {
   normalizeLibraryTitles,
   normalizePeopleNames,
   latinizeNames,
+  olvidarFilmografia,
 } from './tmdb.js';
 import {
   radarrTest,
@@ -86,7 +87,7 @@ import {
 import {
   runAutoRadarr, runRadarrRules, rulesStatus, rulesOverview, rulesLog,
   createRule, updateRule, deleteRule, getRule,
-  aprobarPendiente, rechazarPendiente, resolverTodasLasPendientes, cuantasPendientes,
+  aprobarPendiente, rechazarPendiente, resolverTodasLasPendientes, cuantasPendientes, enviosDeFavoritos,
 } from './rules.js';
 import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
 import { ROLES } from './roles.js';
@@ -1077,6 +1078,27 @@ app.post('/api/people/by-tmdb/:tmdbId/follow', async (req, reply) => {
   }
 });
 
+/**
+ * «Actualizar desde TMDB» de una ficha de persona: tira su filmografía
+ * cacheada (siete días) para que la siguiente lectura la pida entera.
+ *
+ * Existe porque el caso concreto no tenía salida: TMDB añade una película nueva
+ * a alguien y la ficha seguía enseñando la de la semana pasada sin que hubiera
+ * ningún botón que decir «mira otra vez». El barrido nocturno ya releé a tus
+ * favoritos, pero esperar a la noche tampoco es una respuesta.
+ */
+app.post('/api/people/by-tmdb/:tmdbId/refresh', async (req, reply) => {
+  const tmdbId = Number(req.params.tmdbId);
+  if (!tmdbId) {
+    reply.code(400);
+    return { error: 'Falta el id de TMDB' };
+  }
+  olvidarFilmografia(tmdbId);
+  // los huecos y el calendario se arman con estas mismas filmografías
+  invalidateFavoritesCaches();
+  return { ok: true };
+});
+
 // unified movie "ficha" for any TMDB id — owned or not (#7)
 app.get('/api/media/:tmdbId', async (req, reply) => {
   try {
@@ -1590,6 +1612,9 @@ app.get('/api/releases', async (req, reply) => {
       kind: req.query.kind,
       window: req.query.window,
       refresh: req.query.refresh === '1',
+      // «Actualizar notas»: reintenta AHORA las Σ que MDBList aún no tenía,
+      // sin reconstruir la lista entera desde TMDB (que es lo caro)
+      refrescarNotas: req.query.notas === '1',
     });
   } catch (err) {
     reply.code(502);
@@ -1909,6 +1934,12 @@ app.post('/api/radarr/pending/all', async (req, reply) => {
     return { error: String(err.message || err) };
   }
 });
+
+// Lo que el pase de favoritos ha mandado solo a Radarr, con la persona por la
+// que entró cada película. Lo pinta el Dashboard.
+app.get('/api/radarr/rules/sent', async (req) =>
+  enviosDeFavoritos({ days: Number(req.query?.days) || 30, limit: Number(req.query?.limit) || 30 })
+);
 
 app.get('/api/radarr/rules/log', async (req) =>
   rulesLog({ ruleId: req.query?.ruleId ?? null, limit: Number(req.query?.limit) || 200 })

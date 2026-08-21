@@ -268,6 +268,38 @@ export function rulesLog({ ruleId = null, limit = 200 } = {}) {
     : db.prepare('SELECT * FROM radarr_rule_log ORDER BY at DESC, id DESC LIMIT ?').all(lim);
 }
 
+/**
+ * QUÉ SE HA MANDADO SOLO A RADARR, y por quién.
+ *
+ * El pase de favoritos («autorradarr») baja los estrenos de la gente que sigues
+ * en un oficio, casi siempre dirección. Hasta ahora eso solo se podía leer
+ * abriendo Ajustes → Automatismos y bajando por el historial de la regla; en la
+ * pantalla de entrada, esas altas se mezclaban con todo lo demás en «Últimas
+ * peticiones a Radarr», que es la lista de Radarr entera —lo que mandas a mano,
+ * lo de las reglas de festivales y lo de esta— sin distinguir nada.
+ *
+ * Aquí solo salen las de PowaFlex, y solo las del pase de favoritos, con el
+ * nombre de la persona por la que entró cada una. Las filas anteriores a la
+ * columna `person` salen sin nombre: no se inventa.
+ *
+ * Se lee del log de reglas, que se poda a 30 días en cada pasada: pedir más
+ * días que eso devuelve lo que haya.
+ */
+export function enviosDeFavoritos({ days = 30, limit = 30 } = {}) {
+  const desde = Date.now() - entero(days, 1, 30, 30) * DAY;
+  return db
+    .prepare(
+      `SELECT l.tmdb_id, l.title, l.score, l.at, l.person, l.detail, r.source AS role,
+              m.has_file, m.monitored
+       FROM radarr_rule_log l
+       JOIN radarr_rules r ON r.id = l.rule_id
+       LEFT JOIN radarr_movies m ON m.tmdb_id = l.tmdb_id
+       WHERE l.action = 'added' AND l.tmdb_id IS NOT NULL AND l.at >= ? AND r.kind = 'favoritos'
+       ORDER BY l.at DESC, l.id DESC LIMIT ?`
+    )
+    .all(desde, entero(limit, 1, 200, 30));
+}
+
 // --- el evaluador PURO -------------------------------------------------------
 
 /**
@@ -609,7 +641,7 @@ const MOTIVO_NOTAS = {
 
 const insLog = () =>
   db.prepare(
-    'INSERT INTO radarr_rule_log (rule_id, at, tmdb_id, title, score, action, detail) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO radarr_rule_log (rule_id, at, tmdb_id, title, score, action, detail, person) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
 
 /**
@@ -712,20 +744,22 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
             parte.added++;
             rulesStatus.added++;
             parte.log.push(`✓ ${item.title}${score != null ? ` · Σ ${score}` : ''}`);
-            log.run(rule.id, Date.now(), item.tmdb_id, item.title, score, 'added', ruleLabel(rule));
+            // `item.person` solo lo traen las candidatas del pase de favoritos:
+            // es la persona por la que esta película entró
+            log.run(rule.id, Date.now(), item.tmdb_id, item.title, score, 'added', ruleLabel(rule), item.person || null);
           } catch (err) {
             const msg = String(err.message || err);
             if (/already/i.test(msg)) { owned.add(item.tmdb_id); continue; }
             parte.failed++;
             parte.log.push(`⚠️ ${item.title}: ${msg}`);
-            log.run(rule.id, Date.now(), item.tmdb_id, item.title, score, 'error', msg);
+            log.run(rule.id, Date.now(), item.tmdb_id, item.title, score, 'error', msg, item.person || null);
           }
         }
 
         // el resumen de descartes, para que «0 añadidas» sea explicable
         if (!dryRun) {
           for (const [motivo, n] of Object.entries(porMotivo)) {
-            log.run(rule.id, Date.now(), null, null, null, 'skipped', `${MOTIVOS[motivo] || motivo}: ${n}`);
+            log.run(rule.id, Date.now(), null, null, null, 'skipped', `${MOTIVOS[motivo] || motivo}: ${n}`, null);
           }
           // si TODAS las altas fallaron, eso NO es una pasada correcta: sin
           // esto la tarjeta decía «0 añadidas de 20 candidatas» y borraba el
@@ -741,7 +775,7 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
         if (!dryRun) {
           db.prepare('UPDATE radarr_rules SET last_run_at = ?, last_error = ? WHERE id = ?')
             .run(Date.now(), parte.error, rule.id);
-          log.run(rule.id, Date.now(), null, null, null, 'error', parte.error);
+          log.run(rule.id, Date.now(), null, null, null, 'error', parte.error, null);
         }
       }
       parte.log = parte.log.slice(0, 60);

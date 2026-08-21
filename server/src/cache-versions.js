@@ -13,7 +13,11 @@
  * sincronizar a mano: se sube el número y ya está.
  */
 export const CACHE_VERSIONS = {
-  calendar: 7,
+  // v8: cada estreno dice si entra por alguien a quien sigues como DIRECCIÓN o
+  // por reparto/otros oficios (`porDireccion`, `porQuien`). Lo cacheado antes no
+  // lo lleva, y sin ese dato la separación de la página se deducía del crédito
+  // —que siempre trae al director real de la ficha— y salía mal.
+  calendar: 8,
   // v8: el umbral de ruido pasó a mirar también los votos de Letterboxd
   // v9: la clave lleva los filtros demográficos (género/vida/continente/país)
   // v10: cada película va podada de los datos de trabajo del servidor que no se
@@ -86,14 +90,18 @@ export const CACHE_VERSIONS = {
   // vacío en media Cannes y en media Venecia, y 28 filas —los nominados de
   // Platform, la Concha de 1977, el Óscar de 1955— con el título original en el
   // campo de la dirección. Entran también Seminci y Sitges.
-  festival: 15,
+  // v16: las filas que llegan con el id de TMDB puesto (los palmareses
+  // empaquetados) también preguntan a TMDB quién dirige cuando su tabla no lo
+  // dice. Lo cacheado antes tiene sin un solo nombre a Sundance, a Sitges y al
+  // Donatello: sin nombre que leer y sin estrella que pulsar.
+  festival: 16,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)
   releases: 2,
 };
 
-/** Prefijo con versión de una caché: `calendar:v7`, `discover_gaps:v7`… */
+/** Prefijo con versión de una caché: `calendar:v8`, `discover_gaps:v10`… */
 export const cachePrefix = (name) => `${name}:v${CACHE_VERSIONS[name]}`;
 
 /**

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Ticket, Flag, MonitorPlay, Tv, Plus, RotateCw } from 'lucide-react';
+import { Ticket, Flag, MonitorPlay, Tv, Plus, RotateCw, Sigma } from 'lucide-react';
 import {
   ErrorBox, TmdbCard, RadarrButton, Empty, Spinner, PageHeader, Select,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts,
@@ -32,6 +32,15 @@ const SORTS = {
   score: { label: 'Nota combinada Σ', fn: (a, b) => (b.mdb?.score ?? -1) - (a.mdb?.score ?? -1) },
   popularidad: { label: 'Popularidad TMDB', fn: (a, b) => (b.popularity || 0) - (a.popularity || 0) },
   votos: { label: 'Más votadas', fn: (a, b) => (b.votes || 0) - (a.votes || 0) },
+};
+
+// Por qué una tanda de notas puede volver de vacío, en cristiano. Mismos
+// motivos que devuelve `refrescarNotasDeReglas` en el servidor.
+const MOTIVO_NOTAS = {
+  sin_api_key: 'Sin clave de MDBList no hay notas Σ: ponla en Ajustes',
+  sin_presupuesto: 'Agotado el cupo diario de MDBList: se completan mañana',
+  quedan_para_manana: 'Quedan notas por pedir: pulsa otra vez en un rato',
+  sin_respuesta: 'MDBList no ha devuelto ninguna: o aún no las tiene, o la clave ya no vale',
 };
 
 function fmtFecha(iso) {
@@ -131,16 +140,30 @@ export default function Estrenos() {
 
   // como en Descubrir: cada petición lleva su número y solo la última pinta
   const reqId = useRef(0);
-  const load = (refresh = false) => {
+  // «notas» no reconstruye la lista: solo vuelve a preguntar por las Σ que
+  // MDBList aún no tenía cuando se miró (ver `ponerNotas` en el servidor)
+  const [notasBusy, setNotasBusy] = useState(false);
+  const load = ({ refresh = false, notas = false } = {}) => {
     const id = ++reqId.current;
     setError(null);
-    if (refresh) setRefreshing(true);
+    if (notas) setNotasBusy(true);
+    else if (refresh) setRefreshing(true);
     else setData(null);
-    api(`/releases?kind=${tab}&window=${win}${refresh ? '&refresh=1' : ''}`).then((d) => {
+    api(`/releases?kind=${tab}&window=${win}${refresh ? '&refresh=1' : ''}${notas ? '&notas=1' : ''}`).then((d) => {
       if (id !== reqId.current) return;
       setRefreshing(false);
-      if (d.error) setError(d.error);
-      else setData(d);
+      setNotasBusy(false);
+      if (d.error) return setError(d.error);
+      setData(d);
+      if (notas) {
+        // decir lo que ha pasado: «0 nuevas» con el cupo agotado y «0 nuevas»
+        // porque ya estaban todas son cosas MUY distintas
+        const n = d.notas?.nuevas || 0;
+        const motivo = MOTIVO_NOTAS[d.notas?.motivo];
+        if (n > 0) toast(t('✓ {n} notas nuevas', { n }), 'success');
+        else if (motivo) toast(`⚠️ ${t(motivo)}`, 'error');
+        else toast(t('Ninguna nota nueva: MDBList aún no las tiene'), 'info');
+      }
     });
   };
   useEffect(() => { load(); setProvider(''); }, [tab, win]);
@@ -184,6 +207,8 @@ export default function Estrenos() {
 
   // los recuentos van CONTADOS, no a cero: el porqué vive en typeCounts (components.jsx)
   const counts = typeCounts([...(data?.recent || []), ...(data?.upcoming || [])]);
+  // cuántas de las visibles siguen sin Σ: es lo que da sentido al botón de notas
+  const sinNota = [...recent, ...upcoming].filter((f) => f.mdb?.score == null).length;
 
   const grid = (films) => (
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
@@ -258,6 +283,9 @@ export default function Estrenos() {
           <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
             <p className="text-sm text-zinc-500">
               {t('Actualizado {date}.', { date: new Date(data.generatedAt).toLocaleString(locale()) })}
+              {sinNota > 0 && (
+                <span className="text-zinc-400"> · {t('{n} aún sin nota Σ', { n: sinNota })}</span>
+              )}
               {data.errors?.length > 0 && (
                 <span className="text-orange-300"> · {t('TMDB cortó a mitad: lista incompleta, recarga en un rato')}</span>
               )}
@@ -268,7 +296,18 @@ export default function Estrenos() {
                   <Plus size={13} strokeWidth={2.5} /> {t('Añadir {n} visibles a Radarr', { n: Math.min(pendingIds.length, 300) })}
                 </button>
               )}
-              <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={() => load(true)} disabled={refreshing}>
+              {/* las dos actualizaciones NO cuestan lo mismo: «notas» solo
+                  repregunta las Σ que faltan (MDBList, barato); «actualizar»
+                  reconstruye la lista entera desde TMDB */}
+              <button
+                className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5"
+                onClick={() => load({ notas: true })}
+                disabled={notasBusy || refreshing}
+                title={t('Vuelve a preguntar a MDBList por las notas que faltan. Es normal que un estreno tarde semanas en tener Σ.')}
+              >
+                {notasBusy ? t('Pidiendo notas…') : <><Sigma size={13} strokeWidth={2} /> {t('Actualizar notas')}</>}
+              </button>
+              <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={() => load({ refresh: true })} disabled={refreshing || notasBusy}>
                 {refreshing ? t('Actualizando…') : <><RotateCw size={13} strokeWidth={2} /> {t('Actualizar')}</>}
               </button>
             </div>

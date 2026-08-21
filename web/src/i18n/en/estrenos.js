@@ -48,4 +48,21 @@ export default {
   'Próximas': 'Upcoming',
   '{n} en plataformas y VOD en 60 días': '{n} on streaming & VOD in the next 60 days',
   '{n} en cines en 60 días': '{n} in theaters in the next 60 days',
+
+  // «Actualizar notas»: repreguntar a MDBList por las Σ que aún no tenía
+  'Actualizar notas': 'Refresh scores',
+  'Pidiendo notas…': 'Fetching scores…',
+  'Vuelve a preguntar a MDBList por las notas que faltan. Es normal que un estreno tarde semanas en tener Σ.':
+    'Ask MDBList again for the scores that are still missing. A new release normally takes weeks to get a Σ.',
+  '{n} aún sin nota Σ': '{n} still without a Σ score',
+  '✓ {n} notas nuevas': '✓ {n} new scores',
+  'Ninguna nota nueva: MDBList aún no las tiene': 'No new scores: MDBList does not have them yet',
+  'Sin clave de MDBList no hay notas Σ: ponla en Ajustes':
+    'No MDBList key means no Σ scores: add one in Settings',
+  'Agotado el cupo diario de MDBList: se completan mañana':
+    "MDBList's daily quota is spent: the rest arrive tomorrow",
+  'Quedan notas por pedir: pulsa otra vez en un rato':
+    'There are still scores to fetch: press again in a while',
+  'MDBList no ha devuelto ninguna: o aún no las tiene, o la clave ya no vale':
+    'MDBList returned none: either it does not have them yet, or the key no longer works',
 };

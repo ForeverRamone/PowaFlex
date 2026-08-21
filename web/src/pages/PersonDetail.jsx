@@ -192,6 +192,36 @@ export default function PersonDetail() {
       onClose={() => setCorrigiendo(false)}
     />
   );
+  // «Actualizar desde TMDB»: la filmografía se cachea siete días (y a tus
+  // favoritos se les relee entera cada noche), así que una película recién
+  // metida en TMDB puede tardar en asomar. Esto tira esa caché y vuelve a
+  // pedirla ahora, sin esperar a la noche ni a que caduque.
+  const [refrescando, setRefrescando] = useState(false);
+  const refrescarDesdeTmdb = async () => {
+    const tmdbId = data?.person?.tmdb_id;
+    if (!tmdbId) return;
+    setRefrescando(true);
+    const r = await api(`/people/by-tmdb/${tmdbId}/refresh`, { method: 'POST' });
+    if (r?.error) {
+      setRefrescando(false);
+      return toast(`⚠️ ${t(r.error)}`, 'error');
+    }
+    // recargarFicha vacía el estado y vuelve a pedir; el testigo se apaga al
+    // llegar la respuesta nueva (efecto de abajo)
+    recargarFicha();
+  };
+  useEffect(() => { if (data) setRefrescando(false); }, [data]);
+  const botonRefrescar = (
+    <button
+      onClick={refrescarDesdeTmdb}
+      disabled={refrescando}
+      className="text-xs text-zinc-500 hover:text-gold-400 cursor-pointer disabled:cursor-default"
+      title={t('Vuelve a pedir su filmografía a TMDB ahora mismo, sin esperar a la actualización de esta noche. Cine venidero y los huecos se rehacen en la siguiente visita.')}
+    >
+      {refrescando ? t('Actualizando…') : t('⟳ Actualizar desde TMDB')}
+    </button>
+  );
+
   const botonCorregir = (
     <button
       onClick={() => setCorrigiendo(true)}
@@ -301,6 +331,7 @@ export default function PersonDetail() {
               </Link>
             )}
             {enBiblioteca && botonCorregir}
+            {botonRefrescar}
           </div>
           {person.birthday && (
             <div className="text-sm text-zinc-500 mt-1">

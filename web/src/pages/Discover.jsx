@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, tmdbImg } from '../api.js';
-import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid, X, Layers } from 'lucide-react';
+import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid, X, Layers, EyeOff, UserX } from 'lucide-react';
 import {
   Spinner, Progreso, useCargaProgresiva, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts, PageHeader, Signature, Select,
@@ -27,9 +27,22 @@ async function sendBulk(ids, addRadarrId) {
   if (summary) toast(summary, error ? 'error' : undefined);
 }
 
-const visibleMissing = (p, show, minScore, dismissed) =>
+/**
+ * Lo que de verdad se pinta de una persona.
+ *
+ * `ocultarRadarr` es el filtro que faltaba para el completismo por tandas: lo
+ * que ya has mandado a Radarr está resuelto —llegará cuando llegue— y seguía
+ * ocupando sitio en la parrilla, así que cada visita había que volver a
+ * distinguir a ojo lo pendiente de lo ya pedido. Va aparte del ✕ de descartar,
+ * que es «esta no me interesa» y es para siempre.
+ */
+const visibleMissing = (p, show, minScore, dismissed, ocultarRadarr = false, radarrIds = null) =>
   (p.missing || []).filter(
-    (f) => !dismissed.has(f.tmdb_id) && matchesTypeFilters(f, show) && passesScore(f, minScore)
+    (f) =>
+      !dismissed.has(f.tmdb_id) &&
+      !(ocultarRadarr && radarrIds?.has(f.tmdb_id)) &&
+      matchesTypeFilters(f, show) &&
+      passesScore(f, minScore)
   );
 
 function GapCard({ f, radarrIds, addRadarrId, onDismiss, person }) {
@@ -59,14 +72,17 @@ function GapCard({ f, radarrIds, addRadarrId, onDismiss, person }) {
   );
 }
 
-function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, addRadarrId }) {
-  const shown = visibleMissing(p, show, minScore, dismissed);
+function PersonGaps({ p, role, show, minScore, dismissed, onDismiss, radarrIds, addRadarrId, ocultarRadarr, ocultarVacios }) {
+  const shown = visibleMissing(p, show, minScore, dismissed, ocultarRadarr, radarrIds);
   const alive = (p.missing || []).filter((f) => !dismissed.has(f.tmdb_id));
   const hidden = alive.length - shown.length;
   const pendingIds = shown.filter((f) => !radarrIds.has(f.tmdb_id)).map((f) => f.tmdb_id);
 
   // never vanish silently: with everything filtered out, keep a compact row so
   // "no aparece" can't be read as "no le falta nada"
+  // …salvo que hayas pedido justo eso: con listas largas, media pantalla de
+  // filas «todas ocultas por tus filtros» es ruido, y por eso el interruptor.
+  if (!shown.length && ocultarVacios) return null;
   if (!shown.length) {
     return (
       <section className="card p-3 mb-3 flex items-center justify-between flex-wrap gap-2 text-sm">
@@ -123,10 +139,10 @@ const FILM_SORTS = {
 };
 
 /** All missing films of everyone, in one grid — no person-by-person scrolling. */
-function FilmGrid({ people, show, minScore, dismissed, onDismiss, radarrIds, addRadarrId, sort }) {
+function FilmGrid({ people, show, minScore, dismissed, onDismiss, radarrIds, addRadarrId, sort, ocultarRadarr }) {
   const byId = new Map();
   for (const p of people) {
-    for (const f of visibleMissing(p, show, minScore, dismissed)) {
+    for (const f of visibleMissing(p, show, minScore, dismissed, ocultarRadarr, radarrIds)) {
       if (!byId.has(f.tmdb_id)) byId.set(f.tmdb_id, { ...f, _person: { id: p.id, name: p.name, role: p.role } });
     }
   }
@@ -173,6 +189,11 @@ function GapsView({
   const [view, setView] = useState(() => localStorage.getItem('gaps_view') || 'person');
   const [personSort, setPersonSort] = useState(() => localStorage.getItem('gaps_person_sort') || 'huecos');
   const [filmSort, setFilmSort] = useState(() => localStorage.getItem('gaps_film_sort') || 'score');
+  // los dos interruptores de «enséñame solo lo que me queda por decidir»
+  const [ocultarRadarr, setOcultarRadarr] = useState(() => localStorage.getItem('gaps_hide_radarr') === '1');
+  const [ocultarVacios, setOcultarVacios] = useState(() => localStorage.getItem('gaps_hide_empty') === '1');
+  const setOcultarRadarrPref = (v) => { setOcultarRadarr(v); localStorage.setItem('gaps_hide_radarr', v ? '1' : '0'); };
+  const setOcultarVaciosPref = (v) => { setOcultarVacios(v); localStorage.setItem('gaps_hide_empty', v ? '1' : '0'); };
 
   const setViewPref = (v) => { setView(v); localStorage.setItem('gaps_view', v); };
   const setPersonSortPref = (v) => { setPersonSort(v); localStorage.setItem('gaps_person_sort', v); };
@@ -220,6 +241,10 @@ function GapsView({
   const withGaps = (data.people || []).filter((p) => (p.missingTotal || 0) > 0);
   const sortedPeople = [...withGaps].sort(PERSON_SORTS[personSort]?.fn || PERSON_SORTS.huecos.fn);
   const complete = (data.people || []).length - withGaps.length;
+  // cuántas de las que TIENEN huecos se quedan sin nada que enseñar
+  const escondidas = withGaps.filter(
+    (p) => visibleMissing(p, show, minScore, dismissed, ocultarRadarr, radarrIds).length === 0
+  ).length;
 
   return (
     <div>
@@ -268,9 +293,32 @@ function GapsView({
             <div className="flex items-center gap-3 flex-wrap">
               <MinScoreBar minScore={minScore} setMinScore={setMinScore} />
               <button
+                onClick={() => setOcultarRadarrPref(!ocultarRadarr)}
+                className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${ocultarRadarr ? '!border-gold-400 text-gold-400' : ''}`}
+                title={t('Lo que ya has mandado a Radarr está decidido: esto lo quita de la parrilla para dejar solo lo que falta por pedir')}
+              >
+                <EyeOff size={13} strokeWidth={2} /> {t('Ocultar las que ya están en Radarr')}
+              </button>
+              {view === 'person' && (
+                <button
+                  onClick={() => setOcultarVaciosPref(!ocultarVacios)}
+                  className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${ocultarVacios ? '!border-gold-400 text-gold-400' : ''}`}
+                  title={t('Quita de la lista a quien, con los filtros puestos, no ofrece ninguna película')}
+                >
+                  <UserX size={13} strokeWidth={2} /> {t('Ocultar a quien no ofrece nada')}
+                </button>
+              )}
+              <button
                 className="btn-ghost !py-1 text-xs"
                 title={t('Vuelve la página a su estado de fábrica: vista, orden, nota mínima y filtros de tipo')}
-                onClick={() => { clearBaseFilters?.(); setViewPref('person'); setPersonSortPref('huecos'); setFilmSortPref('score'); }}
+                onClick={() => {
+                  clearBaseFilters?.();
+                  setViewPref('person');
+                  setPersonSortPref('huecos');
+                  setFilmSortPref('score');
+                  setOcultarRadarrPref(false);
+                  setOcultarVaciosPref(false);
+                }}
               >
                 {t('✕ Limpiar filtros')}
               </button>
@@ -285,15 +333,26 @@ function GapsView({
             <FilmGrid
               people={sortedPeople} show={show} minScore={minScore} dismissed={dismissed}
               onDismiss={onDismiss} radarrIds={radarrIds} addRadarrId={addRadarrId} sort={filmSort}
+              ocultarRadarr={ocultarRadarr}
             />
           ) : (
-            sortedPeople.map((p) => (
-              <PersonGaps
-                key={p.id} p={p} role={role} show={show} minScore={minScore}
-                dismissed={dismissed} onDismiss={onDismiss}
-                radarrIds={radarrIds} addRadarrId={addRadarrId}
-              />
-            ))
+            <>
+              {sortedPeople.map((p) => (
+                <PersonGaps
+                  key={p.id} p={p} role={role} show={show} minScore={minScore}
+                  dismissed={dismissed} onDismiss={onDismiss}
+                  radarrIds={radarrIds} addRadarrId={addRadarrId}
+                  ocultarRadarr={ocultarRadarr} ocultarVacios={ocultarVacios}
+                />
+              ))}
+              {/* la cuenta de quién se ha escondido: sin ella, «ocultar a quien
+                  no ofrece nada» deja una página más corta sin explicar por qué */}
+              {ocultarVacios && escondidas > 0 && (
+                <p className="text-xs text-zinc-500 mb-4">
+                  {t('{n} personas escondidas: con estos filtros no ofrecen ninguna película.', { n: escondidas })}
+                </p>
+              )}
+            </>
           )}
 
           {paginated && data.hasMore && (

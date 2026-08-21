@@ -108,12 +108,22 @@ export async function refrescarNotasDeReglas(items, { maxFetch = 200, caducaMs =
   if (presupuesto <= 0) return { pedidas: 0, motivo: 'sin_presupuesto' };
 
   const aPedir = pendientes.slice(0, Math.min(maxFetch, presupuesto));
+  // `recibidas` es la diferencia entre «se pidieron cuatro» y «vinieron cuatro».
+  // Sin ella, una clave que ya no vale devuelve exactamente lo mismo que cuatro
+  // películas que MDBList todavía no conoce: cero notas y ningún aviso.
+  let recibidas = 0;
   try {
-    for (let i = 0; i < aPedir.length; i += 100) await fetchRatingsBatch(aPedir.slice(i, i + 100));
+    for (let i = 0; i < aPedir.length; i += 100) {
+      recibidas += (await fetchRatingsBatch(aPedir.slice(i, i + 100))).length;
+    }
   } catch (err) {
-    return { pedidas: 0, motivo: err.rateLimited ? 'sin_presupuesto' : String(err.message || err) };
+    return { pedidas: 0, recibidas: 0, motivo: err.rateLimited ? 'sin_presupuesto' : String(err.message || err) };
   }
-  return { pedidas: aPedir.length, motivo: pendientes.length > aPedir.length ? 'quedan_para_manana' : null };
+  return {
+    pedidas: aPedir.length,
+    recibidas,
+    motivo: pendientes.length > aPedir.length ? 'quedan_para_manana' : null,
+  };
 }
 
 // --- ratings ------------------------------------------------------------------

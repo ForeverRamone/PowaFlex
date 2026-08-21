@@ -2094,8 +2094,23 @@ export async function resolveFilms(rows, yearOf) {
         continue;
       }
 
-      // filas con TMDB id de origen (dataset de Wikidata): nada que verificar
+      // filas con TMDB id de origen (dataset de Wikidata o palmarés empaquetado):
+      // nada que verificar.
       if (r.tmdb_id) {
+        // …pero SÍ hay que ponerle nombre a la dirección. Los palmareses que
+        // vienen dentro de la app salen de tablas sin columna de dirección
+        // (Sundance lista en viñetas, Sitges pone cuatro premios en columnas,
+        // el Donatello acredita productores): sus filas llegan con id y sin
+        // ningún nombre, y esta rama —la más corta— era la única que no lo
+        // rellenaba desde TMDB. Resultado: media «Lo mejor del año» con la
+        // estrella de seguir en blanco. La ficha con créditos se pide PRIMERO
+        // porque `movieSummary` reaprovecha ese superset y así no cuesta una
+        // petición de más.
+        let dirs = null;
+        if (!r.director) {
+          dirs = await movieDirectors(r.tmdb_id).catch((e) => (esFichaFantasma(e) ? [] : null));
+          if (dirs === null) errors++; // fallo de red: que no se cachee sin nombres
+        }
         let sum = null;
         try {
           sum = await movieSummary(r.tmdb_id);
@@ -2104,6 +2119,7 @@ export async function resolveFilms(rows, yearOf) {
         }
         films[idx] = {
           ...r,
+          director: r.director || (dirs?.length ? dirs.join(', ') : null),
           poster_path: sum?.poster_path || null,
           date: sum?.date || null,
           year: r.year ?? (sum?.date ? Number(sum.date.slice(0, 4)) : null),

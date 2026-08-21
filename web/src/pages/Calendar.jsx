@@ -26,6 +26,43 @@ function typeBadges(ev) {
   return badges;
 }
 
+/**
+ * DIRECCIÓN O REPARTO: la separación que pedía esta página.
+ *
+ * No son lo mismo aunque el calendario los junte. Lo que dirige alguien a quien
+ * sigues es lo que el pase automático puede bajar solo (las reglas de Radarr se
+ * ponen por oficio, y la de dirección es la típica); lo que sale de un actor o
+ * una actriz es exploración: se mira y se elige a mano. Mezclados en la misma
+ * parrilla, lo segundo tapaba lo primero.
+ *
+ * El dato lo pone el SERVIDOR (`porDireccion`, tmdb.js) y no se puede deducir
+ * de los créditos de la ficha: `people` lleva siempre al director real de la
+ * película, la sigas o no, así que una película que entra por su actriz también
+ * dice «Dirige Fulano» y por ahí se clasificaba mal.
+ */
+export const dirigeAlguien = (ev) => !!ev.porDireccion;
+
+const FACETAS = [
+  ['todo', 'Dirección y reparto'],
+  ['direccion', 'Solo dirección'],
+  ['reparto', 'Solo reparto y otros oficios'],
+];
+
+function FacetBadge({ ev }) {
+  const dirige = dirigeAlguien(ev);
+  return (
+    <span
+      className={`badge-quiet ml-1.5 align-middle ${dirige ? 'text-gold-400' : 'text-sky-300'}`}
+      title={`${dirige
+        ? t('Sale de alguien a quien sigues como director/a: es lo que el pase automático puede bajar solo')
+        : t('Sale de alguien a quien sigues por otro oficio: aquí eliges tú qué mandar a Radarr')}${
+        ev.porQuien?.length ? ` — ${ev.porQuien.join(' · ')}` : ''}`}
+    >
+      {dirige ? t('dirección') : t('reparto')}
+    </span>
+  );
+}
+
 function EventCard({ ev, radarrIds, onAdded, vetada, onToggleVeto }) {
   const img = tmdbImg(ev.poster_path, 'w185');
   const [ficha, setFicha] = useState(false);
@@ -43,6 +80,7 @@ function EventCard({ ev, radarrIds, onAdded, vetada, onToggleVeto }) {
       <div className="min-w-0 flex-1">
         <div className="font-medium text-zinc-100 text-sm">
           {ev.title}
+          <FacetBadge ev={ev} />
           {typeBadges(ev).map(([label, cls]) => (
             <span key={label} className={`badge-quiet ml-1.5 align-middle ${cls}`}>
               {label}
@@ -115,6 +153,10 @@ export default function Calendar() {
   // el horizonte sobrevive a la navegación hasta pulsar «Limpiar filtros»
   const [horizon, setHorizonState] = useState(() => localStorage.getItem('cal_horizon') || '6');
   const setHorizon = (v) => { setHorizonState(v); localStorage.setItem('cal_horizon', v); };
+  // dirección / reparto: ver `dirigeAlguien`. Sobrevive a la navegación, como
+  // el horizonte, y vuelve a «todo» con «Limpiar filtros».
+  const [faceta, setFacetaState] = useState(() => localStorage.getItem('cal_faceta') || 'todo');
+  const setFaceta = (v) => { setFacetaState(v); localStorage.setItem('cal_faceta', v); };
   const [bulk, setBulk] = useState({ running: false, summary: null });
   // vetadas al pase automático: se pintan apagadas y el añadido masivo las salta
   const [vetadas, setVetadas] = useState(new Set());
@@ -165,8 +207,16 @@ export default function Calendar() {
   // las siete claves contadas siempre (typeCounts, components.jsx): omitir una
   // pintaba su chip sin recuento en vez de esconderlo
   const counts = typeCounts(data.events);
-  const visible = data.events.filter((e) => matchesTypeFilters(e, show));
-  const hiddenCount = data.events.length - visible.length;
+  const pasaFaceta = (e) =>
+    faceta === 'todo' || (faceta === 'direccion' ? dirigeAlguien(e) : !dirigeAlguien(e));
+  const porTipo = data.events.filter((e) => matchesTypeFilters(e, show));
+  const visible = porTipo.filter(pasaFaceta);
+  // «ocultas por tus filtros» habla SOLO del filtro de tipo: lo que quita la
+  // faceta ya se lee en sus propios botones, que llevan el recuento puesto
+  const hiddenCount = data.events.length - porTipo.length;
+  // los recuentos de las dos facetas, para que los botones digan cuánto hay
+  const nDireccion = porTipo.filter(dirigeAlguien).length;
+  const nReparto = porTipo.length - nDireccion;
 
   const upcoming = visible.filter((e) => e.date && e.date >= today);
   const recent = visible.filter((e) => e.date && e.date < today);
@@ -216,14 +266,38 @@ export default function Calendar() {
         {t('. Generado {date}.', { date: new Date(data.generatedAt).toLocaleString(locale()) })}
       </p>
 
+      {/* La separación que faltaba: qué viene de tu gente de DIRECCIÓN (lo que
+          el pase automático puede bajar solo) y qué viene del reparto y de los
+          demás oficios, que es exploración y se elige a mano. */}
+      <div className="card p-3 mb-4 flex items-center gap-2 flex-wrap text-sm">
+        <span className="text-xs text-zinc-500">{t('Por quién:')}</span>
+        {FACETAS.map(([v, label]) => (
+          <button
+            key={v}
+            onClick={() => setFaceta(v)}
+            className={`btn-ghost !py-1 text-xs ${faceta === v ? '!border-gold-400 text-gold-400' : ''}`}
+          >
+            {t(label)}
+            <span className="text-zinc-600">
+              {' '}{v === 'todo' ? porTipo.length : v === 'direccion' ? nDireccion : nReparto}
+            </span>
+          </button>
+        ))}
+        <span className="text-xs text-zinc-600">
+          {t('El pase automático solo baja lo de los oficios que tengas puestos en una regla —')}
+          <Link to="/ajustes?tab=automatismos" className="text-gold-400 hover:underline">{t('Automatismos')}</Link>
+          {t('—; el reparto se elige a mano.')}
+        </span>
+      </div>
+
       <div className="flex items-center gap-3 flex-wrap">
         <TypeFilterBar show={show} toggle={toggleFilter} counts={counts} />
-        <button className="btn-ghost !py-1 text-xs" onClick={() => { resetTypes(); setHorizon('6'); }}>
+        <button className="btn-ghost !py-1 text-xs" onClick={() => { resetTypes(); setHorizon('6'); setFaceta('todo'); }}>
           {t('✕ Limpiar filtros')}
         </button>
       </div>
       {hiddenCount > 0 && (
-        <p className="text-xs text-zinc-500 -mt-2 mb-6">{t('{n} ocultas por tus filtros — solo cine largometraje', { n: hiddenCount })}</p>
+        <p className="text-xs text-zinc-500 mt-1 mb-6">{t('{n} ocultas por tus filtros — solo cine largometraje', { n: hiddenCount })}</p>
       )}
 
       <div className="card p-3 mb-6 flex flex-wrap items-center gap-2 text-sm">

@@ -562,6 +562,12 @@ db.exec(`CREATE TABLE IF NOT EXISTS radarr_rule_log (
 );
 CREATE INDEX IF NOT EXISTS idx_rrl_at ON radarr_rule_log(at);
 CREATE INDEX IF NOT EXISTS idx_rrl_rule ON radarr_rule_log(rule_id, at);`);
+// A CUENTA DE QUIÉN entró cada película. El pase de favoritos ya sabe de qué
+// persona sale cada candidata (`candidatasDeFavoritos` la trae en `person`),
+// pero el log solo guardaba el rótulo de la regla —«Mis directores/as
+// favoritos»—, así que el Dashboard no podía decir «esta la trajo Fulana».
+// Las filas viejas se quedan a null: se pintan con el rótulo de su regla.
+ensureColumn('radarr_rule_log', 'person', 'person TEXT');
 
 // CUARENTENA PRE-RADARR: lo que una regla habría mandado a Radarr pero cumple
 // alguno de los criterios sospechosos (idioma, país), y por tanto espera tu ✓.

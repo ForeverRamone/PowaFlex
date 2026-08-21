@@ -1,5 +1,61 @@
 # Changelog
 
+## Beta 1.18 (1.0.18-beta) — 2026-08-21
+
+**Media «Lo mejor del año» estaba sin un solo nombre a quien seguir, y las filmografías podían llevar una semana viejas. Además: las notas que faltan en Estrenos se vuelven a pedir solas, el Dashboard cuenta qué ha bajado el robot y por quién, y Cine venidero separa lo que dirige tu gente de lo que solo interpreta.**
+
+### El palmarés empaquetado llegaba sin dirección
+
+En «Lo mejor del año», Sundance, Sundance · EE UU, Sitges y el David di Donatello salían con cartel, con nota y **sin una sola persona a la que seguir**: ni nombre que leer ni estrella que pulsar.
+
+Ninguno de los cuatro tiene columna de dirección en su tabla (Sundance va en viñetas, Sitges pone cuatro premios en columnas y el Donatello acredita productores), y para eso la 1.15 y la 1.16 ya habían puesto que el nombre lo diera TMDB. Pero desde la 1.17 esas filas llegan **con el `tmdb_id` ya resuelto** desde el palmarés empaquetado, y esa rama de `resolveFilms` —la más corta, la que no tiene nada que verificar— era **la única de las cuatro que no rellenaba la dirección**. El relleno se había escrito dos veces, en el camino de caché caliente y en el del emparejado nuevo, y el tercero se quedó fuera.
+
+Ahora también pregunta. No cuesta una petición de más: la ficha con créditos se pide primero y `movieSummary` reaprovecha ese mismo superset para el cartel y la fecha. Y si la petición falla por red, la página **no se cachea sin nombres**: se reintenta en la siguiente visita en vez de guardar el hueco durante treinta días.
+
+Caché `festival` v15 → **v16**.
+
+### Las filmografías de tus favoritos, releídas cada noche
+
+Una directora a la que sigues estrena, TMDB lo apunta, y su ficha en PowaFlex seguía enseñando la filmografía de la semana pasada. No era un fallo: `personCredits` cachea **siete días**, y ese plazo solo se adelantaba para quien apareciera en el feed global de cambios de TMDB — un feed que no siempre recoge «le han añadido una película». Y no había ningún sitio donde decir «mira otra vez».
+
+Dos cosas:
+
+- El paso nocturno «Detectar filmografías cambiadas en TMDB» **tira la filmografía de todos tus favoritos vivos**, sin mirar el feed. Son unas decenas o unos cientos de personas: una petición por cabeza y por noche, dentro de los pasos que ya recorren esa misma lista. Al resto de la biblioteca —miles— no se le toca: ahí los siete días siguen siendo lo razonable. La ficha personal (foto, biografía, fallecimiento) no se invalida, porque el paso de «estado vital» acaba de refrescarla unos minutos antes.
+- La ficha de persona tiene **«⟳ Actualizar desde TMDB»**: `POST /api/people/by-tmdb/:tmdbId/refresh` tira su caché y vuelve a pedirla ya. Como Cine venidero y los huecos se arman con esas mismas filmografías, se invalidan también y se rehacen en la siguiente visita; el rótulo del botón lo dice.
+
+### Estrenos: las Σ que faltan se vuelven a pedir
+
+Un estreno se mira el día que se anuncia, cuando todavía no lo ha votado nadie, y `enrichWithScores` le deja su fila vacía en `mdb_ratings`. Como esa función solo pide lo que **no tiene fila**, esa película se quedaba sin Σ para siempre — en la página donde la Σ es el filtro principal, y precisamente con las películas más nuevas, que son las que estrenan la nota semanas después del cine.
+
+Ahora cada carga repasa las notas que faltan (`ponerNotas`, reutilizando `refrescarNotasDeReglas`, que ya sabía reintentar las filas sin Σ): se vuelve a preguntar por las que llevan tres días paradas, así que la petición se paga una vez cada tres días y no en cada visita. La lista cacheada **no se reescribe** al hacerlo: renovarle el plazo de doce horas habría impedido que se reconstruyera nunca.
+
+Además, un botón **«Actualizar notas»** que lo fuerza ya sin reconstruir la lista desde TMDB (que es lo caro), y un contador de «N aún sin nota Σ» para que el botón tenga sentido. `refrescarNotasDeReglas` devuelve ahora cuántas notas **volvieron**, no solo cuántas se pidieron: sin ese dato, una clave que ya no vale y cuatro películas que MDBList todavía no conoce daban exactamente el mismo «0 notas nuevas». Y el recuento parte de lo que hay en la tabla, no de la copia cacheada de la página: pulsar dos veces seguidas ya no canta «3 notas nuevas» las dos veces.
+
+### El Dashboard dice qué ha bajado el robot, y por quién
+
+Cuadro nuevo: **«🤖 El automático las bajó por ti»**, los últimos 30 días agrupados por la persona a cuenta de la que entró cada película, con ✓ si ya tiene archivo y ⏳ si sigue pedida.
+
+Solo salen las altas del pase de favoritos. «Últimas peticiones a Radarr», que sigue justo debajo, es la lista de Radarr entera: lo que mandas a mano, lo de las reglas de festivales y lo de este pase, todo mezclado y sin distinguir de dónde viene cada cosa.
+
+Hizo falta apuntar la persona: el pase ya sabía de quién sale cada candidata (`candidatasDeFavoritos` la trae), pero el log solo guardaba el rótulo de la regla. Columna nueva `radarr_rule_log.person`, con su migración; las filas anteriores se agrupan aparte como «Sin persona apuntada» en vez de inventarles un nombre.
+
+### Descubrir huecos: dos interruptores
+
+- **«Ocultar las que ya están en Radarr»**: lo que ya has pedido está decidido y llegará cuando llegue, pero seguía ocupando sitio en la parrilla y había que distinguirlo a ojo en cada visita. Es distinto del ✕ de descartar, que es «esta no me interesa» y es para siempre.
+- **«Ocultar a quien no ofrece nada»** (solo en la vista por persona): con los filtros puestos, media pantalla podía ser gente con una fila que decía «todas ocultas por tus filtros». Se esconden, y debajo se dice cuántas, para que la página más corta no parezca que se ha comido a nadie.
+
+Los dos se recuerdan entre visitas y vuelven a su sitio con «✕ Limpiar filtros».
+
+### Cine venidero separa dirección de reparto
+
+Lo que dirige alguien a quien sigues es lo que el pase automático puede bajar solo; lo que sale de un actor o una actriz es exploración, y se elige a mano. Mezclados en la misma parrilla, lo segundo tapaba lo primero. Ahora hay tres botones —**Dirección y reparto / Solo dirección / Solo reparto y otros oficios**— con su recuento, una etiqueta en cada ficha y el añadido en bloque respetando el filtro.
+
+Con un detalle que no era evidente: **esto no se puede deducir de los créditos de la ficha**. La lista de personas de cada estreno lleva siempre al director REAL de la película, lo sigas o no, así que una película que entra por su actriz también dice «Dirige Fulano» y se clasificaba como si fuera cosa de su dirección. El dato bueno lo pone ahora el servidor (`porDireccion`), mirando por quién entró de verdad. Caché `calendar` v7 → **v8**.
+
+### Números
+
+Pruebas 296 → **303** (`server/test/lote-118.test.js`). Cachés: `festival` v15 → v16, `calendar` v7 → v8. Migración: columna `person` en `radarr_rule_log`.
+
 ## Beta 1.17 (1.0.17-beta) — 2026-08-11
 
 **Los palmareses cerrados vienen empaquetados con la app: Wikipedia se queda para lo que se mueve. Y entran Seminci y Sitges.**

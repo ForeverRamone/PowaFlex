@@ -9,6 +9,23 @@ import { useChartTheme } from '../charts.js';
 // contadores y las novedades se pintan sin esperar a la librería de gráficas
 const DashboardCharts = lazy(() => import('./charts/DashboardCharts.jsx'));
 
+// Las altas automáticas se leen por PERSONA, no por fecha: la pregunta es «¿qué
+// me ha bajado el robot de quién?». Las filas viejas del log no llevan nombre
+// (la columna es nueva) y se agrupan aparte en vez de inventarse uno.
+const SIN_PERSONA = '\u0000';
+function porPersona(filas) {
+  const mapa = new Map();
+  for (const f of filas) {
+    const k = f.person || SIN_PERSONA;
+    if (!mapa.has(k)) mapa.set(k, []);
+    mapa.get(k).push(f);
+  }
+  // quien más ha traído, primero; el bloque sin nombre siempre al final
+  return [...mapa.entries()].sort((a, b) =>
+    a[0] === SIN_PERSONA ? 1 : b[0] === SIN_PERSONA ? -1 : b[1].length - a[1].length
+  );
+}
+
 // small poster tile used across the "recent" strips
 function PosterTile({ item, onClick, badge, sub }) {
   const [err, setErr] = useState(false);
@@ -82,10 +99,12 @@ export default function Dashboard() {
         api('/stats/recent'),
         api('/events?days=14'),
         api('/radarr/captures?days=7'),
-      ]).then(([recent, events, captures]) => ({
+        api('/radarr/rules/sent?days=30&limit=24'),
+      ]).then(([recent, events, captures, autoEnviadas]) => ({
         recent,
         events: Array.isArray(events) ? events : null,
         captures: Array.isArray(captures) ? captures : null,
+        autoEnviadas: Array.isArray(autoEnviadas) ? autoEnviadas : null,
       })),
     },
     {
@@ -105,6 +124,7 @@ export default function Dashboard() {
   const recent = carga.datos.reciente?.recent ?? null;
   const events = carga.datos.reciente?.events ?? null;
   const captures = carga.datos.reciente?.captures ?? null;
+  const autoEnviadas = carga.datos.reciente?.autoEnviadas ?? null;
   const directors = carga.datos.personas?.directors ?? [];
   const actors = carga.datos.personas?.actors ?? [];
 
@@ -176,6 +196,37 @@ export default function Dashboard() {
                   {c.rating_key ? t('en Plex') : t('aún sin sincronizar')}
                 </span>
                 <span className="text-[11px] text-zinc-500 shrink-0 tabular">{fmtDate(c.captured_at)}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Lo que el pase de favoritos ha bajado SOLO, agrupado por la persona a
+          cuenta de la que entró: «Últimas peticiones a Radarr» (más abajo) es la
+          lista de Radarr entera y ahí esto se pierde entre lo que mandas a mano. */}
+      {autoEnviadas?.length > 0 && (
+        <Section
+          title={t('🤖 El automático las bajó por ti ({n} en 30 días)', { n: autoEnviadas.length })}
+          action={<Link to="/ajustes?tab=automatismos" className="text-xs text-gold-400 hover:underline">{t('Automatismos →')}</Link>}
+        >
+          <div className="card divide-y divide-ink-800 max-h-72 overflow-y-auto">
+            {porPersona(autoEnviadas).map(([quien, pelis]) => (
+              <div key={quien} className="px-3 py-2 text-sm">
+                <div className="text-[11px] uppercase tracking-wide text-gold-400 font-semibold">
+                  {quien === SIN_PERSONA ? t('Sin persona apuntada') : quien}
+                  <span className="text-zinc-600 font-normal normal-case tracking-normal"> · {pelis.length}</span>
+                </div>
+                {pelis.map((p) => (
+                  <div key={`${p.tmdb_id}-${p.at}`} className="flex items-center gap-2 mt-0.5">
+                    <span className={p.has_file ? 'text-emerald-400' : 'text-zinc-500'} title={p.has_file ? t('Ya descargada') : t('Pedida, aún sin archivo')}>
+                      {p.has_file ? '✓' : '⏳'}
+                    </span>
+                    <span className="text-zinc-200 truncate flex-1">{p.title}</span>
+                    {p.score != null && <span className="text-[11px] text-gold-400 shrink-0 tabular">Σ {p.score}</span>}
+                    <span className="text-[11px] text-zinc-500 shrink-0 tabular">{fmtDate(p.at)}</span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

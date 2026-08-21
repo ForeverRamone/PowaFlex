@@ -5,6 +5,24 @@
 // en/app.js, y el titular «Festivales y premios» de la Alpha 0.9.5 ya existe
 // como nombre de página en en/app.js: aquí no se repiten.
 export default {
+  // ── Beta 1.18 ──────────────────────────────────────────────────────────────
+  'Los nombres que faltaban en los palmareses, y las filmografías al día':
+    'The names missing from the award lists, and filmographies kept current',
+  'En «Lo mejor del año», Sundance, Sitges y el David di Donatello salían con cartel y con nota pero sin un solo nombre debajo: ni a quién leer ni una estrella que pulsar para seguirle. Sus tablas de Wikipedia no dicen quién dirige, y desde la versión pasada esas películas entraban por un atajo que se saltaba la pregunta a TMDB. Ya la hace.':
+    'In “Best of the year”, Sundance, Sitges and the David di Donatello showed a poster and a score but not a single name underneath: nobody to read, no star to press to follow them. Their Wikipedia tables do not say who directed, and since the last version those films came in through a shortcut that skipped asking TMDB. Now it asks.',
+  'Si sigues a alguien y TMDB le apunta una película nueva, ahora aparece al día siguiente. Su filmografía se guardaba una semana entera, así que un estreno recién añadido podía tardar todo ese tiempo en salir en su ficha, en Cine venidero y en los huecos. Cada noche se vuelve a leer entera la de toda la gente a la que sigues.':
+    'If you follow someone and TMDB records a new film for them, it now shows up the next day. Their filmography was cached for a whole week, so a freshly added release could take that long to appear on their page, in Upcoming cinema and in your gaps. Every night the whole filmography of everyone you follow is read again.',
+  'Y si no quieres esperar a la noche, su ficha tiene un botón nuevo: «Actualizar desde TMDB» vuelve a pedirla en ese momento.':
+    'And if you would rather not wait for the night, their page has a new button: “Refresh from TMDB” asks for it right then.',
+  'Las películas sin nota de Estrenos dejan de quedarse sin nota para siempre. Un estreno se mira el día que se anuncia, cuando todavía no lo ha votado nadie, y esa respuesta vacía se quedaba guardada. Ahora se vuelve a preguntar cada pocos días, y hay un botón «Actualizar notas» para pedirlas todas ya. Arriba te dice cuántas siguen sin Σ.':
+    'Unrated films in New releases no longer stay unrated forever. A release is looked up the day it is announced, when nobody has voted on it yet, and that empty answer was kept. Now it is asked again every few days, and there is a “Refresh scores” button to fetch them all right away. The line above tells you how many are still without a Σ.',
+  'El Dashboard tiene un cuadro nuevo: qué películas te ha bajado solo el automático en los últimos treinta días, agrupadas por el director o directora por quien entró cada una, y si ya han llegado o siguen esperando. «Últimas peticiones a Radarr» sigue estando debajo, pero ahí se mezcla todo: lo que mandas a mano, lo de las reglas de festivales y lo de este pase.':
+    'The Dashboard has a new box: which films the nightly job grabbed for you over the last thirty days, grouped by the director each one came in for, and whether they have arrived or are still pending. “Latest Radarr requests” is still below it, but that one mixes everything: what you send by hand, what the festival rules bring and what this job grabs.',
+  'En Descubrir huecos, dos interruptores nuevos: esconder lo que ya está en Radarr —que ya está decidido y llegará— y esconder a quien, con los filtros que tienes puestos, no ofrece ninguna película. Los dos se recuerdan y se quitan con «Limpiar filtros».':
+    'In Discover gaps, two new toggles: hide what is already in Radarr — settled, and on its way — and hide anyone who, with the filters you have set, offers no film at all. Both are remembered and both clear with “Clear filters”.',
+  'Cine venidero separa por fin lo que dirige tu gente de lo que solo interpreta. Son dos cosas distintas: lo primero es lo que el pase automático puede bajar solo, y lo segundo es para mirar y elegir a mano. Tres botones arriba, con su recuento, y una etiqueta en cada ficha.':
+    'Upcoming cinema finally separates what your people direct from what they only act in. They are two different things: the first is what the nightly job can grab on its own, the second is for you to look at and pick by hand. Three buttons at the top with their counts, and a tag on every card.',
+
   // ── Beta 1.17 ──────────────────────────────────────────────────────────────
   'Los palmareses viejos vienen dentro de la app: Wikipedia se queda para lo que se mueve':
     'The old award lists now ship inside the app: Wikipedia is left for what still moves',

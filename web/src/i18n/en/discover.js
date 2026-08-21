@@ -128,4 +128,14 @@ export default {
   'actores/actrices': 'actors',
   'Qué te falta de las filmografías de {role} más presentes en tu biblioteca.': "What you're missing from the filmographies of the {role} most present in your library.",
   'Qué te falta de las filmografías de {role} más presentes en tu biblioteca, con tus filtros demográficos aplicados.': "What you're missing from the filmographies of the {role} most present in your library, with your demographic filters applied.",
+
+  // los dos interruptores de «enséñame solo lo que queda por decidir»
+  'Ocultar las que ya están en Radarr': 'Hide the ones already in Radarr',
+  'Lo que ya has mandado a Radarr está decidido: esto lo quita de la parrilla para dejar solo lo que falta por pedir':
+    'What you already sent to Radarr is settled: this drops it from the grid so only what is left to request remains',
+  'Ocultar a quien no ofrece nada': 'Hide people with nothing to offer',
+  'Quita de la lista a quien, con los filtros puestos, no ofrece ninguna película':
+    'Drops from the list anyone who, with these filters on, offers no film at all',
+  '{n} personas escondidas: con estos filtros no ofrecen ninguna película.':
+    '{n} people hidden: with these filters they offer no film at all.',
 };

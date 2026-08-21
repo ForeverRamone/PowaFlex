@@ -46,4 +46,20 @@ export default {
     'Keep the nightly Radarr job from grabbing it. It stays visible here and you can still add it by hand.',
   '🚫 «{title}» queda fuera del pase automático': '🚫 “{title}” is out of the nightly Radarr job',
   '↩︎ «{title}» vuelve al pase automático': '↩︎ “{title}” is back in the nightly Radarr job',
+
+  // dirección vs reparto: lo que el pase automático puede bajar solo y lo que
+  // se elige a mano
+  'Por quién:': 'Whose:',
+  'Dirección y reparto': 'Directing and cast',
+  'Solo dirección': 'Directing only',
+  'Solo reparto y otros oficios': 'Cast and other crafts only',
+  'dirección': 'directing',
+  'reparto': 'cast',
+  'Sale de alguien a quien sigues como director/a: es lo que el pase automático puede bajar solo':
+    'Comes from someone you follow as a director: this is what the nightly job can grab on its own',
+  'Sale de alguien a quien sigues por otro oficio: aquí eliges tú qué mandar a Radarr':
+    'Comes from someone you follow for another craft: here you pick what goes to Radarr',
+  'El pase automático solo baja lo de los oficios que tengas puestos en una regla —':
+    'The nightly job only grabs the crafts you set up in a rule —',
+  '—; el reparto se elige a mano.': '—; cast picks are made by hand.',
 };

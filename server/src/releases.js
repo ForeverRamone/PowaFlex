@@ -1,7 +1,7 @@
 import { db, cacheRead, cacheWrite } from './db.js';
 import { today } from './dates.js';
 import { tmdbGet, enrichRuntimes, esParcialCaducado, classifyGenres } from './tmdb.js';
-import { enrichWithScores } from './mdblist.js';
+import { enrichWithScores, refrescarNotasDeReglas } from './mdblist.js';
 import { matchMovie, watchedIndex, isWatched } from './letterboxd.js';
 import { mapPool } from './pool.js';
 import { cachePrefix } from './cache-versions.js';
@@ -109,13 +109,60 @@ async function attachProviders(items, region, { concurrency = 6 } = {}) {
   });
 }
 
-export async function releases({ kind = 'cine-es', window = 30, refresh = false } = {}) {
+/**
+ * LAS NOTAS QUE FALTAN, en una lista de estrenos.
+ *
+ * Aquí está el caso peor de la caché negativa de MDBList: un estreno se mira el
+ * día que se anuncia, cuando todavía no lo ha votado nadie, y `enrichWithScores`
+ * le deja su fila vacía. Como esa función solo pide lo que NO tiene fila, esa
+ * película se quedaba sin Σ PARA SIEMPRE — justo en la página donde la Σ es el
+ * filtro principal, y justo con las películas más nuevas, que son las que
+ * estrenan la nota semanas después.
+ *
+ * `refrescarNotasDeReglas` ya sabe volver a preguntar por las que siguen sin Σ:
+ * con `caducaMs` de tres días se reintenta solo lo que lleva tres días parado,
+ * así que la petición se paga una vez cada tres días y no en cada visita.
+ * `forzar` (el botón «Actualizar notas») lo reintenta todo ya.
+ *
+ * Devuelve si algo cambió, para no reescribir la caché sin motivo.
+ */
+async function ponerNotas(films, { forzar = false } = {}) {
+  // El punto de partida es lo que HAY EN LA TABLA ahora, no lo que traía la
+  // copia cacheada de la página: si no, pulsar «Actualizar notas» dos veces
+  // seguidas cantaba «3 notas nuevas» las dos veces, cuando la segunda no había
+  // pedido nada. Un «hecho» que no es verdad es peor que no decir nada.
+  await enrichWithScores(films, { fetchMissing: false });
+  const antes = films.filter((f) => f.mdb?.score != null).length;
+  const notas = await refrescarNotasDeReglas(films, {
+    maxFetch: forzar ? 400 : 120,
+    caducaMs: forzar ? 0 : 3 * DAY,
+  });
+  // lo recién descargado ya está en la tabla: se relee sin gastar nada más
+  await enrichWithScores(films, { fetchMissing: false });
+  const ahora = films.filter((f) => f.mdb?.score != null).length;
+  // se pidieron y no vino NI UNA: o MDBList aún no las tiene, o la clave ya no
+  // vale. Callarlo dejaba las dos cosas con la misma cara («0 notas nuevas»).
+  const motivo = notas.motivo || (notas.pedidas > 0 && notas.recibidas === 0 ? 'sin_respuesta' : null);
+  return { pedidas: notas.pedidas, recibidas: notas.recibidas ?? 0, motivo, nuevas: ahora - antes };
+}
+
+export async function releases({ kind = 'cine-es', window = 30, refresh = false, refrescarNotas = false } = {}) {
   if (!RELEASE_KINDS[kind]) throw new Error(`kind desconocido: ${kind}`);
   const win = [7, 30, 90].includes(Number(window)) ? Number(window) : 30;
   const cacheKey = `${cachePrefix('releases')}:${kind}:${win}`;
   if (!refresh) {
     const hit = cacheRead(cacheKey, 12 * HOUR);
-    if (hit && !esParcialCaducado(hit)) return hit;
+    if (hit && !esParcialCaducado(hit)) {
+      // La lista cacheada se sirve tal cual, pero las NOTAS se repasan: son lo
+      // que envejece de verdad de un estreno (la lista de qué se estrena no
+      // cambia en doce horas; su Σ sí, porque aparece días después del estreno).
+      // La caché NO se reescribe: hacerlo le renovaría el plazo de doce horas y
+      // la lista no se reconstruiría nunca. Repasar cuesta una consulta a la
+      // tabla de notas, que ya está descargada.
+      const films = [...(hit.recent || []), ...(hit.upcoming || [])];
+      const notas = await ponerNotas(films, { forzar: refrescarNotas });
+      return { ...hit, notas };
+    }
   }
 
   const hoy = today();
@@ -157,9 +204,13 @@ export async function releases({ kind = 'cine-es', window = 30, refresh = false 
 
   if (RELEASE_KINDS[kind].providers) await attachProviders(features, RELEASE_KINDS[kind].region);
   await enrichWithScores(features, { maxFetch: 250 });
+  // y las que sigan sin Σ, otra vuelta: ver `ponerNotas`. En una construcción
+  // nueva casi todas las nuevas caen aquí, porque `enrichWithScores` solo pide
+  // las que no tienen ni fila.
+  const notas = await ponerNotas(features, { forzar: refrescarNotas });
 
   const { recent, upcoming } = partirPorFecha(features, hoy);
-  const result = { generatedAt: Date.now(), kind, window: win, recent, upcoming, errors: errors.slice(0, 5) };
+  const result = { generatedAt: Date.now(), kind, window: win, recent, upcoming, notas, errors: errors.slice(0, 5) };
   // ver buildCalendar: un resultado con fallos de red se sirve pero caduca antes
   cacheWrite(cacheKey, errors.length ? { ...result, partial: true } : result);
   return result;

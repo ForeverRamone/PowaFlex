@@ -56,4 +56,11 @@ export default {
   'Directores/as con más películas': 'Directors with the most movies',
   'Ver todos →': 'See all →',
   'Actores/actrices con más películas': 'Actors with the most movies',
+
+  // lo que el pase de favoritos ha bajado solo, por persona
+  '🤖 El automático las bajó por ti ({n} en 30 días)': '🤖 The nightly job grabbed these for you ({n} in 30 days)',
+  'Automatismos →': 'Automation →',
+  'Sin persona apuntada': 'No person recorded',
+  'Ya descargada': 'Already downloaded',
+  'Pedida, aún sin archivo': 'Requested, still no file',
 };
