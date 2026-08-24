@@ -14,8 +14,8 @@ export default {
     'Building the calendar from TMDB (the first time takes a while)…',
   'Actualizando…': 'Updating…',
   'Actualizar desde TMDB': 'Refresh from TMDB',
-  'Estrenos próximos y proyectos anunciados de los {n} directores/actores vigilados: el top automático de tu biblioteca más tus ':
-    "Upcoming releases and announced projects from the {n} directors/actors you watch: your library's automatic top plus your ",
+  'Estrenos y proyectos anunciados de los {n} vigilados: el top de tu biblioteca más tus ':
+    'Upcoming releases and announced projects from the {n} people watched: your library’s top names plus your ',
   'favoritos': 'favorites',
   '. Generado {date}.': '. Generated {date}.',
   '✕ Limpiar filtros': '✕ Clear filters',

@@ -46,15 +46,15 @@ export default {
   'Pedir {n} a Radarr': 'Request {n} from Radarr',
   ' (todas las visibles)': ' (all visible)',
   'Pedidas a Radarr que siguen sin aparecer ({n})': 'Requested from Radarr and still missing ({n})',
-  'Monitorizadas sin archivo, las más antiguas primero: son las que piden una decisión (volver a buscar, esperar al estreno digital o quitar de Radarr).':
-    'Monitored with no file, oldest first: these are the ones that call for a decision (search again, wait for the digital release, or remove from Radarr).',
+  'Monitorizadas sin archivo, las más antiguas primero: piden una decisión —volver a buscar, esperar al digital o quitarlas de Radarr.':
+    'Monitored with no file, oldest first: these need a decision — search again, wait for digital, or drop them from Radarr.',
   '¿?': '?',
   'Tiempo en Radarr sin conseguirse': 'Time in Radarr without being grabbed',
   'hace {t}': '{t} ago',
   '🔍 Buscar de nuevo': '🔍 Search again',
   'Por debajo del corte de tu perfil de Radarr ({n})': 'Below your Radarr profile cutoff ({n})',
-  'Tienen archivo, pero de menos calidad de la que pide tu perfil: Radarr las mejorará si aparece algo mejor, y puedes forzar la búsqueda ya.':
-    'They have a file, but of lower quality than your profile asks for: Radarr will upgrade them if something better shows up, and you can force the search now.',
+  'Tienen archivo, pero por debajo de tu perfil. Radarr las mejorará si aparece algo mejor, y puedes forzar la búsqueda ya.':
+    'They have a file, but below your profile. Radarr will upgrade them if something better shows up, and you can force the search now.',
   '🔍 Buscar mejor': '🔍 Search for better',
   'Duplicados y versiones múltiples': 'Duplicates and multiple versions',
   'Con varias versiones/archivos ({n})': 'With several versions/files ({n})',
@@ -75,17 +75,17 @@ export default {
   '✓ {n} entradas emparejadas': '✓ {n} entries matched',
   'Auditando la base de datos…': 'Auditing the database…',
   'Mirando si quedó una comprobación a medias…': 'Checking whether a verification was left half-done…',
-  'Auditorías locales de la base de datos: huérfanos, homónimos y peticiones zombis, cada uno con su remedio al lado.':
-    'Local database audits: orphans, namesakes and zombie requests, each with its fix right next to it.',
+  'Auditorías locales: huérfanos, homónimos y peticiones zombis, cada una con su remedio al lado.':
+    'Local audits: orphans, namesakes and zombie requests, each with its remedy beside it.',
   'Películas sin ficha de TMDB': 'Movies without a TMDB entry',
   'Toda la biblioteca tiene su ficha: notas, sagas, festivales y huecos las ven todas.':
     'Every film in the library has its record: ratings, sagas, festivals and gaps see them all.',
-  'Sin TMDB id quedan fuera de notas, sagas, festivales y huecos. El pase nocturno intenta resolverlas solas (por IMDb id y por título); las que persisten suelen ser rarezas o títulos mal escritos en Plex.':
-    'Without a TMDB id they stay out of ratings, sagas, festivals and gaps. The nightly run tries to resolve them on its own (by IMDb id and by title); the ones that persist are usually oddities or titles misspelled in Plex.',
+  'Sin id de TMDB quedan fuera de notas, sagas, festivales y huecos. El pase nocturno lo intenta solo; las que persisten suelen ser rarezas o títulos mal escritos en Plex.':
+    'With no TMDB id they fall outside scores, sagas, festivals and gaps. The nightly job tries on its own; the ones that persist are usually oddities or titles misspelled in Plex.',
   'Mismo TMDB id en varias entradas de Plex': 'Same TMDB id across several Plex entries',
   'Ninguna identidad repetida.': 'No repeated identities.',
-  'O son ediciones legítimas duplicadas (véase también «Duplicados» en Calidad y disco), o el agente de Plex emparejó dos películas distintas a la misma ficha: merece un vistazo en Plex.':
-    'Either they are legitimate duplicate editions (see also “Duplicates” under Quality & disk), or the Plex agent matched two different films to the same record: worth a look in Plex.',
+  'O son ediciones duplicadas, o el agente de Plex emparejó dos películas distintas a la misma ficha. Merece un vistazo en Plex.':
+    'Either they are duplicate editions, or Plex’s agent matched two different films to the same entry. Worth a look in Plex.',
   'Entradas de Letterboxd sin emparejar': 'Unmatched Letterboxd entries',
   'Todo tu Letterboxd está casado con la biblioteca o con TMDB.': 'Your whole Letterboxd is matched to the library or to TMDB.',
   'Visionados o notas tuyas que no casan con nada: no cuentan en Visionado ni en el completismo.':
@@ -95,19 +95,19 @@ export default {
   'Ir a Ajustes → Letterboxd': 'Go to Settings → Letterboxd',
   'Peticiones zombis en Radarr (6+ meses sin aparecer)': 'Zombie requests in Radarr (6+ months missing)',
   'Nada pedido lleva más de seis meses atascado.': 'Nothing requested has been stuck for more than six months.',
-  'Monitorizadas desde hace más de medio año sin archivo. En «Calidad y disco» tienen su fase de estreno y la re-búsqueda; las que no existan en digital quizá merezcan salir de Radarr.':
-    'Monitored for over half a year with no file. Under “Quality & disk” they have their release phase and the re-search; the ones that do not exist on digital may deserve to leave Radarr.',
+  'Monitorizadas más de medio año sin archivo. Las que no existan en digital quizá merezcan salir de Radarr.':
+    'Monitored for over six months with no file. The ones that do not exist digitally may deserve to leave Radarr.',
   'Verlas en Calidad y disco →': 'See them under Quality & disk →',
   'desde {date}': 'since {date}',
   'Personas con emparejado sin demostrar': 'People with an unverified match',
   'Todas las personas con ficha TMDB demostraron su identidad con tus propias películas.':
     'Everyone with a TMDB entry proved their identity with your own films.',
-  'Casi todas están simplemente SIN MIRAR: añadir a alguien a favoritos o volcar un canon le pone su ficha de TMDB, pero la identidad solo se comprueba cuando algo necesita su filmografía. Con el botón se comprueban todas de una vez.':
-    'Almost all of them are simply UNCHECKED: adding someone to favorites or importing a canon gives them their TMDB entry, but the identity is only checked when something needs their filmography. The button checks them all in one go.',
-  'Su búsqueda en TMDB no encontró a nadie con al menos una de tus películas en su filmografía: puede ser un homónimo. Se reintenta solo cada semana; entrar en su ficha también fuerza el reintento.':
-    'Their TMDB search found nobody with at least one of your films in their filmography: it may be a namesake. It retries on its own every week; opening their page also forces the retry.',
-  ' se comprobaron y ninguna ficha de TMDB compartía película con las tuyas (ahí sí puede haber un homónimo) · ':
-    ' were checked and no TMDB entry shared a movie with yours (there a namesake really is possible) · ',
+  'Casi todas están simplemente sin mirar: la identidad solo se comprueba cuando algo necesita su filmografía. El botón las comprueba todas de una vez.':
+    'Almost all of them are simply unchecked: identity is only verified when something needs their filmography. The button checks them all at once.',
+  'TMDB no encontró a nadie con al menos una de tus películas en su filmografía: puede ser un homónimo. Se reintenta solo cada semana.':
+    'TMDB found nobody with at least one of your films in their filmography: it may be a namesake. It retries on its own every week.',
+  ' se comprobaron y ninguna ficha compartía película con las tuyas: ahí sí puede haber un homónimo · ':
+    ' were checked and no entry shared a film with yours: those may well be namesakes · ',
   ' aún sin mirar.': ' still unchecked.',
   'Comprobando…': 'Checking…',
   '🔎 Comprobar ahora contra TMDB': '🔎 Check against TMDB now',

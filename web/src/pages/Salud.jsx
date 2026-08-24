@@ -145,7 +145,7 @@ export default function Salud({ embedded = false }) {
         <PageHeader
           eyebrow={t('Tu colección')}
           title={t('Salud de los datos')}
-          subtitle={t('Auditorías locales de la base de datos: huérfanos, homónimos y peticiones zombis, cada uno con su remedio al lado.')}
+          subtitle={t('Auditorías locales: huérfanos, homónimos y peticiones zombis, cada una con su remedio al lado.')}
         />
       )}
 
@@ -155,7 +155,7 @@ export default function Salud({ embedded = false }) {
         title={t('Películas sin ficha de TMDB')}
         total={data.sinTmdb.total}
         ok={t('Toda la biblioteca tiene su ficha: notas, sagas, festivales y huecos las ven todas.')}
-        hint={t('Sin TMDB id quedan fuera de notas, sagas, festivales y huecos. El pase nocturno intenta resolverlas solas (por IMDb id y por título); las que persisten suelen ser rarezas o títulos mal escritos en Plex.')}
+        hint={t('Sin id de TMDB quedan fuera de notas, sagas, festivales y huecos. El pase nocturno lo intenta solo; las que persisten suelen ser rarezas o títulos mal escritos en Plex.')}
       >
         <Lista>
           {data.sinTmdb.sample.map((m) => (
@@ -171,7 +171,7 @@ export default function Salud({ embedded = false }) {
         title={t('Mismo TMDB id en varias entradas de Plex')}
         total={data.tmdbRepetido.total}
         ok={t('Ninguna identidad repetida.')}
-        hint={t('O son ediciones legítimas duplicadas (véase también «Duplicados» en Calidad y disco), o el agente de Plex emparejó dos películas distintas a la misma ficha: merece un vistazo en Plex.')}
+        hint={t('O son ediciones duplicadas, o el agente de Plex emparejó dos películas distintas a la misma ficha. Merece un vistazo en Plex.')}
       >
         <Lista>
           {data.tmdbRepetido.sample.map((g) => (
@@ -209,7 +209,7 @@ export default function Salud({ embedded = false }) {
         title={t('Peticiones zombis en Radarr (6+ meses sin aparecer)')}
         total={data.radarrZombis.total}
         ok={t('Nada pedido lleva más de seis meses atascado.')}
-        hint={t('Monitorizadas desde hace más de medio año sin archivo. En «Calidad y disco» tienen su fase de estreno y la re-búsqueda; las que no existan en digital quizá merezcan salir de Radarr.')}
+        hint={t('Monitorizadas más de medio año sin archivo. Las que no existan en digital quizá merezcan salir de Radarr.')}
       >
         <div className="mb-2">
           <Link to="/taller?tab=calidad" className="btn-ghost !py-1 text-xs">{t('Verlas en Calidad y disco →')}</Link>
@@ -232,13 +232,13 @@ export default function Salud({ embedded = false }) {
         ok={t('Todas las personas con ficha TMDB demostraron su identidad con tus propias películas.')}
         hint={
           data.personasSinVerificar.sinComprobar > 0
-            ? t('Casi todas están simplemente SIN MIRAR: añadir a alguien a favoritos o volcar un canon le pone su ficha de TMDB, pero la identidad solo se comprueba cuando algo necesita su filmografía. Con el botón se comprueban todas de una vez.')
-            : t('Su búsqueda en TMDB no encontró a nadie con al menos una de tus películas en su filmografía: puede ser un homónimo. Se reintenta solo cada semana; entrar en su ficha también fuerza el reintento.')
+            ? t('Casi todas están simplemente sin mirar: la identidad solo se comprueba cuando algo necesita su filmografía. El botón las comprueba todas de una vez.')
+            : t('TMDB no encontró a nadie con al menos una de tus películas en su filmografía: puede ser un homónimo. Se reintenta solo cada semana.')
         }
       >
         <p className="text-xs text-zinc-400 mb-2">
           <b className="text-orange-300">{data.personasSinVerificar.fallidas.toLocaleString(locale())}</b>
-          {t(' se comprobaron y ninguna ficha de TMDB compartía película con las tuyas (ahí sí puede haber un homónimo) · ')}
+          {t(' se comprobaron y ninguna ficha compartía película con las tuyas: ahí sí puede haber un homónimo · ')}
           <b className="text-zinc-300">{data.personasSinVerificar.sinComprobar.toLocaleString(locale())}</b>
           {t(' aún sin mirar.')}
         </p>

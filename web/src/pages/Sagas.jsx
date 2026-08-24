@@ -116,7 +116,7 @@ export default function Sagas({ embedded = false }) {
     <div>
       {!embedded && <PageHeader eyebrow={t('Colección')} title={t('Sagas')} />}
       <p className="text-sm text-zinc-500 mb-5 max-w-3xl">
-        {t('Franquicias detectadas cruzando cada película de tu biblioteca con su colección real de TMDB (no con las etiquetas manuales de Plex). Abre cualquiera para ver qué partes te faltan y mandarlas a Radarr.')}
+        {t('Franquicias detectadas cruzando tu biblioteca con la colección real de TMDB, no con las etiquetas de Plex. Abre cualquiera para ver qué partes faltan.')}
       </p>
 
       {/* scan control */}

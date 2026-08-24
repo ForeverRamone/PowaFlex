@@ -261,7 +261,7 @@ export default function Calendar() {
         </button>
       </div>
       <p className="text-sm text-zinc-500 mb-6">
-        {t('Estrenos próximos y proyectos anunciados de los {n} directores/actores vigilados: el top automático de tu biblioteca más tus ', { n: data.peopleCount })}
+        {t('Estrenos y proyectos anunciados de los {n} vigilados: el top de tu biblioteca más tus ', { n: data.peopleCount })}
         <Link to="/favoritos" className="text-gold-400 hover:underline">{t('favoritos')}</Link>
         {t('. Generado {date}.', { date: new Date(data.generatedAt).toLocaleString(locale()) })}
       </p>

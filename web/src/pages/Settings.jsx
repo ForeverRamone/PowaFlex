@@ -123,7 +123,7 @@ function LetterboxdSection() {
       </h2>
       <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-3xl">
         {t('Exporta tus datos en letterboxd.com → Settings → Data → Export y sube aquí ')}<b>{t('el .zip completo')}</b>
-        {t(' tal cual (sin descomprimir): PowaFlex extrae diario, notas, vistas, watchlist y tus listas. También acepta CSV sueltos y el formato Letterboxd de WebTools-NG. Tus notas vs. la comunidad se ven en ')}
+        {t(' tal cual, sin descomprimir. También acepta CSV sueltos y el formato de WebTools-NG. Tus notas frente a la comunidad se ven en ')}
         <b>{t('Visionado')}</b>{t('; la watchlist, en ')}<b>{t('Listas y retos')}</b>.
       </p>
       {summary?.error ? (
@@ -168,7 +168,7 @@ function LetterboxdSection() {
           <div className="mt-4">
             <h3 className="font-semibold text-zinc-100 text-sm mb-1">{t('Feed RSS de tu perfil')}</h3>
             <p className="text-xs text-zinc-500 mb-3 max-w-3xl">
-              {t('Guarda tu usuario de Letterboxd y PowaFlex irá recogiendo tus últimas películas vistas automáticamente (cada noche, y cuando pulses aquí). Aparecerán en el Dashboard y se emparejan con tu biblioteca.')}
+              {t('Con tu usuario de Letterboxd, tus últimas vistas se recogen solas cada noche y aparecen en el Dashboard.')}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-zinc-500 text-sm">letterboxd.com/</span>
@@ -299,7 +299,7 @@ function SeccionPlex() {
               ))}
             </div>
             <p className="text-[11px] text-zinc-500 mt-2">
-              {t('Guarda los ajustes y sincroniza: las películas de bibliotecas desmarcadas se retiran de PowaFlex en la siguiente sincronización (en Plex no se toca nada).')}
+              {t('Al sincronizar, lo de las bibliotecas desmarcadas se retira de PowaFlex. En Plex no se toca nada.')}
             </p>
           </div>
         );
@@ -419,7 +419,7 @@ function SeccionRadarr() {
           )}
         </div>
         <p className="text-[11px] text-zinc-500 mt-1">
-          {t('Guarda un listado local de lo que ya tienes en Radarr para que las fichas muestren el recuadro verde «✓ en Radarr» en vez de intentar añadirlo y fallar con «ya existe».')}
+          {t('Guarda lo que ya tienes en Radarr para que las fichas digan «✓ en Radarr» en vez de fallar con «ya existe».')}
         </p>
       </div>
 
@@ -461,7 +461,7 @@ function SeccionMdblist() {
             <option value="supporter">{t('Supporter (25.000/día)')}</option>
           </select>
           <p className="text-[11px] text-zinc-500 mt-1">
-            {t('Define cuántas notas se refrescan al día: con cuenta gratuita el llenado inicial se reparte en varios días; con Supporter cabe la biblioteca entera de una tanda.')}
+            {t('Cuántas notas se refrescan al día. Con cuenta gratuita el llenado inicial se reparte en varios días; con Supporter cabe entera.')}
           </p>
         </div>
       </div>
@@ -504,7 +504,7 @@ function SeccionMdblist() {
       <Guide title={t('¿Cómo consigo la API key de MDBList?')}>
         <p>{t('1. Cuenta en ')}<b>mdblist.com</b>{t(' (puedes entrar con Trakt).')}</p>
         <p>{t('2. Ve a ')}<b>Preferences → API Access</b>{t(' y copia la key.')}</p>
-        <p>{t('3. La cuenta gratuita da 1.000 peticiones/día; las Supporter, bastantes más. PowaFlex respeta el límite y reparte el trabajo.')}</p>
+        <p>{t('3. La gratuita da 1.000 peticiones al día y las Supporter bastantes más. PowaFlex reparte el trabajo dentro del límite.')}</p>
       </Guide>
     </section>
   );
@@ -518,7 +518,7 @@ function SeccionImdb() {
         {t('Notas de IMDb')} <span className="text-zinc-500 text-xs font-normal">{t('(opcional: el volcado público, sin API)')}</span>
       </h2>
       <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-2xl">
-        {t('IMDb publica a diario un fichero con las notas y los votos de todo su catálogo. PowaFlex lo usa para el umbral de ruido de Descubrir sin gastar ni una petición de API.')}
+        {t('IMDb publica a diario las notas y los votos de todo su catálogo. Sirve para el umbral de ruido de Descubrir sin gastar API.')}
       </p>
       <div className="flex gap-2 items-center flex-wrap">
         <button
@@ -545,7 +545,7 @@ function SeccionImdb() {
         {imdb?.error && <span className="text-xs text-red-400">✗ {imdb.error}</span>}
       </div>
       <p className="text-[11px] text-zinc-500 mt-2">
-        {t('La descarga son unos 8 MB comprimidos y tarda un par de minutos. El pase nocturno la repite sola una vez por semana, así que no hace falta que la lances a mano.')}
+        {t('Son unos 8 MB y un par de minutos. El pase nocturno la repite solo una vez por semana.')}
       </p>
     </section>
   );
@@ -559,7 +559,7 @@ function SeccionAspecto() {
     <section className="card p-5 mb-5">
       <h2 className="font-semibold text-zinc-100 mb-1">{t('Aspecto')}</h2>
       <p className="text-xs text-zinc-500 mb-3 max-w-2xl">
-        {t('Cambia el lenguaje visual de toda la app. Se aplica al instante y se guarda en el servidor, así que te sigue en cualquier navegador.')}
+        {t('Cambia el aspecto de toda la app. Se guarda en el servidor, así que te sigue en cualquier navegador.')}
       </p>
       <div className="grid sm:grid-cols-2 gap-2">
         {UI_THEMES.map((th) => (
@@ -576,7 +576,7 @@ function SeccionAspecto() {
         ))}
       </div>
       <p className="text-[11px] text-zinc-500 mt-2">
-        {t('«Clásico» recupera la paleta y la tipografía anteriores al rediseño. Los iconos y la agrupación del menú son comunes a los dos.')}
+        {t('«Clásico» recupera la paleta y la tipografía anteriores al rediseño.')}
       </p>
     </section>
   );
@@ -587,7 +587,7 @@ function SeccionIdioma() {
     <section className="card p-5 mb-5">
       <h2 className="font-semibold text-zinc-100 mb-1">{t('Idioma de la interfaz')} · Language</h2>
       <p className="text-xs text-zinc-500 mb-3 max-w-2xl">
-        {t('Solo cambia los textos de PowaFlex. Los datos que llegan de TMDB (sinopsis, títulos traducidos) siguen el idioma de datos del servidor, que es un ajuste aparte.')}
+        {t('Solo cambia los textos de PowaFlex. Lo que llega de TMDB sigue el idioma de datos del servidor, que es otro ajuste.')}
       </p>
       <div className="flex gap-2">
         {[['es', 'Español'], ['en', 'English']].map(([k, label]) => (
@@ -630,7 +630,7 @@ function SeccionNotas() {
     <section className="card p-5 mb-5">
       <h2 className="font-semibold text-zinc-100 mb-1">{t('Notas y puntuaciones que mostrar')}</h2>
       <p className="text-xs text-zinc-500 mb-3">
-        {t('Elige de qué webs aparecen las notas en las fichas de película (necesita MDBList para tenerlas). Desmarca las que no te interesen.')}
+        {t('De qué webs aparecen las notas en cada ficha. Necesita MDBList.')}
       </p>
       <div className="flex flex-wrap gap-2">
         {ALL.map(([k, label]) => (
@@ -648,7 +648,7 @@ function SeccionNotas() {
           <option value="letterboxd">Letterboxd</option>
         </select>
         <p className="text-[11px] text-zinc-500 mt-1">
-          {t('Es la nota que aparece en la vista de portada pequeña. Si una película no tiene esa nota, se usa la primera disponible. Necesita MDBList sincronizado.')}
+          {t('La nota que sale en el póster. Si falta, se usa la primera disponible.')}
         </p>
       </div>
     </section>
@@ -664,7 +664,7 @@ function SeccionCalendario() {
       <h2 className="font-semibold text-zinc-100">{t('Calendario de cine venidero')}</h2>
       <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-2xl">
         {t('El calendario lo mandan ')}<b>{t('tus favoritos')}</b>
-        {t(', cada uno en la faceta por la que le sigues: de un director/a se vigila lo que dirige, de un actor/actriz lo que interpreta. Si además quieres vigilar a los más presentes en tu biblioteca aunque no les sigas, sube estos números (0 = solo tus favoritos).')}
+        {t(', cada uno en la faceta por la que le sigues. Para vigilar además a los más presentes en tu biblioteca, sube estos números (0 = solo tus favoritos).')}
       </p>
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
@@ -690,7 +690,7 @@ function SeccionCalendario() {
         {lifeMsg && <span className="text-xs text-zinc-400">{lifeMsg}</span>}
       </div>
       <p className="text-[11px] text-zinc-500 mt-2">
-        {t('Marca quién ha fallecido para no vigilar sus estrenos ni incluirlos en el auto-Radarr. En Favoritos puedes quitar de golpe a los fallecidos.')}
+        {t('Marca quién ha fallecido para no vigilar sus estrenos. En Favoritos se les puede quitar de golpe.')}
       </p>
     </section>
   );
@@ -722,7 +722,7 @@ function SeccionEmergentes() {
     <section className="card p-5 mb-5">
       <h2 className="font-semibold text-zinc-100">{t('Detector de directores emergentes')}</h2>
       <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-2xl">
-        {t('Cuánto pesa cada señal en la puntuación de emergente (0–100). La señal sin datos no puntúa cero: sale del reparto y las demás se reparten su peso. Deja un campo vacío para volver al peso de fábrica.')}
+        {t('Cuánto pesa cada señal en la puntuación de emergente. La que no tiene datos sale del reparto en vez de puntuar cero. Vacío = peso de fábrica.')}
       </p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {señales.map(([k, label, def]) => (
@@ -746,7 +746,7 @@ function SeccionEmergentes() {
           : t('Los pesos suman {n} (no pasa nada: son relativos, pero 100 es la escala pensada).', { n: suma })}
       </p>
       <p className="text-[11px] text-zinc-500 mt-1">
-        {t('El detector se rehace una vez por semana en el pase nocturno; el cambio de pesos se nota en la siguiente detección (o al forzarla desde la página de Emergentes).')}
+        {t('El detector se rehace una vez por semana; los pesos nuevos se notan en la siguiente detección, o al forzarla desde Emergentes.')}
       </p>
     </section>
   );
@@ -759,7 +759,7 @@ function SeccionHuecos() {
       <h2 className="font-semibold text-zinc-100">{t('Descubrir huecos: umbral de ruido')}</h2>
       <p className="text-xs text-zinc-500 mt-1 mb-3 max-w-2xl">
         {t('Una película cuenta como hueco si llega al umbral de votos en TMDB ')}<b>{t('o')}</b>
-        {t(' en Letterboxd (vía MDBList, donde la haya): en TMDB apenas vota nadie y el listón solo descartaba cine de verdad. Sube el umbral si los huecos te traen demasiada morralla; baja a 0 para el completismo absoluto.')}
+        {t(' en Letterboxd, donde la haya. Sube el umbral si los huecos traen demasiada morralla; 0 para el completismo absoluto.')}
       </p>
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
@@ -772,7 +772,7 @@ function SeccionHuecos() {
         </div>
       </div>
       <p className="text-[11px] text-zinc-500 mt-2">
-        {t('La nota mínima Σ y los filtros de cortos/documentales/TV/cameos se ajustan directamente en la página de Descubrir.')}
+        {t('La nota mínima Σ y los filtros de ruido se ajustan en la propia página de Descubrir.')}
       </p>
     </section>
   );
@@ -786,7 +786,7 @@ function SeccionSync() {
     <section className="card p-5 mb-5">
       <h2 className="font-semibold text-zinc-100 mb-2">{t('Sincronización con Plex')}</h2>
       <p className="text-xs text-zinc-500 mb-3">
-        {t('La primera sincronización descarga los detalles de cada película (reparto completo, pistas de vídeo, HDR…): con ~12.000 películas puede tardar varios minutos. Después es incremental y además se ejecuta sola cada noche a las 03:30.')}
+        {t('La primera descarga los detalles de cada película: con ~12.000 puede tardar varios minutos. Después es incremental y se repite sola a las 03:30.')}
       </p>
       {sync?.running ? (
         <div>
@@ -821,7 +821,7 @@ function SeccionHistorial() {
     <section className="card p-5 mb-5">
       <h2 className="font-semibold text-zinc-100 mb-1">{t('Histórico de actualizaciones (30 días)')}</h2>
       <p className="text-xs text-zinc-500 mb-3">
-        {t('Cada pasada del cron nocturno o de «Actualizar todo», con lo que hizo cada paso. Se guarda paso a paso: si el contenedor se reinicia a mitad, aquí queda hasta dónde llegó.')}
+        {t('Cada pasada del pase nocturno o de «Actualizar todo», paso a paso. Si el contenedor se reinicia a mitad, aquí queda hasta dónde llegó.')}
       </p>
       {!historial ? (
         <p className="text-sm text-zinc-500">{t('Cargando…')}</p>
@@ -871,7 +871,7 @@ function SeccionCopias() {
     <section className="card p-5 mb-5">
       <h2 className="font-semibold text-zinc-100 mb-1">{t('Copia de seguridad')}</h2>
       <p className="text-xs text-zinc-500 mb-3">
-        {t('Para reinstalar el contenedor sin empezar de cero. La base de datos lo incluye todo (biblioteca, notas, favoritos, ajustes…); el fichero de ajustes solo guarda la configuración (claves API, conexiones, umbrales) y se puede importar aquí mismo.')}
+        {t('Para reinstalar sin empezar de cero. La base lo incluye todo; el fichero de ajustes solo la configuración, y se importa aquí mismo.')}
       </p>
       <div className="flex gap-2 items-center flex-wrap">
         <a className="btn-gold" href="/api/backup/database" download>
@@ -886,7 +886,7 @@ function SeccionCopias() {
         </label>
       </div>
       <p className="text-[11px] text-zinc-600 mt-2">
-        {t('Ambos ficheros contienen tus claves API y token de Plex: guárdalos en un sitio seguro. Para restaurar la base de datos entera, copia el ')}
+        {t('Los dos llevan tus claves API y tu token de Plex: guárdalos a buen recaudo. Para restaurar la base entera, copia el ')}
         <code>.db</code>{t(' como')}{' '}
         <code>powaflex.db</code>{t(' en la carpeta de datos del contenedor (parado) y arráncalo.')}
       </p>
@@ -929,7 +929,7 @@ function SeccionCopias() {
           </button>
         </div>
         <p className="text-[11px] text-zinc-500 mt-2 ml-6">
-          {t('Se hace sola al final del pase nocturno, con la base ya al día, y va rotando: al pasar del número que pongas se borra la más vieja. Guarda ahí solo la base de datos; los ajustes se exportan aparte con el botón de arriba.')}
+          {t('Se hace sola al final del pase nocturno y va rotando: al pasar del número que pongas se borra la más vieja. Solo la base; los ajustes se exportan con el botón de arriba.')}
         </p>
         {copias?.length > 0 && (
           <div className="mt-3 ml-6 space-y-0.5 max-h-48 overflow-y-auto text-xs text-zinc-400">
@@ -959,7 +959,7 @@ function ActualizarTodo() {
         <div className="min-w-0 flex-1 basis-64">
           <h2 className="font-semibold text-zinc-100">{t('Actualizar todo')}</h2>
           <p className="text-xs text-zinc-500 mt-1 max-w-2xl">
-            {t('Una sola rutina con todo lo que PowaFlex necesita, en orden: biblioteca de Plex, emparejado de Letterboxd, títulos en otros idiomas, notas de MDBList, lo que ya tienes en Radarr, calendario, huecos de tus favoritos y sagas. Es exactamente lo mismo que se ejecuta solo cada noche. Lo que no tengas configurado se salta.')}
+            {t('Una sola rutina, en orden: Plex, Letterboxd, títulos, notas, Radarr, calendario, huecos y sagas. Es lo mismo que corre cada noche, y se salta lo que no tengas configurado.')}
           </p>
         </div>
         <button className="btn-gold shrink-0" onClick={startFullRefresh} disabled={refresh?.running}>
@@ -1190,7 +1190,7 @@ export default function Settings() {
         {tab === 'conexiones' && (
           <>
             <p className="text-xs text-zinc-500 mb-4 max-w-3xl">
-              {t('Los tres servicios que gobiernas. Plex y TMDB son imprescindibles; Radarr es lo que convierte «me falta» en «pedida».')}
+              {t('Plex y TMDB son imprescindibles. Radarr es lo que convierte «me falta» en «pedida».')}
             </p>
             <SeccionPlex />
             <SeccionTmdb />
@@ -1201,7 +1201,7 @@ export default function Settings() {
         {tab === 'fuentes' && (
           <>
             <p className="text-xs text-zinc-500 mb-4 max-w-3xl">
-              {t('De dónde salen las notas y qué has visto. Todo esto es opcional: sin ello PowaFlex funciona, pero se queda ciego para ordenar y para saber qué has visto fuera de Plex.')}
+              {t('De dónde salen las notas y qué has visto. Opcional, pero sin ello no hay con qué ordenar ni cómo saber lo que ves fuera de Plex.')}
             </p>
             <SeccionMdblist />
             <SeccionImdb />

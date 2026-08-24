@@ -242,7 +242,7 @@ export default function Estrenos() {
       <PageHeader eyebrow={t('La caza')} title={t('Estrenos')} />
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
         {t('Qué acaba de llegar y qué viene: a los ')}<b>{t('cines de España y de EE UU')}</b>{t(' y a las ')}
-        <b>{t('plataformas y VOD de España y de EE UU')}</b>{t(' (fecha de estreno digital de TMDB, con dónde verla en cada país). Solo cine largometraje. El listón Σ separa el estreno que importa del relleno de cartelera; lo aún sin nota no se oculta.')}
+        <b>{t('plataformas y VOD de España y de EE UU')}</b>{t(' (fecha digital de TMDB, con dónde verla en cada país). Solo largometraje. El listón Σ separa lo que importa del relleno, sin ocultar lo que aún no tiene nota.')}
       </p>
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -322,7 +322,7 @@ export default function Estrenos() {
                 className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5"
                 onClick={() => load({ notas: true })}
                 disabled={notasBusy || refreshing}
-                title={t('Vuelve a preguntar a MDBList por las notas que faltan. Es normal que un estreno tarde semanas en tener Σ.')}
+                title={t('Vuelve a pedir a MDBList las notas que faltan. Un estreno tarda semanas en tener Σ.')}
               >
                 {notasBusy ? t('Pidiendo notas…') : <><Sigma size={13} strokeWidth={2} /> {t('Actualizar notas')}</>}
               </button>

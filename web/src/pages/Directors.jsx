@@ -266,12 +266,12 @@ export default function Directors({ embedded = false }) {
         <PageHeader
           eyebrow={t('La caza')}
           title={t('Directores en activo')}
-          subtitle={t('680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Filtra por región, país o género, ordena por lo que te interese y ve marcando con la estrella a quién quieres seguir.')}
+          subtitle={t('680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Marca con la estrella a quién quieres seguir.')}
         />
       )}
       {embedded && (
         <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-          {t('680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Este catálogo no sale de tu biblioteca — sirve para descubrir a quién seguir con la estrella.')}
+          {t('680 directores y directoras con obra reciente, de Wikidata. No sale de tu biblioteca: sirve para descubrir a quién seguir.')}
         </p>
       )}
 
@@ -323,7 +323,7 @@ export default function Directors({ embedded = false }) {
 
       <p className="text-[11px] text-zinc-500 mb-4 max-w-3xl leading-relaxed">
         {t('La')} <b className="text-zinc-400">{t('importancia')}</b>{' '}
-        {t('combina prestigio (premios y reconocimiento crítico, 60 %) e impacto (notoriedad, alcance de la obra y taquilla, 40 %). Es una convención operativa, no un juicio de valor: Wikidata no es exhaustiva ni neutral y su cobertura de premios está sesgada hacia Europa y Norteamérica. «En activo» significa al menos un largometraje en los últimos ocho años.')}
+        {t('combina prestigio (60 %) e impacto (40 %) según Wikidata, que cubre mejor Europa y Norteamérica. «En activo» es al menos un largometraje en los últimos ocho años.')}
       </p>
 
       {/* aviso discreto y NO bloqueante: la rejilla ya se ve con las iniciales */}

@@ -2,7 +2,8 @@
 export default {
   'Colección': 'Collection',
   'Sagas': 'Sagas',
-  'Franquicias detectadas cruzando cada película de tu biblioteca con su colección real de TMDB (no con las etiquetas manuales de Plex). Abre cualquiera para ver qué partes te faltan y mandarlas a Radarr.': "Franchises detected by cross-checking every movie in your library against its real TMDB collection (not Plex's manual tags). Open any of them to see which parts you're missing and send them to Radarr.",
+  'Franquicias detectadas cruzando tu biblioteca con la colección real de TMDB, no con las etiquetas de Plex. Abre cualquiera para ver qué partes faltan.':
+    'Franchises detected by cross-referencing your library with TMDB’s real collections, not Plex’s manual tags. Open any of them to see which parts are missing.',
 
   // escaneo
   'Escaneando colecciones en TMDB… {done} de {total}': 'Scanning collections on TMDB… {done} of {total}',

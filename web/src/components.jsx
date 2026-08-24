@@ -276,7 +276,7 @@ export function GlobalSearch() {
         )}
         {!term && (
           <div className="text-xs text-zinc-500 px-2 py-3">
-            {t('Escribe para buscar películas, personas, sagas, listas, festivales o saltar a una sección. ↑↓ para moverte, Enter para abrir. Atajo: Ctrl/⌘ + K.')}
+            {t('Busca películas, personas, sagas, listas y festivales, o salta a una sección. ↑↓ para moverte, Enter para abrir.')}
           </div>
         )}
       </div>
@@ -606,7 +606,7 @@ export function Progreso({
   // dicho por dónde va»), y si no, estos dos cubren los dos casos normales
   const porQue =
     indeterminado && segundos >= SEGUNDOS_EXPLICACION
-      ? explicacion || t('Esta consulta va de una pieza: el servidor no dice por dónde va, así que no hay porcentaje que enseñar. Sigue en marcha.')
+      ? explicacion || t('Esta consulta va de una pieza: el servidor no dice por dónde va. Sigue en marcha.')
       : !indeterminado && !rematando && quieto >= SEGUNDOS_CLAVADA
         ? explicacion || t('El porcentaje no se mueve porque cada paso salta de golpe al terminar, no poco a poco. Sigue en marcha.')
         : null;
@@ -1355,8 +1355,8 @@ export function BuildProgress({ label = t('Construyendo desde TMDB…'), job = n
         label={rematando ? t('{label} — datos completos, montando la respuesta…', { label }) : label}
         explicacion={
           rematando
-            ? t('El servidor ya ha recorrido la lista entera; ahora la ordena, la guarda en caché y la manda. Sigue en marcha.')
-            : t('El servidor todavía no ha dicho por dónde va, así que un porcentaje aquí sería inventado. Sigue en marcha.')
+            ? t('Recorrida la lista entera; ahora la ordena y la manda. Sigue en marcha.')
+            : t('El servidor aún no ha dicho por dónde va. Sigue en marcha.')
         }
       />
     );
@@ -1953,7 +1953,7 @@ export function Ficha({ ratingKey, tmdbId, onClose }) {
           title={vm.title}
           initialQuery={vm.originalTitle || vm.title}
           year={vm.year}
-          subtitle={t('Elige su ficha de TMDB. De ahí salen las notas, el reparto y el completismo de su gente. La corrección se recuerda y sobrevive a las sincronizaciones de Plex.')}
+          subtitle={t('Elige su ficha de TMDB: de ahí salen las notas, el reparto y el completismo. La corrección se recuerda.')}
           onPick={fijarPelicula}
           onClear={vm.tmdbLocked ? () => fijarPelicula(null) : null}
           clearLabel={t('Quitar la corrección y volver a lo que diga Plex')}

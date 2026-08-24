@@ -293,7 +293,7 @@ function CargaAnadir({ cache, children }) {
     { clave: 'sugerencias', etiqueta: t('Buscando a quién más podrías seguir…'), carga: () => pedir('sugerencias', () => api('/people/suggestions')) },
     {
       clave: 'festivales',
-      etiqueta: t('Bajando de Wikipedia los habituales de Cannes, Venecia y Berlín (la primera vez tarda; se guarda una semana)…'),
+      etiqueta: t('Bajando de Wikipedia los habituales de Cannes, Venecia y Berlín…'),
       carga: () => pedir('festivales', () => api('/people/festival-packs')),
     },
   ], []);
@@ -561,7 +561,7 @@ export default function Favorites() {
       <PageHeader eyebrow={t('La caza')} title={t('Favoritos')} />
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
         {t('La gente que sigues,')} <b>{t('separada por faceta')}</b>
-        {t(': a quien sigues como director/a solo cuenta por lo que dirige, y a quien sigues como actor/actriz solo por lo que interpreta. Todos entran en')}{' '}
+        {t(': cada uno cuenta solo por la faceta que sigues. Todos entran en')}{' '}
         <Link to="/calendario" className="text-gold-400 hover:underline">{t('Cine venidero')}</Link> {t('y en')}{' '}
         <Link to="/descubrir" className="text-gold-400 hover:underline">{t('Descubrir huecos')}</Link>.
       </p>
@@ -732,7 +732,7 @@ export default function Favorites() {
           {info(role).rankable && (
             <div className="card p-4 flex items-center justify-between flex-wrap gap-2 text-sm">
               <span className="text-zinc-400">
-                {t('¿Buscas el ranking de {faceta} por títulos en tu Plex? Vive en Personas, con la ★ para seguir y el alta de «los N primeros».', { faceta })}
+                {t('¿Buscas el ranking de {faceta} por títulos en tu Plex? Está en Personas.', { faceta })}
               </span>
               <Link to={`/personas?role=${role}`} className="btn-ghost !py-1.5 text-xs shrink-0 inline-flex items-center gap-1.5">
                 <Star size={13} strokeWidth={2} /> {t('Ir a Personas')}
@@ -772,7 +772,7 @@ export default function Favorites() {
                 <div className="min-w-0 flex-1">
                   <h2 className="font-semibold text-zinc-100">{t('Añadir directores en activo · el catálogo')}</h2>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    {t('680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y ordena por importancia, premios, número de largometrajes o taquilla: españoles, premiados, emergentes o taquilleros salen de aquí con dos clics, con la ☆ para seguirlos.')}
+                    {t('680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y ordena por importancia, premios, largometrajes o taquilla. La ☆ los sigue.')}
                   </p>
                 </div>
                 <span className="text-gold-400 shrink-0 text-sm">{catalogoAbierto ? t('Plegar ▴') : t('Explorar ▾')}</span>

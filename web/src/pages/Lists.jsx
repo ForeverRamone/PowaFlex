@@ -618,7 +618,7 @@ function PanelMdblist() {
   return (
     <>
       <p className="text-sm text-zinc-500 mb-5 max-w-3xl">
-        {t('Sigue listas de MDBList (1001 películas, palmarés de premios, tops de la comunidad…). Necesita la API key de MDBList en Ajustes.')}
+        {t('Sigue listas de MDBList: las 1001, palmareses, tops de la comunidad. Necesita su API key en Ajustes.')}
       </p>
 
       <div className="card p-4 mb-6 grid md:grid-cols-2 gap-4">
@@ -736,7 +736,7 @@ export default function Lists() {
     <div>
       <PageHeader eyebrow={t('La caza')} title={t('Listas y retos')} />
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-        {t('Convierte listas famosas en retos de completismo: qué % tienes, qué has visto, qué te falta y envío a Radarr.')}
+        {t('Listas famosas como retos de completismo: qué tienes, qué has visto y qué te falta.')}
       </p>
       <div className="flex gap-2 mb-6">
         <button onClick={() => setTab('letterboxd')} className={tab === 'letterboxd' ? 'btn-gold' : 'btn-ghost'}>{t('🟠 Retos de Letterboxd')}</button>

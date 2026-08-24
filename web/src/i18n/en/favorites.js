@@ -68,8 +68,8 @@ export default {
   'Favoritos': 'Favorites',
   'La gente que sigues,': 'The people you follow,',
   'separada por faceta': 'split by facet',
-  ': a quien sigues como director/a solo cuenta por lo que dirige, y a quien sigues como actor/actriz solo por lo que interpreta. Todos entran en':
-    ': anyone you follow as a director only counts for what they direct, and anyone you follow as an actor only for what they act in. They all feed into',
+  ': cada uno cuenta solo por la faceta que sigues. Todos entran en':
+    ': each one counts only for the role you follow. All of them feed',
   'Cine venidero': 'Upcoming cinema',
   'y en': 'and',
   'Descubrir huecos': 'Discover gaps',
@@ -106,8 +106,8 @@ export default {
   'Los huecos y el completismo se calculan al visitar': 'Gaps and completism are computed when you visit',
   ', o con «Actualizar todo» en': ', or with “Refresh everything” in',
   'Ajustes': 'Settings',
-  '¿Buscas el ranking de {faceta} por títulos en tu Plex? Vive en Personas, con la ★ para seguir y el alta de «los N primeros».':
-    'Looking for the ranking of {faceta} by titles in your Plex? It lives in People, with the ★ to follow and the “top N” bulk add.',
+  '¿Buscas el ranking de {faceta} por títulos en tu Plex? Está en Personas.':
+    'Looking for the {faceta} ranking by titles in your Plex? It lives in People.',
   'Ir a Personas': 'Go to People',
 
   // toasts y errores
@@ -128,8 +128,8 @@ export default {
   '. Cambia la faceta arriba si quieres seguir a alguien por la otra.':
     '. Switch the facet above if you want to follow someone for the other one.',
   'Añadir directores en activo · el catálogo': 'Add working directors · the catalog',
-  '680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y ordena por importancia, premios, número de largometrajes o taquilla: españoles, premiados, emergentes o taquilleros salen de aquí con dos clics, con la ☆ para seguirlos.':
-    '680 directors with recent work, from Wikidata. Filter by region, country or gender and sort by importance, awards, feature count or box office: Spanish, award-winning, emerging or box-office directors come out of here in two clicks, with the ☆ to follow them.',
+  '680 directores y directoras con obra reciente, de Wikidata. Filtra por región, país o género y ordena por importancia, premios, largometrajes o taquilla. La ☆ los sigue.':
+    '680 directors with recent work, from Wikidata. Filter by region, country or gender and sort by importance, awards, features or box office. The ☆ follows them.',
   'Plegar ▴': 'Collapse ▴',
   'Explorar ▾': 'Explore ▾',
   'Añadir una lista de nombres': 'Add a list of names',
@@ -155,6 +155,6 @@ export default {
   'Buscando los cánones disponibles…': 'Looking up the available canons…',
   'Comprobando si hay un alta en marcha…': 'Checking whether a bulk add is already running…',
   'Buscando a quién más podrías seguir…': 'Looking for who else you could follow…',
-  'Bajando de Wikipedia los habituales de Cannes, Venecia y Berlín (la primera vez tarda; se guarda una semana)…':
-    'Downloading the Cannes, Venice and Berlin regulars from Wikipedia (the first time is slow; it is kept for a week)…',
+  'Bajando de Wikipedia los habituales de Cannes, Venecia y Berlín…':
+    'Fetching the Cannes, Venice and Berlin regulars from Wikipedia…',
 };

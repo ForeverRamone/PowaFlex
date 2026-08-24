@@ -62,8 +62,8 @@ export default {
   'Puesto {n}': 'Rank {n}',
   'Ya en favoritos': 'Already in favorites',
   'Seguir a {name} como director/a': 'Follow {name} as a director',
-  'Busca en TMDB y elige la ficha correcta. La corrección se recuerda y manda sobre el emparejado automático.':
-    'Search TMDB and pick the right match. The fix is remembered and overrides the automatic matching.',
+  'Busca en TMDB y elige la ficha correcta. Se recuerda y manda sobre el emparejado automático.':
+    'Search TMDB and pick the right entry. It is remembered and overrides automatic matching.',
   '⭐ {name} en favoritos (directores/as)': '⭐ {name} added to favorites (directors)',
   '{name} ya estaba en favoritos': '{name} was already in favorites',
   '⭐ {n} directores/as añadidos a favoritos': '⭐ {n} directors added to favorites',
@@ -203,6 +203,6 @@ export default {
   'National Film Registry': 'National Film Registry',
   'Biblioteca del Congreso de EE UU: cine conservado por su valor cultural, histórico o estético (25 al año desde 1989)':
     'US Library of Congress: films preserved for their cultural, historical or aesthetic value (25 a year since 1989)',
-  'Sesenta y cinco fuentes: las secciones oficiales de los grandes festivales, el palmarés y las nominadas de los premios de cada año, la crítica gremial, los circuitos de animación y documental, y los cánones y catálogos (Sight & Sound, las 1001, el AFI, Criterion y el registro estadounidense).':
-    'Sixty-five sources: the official selections of the major festivals, the winners and nominees of each yearly award, the critics\u2019 associations, the animation and documentary circuits, and the canons and catalogues (Sight & Sound, the 1001, the AFI, Criterion and the US registry).',
+  'Sesenta y cinco fuentes: secciones oficiales, palmareses y nominadas, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el AFI, Criterion y el registro estadounidense).':
+    'Sixty-five sources: official selections, winners and nominees, guild critics, animation and documentary, and the canons (Sight & Sound, the 1001, the AFI, Criterion and the US registry).',
 };

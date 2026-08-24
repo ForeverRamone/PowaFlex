@@ -279,7 +279,7 @@ function GapsView({
       {data.people.length === 0 ? (
         <Empty>
           {data.totalPeople === 0
-            ? t('Nadie en tu biblioteca casa con esos filtros. Puede que falten datos demográficos: amplíalos en Ajustes → «Actualizar estado vital».')
+            ? t('Nadie en tu biblioteca casa con esos filtros. Puede que falten datos demográficos: amplíalos en Ajustes.')
             : t('Nada que rellenar aquí: filmografías completas.')}
         </Empty>
       ) : (
@@ -313,7 +313,7 @@ function GapsView({
               <button
                 onClick={() => setOcultarRadarrPref(!ocultarRadarr)}
                 className={`btn-ghost !py-1 text-xs inline-flex items-center gap-1.5 ${ocultarRadarr ? '!border-gold-400 text-gold-400' : ''}`}
-                title={t('Lo que ya has mandado a Radarr está decidido: esto lo quita de la parrilla para dejar solo lo que falta por pedir')}
+                title={t('Quita de la parrilla lo que ya está pedido, para dejar solo lo que falta')}
               >
                 <EyeOff size={13} strokeWidth={2} /> {t('Ocultar las que ya están en Radarr')}
               </button>
@@ -422,7 +422,7 @@ function NewCanonForm({ onSaved }) {
   return (
     <div className="card p-4 mb-4 w-full">
       <div className="text-sm text-zinc-300 mb-2">
-        {t('Pega aquí cualquier lista de directores/as —una por línea— y se convierte en un canon más. Vale copiada de IMDb, de un libro o escrita a mano; la numeración («12. Chantal Akerman») se ignora sola.')}
+        {t('Pega cualquier lista de directores/as, una por línea, y se convierte en un canon más. La numeración («12. Chantal Akerman») se ignora sola.')}
       </div>
       <input
         className="input mb-2"
@@ -851,7 +851,7 @@ export default function Discover() {
           cargando={t('Ordenando quién manda en tu biblioteca…')}
           {...gapProps}
           intro={demoActivo
-            ? t('Qué te falta de las filmografías de {role} más presentes en tu biblioteca, con tus filtros demográficos aplicados.', { role: tab === 'director' ? t('directores/as') : t('actores/actrices') })
+            ? t('Qué te falta de los/las {role} más presentes en tu biblioteca, con tus filtros aplicados.', { role: tab === 'director' ? t('directores/as') : t('actores/actrices') })
             : t('Qué te falta de las filmografías de {role} más presentes en tu biblioteca.', { role: tab === 'director' ? t('directores/as') : t('actores/actrices') })}
         />
       )}

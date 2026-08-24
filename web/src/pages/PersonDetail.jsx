@@ -185,7 +185,7 @@ export default function PersonDetail() {
       role={wantRole}
       title={nombre}
       initialQuery={nombre}
-      subtitle={t('Elige su ficha de TMDB. Se recuerda para siempre y ningún automatismo vuelve a revisarla: úsalo cuando haya dos personas con el mismo nombre o cuando su obra esté repartida en dos fichas.')}
+      subtitle={t('Elige su ficha de TMDB. Se recuerda para siempre: úsalo con dos personas del mismo nombre o con la obra repartida en dos fichas.')}
       onPick={fijarPersona}
       onClear={data?.person?.tmdb_locked ? () => fijarPersona(null) : null}
       clearLabel={t('Quitar la corrección y volver al emparejado automático')}
@@ -216,7 +216,7 @@ export default function PersonDetail() {
       onClick={refrescarDesdeTmdb}
       disabled={refrescando}
       className="text-xs text-zinc-500 hover:text-gold-400 cursor-pointer disabled:cursor-default"
-      title={t('Vuelve a pedir su filmografía a TMDB ahora mismo, sin esperar a la actualización de esta noche. Cine venidero y los huecos se rehacen en la siguiente visita.')}
+      title={t('Vuelve a pedir su filmografía a TMDB ahora, sin esperar a esta noche.')}
     >
       {refrescando ? t('Actualizando…') : t('⟳ Actualizar desde TMDB')}
     </button>

@@ -29,9 +29,9 @@ export default {
   'Añadidas en la última sincronización': 'Added in the last sync',
   'PowaFlex {v} — ver qué trae esta versión': 'PowaFlex {v} — see what this version brings',
   'Últimas novedades': 'What’s new',
-  'Qué trae cada versión de PowaFlex. (Lo que pasa en tu colección —una edición de festival publicada, una pedida que llega a digital— está en las novedades del Dashboard.)':
-    'What each version of PowaFlex brings. (What happens in your own collection — a festival line-up published, a requested movie hitting digital — lives in the Dashboard news.)',
+  'Qué trae cada versión. Lo que pasa en tu colección está en las novedades del Dashboard.':
+    'What each version brings. What happens in your own collection is in the Dashboard news.',
   'la que tienes': 'the one you have',
-  'El detalle técnico de cada versión, con nombres de fichero y motivos de cada arreglo, está en el CHANGELOG del repositorio.':
-    'The technical detail of each version, with file names and the reason behind every fix, lives in the repository CHANGELOG.',
+  'El detalle técnico está en el CHANGELOG del repositorio.':
+    'The technical detail is in the repository CHANGELOG.',
 };

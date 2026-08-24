@@ -314,7 +314,7 @@ export default function Emergentes() {
       <PageHeader
         eyebrow={t('La caza')}
         title={t('Directores emergentes')}
-        subtitle={t('Quién puede ser un grande dentro de diez años. Sale de lo que PowaFlex ya tiene cacheado —las tablas de selección oficial, con las cinco secciones de debut que es donde de verdad estrena quien empieza, y los palmareses que alcanzan primeras películas, empezando por la Cámara de Oro— y se puntúa de 0 a 100. Cada ficha enseña con qué datos puntuó.')}
+        subtitle={t('Quién puede ser un grande dentro de diez años, puntuado de 0 a 100. Sale de las tablas de selección oficial —con las cinco secciones de debut— y de los palmareses que alcanzan primeras películas. Cada ficha enseña con qué datos puntuó.')}
       />
 
       <div className="flex flex-wrap gap-2 items-center mb-3">
@@ -394,7 +394,7 @@ export default function Emergentes() {
 
       <div className="text-[11px] text-zinc-600 mt-8 max-w-3xl leading-relaxed space-y-1">
         <p>
-          {t('Cinco señales, con estos pesos: consagración institucional {i}, consenso crítico {c}, tracción real {tr}, aceleración {a} y afinidad contigo {af}. La señal que no tiene datos NO puntúa cero: sale del reparto y las demás se reparten su peso, para que un debut sin Metacritic no quede por detrás de una película mediana solo porque de la mediana haya más datos.', {
+          {t('Cinco señales: consagración institucional {i}, consenso crítico {c}, tracción real {tr}, aceleración {a} y afinidad contigo {af}. La señal sin datos no puntúa cero: sale del reparto y las demás se reparten su peso.', {
             i: data.pesos.institucional, c: data.pesos.critica, tr: data.pesos.traccion,
             a: data.pesos.aceleracion, af: data.pesos.afinidad,
           })}

@@ -288,7 +288,7 @@ export default function Quality({ embedded = false }) {
       {Array.isArray(wanted) && wanted.length > 0 && (
         <Section title={t('Pedidas a Radarr que siguen sin aparecer ({n})', { n: wanted.length })}>
           <p className="text-xs text-zinc-500 mb-2 max-w-3xl">
-            {t('Monitorizadas sin archivo, las más antiguas primero: son las que piden una decisión (volver a buscar, esperar al estreno digital o quitar de Radarr).')}
+            {t('Monitorizadas sin archivo, las más antiguas primero: piden una decisión —volver a buscar, esperar al digital o quitarlas de Radarr.')}
           </p>
           <div className="card divide-y divide-ink-800 max-h-96 overflow-y-auto">
             {wanted.map((m) => (
@@ -317,7 +317,7 @@ export default function Quality({ embedded = false }) {
       {Array.isArray(cutoff) && cutoff.length > 0 && (
         <Section title={t('Por debajo del corte de tu perfil de Radarr ({n})', { n: cutoff.length })}>
           <p className="text-xs text-zinc-500 mb-2 max-w-3xl">
-            {t('Tienen archivo, pero de menos calidad de la que pide tu perfil: Radarr las mejorará si aparece algo mejor, y puedes forzar la búsqueda ya.')}
+            {t('Tienen archivo, pero por debajo de tu perfil. Radarr las mejorará si aparece algo mejor, y puedes forzar la búsqueda ya.')}
           </p>
           <div className="card divide-y divide-ink-800 max-h-96 overflow-y-auto">
             {cutoff.map((m) => (

@@ -319,7 +319,7 @@ export default function People() {
         <div className="card p-4 mb-6">
           <h2 className="font-semibold text-zinc-100 mb-1">{t('Seguir por nombre')}</h2>
           <p className="text-xs text-zinc-500 mb-3 max-w-2xl">
-            {t('Plex no guarda estos créditos, así que aquí no hay «top de tu biblioteca»: busca a la persona en TMDB y síguela como {role} con la ★.', { role: roleSingular(role) })}
+            {t('Plex no guarda estos créditos, así que no hay «top de tu biblioteca»: busca a la persona en TMDB y síguela con la ★.', { role: roleSingular(role) })}
           </p>
           <form onSubmit={buscarTmdb} className="flex gap-2 max-w-xl">
             <input className="input" placeholder={t('Buscar por nombre en TMDB…')} value={tq} onChange={(e) => setTq(e.target.value)} />

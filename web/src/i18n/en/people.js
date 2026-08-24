@@ -55,8 +55,8 @@ export default {
 
   // seguir por nombre: la única vía en los oficios que Plex no acredita
   'Seguir por nombre': 'Follow by name',
-  'Plex no guarda estos créditos, así que aquí no hay «top de tu biblioteca»: busca a la persona en TMDB y síguela como {role} con la ★.':
-    'Plex does not store these credits, so there is no “top of your library” here: look the person up on TMDB and follow them as {role} with the ★.',
+  'Plex no guarda estos créditos, así que no hay «top de tu biblioteca»: busca a la persona en TMDB y síguela con la ★.':
+    'Plex does not store these credits, so there is no “top of your library” here: look the person up on TMDB and follow them with the ★.',
   'Buscar por nombre en TMDB…': 'Search TMDB by name…',
   'Buscando…': 'Searching…',
   'Buscar': 'Search',
@@ -132,8 +132,8 @@ export default {
   'emparejado a mano': 'matched by hand',
   'corregir emparejado': 'fix matching',
   'Corregir a mano su ficha de TMDB': 'Fix their TMDB page by hand',
-  'Elige su ficha de TMDB. Se recuerda para siempre y ningún automatismo vuelve a revisarla: úsalo cuando haya dos personas con el mismo nombre o cuando su obra esté repartida en dos fichas.':
-    'Pick their TMDB page. It is remembered forever and no automation ever reviews it again: use it when two people share a name or when their work is split across two pages.',
+  'Elige su ficha de TMDB. Se recuerda para siempre: úsalo con dos personas del mismo nombre o con la obra repartida en dos fichas.':
+    'Pick their TMDB entry. It is remembered for good: use it for two people with the same name, or work split across two entries.',
   'Quitar la corrección y volver al emparejado automático':
     'Remove the correction and go back to automatic matching',
   '✓ {name} emparejado a mano': '✓ {name} matched by hand',
@@ -151,8 +151,8 @@ export default {
 
   // «Actualizar desde TMDB» de una ficha de persona
   '⟳ Actualizar desde TMDB': '⟳ Refresh from TMDB',
-  'Vuelve a pedir su filmografía a TMDB ahora mismo, sin esperar a la actualización de esta noche. Cine venidero y los huecos se rehacen en la siguiente visita.':
-    'Ask TMDB for their filmography right now, without waiting for tonight’s update. Upcoming cinema and the gaps rebuild on your next visit.',
+  'Vuelve a pedir su filmografía a TMDB ahora, sin esperar a esta noche.':
+    'Fetches their filmography from TMDB right now, without waiting for tonight.',
 
   // el otro completismo: cuánta de su obra avalada tienes
   '{tuyas} de {total} avaladas por un premio o un canon':

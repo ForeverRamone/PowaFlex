@@ -406,7 +406,7 @@ function NuevaRegla({ catalog, existentes, onCreate }) {
       {duplicada && <p className="text-[11px] text-amber-400">{t('Esa regla ya existe: afínala en su tarjeta.')}</p>}
       <p className="text-[11px] text-zinc-500">
         {kind === 'emergentes'
-          ? t('Nace pidiendo 70 de puntuación de emergente y con tope de 10 por pasada. Se apoya en el detector, que se reconstruye una vez por semana.')
+          ? t('Nace pidiendo 70 de puntuación y con tope de 10 por pasada. Se apoya en el detector, que se rehace cada semana.')
           : t('Nace sin umbral (entra todo) y con tope de 20 por pasada. Ajusta la barrita después.')}
       </p>
     </div>
@@ -614,7 +614,7 @@ function Cuarentena({ criterios, pendientes, onGuardar, onAprobar, onRechazar, o
         {t('Cuarentena antes de Radarr')}
       </Titulo>
       <p className="text-[11px] text-zinc-500 mt-1 max-w-3xl">
-        {t('Lo que cumpla estos criterios NO se manda solo: pasa por aquí y espera tu aprobación. Es para lo que pasa el umbral pero merece una segunda mirada — notas infladas por una comunidad muy entregada, por ejemplo. Vale para TODAS las reglas.')}
+        {t('Lo que cumpla estos criterios no se manda solo: espera tu aprobación. Para lo que pasa el umbral y aun así merece una segunda mirada. Vale para todas las reglas.')}
       </p>
 
       <label className="flex items-center gap-2 text-sm text-zinc-200 cursor-pointer mt-3">
@@ -690,7 +690,7 @@ function VetadasList() {
         {t('🚫 {n} fuera del pase automático', { n: vetadas.length })}
       </summary>
       <p className="text-[11px] text-zinc-500 mt-1 mb-2 max-w-2xl">
-        {t('El automático las ignora. Se siguen viendo en Cine venidero y puedes mandarlas a Radarr a mano cuando quieras.')}
+        {t('El automático las ignora. Se siguen viendo en Cine venidero y se mandan a mano cuando quieras.')}
       </p>
       <div className="space-y-1 max-h-48 overflow-y-auto">
         {vetadas.map((v) => (
@@ -932,10 +932,10 @@ export default function RadarrRulesSection() {
       </Titulo>
 
       <p className="text-[11px] text-zinc-500 mt-1 max-w-3xl">
-        {t('Cada regla vigila una cosa —un festival, un premio, los estrenos de una región, tus favoritos de un oficio— y manda a Radarr lo que pase su filtro. Se revisan CADA NOCHE: una película que hoy no llega al umbral puede entrar mañana, cuando tenga más notas.')}
+        {t('Cada regla vigila una cosa —un festival, un premio, una región, un oficio— y manda a Radarr lo que pase su filtro. Se revisan cada noche: lo que hoy no llega al umbral puede entrar mañana.')}
       </p>
       <p className="text-[11px] text-amber-400/80 mt-1 max-w-3xl">
-        {t('⚠️ Como se reevalúan cada noche, borrar algo de Radarr a mano no basta: volvería. Para que una película no vuelva a entrar, pulsa su 🚫 en el historial de abajo (o el ✕ de Descubrir y Estrenos).')}
+        {t('⚠️ Borrar algo de Radarr a mano no basta: volvería esta noche. Para que no vuelva, pulsa su 🚫 en el historial de abajo.')}
       </p>
       {!data.radarrConfigurado && (
         <p className="text-[11px] text-red-400 mt-1">{t('Radarr no está configurado: las reglas no se ejecutarán.')}</p>

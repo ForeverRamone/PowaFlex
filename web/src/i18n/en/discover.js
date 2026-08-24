@@ -56,7 +56,8 @@ export default {
   '{n} con filmografía completa': '{n} with a complete filmography',
   'Actualizando…': 'Updating…',
   'Actualizar': 'Refresh',
-  'Nadie en tu biblioteca casa con esos filtros. Puede que falten datos demográficos: amplíalos en Ajustes → «Actualizar estado vital».': 'Nobody in your library matches those filters. Demographic data may be missing: expand it in Settings → “Update life status”.',
+  'Nadie en tu biblioteca casa con esos filtros. Puede que falten datos demográficos: amplíalos en Ajustes.':
+    'Nobody in your library matches those filters. Demographic data may be missing: fill it in from Settings.',
   'Nada que rellenar aquí: filmografías completas.': 'Nothing to fill here: complete filmographies.',
   'Vista:': 'View:',
   'Por persona': 'By person',
@@ -69,7 +70,8 @@ export default {
 
   // listas propias (canones)
   'Lista propia': 'Your own list',
-  'Pega aquí cualquier lista de directores/as —una por línea— y se convierte en un canon más. Vale copiada de IMDb, de un libro o escrita a mano; la numeración («12. Chantal Akerman») se ignora sola.': 'Paste any list of directors here —one per line— and it becomes another canon. Copied from IMDb, from a book or typed by hand, all fine; numbering (“12. Chantal Akerman”) is ignored automatically.',
+  'Pega cualquier lista de directores/as, una por línea, y se convierte en un canon más. La numeración («12. Chantal Akerman») se ignora sola.':
+    'Paste any list of directors, one per line, and it becomes another canon. Numbering (“12. Chantal Akerman”) is ignored automatically.',
   'Nombre de la lista (p. ej. «IMDb · 501 Directors»)': 'List name (e.g. “IMDb · 501 Directors”)',
   '✓ «{label}» guardada con {n} nombres': '✓ “{label}” saved with {n} names',
   'Guardando…': 'Saving…',
@@ -127,12 +129,13 @@ export default {
   'directores/as': 'directors',
   'actores/actrices': 'actors',
   'Qué te falta de las filmografías de {role} más presentes en tu biblioteca.': "What you're missing from the filmographies of the {role} most present in your library.",
-  'Qué te falta de las filmografías de {role} más presentes en tu biblioteca, con tus filtros demográficos aplicados.': "What you're missing from the filmographies of the {role} most present in your library, with your demographic filters applied.",
+  'Qué te falta de los/las {role} más presentes en tu biblioteca, con tus filtros aplicados.':
+    'What you are missing from the {role} most present in your library, with your filters applied.',
 
   // los dos interruptores de «enséñame solo lo que queda por decidir»
   'Ocultar las que ya están en Radarr': 'Hide the ones already in Radarr',
-  'Lo que ya has mandado a Radarr está decidido: esto lo quita de la parrilla para dejar solo lo que falta por pedir':
-    'What you already sent to Radarr is settled: this drops it from the grid so only what is left to request remains',
+  'Quita de la parrilla lo que ya está pedido, para dejar solo lo que falta':
+    'Hides what has already been requested, leaving only what is still missing',
   'Ocultar a quien no ofrece nada': 'Hide people with nothing to offer',
   'Quita de la lista a quien, con los filtros puestos, no ofrece ninguna película':
     'Drops from the list anyone who, with these filters on, offers no film at all',

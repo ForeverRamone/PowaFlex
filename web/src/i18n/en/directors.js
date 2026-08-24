@@ -32,10 +32,10 @@ export default {
   'Cargando el catálogo de directores…': 'Loading the director catalog…',
   'La caza': 'The hunt',
   'Directores en activo': 'Working directors',
-  '680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Filtra por región, país o género, ordena por lo que te interese y ve marcando con la estrella a quién quieres seguir.':
-    "680 directors with recent work, from Wikidata: who they are, how much they've shot and what they've won. Filter by region, country or gender, sort by whatever you care about and star whoever you want to follow.",
-  '680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Este catálogo no sale de tu biblioteca — sirve para descubrir a quién seguir con la estrella.':
-    "680 directors with recent work, from Wikidata: who they are, how much they've shot and what they've won. This catalog doesn't come from your library — it's for discovering who to follow with the star.",
+  '680 directores y directoras con obra reciente, de Wikidata: quiénes son, cuánto han rodado y qué han ganado. Marca con la estrella a quién quieres seguir.':
+    '680 directors with recent work, from Wikidata: who they are, how much they have shot and what they have won. Star whoever you want to follow.',
+  '680 directores y directoras con obra reciente, de Wikidata. No sale de tu biblioteca: sirve para descubrir a quién seguir.':
+    '680 directors with recent work, from Wikidata. This is not drawn from your library: it is for finding who to follow.',
 
   // filtros y orden
   'Buscar nombre o país…': 'Search name or country…',
@@ -60,8 +60,8 @@ export default {
   // nota metodológica
   'La': 'The',
   'importancia': 'importance',
-  'combina prestigio (premios y reconocimiento crítico, 60 %) e impacto (notoriedad, alcance de la obra y taquilla, 40 %). Es una convención operativa, no un juicio de valor: Wikidata no es exhaustiva ni neutral y su cobertura de premios está sesgada hacia Europa y Norteamérica. «En activo» significa al menos un largometraje en los últimos ocho años.':
-    "combines prestige (awards and critical recognition, 60%) and impact (notoriety, reach of the work and box office, 40%). It's an operating convention, not a value judgment: Wikidata is neither exhaustive nor neutral and its awards coverage is biased toward Europe and North America. “Active” means at least one feature in the last eight years.",
+  'combina prestigio (60 %) e impacto (40 %) según Wikidata, que cubre mejor Europa y Norteamérica. «En activo» es al menos un largometraje en los últimos ocho años.':
+    'combines prestige (60 %) and impact (40 %) from Wikidata, whose coverage leans towards Europe and North America. “Active” means at least one feature in the last eight years.',
 
   // lista y pie
   'Nadie con esos filtros.': 'Nobody matches those filters.',

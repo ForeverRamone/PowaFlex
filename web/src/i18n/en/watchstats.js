@@ -26,8 +26,8 @@ export default {
   '{n} sin emparejar con tu Plex': '{n} unmatched with your Plex',
   'todas emparejadas': 'all matched',
   'Tienes ': 'You have ',
-  ' películas vistas en Letterboxd que no cuadran con tu biblioteca (a menudo por el idioma del título). Búscalas en TMDB para emparejarlas:':
-    " movies watched on Letterboxd that don't match your library (often due to the title language). Look them up on TMDB to match them:",
+  ' películas vistas en Letterboxd que no cuadran con tu biblioteca, casi siempre por el idioma del título. Búscalas en TMDB:':
+    ' films watched on Letterboxd that do not line up with your library, nearly always over the title’s language. Look them up on TMDB:',
   'Emparejando…': 'Matching…',
   '↻ Reintentar emparejado por TMDB': '↻ Retry TMDB matching',
   // Gráficas
@@ -42,17 +42,17 @@ export default {
   '{n} pendientes': '{n} pending',
   'Directores/as que más has visto': "Directors you've watched the most",
   'Aún no hay visionados registrados.': 'No viewings recorded yet.',
-  'Por número de películas suyas que has visto, contando lo reproducido en Plex y lo que tienes marcado en Letterboxd. Solo entran las que están emparejadas con tu biblioteca: de una entrada de Letterboxd suelta no se sabe quién la dirigió.':
-    "By how many of their movies you've watched, counting what you played in Plex and what you've marked on Letterboxd. Only movies matched with your library count: a loose Letterboxd entry doesn't say who directed it.",
+  'Por número de películas suyas que has visto, en Plex y en Letterboxd. Solo entran las emparejadas con tu biblioteca: de una entrada suelta de Letterboxd no se sabe quién la dirigió.':
+    'By how many of their films you have seen, in Plex and on Letterboxd. Only ones matched to your library count: a loose Letterboxd entry does not say who directed it.',
   'vistas de {total} suyas que tienes': 'watched of the {total} of theirs you own',
   // Insights de MDBList
   '🏛️ Lo mejor valorado que tienes sin ver': "🏛️ The best-rated films you own but haven't watched",
-  'Películas de tu Plex que ni has reproducido ni tienes marcadas en Letterboxd, ordenadas por la nota combinada de MDBList.':
-    "Movies in your Plex you've neither played nor marked on Letterboxd, sorted by MDBList's combined rating.",
+  'Películas de tu Plex que ni has reproducido ni tienes marcadas en Letterboxd, por nota combinada.':
+    'Films in your Plex you have neither played nor marked on Letterboxd, by combined score.',
   '🏅 «Must-see» de Metacritic que tienes sin ver (metascore ≥ 81)':
     '🏅 Metacritic “must-see” you own but haven\'t watched (metascore ≥ 81)',
-  'El listón de consenso crítico más exigente, avalado por volumen de votos en IMDb. Todo sale de las notas de MDBList ya descargadas.':
-    'The most demanding critical-consensus bar, backed by IMDb vote volume. All of it comes from the MDBList ratings already downloaded.',
+  'El listón de consenso crítico más exigente, avalado por volumen de votos en IMDb.':
+    'The strictest critical-consensus bar, backed by IMDb vote volume.',
   '💎 Joyas tuyas que la crítica no entendió (tu nota LB ≥ 8, RT ≤ 55%)':
     "💎 Your gems the critics didn't get (your LB rating ≥ 8, RT ≤ 55%)",
   'Tú: {r} · 🍅 {rt}%': 'You: {r} · 🍅 {rt}%',

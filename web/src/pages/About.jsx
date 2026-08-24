@@ -20,45 +20,93 @@ const FIRST_STEPS = [
   {
     title: t('Conecta tu Plex'),
     to: '/ajustes?tab=conexiones',
-    body: t('En Ajustes, pega la dirección del servidor y tu X-Plex-Token (la propia página explica cómo sacarlo) y elige la biblioteca de películas. Lanza la sincronización: la primera tarda unos minutos y trae fichas, reparto, géneros, visionados y datos técnicos.'),
+    body: t('Pega la dirección del servidor y tu X-Plex-Token en Ajustes y elige la biblioteca de películas. La primera sincronización tarda unos minutos.'),
   },
   {
     title: t('Añade la clave de TMDB'),
     to: '/ajustes?tab=conexiones',
-    body: t('Es gratuita y es lo que convierte tu lista de archivos en filmografías: sin ella no hay completismo, ni calendario de estrenos, ni sagas, ni huecos que rellenar. Es el paso que más rendimiento da.'),
+    body: t('Es gratuita y es lo que convierte tu lista de archivos en filmografías: sin ella no hay completismo, ni calendario, ni sagas, ni huecos.'),
   },
   {
     title: t('Conecta Radarr'),
     to: '/ajustes?tab=conexiones',
     optional: true,
-    body: t('Sin Radarr, PowaFlex te enseña lo que te falta; con Radarr, además lo pide. Necesita la URL y la API key, y le dices con qué perfil de calidad y en qué carpeta debe añadir.'),
+    body: t('Sin Radarr ves lo que te falta; con Radarr, además lo pides. Necesita la URL, la API key, un perfil de calidad y una carpeta.'),
   },
   {
     title: t('Trae tu Letterboxd y las notas'),
     to: '/ajustes?tab=fuentes',
     optional: true,
-    body: t('En Ajustes, importa el zip de tu export para que PowaFlex sepa qué has visto aunque no lo reprodujeras en Plex, y pon tu RSS para que se mantenga solo. Con la clave de MDBList (también en Ajustes) cada película gana las notas de IMDb, Rotten Tomatoes, Metacritic y Letterboxd.'),
+    body: t('Importa el zip de tu export y pon tu RSS para que se mantenga solo. Con la clave de MDBList cada película gana las notas de IMDb, Rotten Tomatoes, Metacritic y Letterboxd.'),
   },
   {
     title: t('Mira dónde estás'),
     to: '/',
-    body: t('El Dashboard te da la foto general y el Taller la salud técnica. En Visionado ves cuánto llevas visto y qué grandes películas tuyas siguen esperando. Aquí todavía no hay nada que decidir: es tomar medida de la colección.'),
+    body: t('El Dashboard da la foto general y Visionado dice cuánto llevas visto. Aquí todavía no hay nada que decidir.'),
   },
   {
     title: t('Marca a tu gente'),
     to: '/favoritos',
-    body: t('Este es el paso que enciende el resto de la aplicación. Sigue a tus directores/as y actores/actrices —de uno en uno, por paquetes o pegando una lista de nombres— indicando por qué faceta los sigues; quien dirige e interpreta puede estar en las dos a la vez. Sus filmografías pasan a ser tu lista de tareas.'),
+    body: t('El paso que enciende el resto: sigue a tus directores/as y actores/actrices indicando por qué faceta. Sus filmografías pasan a ser tu lista de tareas.'),
   },
   {
     title: t('Caza los huecos'),
     to: '/descubrir',
-    body: t('Descubrir huecos cruza esas filmografías con tu Plex y te dice qué falta, con filtros para dejar fuera el ruido (cortos, documentales, conciertos, TV, cameos). Sagas hace lo mismo con las franquicias a medias, y Listas y retos con los cánones (1001 películas, premios…). Cada película se manda a Radarr desde su propia fila.'),
+    body: t('Descubrir huecos cruza esas filmografías con tu Plex y te dice qué falta. Sagas hace lo mismo con las franquicias, y Listas con los cánones.'),
   },
   {
     title: t('Déjalo corriendo'),
     to: '/calendario',
-    body: t('Cine venidero vigila los estrenos de tu gente. Cada noche PowaFlex resincroniza Plex, recalcula huecos y, si lo activas, manda solos a Radarr los estrenos de tus directores/as favoritos/as vivos. A partir de aquí solo tienes que entrar de vez en cuando.'),
+    body: t('Cada noche PowaFlex resincroniza Plex, recalcula huecos y, si lo activas, manda a Radarr los estrenos de tus favoritos vivos.'),
   },
+];
+
+const HACER = [
+  ['Conocer tu colección', [
+    'Totales: películas, horas de cine, disco ocupado y % visto.',
+    'Gráficas por década y por género, y el reparto de resoluciones en «Calidad y disco».',
+    'Filtrar la biblioteca al estilo Letterboxd y ordenarla por cualquiera de sus notas.',
+    'Abrir la ficha de cualquier película, con reparto, notas y datos técnicos.',
+    'Rankings de dirección, interpretación y guion por presencia, con filtros demográficos.',
+  ]],
+  ['Cazar lo que te falta', [
+    'El completismo de cada persona y lo que te falta de su filmografía.',
+    'Un calendario con los estrenos y proyectos anunciados de tus cineastas.',
+    'Franquicias empezadas y sin terminar, con las partes que faltan a la vista.',
+    'Retos de listas famosas (IMDb Top 250, Cannes, 1001…) con anillos de «tengo» y «visto».',
+    'Las secciones oficiales y los palmareses de los grandes festivales.',
+    'Grandes directores/as del canon ausentes de tu servidor.',
+    'Si existe una versión de más calidad (HD/4K) en el mercado.',
+  ]],
+  ['Actuar con Radarr', [
+    'Añadir con un clic cualquier película que te falte.',
+    'Añadir en bloque una lista, una saga o el cine venidero de un plazo.',
+    'Mandar solos cada noche los estrenos de tus favoritos vivos.',
+    'Ver qué pedidas han llegado y cuáles siguen sin aparecer, con re-búsqueda.',
+    'Pedir upgrades de lo que está por debajo de 1080p.',
+  ]],
+  ['Tu gusto y tu historial', [
+    'Importar tu Letterboxd (zip y RSS) para marcar vistas y notas.',
+    'Ver últimas añadidas, últimas vistas y últimas peticiones a Radarr.',
+    'Comparar tus notas con las de la crítica: joyas ocultas y discrepancias.',
+    'Marcar favoritos por paquetes, pegando una lista o de uno en uno.',
+    'Elegir de qué webs quieres ver las notas.',
+  ]],
+];
+
+const SECCIONES = [
+  ['📊', 'Dashboard', '/', 'La foto general —películas, horas, disco, gráficas por década y por género— y arriba lo vivo: las novedades que detecta el pase nocturno y las capturas de la semana.'],
+  ['🎞️', 'Biblioteca', '/biblioteca', 'Tu colección en una parrilla de pósters, con filtros al estilo Letterboxd: género, país, década, metraje, resolución, HDR y notas mínimas. La nota que sale en cada póster la eliges tú.'],
+  ['🎭', 'Directores/as y actores/actrices', '/personas', 'El ranking por presencia en tu Plex, con filtros demográficos y la ★ para seguir a cualquiera. La ficha de cada persona cruza su filmografía de TMDB con lo que tienes: completismo, huecos y proyectos anunciados.'],
+  ['🗓️', 'Cine venidero', '/calendario', 'Un calendario mensual con los estrenos y los proyectos anunciados de tu gente. Cada uno se manda a Radarr desde ahí.'],
+  ['⭐', 'Favoritos', '/favoritos', 'Tu gente de cabecera, la que alimenta el calendario, seguida por una faceta o por las dos. En «Añadir», el catálogo de 680 directores en activo de Wikidata, los paquetes temáticos, los cánones enteros y una caja para pegar nombres.'],
+  ['🎪', 'Festivales', '/festivales', 'Las secciones oficiales de los grandes festivales edición a edición, el palmarés histórico de sesenta y cinco premios y cánones, y «Lo mejor del año». Todo casado con tu Plex, y con el ✎ para corregir a mano cualquier ficha.'],
+  ['🧭', 'Descubrir huecos', '/descubrir', 'El modo completista en cinco pestañas: tus favoritos, los top de tu biblioteca, los grandes ausentes del canon y tus sagas a medias. Con envío a Radarr, listón de nota y filtros de ruido.'],
+  ['🎟️', 'Estrenos', '/estrenos', 'Qué acaba de llegar y qué viene, a los cines y a las plataformas de España y de EE UU, con chips de dónde verla. Solo largometraje, con ventana de 7, 30 o 90 días.'],
+  ['🏆', 'Listas y retos', '/listas', 'Tu watchlist de Letterboxd, tus retos importados y las listas de MDBList convertidas en retos de completismo, con envío en bloque a Radarr.'],
+  ['👁️', 'Visionado', '/visionado', 'Cuánto llevas visto contra lo pendiente: por década, por género, de quién te queda más por ver, y las joyas y discrepancias frente a tu nota de Letterboxd.'],
+  ['🔧', 'Taller', '/taller', 'Calidad y disco: resoluciones, candidatas a upgrade, duplicados, la deuda de Radarr y los archivos más pesados. Salud de los datos: auditorías locales, cada una con su remedio al lado.'],
+  ['⚙️', 'Ajustes', '/ajustes', 'Las conexiones con su guía paso a paso, el aspecto, qué notas ver, lo que usará Radarr, el histórico del pase nocturno y la copia de seguridad.'],
 ];
 
 export default function About() {
@@ -66,20 +114,16 @@ export default function About() {
     <div>
       <PageHeader eyebrow={t('Cuenta')} title={t('¿Qué es PowaFlex?')} />
       <p className="text-zinc-300 leading-relaxed mb-6 max-w-5xl">
-        {t('PowaFlex es tu centro de mando cinéfilo: una aplicación que vive junto a tu servidor Plex, lee tu biblioteca de películas directamente por la API (sin exports ni CSV), la cruza con')}{' '}
-        <b className="text-zinc-100">TMDB</b>{' '}
-        {t('(la base de datos abierta de cine) y con')}{' '}
-        <b className="text-zinc-100">Radarr</b>{' '}
-        {t('(tu gestor de descargas monitorizadas), y convierte todo eso en dos cosas:')}{' '}
-        <b className="text-gold-400">{t('conocer a fondo el cine que tienes')}</b>{' '}
+        {t('PowaFlex vive junto a tu servidor Plex: lee tu biblioteca por la API, la cruza con TMDB y con Radarr y la convierte en dos cosas,')}{' '}
+        <b className="text-gold-400">{t('conocer el cine que tienes')}</b>{' '}
         {t('y')}{' '}
-        <b className="text-gold-400">{t('cazar el cine que te falta o que está por venir')}</b>
-        {t('. Todo se guarda en local, en tu propia máquina; de tu red solo salen las consultas a los servicios que conectes (TMDB, MDBList, JustWatch, Letterboxd, Wikipedia).')}
+        <b className="text-gold-400">{t('cazar el que te falta')}</b>
+        {t('. Todo se guarda en tu máquina; de tu red solo salen las consultas a los servicios que conectes.')}
       </p>
 
       <h2 className="text-lg font-semibold text-zinc-100 mb-3">{t('Si acabas de llegar: la ruta, paso a paso')}</h2>
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-        {t('Los cuatro primeros pasos se hacen una vez y dejan la aplicación funcionando. Del quinto en adelante empieza el uso diario. Puedes saltarte cualquiera que no te interese: nada depende de lo que no configures.')}
+        {t('Los cuatro primeros se hacen una vez. Del quinto en adelante empieza el uso diario, y puedes saltarte lo que no te interese.')}
       </p>
       <ol className="grid md:grid-cols-2 gap-3 mb-6">
         {FIRST_STEPS.map((s, i) => (
@@ -99,48 +143,14 @@ export default function About() {
       <h2 className="text-lg font-semibold text-zinc-100 mb-3">{t('¿Qué puedo hacer con PowaFlex?')}</h2>
       <div className="card p-5 mb-6 text-sm text-zinc-400 leading-relaxed">
         <div className="grid md:grid-cols-2 gap-x-8 gap-y-4">
-          <div>
-            <div className="text-zinc-200 font-medium mb-1">{t('Conocer tu colección')}</div>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>{t('Ver totales: cuántas películas, horas de cine, disco ocupado y % visto.')}</li>
-              <li>{t('Explorar gráficas por década y género, el ritmo al que crece la colección y, en «Calidad y disco», el reparto de resoluciones.')}</li>
-              <li>{t('Filtrar la biblioteca al estilo Letterboxd (género, país, década, metraje, HDR, notas de IMDb/RT/Letterboxd…) y ordenarla por cualquiera de esas notas. La estrella dorada marca lo que ya has visto.')}</li>
-              <li>{t('Abrir la ficha de cualquier película con reparto, notas de varias webs y datos técnicos, y elegir qué nota sale en cada póster.')}</li>
-              <li>{t('Ver rankings de directores/as, actores/actrices y guionistas por presencia, y filtrarlos por género, país, continente o si están vivos.')}</li>
-            </ul>
-          </div>
-          <div>
-            <div className="text-zinc-200 font-medium mb-1">{t('Cazar lo que te falta')}</div>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>{t('Ver el % de completismo de cada director/a o actor/actriz (solo largometrajes) y lo que te falta de su filmografía.')}</li>
-              <li>{t('Seguir un calendario de estrenos y proyectos anunciados de tus cineastas.')}</li>
-              <li>{t('Detectar franquicias empezadas y sin terminar (sagas de TMDB), con las partes que faltan a la vista.')}</li>
-              <li>{t('Comprobar retos de listas famosas (IMDb Top 250, Cannes, 1001…) con anillos de «tengo» vs «visto».')}</li>
-              <li>{t('Recorrer las secciones oficiales y el palmarés de los grandes festivales (Cannes, Venecia, Berlinale…) para cazar sus películas y seguir a sus cineastas.')}</li>
-              <li>{t('Encontrar grandes directores/as del canon de They Shoot Pictures ausentes de tu servidor.')}</li>
-              <li>{t('Comprobar en JustWatch si existe una versión de más calidad (HD/4K) en el mercado.')}</li>
-            </ul>
-          </div>
-          <div>
-            <div className="text-zinc-200 font-medium mb-1">{t('Actuar con Radarr')}</div>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>{t('Añadir a Radarr cualquier película que te falte con un clic, con perfil y carpeta configurables.')}</li>
-              <li>{t('Añadir en bloque toda una lista, saga o el cine venidero de un plazo.')}</li>
-              <li>{t('Automatizar el día a día: lanzar solo cada noche los estrenos de tus directores/as favoritos/as vivos.')}</li>
-              <li>{t('Ver en el Dashboard qué pedidas han llegado por fin (capturas), y en Calidad cuáles siguen sin aparecer o llegaron por debajo de tu perfil, con re-búsqueda en un clic.')}</li>
-              <li>{t('Pedir upgrades de las películas por debajo de 1080p.')}</li>
-            </ul>
-          </div>
-          <div>
-            <div className="text-zinc-200 font-medium mb-1">{t('Tu gusto y tu historial')}</div>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>{t('Importar tu Letterboxd (zip completo) y su feed RSS para marcar vistas y notas.')}</li>
-              <li>{t('Ver últimas añadidas a Plex, últimas vistas (Plex + Letterboxd) y últimas peticiones a Radarr.')}</li>
-              <li>{t('Comparar tus notas de Letterboxd con las de la crítica y la comunidad (joyas ocultas, discrepancias).')}</li>
-              <li>{t('Marcar favoritos (incluidos directores/as que aún no tienes): por paquetes temáticos, pegando una lista de nombres o de uno en uno.')}</li>
-              <li>{t('Elegir de qué webs (IMDb, RT, Metacritic, Letterboxd…) quieres ver las notas.')}</li>
-            </ul>
-          </div>
+          {HACER.map(([titulo, puntos]) => (
+            <div key={titulo}>
+              <div className="text-zinc-200 font-medium mb-1">{t(titulo)}</div>
+              <ul className="list-disc pl-5 space-y-1">
+                {puntos.map((p) => <li key={p}>{t(p)}</li>)}
+              </ul>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -148,124 +158,46 @@ export default function About() {
       <div className="card p-5 mb-6 text-sm text-zinc-400 leading-relaxed space-y-2">
         <p>
           <b className="text-zinc-200">{t('1. Sincronización con Plex.')}</b>{' '}
-          {t('Con tu X-Plex-Token, PowaFlex recorre tu biblioteca y descarga de cada película el reparto completo, dirección, guion, géneros, países, colecciones, visionados, y los datos técnicos del archivo (resolución, códec, HDR/Dolby Vision, tamaño). La primera vez tarda unos minutos; después es incremental y se repite sola cada noche.')}
+          {t('Con tu X-Plex-Token se descarga de cada película el reparto, los oficios, los géneros, los visionados y los datos técnicos del archivo. Después es incremental y se repite sola cada noche.')}
         </p>
         <p>
           <b className="text-zinc-200">{t('2. Cruce con TMDB.')}</b>{' '}
-          {t('Cada película de Plex trae su identificador TMDB, así que el emparejado es exacto. Con él, PowaFlex consulta filmografías completas, estrenos futuros y sagas, y lo cachea para no repetir llamadas.')}
+          {t('Cada película de Plex trae su identificador de TMDB, así que el emparejado es exacto. De ahí salen las filmografías, los estrenos futuros y las sagas, cacheados.')}
         </p>
         <p>
           <b className="text-zinc-200">{t('3. Acción con Radarr.')}</b>{' '}
-          {t('Cualquier película que te falte —de una filmografía, del calendario, de una saga o de tu watchlist— se añade a Radarr con un clic, monitorizada y con búsqueda automática, usando el perfil de calidad y carpeta que elijas en Ajustes.')}
+          {t('Lo que te falte se añade con un clic, monitorizado y con búsqueda automática, usando el perfil de calidad y la carpeta que elijas.')}
         </p>
       </div>
 
       <h2 className="text-lg font-semibold text-zinc-100 mb-3">{t('Las secciones, una a una')}</h2>
       <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
-        {t('Y desde cualquier sitio,')} <b className="text-zinc-300">Ctrl/⌘ + K</b>{' '}
-        {t('abre la búsqueda global: películas, personas, sagas, listas, festivales y saltar a cualquier sección, con las flechas y Enter.')}
+        {t('Desde cualquier sitio,')} <b className="text-zinc-300">Ctrl/⌘ + K</b>{' '}
+        {t('abre la búsqueda global: películas, personas, sagas, listas y festivales.')}
       </p>
       <div className="grid md:grid-cols-2 gap-4 mb-6">
-        <Block icon="📊" title="Dashboard" to="/">
-          <p>
-            {t('La foto general: cuántas películas tienes, cuántas horas de cine suman, cuánto disco ocupan, y gráficas por década y por género, además del ritmo al que crece la biblioteca y los directores/as y actores/actrices con más presencia. Arriba, lo vivo: las')}{' '}
-            <b>{t('novedades')}</b>{' '}
-            {t('que detecta el pase nocturno (una edición de festival recién publicada, una pedida que ya está en digital) y las')}{' '}
-            <b>{t('capturas')}</b> {t('de la semana.')}
-          </p>
-        </Block>
-        <Block icon="🎞️" title={t('Biblioteca')} to="/biblioteca">
-          <p>
-            {t('Toda tu colección en una parrilla de pósters (con ★ dorada en las vistas) y filtros al estilo Letterboxd: género, país, década, visto/sin ver, largometraje o corto (menos de 40 minutos), resolución, HDR/Dolby Vision, notas mínimas de IMDb/RT/Letterboxd… y ordenación por fecha añadida, estreno, esas notas, duración, tamaño o aleatorio. La nota que sale en cada póster la eliges tú.')}
-          </p>
-        </Block>
-        <Block icon="🎭" title={t('Directores/as y actores/actrices')} to="/personas">
-          <p>
-            {t('El ranking de directores/as, actores/actrices y guionistas por presencia en tu Plex, con filtros demográficos (género, vivos/fallecidos, continente, país), la ★ para seguir a cualquiera y el alta en bloque de «los N primeros» con previsualización. La ficha de cada persona cruza su filmografía completa de TMDB con lo que tienes: completismo, lo que te falta (con botón a Radarr), proyectos anunciados y notas, con orden y listón de nota mínima. Quien dirige y actúa tiene una pestaña por faceta.')}
-          </p>
-        </Block>
-        <Block icon="🗓️" title={t('Cine venidero')} to="/calendario">
-          <p>
-            {t('Un calendario mensual con los próximos estrenos y proyectos anunciados de los directores/as y actores/actrices más importantes de tu biblioteca (y de los que sigas manualmente). Cada estreno se puede mandar a Radarr para tenerlo monitorizado desde ya.')}
-          </p>
-        </Block>
-        <Block icon="⭐" title={t('Favoritos')} to="/favoritos">
-          <p>
-            {t('Tu lista de directores/as y actores/actrices de cabecera, la que alimenta el calendario. Cada persona puede seguirse por una faceta o por las dos (un Eastwood cuenta en directores Y en actores). En «Añadir» está el')}{' '}
-            <b>{t('catálogo de 680 directores en activo')}</b>{' '}
-            {t('de Wikidata —importancia, obra y premios, con filtros por región, país y género— para captar favoritos con la ☆, además de los paquetes temáticos y de festival con «añadir todos», volcar cánones enteros y pegar una lista de nombres; también exportar la tuya y el modo podar para limpiar en bloque. Lo que quites con la ✕ no vuelve por los añadidos masivos (solo a mano). Para seguir gente desde el ranking de tu biblioteca, la ★ vive en Directores y actores.')}
-          </p>
-        </Block>
-        <Block icon="🎪" title={t('Festivales')} to="/festivales">
-          <p>
-            {t('Las secciones oficiales de los grandes festivales —los seis de la vía directa al Óscar internacional (Cannes, Venecia, Berlinale, Sundance, Toronto y Busan) más San Sebastián y sus Horizontes Latinos—, edición a edición, el palmarés histórico de cada premio, los grandes premios anuales con palmarés y nominadas por año (Goya, César, BAFTA, Cine Europeo, Óscar a la mejor película y Óscar internacional) y el canon')}{' '}
-            <b>Sight &amp; Sound 2022</b>{' '}
-            {t('de la crítica al completo. Cualquier emparejado con TMDB se corrige a mano desde la propia tarjeta (✎). Todo casado con tu Plex: manda a Radarr lo que falte y sigue a sus directores/as —de una en una o la sección entera— para que sus estrenos entren en el calendario. El pase nocturno vigila las ediciones nuevas y te lo cuenta en el Dashboard en cuanto un festival publica su selección.')}
-          </p>
-        </Block>
-        <Block icon="🧭" title={t('Descubrir huecos')} to="/descubrir">
-          <p>
-            {t('El modo completista, en cinco pestañas: lo que te falta de')}{' '}
-            <b>{t('tus favoritos')}</b>{t('; los')}{' '}
-            <b>{t('directores/as y actores/actrices top')}</b>{' '}
-            {t('de tu biblioteca (con filtros demográficos: «mis directoras españolas top»); los')}{' '}
-            <b>{t('grandes ausentes')}</b>{' '}
-            {t('del canon —They Shoot Pictures, IMDb 501, el «en boga» de TMDB o cualquier lista que pegues— sin una sola película en tu servidor; y tus')}{' '}
-            <b>{t('sagas')}</b>{' '}
-            {t('a medias, detectadas con la colección real de TMDB. Todo con envío a Radarr, descarte reversible, listón de nota y filtros de ruido.')}
-          </p>
-        </Block>
-        <Block icon="🎟️" title={t('Estrenos')} to="/estrenos">
-          <p>
-            {t('Qué acaba de llegar y qué viene: a los')}{' '}
-            <b>{t('cines de España')}</b>{t(', a los')}{' '}
-            <b>{t('cines de EE UU')}</b> {t('y a las')}{' '}
-            <b>{t('plataformas y VOD de España y de EE UU')}</b>{' '}
-            {t('(fecha de estreno digital de TMDB, con chips de dónde verla en cada país: Netflix, Filmin, Movistar…, y con nombre también cuando solo se alquila). Solo cine largometraje, con ventana de 7/30/90 días más lo próximo, y los filtros de la casa: listón Σ de MDBList para separar el estreno que importa del relleno, Me faltan / Las tengo, tipos, plataforma o VOD concretos, y envío a Radarr suelto o en bloque.')}
-          </p>
-        </Block>
-        <Block icon="🏆" title={t('Listas y retos')} to="/listas">
-          <p>
-            {t('Tu')} <b>{t('watchlist de Letterboxd')}</b>{' '}
-            {t('(con Radarr en lo que te falta), tus retos importados de Letterboxd con anillos de «tengo» vs «visto», y las listas de MDBList (1001 películas, palmarés de premios, tops de la comunidad) convertidas en retos de completismo: % conseguido, lo que falta y envío en bloque a Radarr.')}
-          </p>
-        </Block>
-        <Block icon="👁️" title={t('Visionado')} to="/visionado">
-          <p>
-            {t('El contador de lo que llevas visto (Plex + Letterboxd) y lo visto contra lo pendiente: por década, por género, los directores/as de los que más te queda por ver, joyas y discrepancias frente a tu nota de Letterboxd, las mejor valoradas que aún no has visto, los «must-see» de Metacritic pendientes, la tabla de tus notas contra la comunidad y tu historial reciente.')}
-          </p>
-        </Block>
-        <Block icon="🔧" title={t('Taller')} to="/taller">
-          <p>
-            {t('El mantenimiento, en dos pestañas.')} <b>{t('Calidad y disco')}</b>
-            {t(': resoluciones, códecs y HDR, candidatas a upgrade, duplicados, la deuda de Radarr (pedidas que no llegan, por debajo del corte) y los archivos más pesados.')}{' '}
-            <b>{t('Salud de los datos')}</b>
-            {t(': auditorías locales —películas sin ficha TMDB, identidades repetidas, entradas de Letterboxd sin casar, peticiones zombis y emparejados sin demostrar— cada una con su remedio al lado.')}
-          </p>
-        </Block>
-        <Block icon="⚙️" title={t('Ajustes')} to="/ajustes">
-          <p>
-            {t('Las conexiones (Plex, TMDB, Radarr, MDBList y Letterboxd —el zip del export y el RSS se importan aquí—) con guías paso a paso para conseguir cada credencial, el aspecto de la app, qué notas quieres ver, el perfil de calidad y carpeta que usará Radarr, el tamaño del radar del calendario, el control de sincronización manual, el histórico de los últimos 30 días del pase nocturno (paso a paso, con duraciones y errores) y la copia de seguridad: descarga de la base de datos entera y exportación/importación de la configuración para reinstalar sin empezar de cero.')}
-          </p>
-        </Block>
+        {SECCIONES.map(([icon, titulo, to, texto]) => (
+          <Block key={titulo} icon={icon} title={t(titulo)} to={to}>
+            <p>{t(texto)}</p>
+          </Block>
+        ))}
       </div>
 
       <div className="card p-5 text-xs text-zinc-500 leading-relaxed">
         <p>
-          {t('PowaFlex corre en Docker (pensado para un mini-PC junto a Plex y Radarr), guarda sus datos en SQLite en la carpeta')}{' '}
-          <code className="text-zinc-300">data/</code> {t('y no tiene cuentas ni telemetría. Datos de cine por cortesía de')}{' '}
+          {t('PowaFlex corre en Docker, guarda sus datos en SQLite y no tiene cuentas ni telemetría. Datos de cine por cortesía de')}{' '}
           <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer" className="text-gold-400 hover:underline">
             TMDB
           </a>
-          {t('. No expongas la app a internet sin un proxy con autenticación: está diseñada para tu red local. Las credenciales de Plex, TMDB y Radarr se guardan en SQLite; define la variable de entorno')}{' '}
-          <code className="text-zinc-300">POWAFLEX_SECRET</code> {t('para cifrarlas en disco.')}
+          {t('. No la expongas a internet sin un proxy con autenticación: está pensada para tu red local. Define')}{' '}
+          <code className="text-zinc-300">POWAFLEX_SECRET</code> {t('para cifrar las credenciales en disco.')}
         </p>
         <p className="mt-2">
           {t('Proyecto de código abierto:')}{' '}
           <a href="https://github.com/ForeverRamone/PowaFlex" target="_blank" rel="noreferrer" className="text-gold-400 hover:underline">
             github.com/ForeverRamone/PowaFlex
           </a>{' '}
-          {t('— las novedades de cada versión se publican en la sección Releases.')}
+          {t('— las novedades de cada versión se publican en Releases.')}
         </p>
       </div>
     </div>

@@ -12,10 +12,10 @@ export default {
 
   // ── cabecera de la sección ────────────────────────────────────────────────
   'Reglas automáticas a Radarr': 'Automatic Radarr rules',
-  'Cada regla vigila una cosa —un festival, un premio, los estrenos de una región, tus favoritos de un oficio— y manda a Radarr lo que pase su filtro. Se revisan CADA NOCHE: una película que hoy no llega al umbral puede entrar mañana, cuando tenga más notas.':
-    'Each rule watches one thing — a festival, an award, the new releases of one region, your favorites in one craft — and sends to Radarr whatever clears its filter. They are re-checked EVERY NIGHT: a movie that misses the threshold today can make it tomorrow, once more ratings are in.',
-  '⚠️ Como se reevalúan cada noche, borrar algo de Radarr a mano no basta: volvería. Para que una película no vuelva a entrar, pulsa su 🚫 en el historial de abajo (o el ✕ de Descubrir y Estrenos).':
-    '⚠️ Since they are re-checked every night, deleting something from Radarr by hand is not enough: it would come back. To keep a movie out for good, hit its 🚫 in the history below (or the ✕ in Discover and New releases).',
+  'Cada regla vigila una cosa —un festival, un premio, una región, un oficio— y manda a Radarr lo que pase su filtro. Se revisan cada noche: lo que hoy no llega al umbral puede entrar mañana.':
+    'Each rule watches one thing — a festival, an award, a region, a role — and sends Radarr whatever clears its filter. They are reviewed every night: what falls short today can get in tomorrow.',
+  '⚠️ Borrar algo de Radarr a mano no basta: volvería esta noche. Para que no vuelva, pulsa su 🚫 en el historial de abajo.':
+    '⚠️ Deleting something from Radarr by hand is not enough: it would come back tonight. To keep it out, press its 🚫 in the history below.',
   'Que ninguna regla la vuelva a mandar': 'Keep any rule from sending it again',
   '🚫 «{p}» no volverá a entrar por ninguna regla': '🚫 “{p}” will not come back through any rule',
   'Vas a ejecutar {n} regla(s) sobre Radarr ahora mismo (hasta {m} películas). ¿Sigo?':
@@ -98,8 +98,8 @@ export default {
   // ── cuarentena pre-Radarr ─────────────────────────────────────────────────
   'Cuarentena antes de Radarr': 'Quarantine before Radarr',
   '{n} esperando tu ✓': '{n} waiting for your ✓',
-  'Lo que cumpla estos criterios NO se manda solo: pasa por aquí y espera tu aprobación. Es para lo que pasa el umbral pero merece una segunda mirada — notas infladas por una comunidad muy entregada, por ejemplo. Vale para TODAS las reglas.':
-    'Whatever meets these criteria is NOT sent on its own: it lands here and waits for your approval. It is for what clears the threshold but deserves a second look — scores inflated by a very dedicated community, for instance. It applies to ALL rules.',
+  'Lo que cumpla estos criterios no se manda solo: espera tu aprobación. Para lo que pasa el umbral y aun así merece una segunda mirada. Vale para todas las reglas.':
+    'Anything matching these criteria is not sent automatically: it waits for your approval. For what clears the threshold and still deserves a second look. Applies to every rule.',
   'Poner en cuarentena lo que cumpla alguno de estos criterios': 'Quarantine anything meeting any of these criteria',
   'Idiomas originales': 'Original languages',
   'Países de producción': 'Production countries',

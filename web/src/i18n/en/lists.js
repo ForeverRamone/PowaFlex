@@ -58,12 +58,12 @@ export default {
   ' vista': ' watched',
   'Añadiendo…': 'Adding…',
   '➕ Añadir {n} a Radarr': '➕ Add {n} to Radarr',
-  'Convierte listas famosas en retos de completismo: qué % tienes, qué has visto, qué te falta y envío a Radarr.':
-    "Turn famous lists into completism challenges: what % you own, what you've watched, what you're missing, and send it all to Radarr.",
+  'Listas famosas como retos de completismo: qué tienes, qué has visto y qué te falta.':
+    'Famous lists as completeness challenges: what you own, what you have seen and what you are missing.',
   '🟠 Retos de Letterboxd': '🟠 Letterboxd challenges',
   'Listas de MDBList': 'MDBList lists',
-  'Sigue listas de MDBList (1001 películas, palmarés de premios, tops de la comunidad…). Necesita la API key de MDBList en Ajustes.':
-    'Follow MDBList lists (1001 movies, award winners, community tops…). Needs the MDBList API key in Settings.',
+  'Sigue listas de MDBList: las 1001, palmareses, tops de la comunidad. Necesita su API key en Ajustes.':
+    'Follow MDBList lists: the 1001, award winners, community tops. Needs its API key in Settings.',
   'Pega una URL: https://mdblist.com/lists/usuario/lista': 'Paste a URL: https://mdblist.com/lists/user/list',
   "…o busca listas: «1001 movies», «palme d'or»": '…or search lists: "1001 movies", "palme d\'or"',
   'Consultando MDBList…': 'Querying MDBList…',

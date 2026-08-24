@@ -124,7 +124,7 @@ export default function WatchStats() {
       {s && s.lbUnmatched > 0 && (
         <div className="card p-3 mb-8 flex flex-wrap items-center gap-3 text-sm">
           <span className="text-zinc-400">
-            {t('Tienes ')}<b className="text-orange-300">{s.lbUnmatched.toLocaleString(locale())}</b>{t(' películas vistas en Letterboxd que no cuadran con tu biblioteca (a menudo por el idioma del título). Búscalas en TMDB para emparejarlas:')}
+            {t('Tienes ')}<b className="text-orange-300">{s.lbUnmatched.toLocaleString(locale())}</b>{t(' películas vistas en Letterboxd que no cuadran con tu biblioteca, casi siempre por el idioma del título. Búscalas en TMDB:')}
           </span>
           <button className="btn-gold !py-1 shrink-0" onClick={resolveUnmatched} disabled={resolving}>
             {resolving ? t('Emparejando…') : t('↻ Reintentar emparejado por TMDB')}
@@ -164,7 +164,7 @@ export default function WatchStats() {
         ) : (
           <>
             <p className="text-xs text-zinc-500 -mt-2 mb-3 max-w-3xl">
-              {t('Por número de películas suyas que has visto, contando lo reproducido en Plex y lo que tienes marcado en Letterboxd. Solo entran las que están emparejadas con tu biblioteca: de una entrada de Letterboxd suelta no se sabe quién la dirigió.')}
+              {t('Por número de películas suyas que has visto, en Plex y en Letterboxd. Solo entran las emparejadas con tu biblioteca: de una entrada suelta de Letterboxd no se sabe quién la dirigió.')}
             </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
               {data.directorsMostWatched.map((d, i) => (
@@ -200,7 +200,7 @@ export default function WatchStats() {
           biblioteca como respaldo. */}
       <InsightGrid
         title={t('🏛️ Lo mejor valorado que tienes sin ver')}
-        hint={t('Películas de tu Plex que ni has reproducido ni tienes marcadas en Letterboxd, ordenadas por la nota combinada de MDBList.')}
+        hint={t('Películas de tu Plex que ni has reproducido ni tienes marcadas en Letterboxd, por nota combinada.')}
         items={ins?.consensusUnwatched?.length ? ins.consensusUnwatched : data.unwatchedTopRated}
         caption={(m) => {
           const score = m.score ?? m.mdb_score;
@@ -215,7 +215,7 @@ export default function WatchStats() {
         <>
           <InsightGrid
             title={t('🏅 «Must-see» de Metacritic que tienes sin ver (metascore ≥ 81)')}
-            hint={t('El listón de consenso crítico más exigente, avalado por volumen de votos en IMDb. Todo sale de las notas de MDBList ya descargadas.')}
+            hint={t('El listón de consenso crítico más exigente, avalado por volumen de votos en IMDb.')}
             items={ins.mustSee}
             caption={(m) => `MC ${m.metacritic}${m.imdb != null ? ` · IMDb ${Number(m.imdb).toFixed(1)}` : ''}`}
             onSelect={setSelected}

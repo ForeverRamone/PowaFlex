@@ -25,8 +25,8 @@ export default {
   'cines de España y de EE UU': 'theaters in Spain and the US',
   ' y a las ': ' and on ',
   'plataformas y VOD de España y de EE UU': 'streaming and VOD in Spain and the US',
-  ' (fecha de estreno digital de TMDB, con dónde verla en cada país). Solo cine largometraje. El listón Σ separa el estreno que importa del relleno de cartelera; lo aún sin nota no se oculta.':
-    ' (TMDB digital release date, with where to watch in each country). Feature films only. The Σ bar separates the release that matters from the filler in the listings; titles without a score yet are not hidden.',
+  ' (fecha digital de TMDB, con dónde verla en cada país). Solo largometraje. El listón Σ separa lo que importa del relleno, sin ocultar lo que aún no tiene nota.':
+    ' (TMDB’s digital date, with where to watch it in each country). Features only. The Σ bar separates what matters from filler, without hiding what has no score yet.',
   'Estrenadas en:': 'Released in:',
   'Ordenar:': 'Sort:',
   // el trío Todas / Me faltan / Las tengo lo pinta OwnFilterBar: sus claves
@@ -52,8 +52,8 @@ export default {
   // «Actualizar notas»: repreguntar a MDBList por las Σ que aún no tenía
   'Actualizar notas': 'Refresh scores',
   'Pidiendo notas…': 'Fetching scores…',
-  'Vuelve a preguntar a MDBList por las notas que faltan. Es normal que un estreno tarde semanas en tener Σ.':
-    'Ask MDBList again for the scores that are still missing. A new release normally takes weeks to get a Σ.',
+  'Vuelve a pedir a MDBList las notas que faltan. Un estreno tarda semanas en tener Σ.':
+    'Asks MDBList again for the missing scores. A new release takes weeks to get a Σ.',
   '{n} aún sin nota Σ': '{n} still without a Σ score',
   '✓ {n} notas nuevas': '✓ {n} new scores',
   'Ninguna nota nueva: MDBList aún no las tiene': 'No new scores: MDBList does not have them yet',

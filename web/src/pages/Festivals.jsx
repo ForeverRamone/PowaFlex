@@ -384,7 +384,7 @@ export default function Festivals() {
       <PageHeader
         eyebrow={t('La caza')}
         title={t('Festivales y premios')}
-        subtitle={t('Sesenta y cinco fuentes: las secciones oficiales de los grandes festivales, el palmarés y las nominadas de los premios de cada año, la crítica gremial, los circuitos de animación y documental, y los cánones y catálogos (Sight & Sound, las 1001, el AFI, Criterion y el registro estadounidense).')}
+        subtitle={t('Sesenta y cinco fuentes: secciones oficiales, palmareses y nominadas, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el AFI, Criterion y el registro estadounidense).')}
       />
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
@@ -667,7 +667,7 @@ export default function Festivals() {
           initialQuery={editar.title || ''}
           searchPath={(term) =>
             `/festivals/match-candidates?q=${encodeURIComponent(term)}&year=${(view === 'palmares' || anuario ? editar.matchYear ?? editar.year : data?.year) || ''}`}
-          subtitle={t('Busca en TMDB y elige la ficha correcta. La corrección se recuerda y manda sobre el emparejado automático.')}
+          subtitle={t('Busca en TMDB y elige la ficha correcta. Se recuerda y manda sobre el emparejado automático.')}
           onPick={fijarMatch}
           onClear={editar.tmdb_id ? () => fijarMatch(null) : null}
           onClose={() => setEditar(null)}

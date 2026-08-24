@@ -1,257 +1,249 @@
 # Changelog
 
+El detalle técnico de cada versión: qué se arregló, por qué fallaba y qué números lo demuestran.
+Lo que ve quien usa la app está en `/novedades`, que es otro texto para otro público.
+
+Formato: un titular en negrita, secciones cortas y los hechos con sus cifras. La crónica de cómo
+se llegó a cada arreglo vive en el mensaje del commit, no aquí.
+
+## Beta 1.23 (1.0.23-beta) — 2026-08-24
+
+**106 KB de prosa fuera. Ni una línea de código tocada.**
+
+Una sola voz —narrativa, de reportaje— estaba haciendo cuatro trabajos que piden registros
+distintos: comentario de código, etiqueta de interfaz, changelog y página de ayuda. De ahí salían
+la historia metida en la explicación («Antes… Ahora…»), el ejemplo repetido tres veces, el inciso
+anidado (114 paréntesis y 20 pares de rayas en 6.637 palabras de interfaz: uno cada cuarenta
+palabras) y la justificación defensiva.
+
+| | antes | ahora | |
+|---|---:|---:|---:|
+| Novedades (ES + EN) | 99.587 | 57.347 | **−42 %** |
+| About (ES + EN) | 48.830 | 27.229 | **−44 %** |
+| CHANGELOG | 152.041 | 123.054 | **−19 %** |
+| README | 9.764 | 6.979 | **−29 %** |
+| Copy del resto de páginas (74 textos) | 12.812 | 8.720 | **−32 %** |
+
+### Qué se hizo
+
+- **Novedades** deja de ser un segundo changelog: las 16 versiones de la 1.07 en adelante pasan a
+  entre tres y seis puntos de una o dos frases. El diccionario EN se **regenera desde el
+  castellano**, así que las claves no pueden descuadrarse.
+- **About** reescrito entero. Las doce secciones y las cuatro listas salen ahora de datos
+  (`HACER`, `SECCIONES`) en vez de estar escritas a mano con negritas intercaladas: el mismo texto
+  ocupaba cuarenta claves de traducción troceadas por los `<b>`.
+- **74 textos de interfaz** reescritos en quince páginas. Fuera el «antes/ahora», los detalles de
+  fontanería en copy de usuario y las disculpas metodológicas: la nota de método de Directores/as
+  pasa de 349 caracteres a 158 diciendo lo mismo.
+- **CHANGELOG**: comprimidas las 23 entradas Beta y las tres Alpha mayores conservando todos los
+  hechos, cifras, nombres de fichero y versiones de caché. Lo que se va es la crónica. Cabecera
+  nueva que fija el formato.
+- **README**: la tabla «Qué hace» tenía celdas de 1.400 caracteres y hablaba de treinta palmareses
+  cuando hay sesenta y cinco.
+
+### Lo que se deja
+
+Las 24 entradas Alpha restantes (47 KB), que ya son listas de hechos sin retórica. Los comentarios
+de código, por encargo: siguen siendo 60.342 palabras, el 20 % de cada fichero. Y 469 claves EN
+huérfanas sin borrar, porque el detector no ve las que se traducen indirectamente —los nombres de
+festival que manda el servidor— y borrar una viva rompería el inglés en silencio.
+
+### Verificación
+
+Script nuevo que cruza cada cadena castellana de cada página con los diccionarios EN, incluidas
+las que se traducen indirectamente desde un array: **0 sin clave**. Las 15 rutas pintan en los dos
+idiomas sin errores de consola, y con la interfaz en inglés no queda ni una línea larga en
+castellano. Pruebas 339, sin cambios: aquí no hay comportamiento que probar.
+
 ## Beta 1.22 (1.0.22-beta) — 2026-08-21
 
-**Las fichas que no cuadraban en Criterion, y una pasada de cuatro revisiones a la velocidad, al diseño y a las esperas.**
+**Criterion pasa de quince fichas sin casar a ocho, y las esperas dicen cuánto llevan.**
 
-### Criterion: de quince fichas sin casar a ocho
+### Emparejado
 
-Medido sobre las 1.176 del catálogo, con claves reales. Tres causas distintas, y ninguna era la que parecía:
+Tres causas distintas, medidas sobre las 1.176 de Criterion con claves reales:
 
-**TMDB llama de otra manera a quien dirige.** Guarda a John Woo como «Wu Yu-Sheng» —la transcripción mandarina de 吳宇森— y «John Woo» vive solo entre sus alias. No es una variante de transliteración que se pueda plegar comparando letras: son dos nombres distintos de la misma persona, y ninguna regla de parecido los va a unir. La ficha correcta de «The Killer» estaba ahí, con 925 votos y su título, y se rechazaba por el nombre. Ahora, cuando todo lo demás ha fallado, se miran los alias de quien dirige la ficha candidata — exigiendo igualmente el título clavado, así que siguen siendo dos pruebas y no se afloja la regla de oro. Rescata «The Killer», «Hard Boiled» y «Last Hurrah for Chivalry», y es el pan de cada día del cine asiático, donde el nombre con el que una película se distribuye en occidente casi nunca es el que TMDB guarda.
+- **Los alias de quien dirige.** TMDB guarda a John Woo como «Wu Yu-Sheng» —la transcripción mandarina de 吳宇森— y «John Woo» solo vive entre sus alias: son dos nombres de la misma persona, no una variante que se pliegue comparando letras. Cuando todo lo demás falla se miran los `also_known_as` de la ficha candidata (`nombresDeDireccion`), exigiendo igualmente el título clavado. Rescata «The Killer», «Hard Boiled» y «Last Hurrah for Chivalry», y es el pan de cada día del cine asiático.
+- **El título clavado puede vivir solo en el internacional**: «The Killer» es «The Killer (El asesino)» en castellano y «喋血雙雄» de original.
+- **Cinco de las que fallaban no son películas.** Criterion edita miniseries: «Fishing with John», «Tanner '88», «The Underground Railroad». `esSerieEnTmdb` lo pregunta solo para lo que ya ha fallado —12 de 1.176— y lo cachea 30 días bajo `tv_check:`. Mejora también el registro estadounidense (23 → 20) y el IDFA.
 
-**El título clavado puede vivir solo en el internacional.** «The Killer» es «The Killer (El asesino)» en castellano y «喋血雙雄» de original: ninguno de los dos coincide con lo que dice el catálogo, y el inglés sí.
+Las ocho restantes son erratas de la propia Wikipedia («Harikari», «The Wages **for** Fear», «Berlin Alexanderplantz») y un crédito falso: «The Flight of the Phoenix» atribuida a Robert Altman, que la dirigió Robert Aldrich. Para eso está el ✎.
 
-**Cinco de las que fallaban no son películas.** Criterion edita miniseries —«Fishing with John», «Tanner '88», «The Underground Railroad»—, y ahí no había nada que arreglar: no tienen ficha de película en TMDB ni la van a tener. Antes dejaban un hueco mudo que parecía un fallo del emparejado. Ahora, cuando una fila se queda sin ficha, se le pregunta a TMDB si eso es una serie y la interfaz lo dice. Cuesta una búsqueda y solo se paga por lo que ya ha fallado: doce de 1.176. Mejora también el registro estadounidense (23 → 20 sin ficha) y el IDFA.
+Cachés `festival` 17 → **18** y `film_match` v6 → **v7**.
 
-Las ocho que quedan son erratas de la propia Wikipedia («Harikari» por Harakiri, «Vengence is Mine», «The Wages **for** Fear», «Berlin Alexanderplantz») y un dato mal puesto: «The Flight of the Phoenix» aparece atribuida a Robert Altman y la dirigió Robert Aldrich. Para eso está el ✎ de cada ficha, que recuerda la corrección para siempre.
+### Rendimiento
 
-Cachés `festival` v17 → **v18** y `film_match` v6 → **v7**.
+- `manualChunks.react` nombraba `react-dom`, pero la app importa `react-dom/client`: nadie reclamaba los 264 KB del motor y caían en el trozo del índice. Índice 444 → 265 KB, react 51 → 233 KB.
+- Biblioteca y Favoritos: tarjeta memorizada y manejadores estables. Medido con 780 tarjetas (35 ms por tecla, 80 ms por «Cargar más») y con 600 seguidos (29 ms por casilla).
+- Listas: renderizado por tramos. Una lista de 5.000 ponía **21.257 nodos** para enseñar doce filas. El observador va contra la caja de scroll, no contra la ventana.
 
-### El motor de React ya no se rebaja en cada despliegue
+### Interfaz
 
-El troceado del empaquetado nombraba `react-dom`, pero la aplicación no importa ese módulo: importa `react-dom/client`, que es otro. Nadie lo reclamaba, así que sus 264 KB —el motor de React entero— caían en el trozo del índice, junto al código de la app. Se veía en que el trozo «react» pesaba 51 KB y era react-router al 94 %. No cambia lo que se baja la primera vez, pero sí lo que se reaprovecha: con el motor dentro del índice, tocar una línea de la aplicación obligaba a volver a bajarlo entero. Ahora el índice son 265 KB y React 233, cada uno por su lado.
+- Salud abre con «N de M auditorías tienen algo que revisar» y atajos; las limpias se pliegan a una línea.
+- Áreas táctiles bajo `sm`: botones de la casa a 40 px y ★ de seguir con caja mayor sin icono mayor (era 18×28 repetido sesenta veces). Los enlaces de la barra lateral siguen en 34.
+- Visionado usa la tipografía de cifras del Dashboard, que es la misma cifra.
 
-### Tres páginas que se repintaban enteras
+### Barras de progreso
 
-Medido con la biblioteca de 12.400 películas, que es donde esto se ve:
+- La rueda y el reloj estaban solo en las barras sin porcentaje, pero un porcentaje cierto puede quedarse clavado media espera: las cuatro consultas del Dashboard salen y vuelven a la vez. Ahora están en las dos, a los 12 s se explica por qué no hay porcentaje, y el 100 % dice que sigue en marcha en vez de «Listo».
+- `/api/build-progress` tiene **una casilla para doce tareas**: el progreso del pase nocturno se pintaba bajo el rótulo de Cine venidero. `BuildProgress` acepta ahora `job` y, cuando no puede afinar, atribuye el número. El sondeo se comparte entre esperas (`useTareaDelServidor`).
 
-- **Biblioteca**: cada «Cargar más» añade sesenta tarjetas a las que ya están, y cualquier cambio de estado —teclear en la caja de buscar es uno por tecla— reconciliaba todas. Con 780 tarjetas: 35 ms por tecla y 80 ms por «Cargar más». Ahora la tarjeta va memorizada y los manejadores son estables, que es lo que hace que el memo sirva de algo.
-- **Listas y retos**: una lista de MDBList trae cinco mil títulos y se pintaban enteros dentro de un recuadro donde caben doce filas. Medido con una de 5.000: **21.257 nodos para enseñar doce**. Ahora entran por tramos, como la parrilla de Festivales — con el detalle de que estas listas no scrollean con la página sino dentro de su propia caja, así que el observador va contra la caja y no contra la ventana.
-- **Favoritos**: seguir a varios centenares de personas es lo normal aquí, y marcar una sola casilla de «Podar» repintaba las 600. Medido con 600 seguidos: 29 ms por casilla.
-
-### Las esperas dicen ya cuánto llevan y cuánto queda
-
-Era el encargo literal: que nadie piense que se ha quedado pillado. Tres cosas que solo se ven mirando esperas de verdad:
-
-1. **La rueda giraba solo en las barras sin porcentaje.** Pero un porcentaje cierto puede estar clavado media espera —las cuatro consultas del Dashboard salen a la vez y vuelven a la vez, así que la barra se pasaba veinticinco segundos en el 0 % sin un píxel de movimiento— y una barra vacía e inmóvil es exactamente lo que hace pensar que se ha colgado. Ahora la rueda y el reloj están en las dos.
-2. **Nadie explicaba por qué no había porcentaje.** A los doce segundos se dice.
-3. **El 100 % no es el final**: quien lo enseña todavía tiene que ordenar, cachear y pintar. Decía «Listo» y se quedaba ahí; ahora dice que sigue en marcha.
-
-Y se arregla un fallo de diseño que venía de lejos: `/api/build-progress` tiene **una casilla para doce tareas**. Si el pase nocturno estaba traduciendo títulos cuando alguien abría Cine venidero, lo que se pintaba era el progreso del pase nocturno debajo del rótulo del calendario. Ahora una espera puede nombrar la tarea cuyo progreso sí es el suyo, y cuando no puede, la barra se sigue enseñando pero **atribuida**: la nota dice de qué tarea sale el número. Además el sondeo de ese endpoint se comparte: con dos esperas en pantalla eran dos peticiones por segundo pidiendo lo mismo.
-
-De propina, las cifras redondas cuando la espera son minutos: «247 de 1.001» dice mucho más que «25 %», que no aclara si son mil o diez.
-
-### Salud de los datos, y el pulgar
-
-**Salud** abre ahora con un resumen: «2 de 5 auditorías tienen algo que revisar», con un atajo a cada una. Antes había seis auditorías seguidas sin jerarquía y las que están bien ocupaban lo mismo que las que no, así que había que recorrer la página entera para saber si pasaba algo. Y cuando una auditoría sale limpia, su explicación de qué hacer sobra: se queda en una línea.
-
-**Áreas táctiles en el móvil.** Medido a 375 px: las pestañas de oficio de Personas se quedaban en 28 px de alto y el enlace de Salud a «Calidad y disco» en 25 — la mitad de lo que hay que acertar con el pulgar. Los botones de la casa suben a 40 px por debajo de `sm`, y la ★ de seguir —que era el objetivo más pequeño de su página, 18 × 28 px repetido sesenta veces— crece de caja sin crecer de icono.
-
-**Y los contadores de Visionado se parecen por fin a los del Dashboard**: estaban escritos a mano con otra tipografía, siendo la misma cifra de la misma colección.
-
-### Números
-
-Pruebas 336 → **339**. Cachés: `festival` v18, `film_match` v7.
+Pruebas 336 → **339**.
 
 ## Beta 1.21 (1.0.21-beta) — 2026-08-21
 
-**«Flow» apuntaba a otra película, y las notas de MDBList llevaban meses racionadas a 900 al día teniendo 25.000.**
+**«Flow» apuntaba a otra película, y las notas de MDBList iban racionadas a 900 al día teniendo 25.000.**
 
-Dos fallos que Ramón vio en producción y que se confirmaron midiendo con claves reales, no deduciendo.
+### La fila sin dirección
 
-### La ficha equivocada, y por qué era invisible
+La tabla del Óscar de animación no dice quién dirige —como la del Donatello, Sitges, el BIFA o el registro estadounidense—, así que la única prueba es el título. En TMDB hay **cuatro** películas de 2024 llamadas «Flow» y la buena es la que NO clava: «Straume» de original y «Flow, un mundo que salvar» en castellano, porque a TMDB se le pregunta en castellano.
 
-El Óscar de animación de 2024 enseñaba una «Flow» que no era la de Gints Zilbalodis. Y no era mala suerte: es una clase entera de fallo.
+El fallo se camuflaba solo: desde la 1.18 la dirección de esas filas se rellena desde TMDB, así que la ficha equivocada salía con su director equivocado y cuadraba por dentro. Comparar la dirección con la que acaba de dar TMDB es compararla consigo misma.
 
-La tabla del Óscar de animación no tiene columna de dirección, igual que la del Donatello, la de Sitges, la del BIFA o el registro estadounidense. Sin dirección, la única prueba que le queda al emparejado es el título — y en TMDB hay **cuatro** películas de 2024 que se llaman «Flow». La buena es justo la que NO clava: se titula «Straume» de original y «Flow, un mundo que salvar» en castellano, porque a TMDB se le pregunta en castellano. Las tres que clavaban eran desconocidas, y ganaba la primera de la lista.
+Dos reglas, solo para las filas sin dirección (con director, `directorsMatch` ya desempata):
 
-Lo peor no es el fallo, es que **se camuflaba solo**: desde la 1.18 la dirección de esas filas se rellena desde TMDB, así que la ficha equivocada salía con su director equivocado y todo cuadraba por dentro. Ninguna comprobación automática lo veía, porque comparar la dirección con la que acaba de dar TMDB es compararla consigo misma.
+1. **Se miran todos los candidatos** y decide el volumen de votos: Flow 2.997 contra 25, 0 y 0; «Crash» 3.962 contra 3 y 2; «Heat» 8.579 contra 16 y 3. El título internacional cuenta como prueba de pleno derecho.
+2. **Sin ganador claro, no se elige ninguno.**
 
-Dos reglas nuevas, solo para las filas sin dirección (donde hay director, `directorsMatch` ya desempata y no se toca nada):
+El título **clavado** y el que solo **contiene** al de la fila son dos niveles distintos: mezclados, «All In: The Story of Auburn's Undefeated 2010 Season» empataba con la «Undefeated» del Óscar y bloqueaba el desempate.
 
-1. **Se miran todos los candidatos, no el primero.** Entre los que claven el título decide el **volumen de votos**, que es lo único que separa a una premiada de su homónima. Medido: Flow 2.997 votos contra 25, 0 y 0; «Crash» 3.962 contra 3 y 2; «Heat» 8.579 contra 16 y 3. No es ajustado, son órdenes de magnitud. Y el título internacional cuenta como prueba de pleno derecho, no como rescate de última hora.
-2. **Si no hay ganador claro, no se elige ninguno.** Mejor sin ficha que la ficha de otra.
+Medido: animación 0 sin ficha, documental 2, BIFA 0, Sitges 3 y Donatello 1 — los mismos de antes. El registro estadounidense pasa de 19 a 23 de 714, y una de las nuevas es «Dracula» de 1931, que existe dos veces ese año (la de Browning y la versión española de Melford): ahí no adivinar es lo correcto.
 
-Con un matiz que costó encontrar: el título **clavado** y el que solo **contiene** al de la fila no son la misma prueba. Mezclados, «All In: The Story of Auburn's Undefeated 2010 Season» empataba con la «Undefeated» que ganó el Óscar de documental y bloqueaba el desempate. Ahora son dos niveles y solo se baja al segundo si el primero está vacío.
+Cachés `festival` v16 → **v17** y `film_match` v5 → **v6**, que dura un año. El prefijo deja de estar escrito en dos sitios (`CLAVE_MATCH`).
 
-Medido sobre las fuentes sin dirección: el Óscar de animación se queda en 0 sin ficha (y con la Flow correcta), el de documental en 2, el BIFA en 0, Sitges en 3 y el Donatello en 1 — los mismos de antes. El registro estadounidense pasa de 19 a 23 sin ficha de 714, y una de las cuatro nuevas es «Dracula» de 1931, que existe **dos veces** ese año (la de Browning y la versión española de Melford): ahí no adivinar es exactamente lo correcto.
+### El cupo de MDBList
 
-Caché `festival` v16 → **v17** y `film_match` v5 → **v6**, que es la que dura un año: sin subirla, la Flow equivocada habría sobrevivido doce meses. De paso, el prefijo de esa caché deja de estar escrito en dos sitios (`CLAVE_MATCH`): ya se pagó una vez que el índice de avales siguiera leyendo la versión anterior en silencio.
+`mdblist_detected_limit` solo se escribía al pulsar «Probar» en Ajustes. Sin pulsarlo, el presupuesto se quedaba en el suelo conservador de 900 al día con una cuenta de 25.000, y el barrido nocturno se lo comía entero: el resto del día todo contestaba «agotado el cupo diario». Ahora se pregunta una vez al día, en el primer sitio que vaya a gastar. Medido en la cuenta real: de **817 peticiones disponibles a 19.915**.
 
-### Las notas de MDBList, racionadas a 900 teniendo 25.000
+### El botón «Actualizar notas»
 
-El botón «Actualizar notas» de Estrenos no iba, y la causa no estaba en el botón.
+«Ninguna nota nueva» valía para tres cosas distintas: no queda nada que pedir, se preguntó y MDBList no las tiene, o algo falla. Ahora las distingue.
 
-El presupuesto diario en modo «automático» sale de `mdblist_detected_limit`… que hasta hoy **solo se escribía al pulsar «Probar» en Ajustes**. Quien no lo pulsara nunca —lo normal— se quedaba con el suelo conservador de **900 peticiones al día teniendo una cuenta supporter de 25.000**. Con una biblioteca grande, el barrido nocturno de notas se come esas 900 él solo y a partir de ahí todo lo demás —las reglas, Estrenos, los festivales— contesta «agotado el cupo diario» el resto de la jornada. Desde fuera eso se ve exactamente como que las notas no funcionan.
-
-Ahora el cupo se pregunta **una vez al día**, en el primer sitio que vaya a gastar, sin que nadie tenga que pulsar nada. Medido en la cuenta real: de **817 peticiones disponibles a 19.915**.
-
-### Y el botón dice ahora qué ha hecho
-
-«Ninguna nota nueva» metía en el mismo saco tres cosas que no se parecen: que no quedaba nada por pedir, que se preguntó y MDBList no conoce esas películas, y que algo va mal. Un botón que contesta lo mismo pase lo que pase se lee como un botón roto. Ahora distingue las tres, y cuando dice que MDBList no tiene ficha de una película es porque se preguntó de verdad y no vino nada — que es el caso de los estrenos españoles más recientes.
-
-### Números
-
-Pruebas 328 → **336** (`emparejado-sin-direccion.test.js`, con el caso Flow, el de Undefeated y el de los dos Dráculas).
+Pruebas 328 → **336** (`emparejado-sin-direccion.test.js`).
 
 ## Beta 1.20 (1.0.20-beta) — 2026-08-21
 
-**Auditoría del pase nocturno: ocho cosas que nadie mantenía. La caché de TMDB no se podaba NUNCA, las cifras de las sagas se quedaban viejas y las listas de MDBList no se refrescaban solas.**
-
-Salió de una pregunta directa: ¿el «Actualizar todo» de Ajustes cubre de verdad todo lo que la app necesita? Repasando los diecinueve pasos contra el inventario de todo lo que se cachea o se deriva, la respuesta era «casi». Estos son los huecos, arreglados.
+**Auditoría del pase nocturno: ocho cosas que no mantenía nadie.**
 
 ### La caché de TMDB no se podaba nunca
 
-El más gordo, y el más silencioso. De `tmdb_cache` solo se borraban dos cosas: lo que quedaba obsoleto al subir una versión de caché, y lo que se invalidaba a mano. **Lo que simplemente caduca no lo borraba nadie.** Todas las familias que no son de página —fichas de películas, filmografías, búsquedas de personas, proveedores, emparejados— se quedaban ahí para siempre, así que la base crecía de forma monótona y la copia de seguridad de cada noche se llevaba el bulto entero.
+De `tmdb_cache` solo se borraba lo obsoleto por versión y lo invalidado a mano. Lo que simplemente caduca no lo borraba nadie, así que la base crecía sin techo y la copia de cada noche se llevaba el bulto entero.
 
-Paso nuevo, **«Podar la caché y compactar la base»**, justo antes de la copia. Los plazos no son un número al azar: todas las lecturas de caché de la aplicación pasan un TTL —no hay ni una `cacheRead` sin plazo— y el más largo es el año del emparejado por película; el siguiente, los 180 días de la edición de un festival pasado. De ahí los 400 días para `film_match:` y los 200 para el resto, que dejan semanas de colchón por si algún día se alarga un plazo sin acordarse de esto. Lo que se borra es lo que **ninguna** lectura podría aceptar ya.
+Paso nuevo justo antes de la copia. Los plazos salen del TTL más largo de la app —el año del emparejado por película; después, los 180 días de una edición pasada—: **400 días para `film_match:` y 200 para el resto**, con semanas de colchón. Se borra lo que ninguna lectura podría aceptar ya.
 
-Y compacta. Borrar filas en SQLite deja las páginas libres dentro del fichero: sin compactar, la base no encoge y la copia sigue pesando lo mismo. Solo se hace cuando de verdad ha caído bastante (2.000 entradas), porque compactar bloquea y por cuatro filas no compensa.
+Y compacta: borrar filas en SQLite deja las páginas libres dentro del fichero, así que sin VACUUM la base no encoge y la copia sigue pesando igual. Solo al caer 2.000 entradas, porque compactar bloquea.
 
-De paso, las otras dos tablas que solo crecían: los avisos del Dashboard de más de seis meses, y el log de reglas, que se podaba **solo si había reglas activas** — al apagarlas todas, lo último se quedaba ahí para siempre.
+Se podan también los avisos del Dashboard de más de seis meses y el log de reglas, que antes solo se podaba **si había reglas activas**: al apagarlas todas, lo último se quedaba para siempre.
 
-### Las cifras de las sagas no se rehacían de noche
+### Tres cosas que no se refrescaban solas
 
-El paso de sagas llamaba a `scanSagas` —qué película pertenece a qué colección— pero **nunca a `enrichSagaStats`**, que es la que rellena «te faltan N de esta saga». Esa caché dura siete días y solo se refrescaba pulsando el botón dentro de la página, así que una saga a la que le entraba una película seguía diciendo el número viejo. Ahora van las dos.
+- **Sagas**: el paso llamaba a `scanSagas` pero nunca a `enrichSagaStats`, que es la que rellena «te faltan N de esta saga». Ahora van las dos.
+- **Listas de MDBList**: solo había ruta manual, y son justo las que cambian por su cuenta. Se refresca lo parado más de siete días, tres por pasada, porque gastan del mismo cupo diario que las notas.
+- **Estrenos y las parrillas top**: se reconstruían en la primera visita del día, y son las páginas más lentas. Ahora amanecen hechas —cuatro pestañas de Estrenos, huecos de dirección y de reparto, y grandes ausentes—, cada tarea con su try/catch y el paso cortado a los ocho minutos.
 
-### Las listas de MDBList no se refrescaban solas
+`releases` no lanza cuando TMDB corta a mitad: devuelve lo que pudo con sus errores dentro. Sin mirarlos, una noche con TMDB caído habría cantado «7 de 7 listas» dejando siete listas cojas cacheadas.
 
-Solo había ruta manual. Y son justo las listas que cambian por su cuenta: una lista dinámica añadida en enero seguía enseñando lo de enero. Paso nuevo, a plazos: se refresca lo que lleva más de siete días parado, tres por pasada como mucho, porque cada lista gasta del mismo cupo diario que las notas y refrescar quince de golpe una noche dejaría a las notas sin presupuesto.
-
-### Las páginas más lentas, listas por la mañana
-
-Estrenos y las parrillas de biblioteca de Descubrir eran las únicas que nadie tocaba de noche: se reconstruían en la primera visita del día, y son las más lentas que tiene la app —el cruce de filmografías completo, y las dos pestañas de plataformas de Estrenos, que además traen el «dónde verla» de cada película.
-
-Paso nuevo que las deja hechas: las cuatro pestañas de Estrenos, los huecos de directores y de actores, y los grandes ausentes. Cada tarea con su propio try/catch —que falle una no puede dejar las otras sin hacer— y el paso entero se corta a los ocho minutos: esto es un lujo, no puede comerse la ventana nocturna.
-
-Con un detalle que importa: `releases` **no lanza** cuando TMDB corta a mitad, devuelve lo que pudo con sus errores dentro. Sin mirarlos, una noche con TMDB caído habría dicho «7 de 7 listas» dejando siete listas cojas cacheadas. Ahora distingue las que salieron enteras de las que salieron a medias, y lo dice.
-
-### Números
-
-Pruebas 322 → **328** (`mantenimiento.test.js`). El pase nocturno pasa de 19 a **22 pasos**. El cron y el botón siguen llamando exactamente a la misma rutina, así que no pueden divergir.
+Pruebas 322 → **328** (`mantenimiento.test.js`). El pase pasa de 19 a **22 pasos**; el cron y el botón llaman a la misma rutina, así que no pueden divergir.
 
 ## Beta 1.19 (1.0.19-beta) — 2026-08-21
 
-**El índice al revés: cada película dice ahora en cuántos palmareses y cánones está. Y veinticinco fuentes nuevas, de Locarno a Criterion, sin tocar «Lo mejor del año».**
+**El índice al revés: cada película dice en cuántos palmareses y cánones está. Y veinticinco fuentes nuevas, de Locarno a Criterion, sin tocar «Lo mejor del año».**
 
 ### Los avales: de la película a los premios
 
-PowaFlex sabía ir de un premio a sus películas. Al revés, no. Y esa es la pregunta del completismo: entre dos huecos con una Σ parecida, ¿cuál pesa más? Una nota de 78 la tiene cualquier estreno correcto; estar en Cannes, en el César y en Sight & Sound, no.
+PowaFlex sabía ir de un premio a sus películas, no al revés — que es la pregunta del completismo: entre dos huecos con Σ parecida, ¿cuál pesa más? Una nota de 78 la tiene cualquier estreno correcto; estar en Cannes, en el César y en Sight & Sound, no.
 
-La respuesta ya estaba pagada desde la 1.17. El paquete de palmareses que viaja con la app son 4.794 filas con el `tmdb_id` **ya resuelto de origen**, así que darle la vuelta al índice no cuesta ni una petición a la red:
+Sale gratis: el paquete de la 1.17 son 4.794 filas con el `tmdb_id` ya resuelto de origen.
 
 ```
 3.434 películas indexadas · 33 fuentes · 6 ms de construcción · 1.000 consultas en 2 ms
 ```
 
-Se ve en cuatro sitios: la **ficha de película** (los chips, con 🏆 en lo ganado y el puesto en los cánones), una **marca sobre el cartel** en cualquier parrilla a partir de dos avales, un **orden nuevo en Descubrir huecos** («Más avalada») y un **resumen en la ficha de persona** («N de M avaladas por un premio o un canon», con qué fuentes).
+Se ve en cuatro sitios: los chips de la ficha (🏆 en lo ganado, puesto en los cánones), una marca sobre el cartel en las parrillas a partir de dos avales, el orden «Más avalada» en Descubrir huecos y un resumen en la ficha de persona.
 
-El índice suma tres procedencias y nunca resta: el paquete —el suelo, disponible en cualquier instalación sin abrir nada—, los datasets fijos, y las filas de cualquier premio ya consultado. Por eso una película puede pasar de 3 a 4 avales: es información nueva, no una corrección. Y la interfaz dice hasta qué año llega el paquete, para que «sin avales» no se lea como «no la premió nadie».
+El índice suma tres procedencias y nunca resta: el paquete, los datasets fijos y las filas de cualquier premio ya consultado. Por eso una película puede pasar de 3 a 4 avales —es información nueva, no una corrección— y la interfaz dice hasta qué año llega el paquete, para que «sin avales» no se lea como «no la premió nadie».
 
-Detalles de implementación que explican la forma del módulo: el mapa de emparejados se lee con **una sola consulta** (fila a fila serían ~6.000 lecturas puntuales); las correcciones manuales mandan, y una corregida a «ninguna» retira el aval; estar en un canon **no cuenta como premio ganado**, porque un puesto no es un trofeo; y `avales.js` no se importa desde `tmdb.js` —haría ciclo entre los tres módulos— sino que se engancha en la ruta.
+Implementación: el mapa de emparejados se lee con **una sola consulta** (fila a fila serían ~6.000 lecturas puntuales); las correcciones manuales mandan, y una corregida a «ninguna» retira el aval; estar en un canon no cuenta como premio ganado; y `avales.js` se engancha en la ruta, no desde `tmdb.js`, que haría ciclo.
 
-### El índice se rellena solo, de noche
+### El índice se rellena solo
 
-Las fuentes que no vienen empaquetadas solo aportan cuando sus filas están emparejadas con TMDB, y eso pasa al abrir su palmarés. Dejarlo así habría significado pasearse a mano por veinticinco páginas.
+Las fuentes no empaquetadas solo aportan cuando sus filas están emparejadas, y eso pasa al abrir su palmarés. Paso nuevo del pase nocturno con dos frenos —seis fuentes y 900 películas por noche—, así que converge en unas pocas noches sin encadenar veinte reconstrucciones. Los catálogos gordos van al final de la cola: Criterion son 1.176 películas y por ese precio se encienden seis premios enteros. Una fuente que se intenta y sigue sin aportar no se reintenta hasta la semana siguiente. El paso se salta solo cuando no queda nada frío.
 
-Paso nuevo del pase nocturno, **«Rellenar el índice de premios y cánones»**: abre las que aún no aportan nada, a plazos y acotado por dos frenos —seis fuentes y 900 películas por noche—, así que converge en unas pocas noches sin encadenar veinte reconstrucciones de golpe. Los catálogos gordos van al final de la cola: Criterion son 1.176 películas y por el mismo precio se encienden seis premios enteros. Una fuente que se intenta y sigue sin aportar **no se reintenta hasta la semana siguiente**, para que la única que no puede aprovechar el presupuesto no se lo coma. El paso se salta solo en cuanto no queda nada frío.
+### Veinticinco fuentes nuevas: de 40 a 65
 
-### Veinticinco fuentes nuevas: el registro pasa de 40 a 65
+Verificadas con el parser de la casa antes de escribir una entrada, y comprobadas después por el camino real de la aplicación: 22 de 22 sirven palmarés, 1.463 ganadoras nuevas.
 
-Todas verificadas contra Wikipedia **con el parser de la casa antes de escribir una sola entrada**, y comprobadas después por el camino real de la aplicación: 22 de 22 sirven palmarés, 1.463 ganadoras nuevas.
+- **Festivales**: Locarno (94 Leopardos desde 1946), Rotterdam (75 Tigres) y Karlovy Vary (59 Globos de Cristal).
+- **Los segundos premios de los tres grandes**, donde está media historia del cine europeo que nunca se llevó el gordo: Grand Prix de Cannes (67), Gran Premio del Jurado de Venecia (72) y de Berlín (69), más la Queer Palm (17). Cuelgan de su festival en el menú (campo `parent`).
+- **Academias y crítica**: NSFC, Independent Spirit, BIFA, Lumière —que se falla un mes antes que el César—, Ariel, Cóndor de Plata, Golden Horse, Blue Dragon y Kinema Junpo, el canon japonés desde 1926.
+- **Tres categorías más del Óscar**: dirección, animación y documental.
+- **Animación y documental** como grupos aparte, con Annecy, los Annie y el IDFA: quien completa animación internacional no se guía por el Óscar.
 
-**Festivales**: Locarno (94 Leopardos desde 1946), Rotterdam (75 Tigres) y Karlovy Vary (59 Globos de Cristal).
-
-**Los segundos premios de los tres grandes**, donde está media historia del cine europeo que nunca se llevó el premio gordo: Grand Prix de Cannes (67), Gran Premio del Jurado de Venecia (72) y de Berlín (69), más la Queer Palm (17). Van colgados de su festival en el menú.
-
-**Academias y crítica**: NSFC —el tercero en discordia de la crítica estadounidense—, Independent Spirit, BIFA, Lumière (el premio francés de la prensa, que se falla un mes antes que el César), Ariel, Cóndor de Plata, Golden Horse, Blue Dragon y Kinema Junpo, que es el canon japonés de verdad, con la mejor película de cada año desde 1926.
-
-**Tres categorías más del Óscar**: dirección —el otro canon institucional, y a menudo no coincide con mejor película—, animación y documental, que es donde el Óscar sí manda porque casi ningún premio grande las cubre.
-
-**Animación y documental**, dos grupos nuevos porque son dos circuitos aparte: Annecy, los Annie y el IDFA. Quien quiere completar animación internacional no se guía por el Óscar.
-
-**Nada de esto entra en «Lo mejor del año»**, que sigue exactamente con sus 32 fuentes. Esa vista consulta todos sus palmareses al abrir un año sin cachear, y ampliarla habría multiplicado su tiempo de carga. Hay una prueba que fija el número: si alguien añade algo sin marcarlo, la suite salta.
+Nada de esto entra en **«Lo mejor del año»**, que sigue con sus 32 fuentes: esa vista consulta todos sus palmareses al abrir un año sin cachear. Hay una prueba que fija el número.
 
 ### Tres catálogos que no van por año
 
-Criterion, el AFI y el registro estadounidense tienen tablas excelentes, pero no van «año de premio → película» sino por puesto o por ingreso, y por ahí el parser de palmareses no sacaba ni una fila. Parser nuevo, `parseListaTabulada`, que lee por cabecera con las columnas declaradas en el registro:
+Criterion, el AFI y el registro estadounidense van por puesto o por ingreso, no por año de premio, y de ahí el parser de palmareses no sacaba ni una fila. `parseListaTabulada` lee por cabecera, con las columnas declaradas en el registro:
 
-- **Criterion Collection**: 1.176 películas por número de espina, todas con dirección. No es un canon crítico, es un catálogo, y por eso vale tanto: lo que Criterion restaura y edita es la señal más fiable de «esto merece que lo busques en condiciones».
-- **AFI · 100 películas**: las 100 exactas por su puesto de 2007, con un filtro que deja fuera las 23 que estaban en la lista de 1998 y se cayeron.
-- **National Film Registry**: 714 largometrajes y documentales conservados por la Biblioteca del Congreso, lo último admitido primero. El filtro descarta cortos, noticiarios y películas caseras: sin él eran 925, con más de doscientas que TMDB no puede casar.
+- **Criterion**: 1.176 películas por número de espina, todas con dirección. Es un catálogo, no un canon crítico, y por eso vale: lo que Criterion restaura y edita es la señal más fiable de «búscala en condiciones».
+- **AFI · 100**: las 100 de 2007, con filtro para las 23 que se cayeron de la lista de 1998.
+- **National Film Registry**: 714 largometrajes y documentales, lo último admitido primero. El filtro descarta cortos, noticiarios y películas caseras: sin él eran 925, con más de doscientas que TMDB no puede casar.
 
-Estos tres **no se empaquetan** con la app: no tienen año de premio que cortar, y congelar un catálogo que crece cada mes sería mentir.
+Los tres no se empaquetan: no tienen año que cortar, y congelar un catálogo que crece cada mes sería mentir.
 
-De propina, dos cosas del lector de Wikipedia: `awardSection: null` para los artículos cuyas tablas están en la entradilla y no en una sección (el Cóndor argentino, que antes obligaba a poner un regex falso para caer en el respaldo), y el asterisco **final** de un título se quita —Criterion marca así lo descatalogado— pero el de dentro se respeta, que si no «M*A*S*H» se quedaba sin nombre.
+Dos arreglos del lector de Wikipedia: `awardSection: null` para los artículos con las tablas en la entradilla (el Cóndor), y el asterisco **final** de un título se quita —Criterion marca así lo descatalogado— pero el de dentro se respeta, o «M*A*S*H» se queda sin nombre.
 
-### Una trampa que casi cuela
+### La trampa del generador
 
-El generador del paquete usaba `anuarioKeys()` para decidir qué empaquetar. Con las veintidós entradas nuevas marcadas «fuera del anuario», `npm run snapshot` las habría dejado fuera **justo a ellas**, que son las que más falta les hace. Ahora hay `empaquetables()` (53 claves) separado de `anuarioKeys()` (32), con una prueba que cruza las dos listas.
+El paquete se generaba con `anuarioKeys()`. Con las veintidós entradas nuevas marcadas «fuera del anuario», `npm run snapshot` las habría dejado fuera justo a ellas. Ahora hay `empaquetables()` (53 claves) separado de `anuarioKeys()` (32), con una prueba que cruza las dos listas.
 
-### Lo que NO se hizo, y por qué
+### Lo que no se hizo
 
-No hay refactor de `Festival → Edición → Sección → Premio` como esquema relacional. PowaFlex no tiene esquema de premios: el registro es un objeto de configuración y lo demás es JSON cacheado, así que no hay dónde añadir un nivel. Lo útil de esa idea —que el Grand Prix se lea colgando de Cannes en vez de suelto entre sesenta botones— es el campo `parent`, y eso sí está. TSPDT-1000 y el Sight & Sound histórico se quedan fuera hasta que haya fuente: sus artículos no tienen tablas, y meterlos habría sido inventarse el dataset.
+No hay refactor de `Festival → Edición → Sección → Premio`: no existe un esquema de premios que ampliar —el registro es configuración y lo demás JSON cacheado— y lo útil de esa idea es el campo `parent`, que sí está. TSPDT-1000 y el Sight & Sound histórico se quedan fuera hasta que haya fuente: sus artículos no tienen tablas.
 
-### Números
-
-Pruebas 319 → **322** (`avales.test.js`, `listas-tabuladas.test.js`). Registro de festivales y premios: 40 → **65** entradas. «Lo mejor del año»: 32, igual que antes.
+Pruebas 319 → **322** (`avales.test.js`, `listas-tabuladas.test.js`). Registro 40 → **65** entradas. «Lo mejor del año»: 32.
 
 ## Beta 1.18 (1.0.18-beta) — 2026-08-21
 
-**Media «Lo mejor del año» estaba sin un solo nombre a quien seguir, y las filmografías podían llevar una semana viejas. Además: las notas que faltan en Estrenos se vuelven a pedir solas, el Dashboard cuenta qué ha bajado el robot y por quién, y Cine venidero separa lo que dirige tu gente de lo que solo interpreta.**
+**Media «Lo mejor del año» estaba sin un nombre a quien seguir, y las filmografías podían ir una semana viejas.**
 
 ### El palmarés empaquetado llegaba sin dirección
 
-En «Lo mejor del año», Sundance, Sundance · EE UU, Sitges y el David di Donatello salían con cartel, con nota y **sin una sola persona a la que seguir**: ni nombre que leer ni estrella que pulsar.
+Sundance, Sundance · EE UU, Sitges y el David di Donatello salían con cartel y con nota y sin una sola persona a la que seguir. Ninguno de los cuatro tiene columna de dirección (Sundance va en viñetas, Sitges pone cuatro premios en columnas, el Donatello acredita productores), y para eso la 1.15 y la 1.16 ya habían puesto que el nombre lo diera TMDB — pero desde la 1.17 esas filas llegan con el `tmdb_id` ya resuelto, y esa rama de `resolveFilms`, la más corta, era la única de las cuatro que no rellenaba la dirección. El relleno estaba escrito dos veces y el tercer camino se quedó fuera.
 
-Ninguno de los cuatro tiene columna de dirección en su tabla (Sundance va en viñetas, Sitges pone cuatro premios en columnas y el Donatello acredita productores), y para eso la 1.15 y la 1.16 ya habían puesto que el nombre lo diera TMDB. Pero desde la 1.17 esas filas llegan **con el `tmdb_id` ya resuelto** desde el palmarés empaquetado, y esa rama de `resolveFilms` —la más corta, la que no tiene nada que verificar— era **la única de las cuatro que no rellenaba la dirección**. El relleno se había escrito dos veces, en el camino de caché caliente y en el del emparejado nuevo, y el tercero se quedó fuera.
-
-Ahora también pregunta. No cuesta una petición de más: la ficha con créditos se pide primero y `movieSummary` reaprovecha ese mismo superset para el cartel y la fecha. Y si la petición falla por red, la página **no se cachea sin nombres**: se reintenta en la siguiente visita en vez de guardar el hueco durante treinta días.
+No cuesta una petición de más: la ficha con créditos se pide primero y `movieSummary` reaprovecha ese mismo superset. Si falla por red, la página no se cachea sin nombres.
 
 Caché `festival` v15 → **v16**.
 
 ### Las filmografías de tus favoritos, releídas cada noche
 
-Una directora a la que sigues estrena, TMDB lo apunta, y su ficha en PowaFlex seguía enseñando la filmografía de la semana pasada. No era un fallo: `personCredits` cachea **siete días**, y ese plazo solo se adelantaba para quien apareciera en el feed global de cambios de TMDB — un feed que no siempre recoge «le han añadido una película». Y no había ningún sitio donde decir «mira otra vez».
+`personCredits` cachea siete días, y ese plazo solo se adelantaba para quien apareciera en el feed global de cambios de TMDB, que no siempre recoge «le han añadido una película». Ahora el paso nocturno tira la filmografía de **todos tus favoritos vivos** sin mirar el feed: son decenas o cientos de personas, una petición por cabeza, dentro de pasos que ya recorren esa lista. Al resto de la biblioteca —miles— no se le toca. La ficha personal no se invalida: el paso de estado vital acaba de refrescarla.
 
-Dos cosas:
-
-- El paso nocturno «Detectar filmografías cambiadas en TMDB» **tira la filmografía de todos tus favoritos vivos**, sin mirar el feed. Son unas decenas o unos cientos de personas: una petición por cabeza y por noche, dentro de los pasos que ya recorren esa misma lista. Al resto de la biblioteca —miles— no se le toca: ahí los siete días siguen siendo lo razonable. La ficha personal (foto, biografía, fallecimiento) no se invalida, porque el paso de «estado vital» acaba de refrescarla unos minutos antes.
-- La ficha de persona tiene **«⟳ Actualizar desde TMDB»**: `POST /api/people/by-tmdb/:tmdbId/refresh` tira su caché y vuelve a pedirla ya. Como Cine venidero y los huecos se arman con esas mismas filmografías, se invalidan también y se rehacen en la siguiente visita; el rótulo del botón lo dice.
+Y la ficha de persona estrena **«⟳ Actualizar desde TMDB»** (`POST /api/people/by-tmdb/:tmdbId/refresh`), que invalida también el calendario y los huecos armados con esa filmografía.
 
 ### Estrenos: las Σ que faltan se vuelven a pedir
 
-Un estreno se mira el día que se anuncia, cuando todavía no lo ha votado nadie, y `enrichWithScores` le deja su fila vacía en `mdb_ratings`. Como esa función solo pide lo que **no tiene fila**, esa película se quedaba sin Σ para siempre — en la página donde la Σ es el filtro principal, y precisamente con las películas más nuevas, que son las que estrenan la nota semanas después del cine.
+Un estreno se mira el día que se anuncia, cuando todavía no lo ha votado nadie, y `enrichWithScores` le deja la fila vacía. Como solo pide lo que no tiene fila, esa película se quedaba sin Σ para siempre — en la página donde la Σ es el filtro principal, y con las más nuevas, que son las que estrenan nota semanas después.
 
-Ahora cada carga repasa las notas que faltan (`ponerNotas`, reutilizando `refrescarNotasDeReglas`, que ya sabía reintentar las filas sin Σ): se vuelve a preguntar por las que llevan tres días paradas, así que la petición se paga una vez cada tres días y no en cada visita. La lista cacheada **no se reescribe** al hacerlo: renovarle el plazo de doce horas habría impedido que se reconstruyera nunca.
-
-Además, un botón **«Actualizar notas»** que lo fuerza ya sin reconstruir la lista desde TMDB (que es lo caro), y un contador de «N aún sin nota Σ» para que el botón tenga sentido. `refrescarNotasDeReglas` devuelve ahora cuántas notas **volvieron**, no solo cuántas se pidieron: sin ese dato, una clave que ya no vale y cuatro películas que MDBList todavía no conoce daban exactamente el mismo «0 notas nuevas». Y el recuento parte de lo que hay en la tabla, no de la copia cacheada de la página: pulsar dos veces seguidas ya no canta «3 notas nuevas» las dos veces.
+Ahora cada carga repasa lo que falta (`ponerNotas`, sobre `refrescarNotasDeReglas`): se reintenta lo parado tres días, así que se paga una vez cada tres días y no en cada visita. La lista cacheada no se reescribe, porque renovarle el plazo de doce horas impediría que se reconstruyera nunca. Botón **«Actualizar notas»** para forzarlo, contador de «N aún sin nota Σ», y `refrescarNotasDeReglas` devuelve cuántas **volvieron**: sin ese dato, una clave caducada y cuatro películas que MDBList no conoce daban el mismo «0 notas nuevas».
 
 ### El Dashboard dice qué ha bajado el robot, y por quién
 
-Cuadro nuevo: **«🤖 El automático las bajó por ti»**, los últimos 30 días agrupados por la persona a cuenta de la que entró cada película, con ✓ si ya tiene archivo y ⏳ si sigue pedida.
+Cuadro nuevo con los últimos 30 días agrupados por la persona a cuenta de la que entró cada película, con ✓ si ya tiene archivo y ⏳ si sigue pedida. Solo el pase de favoritos: «Últimas peticiones a Radarr», justo debajo, es la lista de Radarr entera y lo mezcla todo.
 
-Solo salen las altas del pase de favoritos. «Últimas peticiones a Radarr», que sigue justo debajo, es la lista de Radarr entera: lo que mandas a mano, lo de las reglas de festivales y lo de este pase, todo mezclado y sin distinguir de dónde viene cada cosa.
-
-Hizo falta apuntar la persona: el pase ya sabía de quién sale cada candidata (`candidatasDeFavoritos` la trae), pero el log solo guardaba el rótulo de la regla. Columna nueva `radarr_rule_log.person`, con su migración; las filas anteriores se agrupan aparte como «Sin persona apuntada» en vez de inventarles un nombre.
+Columna nueva `radarr_rule_log.person`, con su migración; las filas anteriores se agrupan como «Sin persona apuntada».
 
 ### Descubrir huecos: dos interruptores
 
-- **«Ocultar las que ya están en Radarr»**: lo que ya has pedido está decidido y llegará cuando llegue, pero seguía ocupando sitio en la parrilla y había que distinguirlo a ojo en cada visita. Es distinto del ✕ de descartar, que es «esta no me interesa» y es para siempre.
-- **«Ocultar a quien no ofrece nada»** (solo en la vista por persona): con los filtros puestos, media pantalla podía ser gente con una fila que decía «todas ocultas por tus filtros». Se esconden, y debajo se dice cuántas, para que la página más corta no parezca que se ha comido a nadie.
-
-Los dos se recuerdan entre visitas y vuelven a su sitio con «✕ Limpiar filtros».
+**«Ocultar las que ya están en Radarr»** —distinto del ✕, que es «esta no me interesa» y es para siempre— y **«Ocultar a quien no ofrece nada»** en la vista por persona, con el recuento debajo para que la página corta no parezca que se ha comido a alguien. Los dos se recuerdan y vuelven con «✕ Limpiar filtros».
 
 ### Cine venidero separa dirección de reparto
 
-Lo que dirige alguien a quien sigues es lo que el pase automático puede bajar solo; lo que sale de un actor o una actriz es exploración, y se elige a mano. Mezclados en la misma parrilla, lo segundo tapaba lo primero. Ahora hay tres botones —**Dirección y reparto / Solo dirección / Solo reparto y otros oficios**— con su recuento, una etiqueta en cada ficha y el añadido en bloque respetando el filtro.
+Lo que dirige tu gente es lo que el automático puede bajar solo; lo que sale de un actor o una actriz es exploración, y se elige a mano. Tres botones con su recuento, etiqueta en cada ficha y añadido en bloque respetando el filtro.
 
-Con un detalle que no era evidente: **esto no se puede deducir de los créditos de la ficha**. La lista de personas de cada estreno lleva siempre al director REAL de la película, lo sigas o no, así que una película que entra por su actriz también dice «Dirige Fulano» y se clasificaba como si fuera cosa de su dirección. El dato bueno lo pone ahora el servidor (`porDireccion`), mirando por quién entró de verdad. Caché `calendar` v7 → **v8**.
+Esto **no se puede deducir de los créditos**: la lista de personas de cada estreno lleva siempre al director real, así que una película que entra por su actriz decía «Dirige Fulano» y se clasificaba como cosa de su dirección. El dato lo pone el servidor (`porDireccion`). Caché `calendar` v7 → **v8**.
 
-### Números
-
-Pruebas 296 → **303** (`server/test/lote-118.test.js`). Cachés: `festival` v15 → v16, `calendar` v7 → v8. Migración: columna `person` en `radarr_rule_log`.
+Pruebas 296 → **303** (`lote-118.test.js`).
 
 ## Beta 1.17 (1.0.17-beta) — 2026-08-11
 
@@ -259,237 +251,218 @@ Pruebas 296 → **303** (`server/test/lote-118.test.js`). Cachés: `festival` v1
 
 ### El palmarés, guardado hecho
 
-Los años cerrados no cambian: la Palma de 1978 es la de 1978 y su ficha de TMDB es la misma hoy que dentro de diez años. Preguntarlo en cada instalación nueva, cada vez que caduca una caché, era trabajo tirado — y era el trabajo CARO, porque lo que se llevaba el tiempo no era Wikipedia sino las **cuatro mil búsquedas contra TMDB** con su verificación de dirección.
+Los años cerrados no cambian, y lo caro no era Wikipedia sino las **cuatro mil búsquedas contra TMDB** con su verificación de dirección.
 
-Ahora se guarda hecho. `server/tools/snapshot-palmares.mjs` (`npm run snapshot`) corre los parsers y el emparejado de siempre sobre cada premio y escribe `server/src/data/palmares-2026.js` con el `tmdb_id` ya resuelto, igual que el dataset del Óscar desde la 1.11: **4.794 filas de 31 palmareses hasta 2024, 98,5 % con ficha**. Cada premio dice hasta qué año está cerrado y de ahí en adelante manda la fuente viva, así que la temporada en curso se sigue leyendo de Wikipedia como siempre.
-
-Medido en frío, con la caché entera vaciada:
+`server/tools/snapshot-palmares.mjs` (`npm run snapshot`) corre los parsers y el emparejado de siempre y escribe `server/src/data/palmares-2026.js` con el `tmdb_id` ya resuelto: **4.794 filas de 31 palmareses hasta 2024, 98,5 % con ficha**. Cada premio dice hasta qué año está cerrado; de ahí en adelante manda la fuente viva.
 
 | | antes | ahora |
 |---|---|---|
 | «Lo mejor de 1998» | 13,7 s · 126 peticiones | **2,1 s · 42** |
 | Palmarés de Cannes | 27,5 s · 432 peticiones | **4,2 s · 111** |
 
-De propina: si Wikipedia falla, cambia el molde de una tabla o mueve un artículo, lo empaquetado se sigue sirviendo en vez de dejar el palmarés en un mensaje de error. Y las correcciones manuales del usuario siguen mandando sobre todo, porque se aplican después.
+Si Wikipedia falla, cambia el molde de una tabla o mueve un artículo, lo empaquetado se sigue sirviendo. Las correcciones manuales se aplican después, así que siguen mandando.
 
-Lo que hay que recordar, y por eso está escrito en el propio fichero: **un fallo empaquetado se queda hasta que se regenere**, y lo que alguien arregle en Wikipedia sobre un año viejo no llega solo. Se regenera con `npm run snapshot` en cada temporada de premios. Verificado antes de publicarlo: el paquete dice EXACTAMENTE lo mismo que la fuente viva en los 31 premios, fila a fila.
+**Un fallo empaquetado se queda hasta que se regenere**, y lo que alguien arregle en Wikipedia sobre un año viejo no llega solo: `npm run snapshot` en cada temporada de premios. Verificado antes de publicar: el paquete dice exactamente lo mismo que la fuente viva en los 31 premios, fila a fila.
 
-### Seminci y Sitges, los dos que faltaban
+### Seminci y Sitges (38 → 40 entradas)
 
-El registro pasa de 38 a 40 entradas.
+**Seminci**: 70 Espigas de Oro de 1958 a 2025, con dirección y país. Su tabla buena está en la Wikipedia española —la inglesa se conforma con una viñeta por año desde 1999—, así que `wikiParse` acepta idioma (`awardLang`), que viaja hasta la clave de caché y el enlace de la fuente.
 
-**Seminci**: 70 Espigas de Oro de 1958 a 2025, con dirección y país. Su tabla buena está en la Wikipedia **española** —la inglesa se conforma con una viñeta por año desde 1999 y sin dirección—, así que `wikiParse` acepta idioma (`awardLang`), y el idioma viaja hasta la clave de caché y el enlace de la fuente.
-
-**Sitges**: 46 ganadoras de 1972 a 2025. Su artículo pone cuatro premios en columnas de la misma tabla, donde «Best Director» no es quien dirige a la ganadora sino otro premio de otra película. Dejar que el parser lo adivinara habría dado *The Cremator* firmada por Robert Mulligan sin que nada chirriara, así que sus columnas van **declaradas** en el registro (`awardColumns`).
+**Sitges**: 46 ganadoras de 1972 a 2025. Su artículo pone cuatro premios en columnas de la misma tabla, donde «Best Director» no es quien dirige a la ganadora sino otro premio de otra película: dejarlo a la adivinanza habría dado *The Cremator* firmada por Robert Mulligan sin que nada chirriara. Sus columnas van declaradas (`awardColumns`).
 
 ### Cuatro fallos del parser que solo se ven metiendo tablas nuevas
 
-- **La rejilla**: el parser expandía el `colspan` dentro de una fila pero no arrastraba nada ENTRE filas, así que una celda con `rowspan` dejaba un hueco y las columnas de detrás se leían corridas. En Sitges era catastrófico y silencioso (1973 abre una celda de película vacía con `rowspan="5"`). Arreglarlo rellena **el país que faltaba en media Cannes y media Venecia** y endereza **28 filas viejas** que traían el título original metido en el campo de la dirección: la Concha de 1977, el Óscar de 1955, «Arirang», la Cámara de Oro de 2000 y catorce nominadas de Platform.
-- **El espacio de ancho cero**: la plantilla de referencias de la Wikipedia española deja un `&#8203;` pegado detrás de cada celda, y en JavaScript `\s` no lo toca, así que «1958» dejaba de parecer un año y la tabla entera se leía corrida. Se van solo los invisibles que no significan nada: el ZWNJ persa es letra y se queda (*دانه‌ی انجیر معابد*).
-- **El empate escrito con «&»**: dos títulos en cursiva en la misma celda. Parte el ex aequo de Sitges de 1994 y convierte la nominación de la EFA de 1994 —la trilogía de Kieślowski como un título imposible— en sus tres películas.
-- Una película heredada por `rowspan` ya no se apunta dos veces (los Globos de 1961 tenían cinco nominadas de comedia y cuatro de musical).
+- **La rejilla**: se expandía el `colspan` dentro de una fila pero no se arrastraba nada ENTRE filas, así que un `rowspan` dejaba hueco y las columnas de detrás se leían corridas. Silencioso y catastrófico en Sitges (1973 abre una celda vacía con `rowspan="5"`). Al arreglarlo aparece **el país que faltaba en media Cannes y media Venecia** y se enderezan **28 filas** que traían el título original en el campo de la dirección: la Concha de 1977, el Óscar de 1955, la Cámara de Oro de 2000 y catorce nominadas de Platform.
+- **El espacio de ancho cero**: la Wikipedia española deja un `&#8203;` detrás de cada celda y `\s` no lo toca, así que «1958» dejaba de parecer un año y la tabla se leía corrida. Se van solo los invisibles sin significado: el ZWNJ persa es letra y se queda.
+- **El empate escrito con «&»**: dos títulos en cursiva en la misma celda. Parte el ex aequo de Sitges de 1994 y desdobla la trilogía de Kieślowski en la EFA de 1994.
+- Una película heredada por `rowspan` ya no se apunta dos veces (los Globos de 1961).
 
 ### El emparejado sin dirección, con el año puesto
 
-Mirar las 46 fichas de Sitges una a una —que es la lección de la 1.15— destapó **cuatro emparejados falsos con cero «sin ficha»**: «In the Light of the Moon» (que es el otro nombre de *Ed Gein*, 2000) apuntaba a una película de 2025 que se llama igual, el «Ringu» de 1999 a la versión de televisión de 1995, «The Cremator» a un documental nepalí sin fecha y «The Invitation» a un corto sin fecha.
+Mirar las 46 fichas de Sitges una a una destapó **cuatro emparejados falsos con cero «sin ficha»**: «In the Light of the Moon» apuntaba a una película de 2025 homónima, el «Ringu» de 1999 a la versión de televisión de 1995, «The Cremator» a un documental nepalí sin fecha y «The Invitation» a un corto sin fecha.
 
-Dos agujeros, los dos solo alcanzables en filas SIN dirección:
+Dos agujeros, los dos solo alcanzables en filas sin dirección: una ficha **sin fecha** entraba en la ventana de año y encima ordenaba por delante de las fechadas, así que el homónimo fantasma ganaba siempre; y la segunda vuelta **sin ventana de año** aceptaba cualquier título clavado a cualquier distancia. Ahora la ventana es asimétrica —hasta tres años atrás, uno hacia delante—, que es lo que un palmarés puede sostener.
 
-- Una ficha **sin fecha** entraba en la ventana de año y encima ordenaba por delante de las fechadas, así que el homónimo fantasma le ganaba siempre a la película buena. Sin director no hay quien verifique: ahora no es candidata.
-- La segunda vuelta **sin ventana de año** aceptaba cualquier título clavado a cualquier distancia. Ahora va acotada y es asimétrica —hasta tres años atrás, uno hacia delante—, que es lo que un palmarés puede sostener: un premio no se lo lleva una película que aún no existe.
-
-Caché `film_match` v4 → v5: esa dura un año y no la barre el bump de `festival`, así que sin subirla habrían sobrevivido los aciertos falsos.
+Caché `film_match` v4 → v5: dura un año y no la barre el bump de `festival`.
 
 ### Directores emergentes: los palmareses también son radar
 
-El detector solo miraba **selecciones**. Ahora mira también **diez palmareses** que alcanzan primeras películas, empezando por la **Cámara de Oro**, que es literalmente el premio a la mejor ópera prima de Cannes y era la señal más pura que había en la app sin usar: entran también EFA, Mar del Plata, Óscar internacional, Goya, César, Seminci, Lola, Sitges y BAFTA.
+El detector solo miraba selecciones. Ahora mira también **diez palmareses** que alcanzan primeras películas, empezando por la **Cámara de Oro**, el premio a la mejor ópera prima de Cannes: entran también EFA, Mar del Plata, Óscar internacional, Goya, César, Seminci, Lola, Sitges y BAFTA.
 
-Fuera se quedan a propósito los que coronan carreras hechas (Óscar, Globos, los círculos de crítica de EE UU) y **el Guldbagge y el Donatello por una razón concreta**: su columna «Director(s)» lista productores, y metidos en el radar el detector fichaba a Mattias Nohrborg —productor— como promesa de la dirección sueca.
+Fuera quedan a propósito los que coronan carreras hechas, y el Guldbagge y el Donatello por una razón concreta: su columna «Director(s)» lista productores, y metidos en el radar el detector fichaba a un productor como promesa de la dirección sueca.
 
-El límite de obra sube de tres largos a **cinco**, y ahí apareció lo que no se veía: quien tiene cuatro o cinco películas casi nunca las ha hecho en ocho años, así que el filtro de la obra no llegaba a aplicarse porque le echaba antes la fecha del debut. Separadas las dos ventanas —el radar sigue leyendo ocho años de ediciones, la carrera puede haber empezado hasta doce atrás—, y con la guarda evidente: **quien ya ganó la Palma, el León o el Oso dejó de ser una promesa el día que lo ganó** (ganar la Cámara de Oro o Un Certain Regard es justo lo contrario).
+El límite de obra sube de tres largos a **cinco**, y ahí apareció lo que no se veía: quien tiene cuatro o cinco casi nunca las ha hecho en ocho años, así que el filtro de la obra no llegaba a aplicarse porque le echaba antes la fecha del debut. Separadas las dos ventanas —ocho años de ediciones, hasta doce de carrera—, con la guarda evidente: quien ya ganó la Palma, el León o el Oso dejó de ser una promesa ese mismo día.
 
-Medido contra TMDB real: de 33 emergentes a **47**, 18 con señal de palmarés. Arriba salen Alauda Ruiz de Azúa (Concha de Oro + Goya), Jeanne Herry (que solo llegaba por el César) y los ganadores de la Cámara de Oro.
+Medido contra TMDB real: de 33 emergentes a **47**, 18 con señal de palmarés.
 
-### Móvil
+### Móvil y otros
 
-- La tabla de los 30 archivos más pesados del Taller **se aplastaba** en vez de desbordar: el año se pegaba a la resolución («20041080») y el códec al tamaño. Ancho mínimo y a deslizar, que es para lo que estaba su contenedor. El mismo defecto estaba en la tabla de notas de Letterboxd de Visionado.
-- El botón «Pedir N a Radarr» llevaba `ml-auto`, que en el escritorio lo empuja a la derecha y en móvil, con la barra partida, lo dejaba sangrado a media línea.
+- La tabla de los 30 archivos más pesados del Taller se aplastaba en vez de desbordar: el año pegado a la resolución («20041080»). Ancho mínimo y a deslizar; igual la de notas de Letterboxd de Visionado.
+- El botón «Pedir N a Radarr» llevaba `ml-auto`, que en móvil lo dejaba sangrado a media línea.
+- El detector traduce el nombre de sus fuentes, con un test que cruza la lista de la interfaz con el radar del servidor: es la clase de lista escrita a mano que en la 1.08 dejó una regla sin pintar.
 
-### Otros
-
-- El detector de emergentes traduce el nombre de sus fuentes al inglés (salía «RT crítica» con la interfaz en inglés), y hay un test que cruza la lista de nombres de la interfaz con el radar del servidor: es la clase de lista escrita a mano que en la 1.08 dejó una regla entera sin pintar.
-- Tests 277 → 296. Caché `festival` v14 → v16.
+Tests 277 → **296**. Caché `festival` v14 → v16.
 
 ## Beta 1.16 (1.0.16-beta) — 2026-08-11
 
 **Cuando la lista de un premio se queda atrás, se mira la edición suelta. Y la dirección de las filas que no la traen sale de TMDB.**
 
-### Norma nueva: manda la lista, pero la edición remata
+### Manda la lista, pero la edición remata
 
-El artículo-lista de un premio se actualiza cuando alguien se acuerda. El del Guldbagge seguía terminando en 2024 mientras la 61.ª edición —*Eagles of the Republic*, enero de 2026— llevaba meses con su propio artículo. Donde la gente escribe primero es en la edición.
+El artículo-lista del Guldbagge terminaba en 2024 mientras la 61.ª edición —*Eagles of the Republic*, enero de 2026— llevaba meses con su propio artículo. Donde la gente escribe primero es en la edición.
 
-Ahora, cuando la lista no llega al año que debería, se consulta el artículo de la edición de los años que faltan (hasta dos). La llave para leerlo es general y no depende del idioma ni del orden: esos artículos van con el mismo molde —una rejilla de categorías, cada una con un rótulo que **enlaza al artículo del premio**— y ese enlace es exactamente el `awardPage` que ya está en el registro. Dentro, una viñeta por película con la ganadora en negrita, así que se rescatan también las nominadas del año.
+Ahora, cuando la lista no llega al año que debería, se consulta el artículo de la edición de los años que faltan (hasta dos). La llave es general y no depende del idioma ni del orden: esos artículos van con el mismo molde —una rejilla de categorías, cada rótulo **enlazando al artículo del premio**— y ese enlace es el `awardPage` que ya está en el registro. Dentro, una viñeta por película con la ganadora en negrita, así que se rescatan también las nominadas del año.
 
-Si el artículo no sigue ese molde no se devuelve nada y el año se queda como estaba: es un respaldo, no una fuente. Y solo se consulta lo que la lista NO tiene, así que en cuanto alguien la actualice estas peticiones dejan de hacerse solas.
+Si el artículo no sigue el molde no se devuelve nada y el año se queda como estaba: es un respaldo, no una fuente. Y solo se consulta lo que la lista no tiene, así que en cuanto alguien la actualice estas peticiones dejan de hacerse solas.
 
-Activado en los cuatro premios cuyo artículo de edición se ha comprobado que encaja: **Guldbagge, Goya, BAFTA y Critics' Choice**. El Guldbagge pasa de 63 a 64 ganadoras y «Lo mejor de 2025» se queda sin ningún premio pendiente. Los otros tres tenían su lista al día, así que no añaden nada — que es justo lo que debe pasar.
+Activado en los cuatro premios comprobados: **Guldbagge, Goya, BAFTA y Critics' Choice**. El Guldbagge pasa de 63 a 64 ganadoras y «Lo mejor de 2025» se queda sin ningún premio pendiente. Los otros tres tenían su lista al día y no añaden nada, que es justo lo que debe pasar.
 
 ### La dirección, de TMDB, cuando la fila no la trae
 
-El David di Donatello acredita productores, no dirección, así que sus 69 ganadoras salían **sin un solo nombre** —y sin estrella que pulsar para seguir a nadie—. Lo mismo iba a pasar con las filas que salen del artículo de una edición. Ahora, cuando la fila no trae dirección y la ficha ya está emparejada, el nombre lo pone TMDB: 68 de las 69 del Donatello lo tienen. La ficha ya estaba pedida por el emparejado, así que no cuesta una petición más, y el nombre se guarda en la entrada de la caché por película para no volver a pedirlo.
+El David di Donatello acredita productores, así que sus 69 ganadoras salían **sin un solo nombre** ni estrella que pulsar. Ahora, cuando la fila no trae dirección y la ficha ya está emparejada, el nombre lo pone TMDB: 68 de las 69. La ficha ya estaba pedida por el emparejado, así que no cuesta una petición más, y el nombre se guarda en la caché por película.
 
 Caché `festival` v13 → v14. 277 tests.
 
 ## Beta 1.15 (1.0.15-beta) — 2026-08-11
 
-**Tres arreglos del emparejado que salieron de mirar el palmarés recién estrenado: el Ástor de 1959 apuntaba al making-of, «Paradise Is Burning» salía firmada por su productor y el Guldbagge de 2025 no está porque Wikipedia no lo ha escrito.**
+**Tres arreglos del emparejado salidos de mirar el palmarés recién estrenado.**
 
 ### El emparejado compara con los DOS títulos de la fila
 
-Cada fila de Wikipedia nombra la misma película dos veces —título internacional y original— y solo se comparaba con el primero. Eso dejaba fuera al candidato que TMDB guarda por el original (el Ástor de 1959 es *Smultronstället*, y TMDB lo tiene como *Fresas salvajes*) y, peor, abría la puerta a que ganara un parecido: ese año acabó emparejado con ***Bakomfilm Smultronstället*, el making-of**, que también es de 1957 y también lo firma Bergman.
+Cada fila de Wikipedia nombra la película dos veces —internacional y original— y solo se comparaba con el primero. Eso dejaba fuera al candidato que TMDB guarda por el original (el Ástor de 1959 es *Smultronstället*, y TMDB lo tiene como *Fresas salvajes*) y abría la puerta a un parecido: ese año acabó emparejado con ***Bakomfilm Smultronstället*, el making-of**, también de 1957 y también de Bergman.
 
-Ahora los dos nombres cuentan como prueba, que es lo que son. No es una relajación: son dos maneras de nombrar la misma película, y la verificación de dirección sigue intacta. Mar del Plata era el caso claro —sus títulos internacionales son traducciones libres y el original es exacto— pero vale para todos. **De 13 películas sin casar a 9** en los 32 palmareses (2.000 fichas): se rescata también *King of Ping Pong* de Sundance.
+Ahora los dos nombres cuentan como prueba, que es lo que son, y la verificación de dirección sigue intacta. **De 13 películas sin casar a 9** en los 32 palmareses (2.000 fichas): se rescata también *King of Ping Pong*.
 
 ### La dirección de las fichas rescatadas por el equipo sale de TMDB
 
-La Beta 1.14 estrenó la vuelta que rescata fichas verificando contra producción y guion, para la columna «Director(s)» del Guldbagge que trae productores. Pero la ficha se quedaba con el nombre de la celda: ***Paradise Is Burning* aparecía dirigida por Nima Yousefi**, que es su productor —la dirige Mika Gustafson—, y *Triangle of Sadness* por Erik Hemmendorff en vez de Ruben Östlund.
-
-Cuando el rescate es por el equipo ya se sabe que esa celda no traía dirección, diga lo que diga su cabecera: la dirección buena es la de TMDB, y viaja también en la caché por película para que no vuelva el nombre malo al caducar la página.
+La 1.14 estrenó la vuelta que rescata fichas verificando contra producción y guion, pero la ficha se quedaba con el nombre de la celda: ***Paradise Is Burning* aparecía dirigida por Nima Yousefi**, que es su productor, y *Triangle of Sadness* por Erik Hemmendorff en vez de por Ruben Östlund. Cuando el rescate es por el equipo ya se sabe que esa celda no traía dirección: la buena es la de TMDB, y viaja también en la caché por película.
 
 ### Cachés
 
-`festival` v12 → v13 y, sobre todo, **`film_match` v3 → v4**: esa caché dura un AÑO y no la barre el bump de `festival`, así que sin subirla los aciertos viejos —el making-of de Bergman incluido— habrían sobrevivido a la versión nueva. Queda anotado donde se construye la clave.
+`festival` v12 → v13 y **`film_match` v3 → v4**: esa dura un año y no la barre el bump de `festival`, así que sin subirla los aciertos viejos —el making-of incluido— habrían sobrevivido.
 
-### Lo que NO se puede arreglar desde aquí
+### Lo que no se puede arreglar desde aquí
 
-**El Guldbagge de 2025 falta porque Wikipedia no lo ha publicado.** La lista que lee la app, [Guldbagge Award for Best Film](https://en.wikipedia.org/wiki/Guldbagge_Award_for_Best_Film), termina en 2024 (60.ª edición). La 61.ª sí se falló —enero de 2026, *Eagles of the Republic* de Tarik Saleh— y tiene su propio artículo, pero nadie ha llevado el dato a la lista. Aparecerá solo en cuanto alguien lo edite; mientras tanto sale como «sin fallar todavía» en «Lo mejor del año», que es la verdad que la fuente sostiene.
+El **Guldbagge de 2025** falta porque la lista de Wikipedia termina en 2024. La 61.ª sí se falló —enero de 2026, *Eagles of the Republic*— y tiene su propio artículo, pero nadie ha llevado el dato a la lista. Sale como «sin fallar todavía», que es la verdad que la fuente sostiene.
 
 275 tests.
 
 ## Beta 1.14 (1.0.14-beta) — 2026-08-11
 
-**Trece premios nuevos en Festivales, la vista «Lo mejor del año» que cruza los treinta y ocho palmareses por un año, y seis fallos del parser de Wikipedia que solo se veían al meter tablas nuevas.**
+**Trece premios nuevos, la vista «Lo mejor del año» y seis fallos del parser de Wikipedia que solo se veían al meter tablas nuevas.**
 
-### Trece entradas nuevas: la crítica gremial y cuatro premios nacionales
+### Trece entradas nuevas (25 → 38)
 
-Partiendo del resumen anual de FilmAffinity, se comprobó uno a uno qué de lo que ofrece tiene detrás un artículo de Wikipedia con la forma que sabe leer `server/src/festivals.js`. De ahí salen trece entradas nuevas (de 25 a 38):
+Partiendo del resumen anual de FilmAffinity, se comprobó uno a uno qué tiene detrás un artículo con la forma que sabe leer `server/src/festivals.js`:
 
-- **Asociaciones de críticos** (grupo nuevo dentro de Premios): NBR, Círculo de Nueva York, Los Ángeles, Chicago, Boston y Critics' Choice. Es el bloque que faltaba: hasta ahora solo había academias de la industria, y estos son los que fallan primero y marcan la temporada.
-- **Premios nacionales**: Globos de Oro (drama y comedia/musical, como dos entradas), David di Donatello, Guldbagge y Lola.
-- **Festivales**: el **Premio del Público de Toronto** —el premio gordo del TIFF y el mejor pronóstico del Óscar que existe; la entrada `tiff` seguía el Platform Prize, que es la competición con jurado— y **Mar del Plata**.
+- **Asociaciones de críticos** (grupo nuevo dentro de Premios): NBR, Nueva York, Los Ángeles, Chicago, Boston y Critics' Choice. Es el bloque que faltaba: hasta ahora solo había academias de la industria, y estos fallan primero y marcan la temporada.
+- **Premios nacionales**: Globos de Oro (drama y comedia/musical como dos entradas), David di Donatello, Guldbagge y Lola.
+- **Festivales**: el **Premio del Público de Toronto** —el premio gordo del TIFF y el mejor pronóstico del Óscar que existe; la entrada `tiff` seguía el Platform Prize, que es la competición con jurado— y Mar del Plata.
 
-Se descartaron Sitges (una sola tabla con cuatro premios en columnas) y Seminci (viñetas, sin tabla), que necesitarían parser propio.
+Sitges y Seminci se descartan de momento: necesitan parser propio.
 
-### «Lo mejor del año»: el corte transversal
+### «Lo mejor del año»
 
-La página se navegaba premio a premio. El cuarto rótulo de arriba cambia de modo y enseña **la ganadora de los treinta palmareses en un mismo año**, agrupada en Festivales / Secciones de debut / Premios / Crítica / Cánones, con el nombre del premio sobre cada cartel y el mismo selector de años de siempre (1927–2027, que es hasta donde llega el Óscar).
+El cuarto rótulo de arriba cambia de modo y enseña **la ganadora de los treinta palmareses en un mismo año**, agrupada en Festivales / Debut / Premios / Crítica / Cánones, de 1927 a 2027.
 
-Sale de lo que ya había: reaprovecha el palmarés cacheado de cada premio y, si no lo hay, trae del artículo solo las filas (cacheadas un día); el emparejado pasa por la misma caché por película. Un premio que falle no tumba el año —se queda fuera con su motivo— y los que aún no se han fallado salen por su nombre, que en el año en curso es información y no un hueco.
+Sale de lo que ya había: reaprovecha el palmarés cacheado de cada premio y, si no lo hay, trae del artículo solo las filas (cacheadas un día). Un premio que falle no tumba el año —se queda fuera con su motivo— y los que aún no se han fallado salen por su nombre, que en el año en curso es información y no un hueco.
 
-**El César es el único cuya tabla va por año de gala** y no de película: su fila «2026 (51.ª)» premia el cine francés de 2025. La vista por premio se queda como está; en el anuario se lee con el desfase puesto y el rótulo lo dice («gala de 2026»). Se comprobó una por una que ninguna otra entrada lo necesita.
+**El César es el único cuya tabla va por año de gala**: su fila «2026 (51.ª)» premia el cine francés de 2025. En el anuario se lee con el desfase puesto y el rótulo lo dice. Se comprobó una por una que ninguna otra entrada lo necesita.
 
-Los rótulos que despliegan (Festivales / Premios / Cánones) dejan de ser botones con caja: abiertos se confundían con los premios que acababan de desplegar. Ahora son pestañas subrayadas, de otro rango visual.
+### Seis fallos del parser
 
-### Seis fallos del parser de Wikipedia que las tablas nuevas destaparon
-
-Ninguno era visible con los premios que ya había; todos afectaban también a los viejos en cuanto cambiara su artículo.
-
-1. **«Tiene fondo, luego ganó» era falso.** El sombreado de la ganadora no es un color fijo (#faeb86, #eedd82, #b0c4de, #ddbf5f), así que valía cualquier `background`. Pero Critics' Choice y el Donatello pintan sus filas **a rayas con un gris**, y media lista de nominadas salía marcada como ganadora un año sí y otro no. Ahora un gris neutro (r≈g≈b) es decoración y solo un color con tono es la marca (`esGrisNeutro`).
-2. **La fila de año exigía la tabla completa.** El premio alemán omite la columna del trofeo en casi todas sus filas: «1955» dejaba de reconocerse como año, pasaba a ser el **título** de la película de 1954 y el título original acababa en el campo del director. El discriminador es el mismo de siempre en este fichero —la cursiva—: una celda de título va en `<i>` o enlazada, una de año nunca. Así «1917» de nominada sigue siendo una película.
-3. **Los colspan descolocaban las columnas.** Una celda con `colspan` ocupa varias columnas y se contaba como una: ahora cada celda se coloca en todas las que ocupa (`expandirColspan`). Sin esto, la fila de 1959 de los Globos —que fusiona dirección y producción— sacaba el musical de ese año con el nombre de su director de título.
-4. **Un empate en una sola celda se perdía entero.** Boston 2008 mete *Slumdog Millionaire* y *WALL-E* partidos por `<br>`: el título quedaba en «Slumdog Millionaire , WALL-E» y no casaba con nada. Se desdobla por el salto de línea, que no puede aparecer dentro de un título (la coma sí). Con el cuidado de que un salto en la celda de **dirección** con un solo título es una codirección —la Palma de 1946 y la de 1956—: ahí no se parte nada.
-5. **Dos premios en columnas gemelas.** Los Globos de 1958-1962, cuando comedia y musical eran premios distintos, ponen dos pares (película, dirección) en la misma fila. Ahora se leen los dos: **de 69 películas a 79**.
-6. **El año sin nominadas desaparecía.** En una tabla mixta, el año que trae una sola película no va sombreado porque no hay nada de lo que distinguirla: Chicago 2004 se caía del palmarés sin dejar rastro. Y el rango «1971–1995 · Festival Cancelled» con el que Mar del Plata tapa los 25 inviernos que no se celebró entraba como si fuera una película.
+1. **«Tiene fondo, luego ganó» era falso.** El sombreado de la ganadora no es un color fijo, así que valía cualquier `background`. Pero Critics' Choice y el Donatello pintan sus filas **a rayas con un gris**, y media lista de nominadas salía marcada como ganadora. Ahora un gris neutro (r≈g≈b) es decoración y solo un color con tono es la marca (`esGrisNeutro`).
+2. **La fila de año exigía la tabla completa.** El Lola omite la columna del trofeo en casi todas sus filas: «1955» dejaba de reconocerse como año, pasaba a ser el título de la película de 1954 y el original acababa en el campo del director. El discriminador es la cursiva: una celda de título va en `<i>` o enlazada, una de año nunca. Así «1917» de nominada sigue siendo una película.
+3. **Los colspan descolocaban las columnas**: una celda con `colspan` ocupa varias y se contaba como una. Ahora se coloca en todas las que ocupa (`expandirColspan`). Sin esto, los Globos de 1959 sacaban el musical con el nombre de su director de título.
+4. **Un empate en una sola celda se perdía entero.** Boston 2008 mete *Slumdog Millionaire* y *WALL-E* partidos por `<br>`. Se desdobla por el salto de línea, que no cabe dentro de un título (la coma sí), salvo en la celda de dirección con un solo título, que es una codirección: la Palma de 1946 y la de 1956.
+5. **Dos premios en columnas gemelas**: los Globos de 1958-1962, cuando comedia y musical eran premios distintos, ponen dos pares (película, dirección) en la misma fila. **De 69 películas a 79.**
+6. **El año sin nominadas desaparecía**: si trae una sola película no va sombreado, y Chicago 2004 se caía del palmarés sin rastro. Y el rango «1971–1995 · Festival Cancelled» con el que Mar del Plata tapa los inviernos que no se celebró entraba como si fuera una película.
 
 ### Y tres del emparejado contra TMDB
 
-- **Un 404 abortaba la resolución entera.** La búsqueda de TMDB devuelve fichas fantasma —entradas borradas que su índice todavía sirve— y pedir sus créditos da 404. Como cualquier error se leía como corte de red, se abandonaba la película **con la candidata buena esperando detrás**: así se quedaron sin ficha *Der bewegte Mann* y *Die Artisten in der Zirkuskuppel*, las dos con su director exacto en la lista. Ahora un 404 salta esa candidata y sigue. De propina, esas páginas no se cacheaban nunca y repetían la ráfaga contra TMDB en cada visita.
-- **La columna «Director(s)» del Guldbagge trae productores** en los años recientes: *Triangle of Sadness* sale con Erik Hemmendorff y Philippe Bober, y ningún director casaba. Nueva vuelta de rescate: si el título es **clavado** y ningún director verifica, se comprueba contra producción y guion de esa ficha (`movieCrewNames`). Siguen siendo dos pruebas, así que no afloja la regla de «mejor sin ficha que la ficha de otra».
-- **Los diminutivos ingleses.** Wikipedia acredita «Thomas McCarthy» y «Rick Kaplan»; TMDB, «Tom» y «Richard». Lista en `names.js`, solo corto ↔ largo (dos diminutivos del mismo nombre no se dan por iguales).
-- Y lo que ganó un premio de cine y **no es cine** se marca como serie: *Small Axe*, premio de los críticos de Los Ángeles de 2020, es una antología de la BBC. Ni se busca en TMDB ni cuenta como emparejado fallido.
+- **Un 404 abortaba la resolución entera.** La búsqueda de TMDB devuelve fichas fantasma —entradas borradas que su índice todavía sirve— y pedir sus créditos da 404. Como cualquier error se leía como corte de red, se abandonaba la película **con la candidata buena esperando detrás**: así se quedaron sin ficha *Der bewegte Mann* y *Die Artisten in der Zirkuskuppel*. De propina, esas páginas repetían la ráfaga en cada visita porque no se cacheaban.
+- **La columna «Director(s)» del Guldbagge trae productores** en los años recientes. Vuelta nueva: con el título **clavado** y ningún director que verifique, se comprueba contra producción y guion de esa ficha (`movieCrewNames`). Siguen siendo dos pruebas.
+- **Los diminutivos ingleses**: Wikipedia acredita «Thomas McCarthy» y «Rick Kaplan»; TMDB, «Tom» y «Richard». Lista en `names.js`, solo corto ↔ largo.
+- Y lo que ganó un premio de cine y no es cine se marca como serie: *Small Axe*, premio de los críticos de Los Ángeles de 2020, es una antología de la BBC.
 
-**Resultado medido:** 1.999 películas en los 32 palmareses con ficha, **13 sin casar (0,65 %)** —y 11 de ellas son entradas viejas que esta versión no toca—. Los trece premios nuevos suman 806 películas con 2 sin casar.
+**Medido:** 1.999 películas en los 32 palmareses con ficha, **13 sin casar (0,65 %)**, y 11 son entradas viejas que esta versión no toca. Los trece premios nuevos suman 806 películas con 2 sin casar.
 
-### Verificación
-
-Se ejecutó el parser anterior y el nuevo sobre el mismo HTML de los trece premios que ya existían: salida **idéntica byte a byte** salvo en el Óscar internacional, donde ocho títulos pierden un «‡» de leyenda que no debían llevar. 275 tests (14 nuevos), caché de festivales a v12.
+Verificación: el parser anterior y el nuevo sobre el mismo HTML de los trece premios que ya existían dan salida idéntica byte a byte, salvo ocho títulos del Óscar internacional que pierden un «‡» de leyenda que no debían llevar. 275 tests (14 nuevos), caché de festivales a v12.
 
 ## Beta 1.13 (1.0.13-beta) — 2026-08-10
 
-**Los nueve segundos de Visionado eran un índice que faltaba. Y de paso: React vivía dentro del paquete de las gráficas, Favoritos pedía a Wikipedia una pestaña que no estabas mirando, y ninguna espera decía ya por dónde iba.**
+**Los nueve segundos de Visionado eran un índice que faltaba. Y de paso: React vivía dentro del paquete de las gráficas y Favoritos pedía a Wikipedia una pestaña que no estabas mirando.**
 
-### Antes de nada: había que poder medir
+### Primero, poder medir
 
-La demo con la que se desarrolla tiene 423 películas y ahí **no se reproduce ningún problema de rendimiento** — todo respondía por debajo de 30 ms mientras en una biblioteca de verdad había esperas de segundos. Así que esta versión empieza fabricando una base sintética del tamaño de la real (12.400 películas, 15.114 personas, 160.610 créditos, 8.117 entradas de Letterboxd) y midiendo contra ella. Todas las cifras que siguen están medidas ahí, no estimadas. Queda como entrada `powaflex-grande` en `.claude/launch.json` para la próxima vez.
+La demo con la que se desarrolla tiene 423 películas y ahí **no se reproduce ningún problema de rendimiento**: todo respondía por debajo de 30 ms mientras en una biblioteca de verdad había esperas de segundos. Esta versión empieza fabricando una base sintética del tamaño real —12.400 películas, 15.114 personas, 160.610 créditos, 8.117 entradas de Letterboxd— y midiendo contra ella. Queda como `powaflex-grande` en `.claude/launch.json`.
 
 ### Los 9 segundos de Visionado: `idx_lb_movie`
 
-`/api/mdblist/insights` tardaba **9,09 s y no cacheaba nunca**. Sus cinco consultas calculan «tu nota» con una subconsulta correlacionada sobre `lb_entries` —hasta tres veces por fila— y esa tabla solo tenía índice por `list`: cada una de las 12.400 películas recorría las 8.117 entradas enteras, tres veces. Con `CREATE INDEX idx_lb_movie ON lb_entries(movie_id)` el plan pasa de `SEARCH lb_entries` a `SEARCH lb_entries USING INDEX`, y el endpoint de **9,09 s a 0,031 s: 293×**. Por consulta: hiddenGems 3.004 → 3,6 ms, overrated 3.286 → 4,3 ms, letterboxdDivergence 3.262 → 4,5 ms, mustSee y consensusUnwatched 1.200 → 1,8 ms.
+`/api/mdblist/insights` tardaba **9,09 s y no cacheaba nunca**. Sus cinco consultas calculan «tu nota» con una subconsulta correlacionada sobre `lb_entries` —hasta tres veces por fila— y esa tabla solo tenía índice por `list`: cada una de las 12.400 películas recorría las 8.117 entradas enteras, tres veces. Con `CREATE INDEX idx_lb_movie ON lb_entries(movie_id)`, de **9,09 s a 0,031 s: 293×**. La página entera pasa de 9,1 s a 0,15 s.
 
-El índice se crea solo al arrancar sobre las bases que ya existen (`IF NOT EXISTS` dentro del bloque de esquema), así que no hay migración que lanzar.
+El índice se crea al arrancar (`IF NOT EXISTS` en el bloque de esquema): no hay migración que lanzar.
 
-Con eso, y con las tres peticiones de la página en paralelo, **Visionado entero pasa de 9,1 s a 0,15 s**. No se ha partido en subpestañas —estaba en el encargo— porque una vez resuelto el índice ninguna pestaña ahorraría espera y solo añadiría clics para ver lo mismo; el reparto en tres pestañas queda estudiado por si algún día hace falta.
+No se ha partido en subpestañas —estaba en el encargo— porque con el índice resuelto ninguna pestaña ahorraría espera y solo añadiría clics para ver lo mismo.
 
-### Favoritos: 25,7 segundos esperando una pestaña que no mirabas
+### Favoritos: 25,7 segundos por una pestaña que no mirabas
 
-El peor caso de la app no era Visionado. `/api/people/festival-packs` baja ~30 tablas de Wikipedia y tarda **25.765 ms en frío**, y se pedía al montar la página… para alimentar la pestaña «Añadir», que no es la que se abre por defecto. Partida con el nuevo `<Subpestanas>`: «Mis favoritos» carga solo lo suyo (`/roles` + `/tracked/health`) y «Añadir» pide sus cuatro peticiones al abrirse y no vuelve a pedirlas al volver. **25.765 ms → 114 ms** al entrar. La espera de Wikipedia, cuando de verdad la pides, se anuncia diciendo por qué tarda y que se guarda una semana.
+`/api/people/festival-packs` baja ~30 tablas de Wikipedia y tarda **25.765 ms en frío**, y se pedía al montar la página para alimentar «Añadir», que no es la que se abre. Partida con el nuevo `<Subpestanas>`: **25.765 ms → 114 ms** al entrar. La espera de Wikipedia, cuando de verdad la pides, dice por qué tarda.
 
 ### React vivía dentro del paquete de recharts
 
-`manualChunks: { recharts: ['recharts'] }` parecía aislar la librería de gráficas para que solo la bajaran las tres páginas que la usan. Pero React es su dependencia y ese era el primer grupo que la reclamaba, así que **React acabó dentro del trozo de recharts y las 415 KB las descargaba y ejecutaba TODA la app**, incluidas las páginas sin una sola gráfica. Declarando `react` aparte cada uno va a lo suyo. Y además las gráficas de Visionado y del Dashboard se han sacado a módulos diferidos (`web/src/pages/charts/`): en Visionado, el JavaScript de la página está listo a los 38 ms y recharts ni se pide hasta los 147, con la página ya pintada. Hoy solo la tocan Taller → Calidad y los dos módulos de gráficas.
+`manualChunks: { recharts: ['recharts'] }` parecía aislar las gráficas, pero React es su dependencia y ese era el primer grupo que la reclamaba: **las 415 KB las descargaba y ejecutaba toda la app**, incluidas las páginas sin una sola gráfica. Declarando `react` aparte, cada uno va a lo suyo. Y las gráficas de Visionado y del Dashboard salen a módulos diferidos (`web/src/pages/charts/`): en Visionado el JavaScript de la página está listo a los 38 ms y recharts ni se pide hasta los 147, con la página ya pintada.
 
-### Toda espera dice qué hace, por dónde va y cuánto lleva
+### Toda espera dice qué hace y por dónde va
 
-Los 28 `<Spinner>` mudos («Cargando…», una ruedecita y nada más) pasan a `<Progreso>`: el paso con nombre, «2 de 4» y el porcentaje. El porcentaje es **peticiones terminadas sobre el total** — nunca una animación que finge avanzar. Con una sola petición no hay porcentaje honesto, así que ahí sale el nombre de lo que se trae, barra indeterminada y, pasados cuatro segundos, «Llevamos N s». `<Spinner>` sigue existiendo (por dentro ya es un Progreso indeterminado), así que ninguna llamada suya se rompió.
+Los 28 `<Spinner>` mudos pasan a `<Progreso>`: el paso con nombre, «2 de 4» y el porcentaje, que es **peticiones terminadas sobre el total** y nunca una animación que finge avanzar. Con una sola petición no hay porcentaje honesto: nombre de lo que se trae, barra indeterminada y, pasados cuatro segundos, «Llevamos N s».
 
-Donde el servidor sí publica su avance real —el calendario y los huecos de Descubrir, vía `/api/build-progress`— se ha respetado la barra que ya había: cambiarla por un contador de pasos habría sustituido información real por un porcentaje peor. Aviso comprobado y anotado: `/api/festivals/:clave/:año` y `/palmares` NO publican ahí (solo `festival:packs`), así que una barra en Festivales enseñaría el avance de OTRA tarea.
+Donde el servidor publica su avance real —el calendario y los huecos, vía `/api/build-progress`— se respeta la barra que ya había. Aviso anotado: `/api/festivals/:clave/:año` y `/palmares` no publican ahí, así que una barra en Festivales enseñaría el avance de OTRA tarea.
 
-### Y lo que pesaba de más
+### Lo que pesaba de más
 
-- Las parrillas de Descubrir mandaban campos que el servidor usa por dentro y el navegador tira (idioma original, países, géneros en crudo, duración, `character`/`job`): podados **antes** de cachear, así no cuestan por petición. ~650 KB → 484 KB, y suben de versión las tres cachés de Descubrir.
-- `/api/letterboxd/summary` mandaba TODAS las notas del diario y la tabla de Visionado pinta 200: `LIMIT 200` en origen, **102 KB → 26 KB**.
-- Los recorridos largos ceden el turno al bucle de eventos (`cedeElHilo` en pool.js) para que el servidor no se quede mudo durante una pasada.
+- Las parrillas de Descubrir mandaban campos que el servidor usa por dentro y el navegador tira: podados antes de cachear, ~650 → 484 KB.
+- `/api/letterboxd/summary` mandaba todas las notas del diario y la tabla pinta 200: `LIMIT 200` en origen, **102 → 26 KB**.
+- Los recorridos largos ceden el turno al bucle de eventos (`cedeElHilo` en `pool.js`) para que el servidor no se quede mudo durante una pasada.
 
-Tests 255 → 261, con `server/test/rendimiento.test.js` nuevo que fija la poda de campos y que un recorrido largo no deja el servidor sin responder. Cachés de Descubrir subidas de versión.
+Tests 255 → **261** (`server/test/rendimiento.test.js`). Cachés de Descubrir subidas de versión.
 
 ## Beta 1.12 (1.0.12-beta) — 2026-08-10
 
-**Seis agentes auditando y siete arreglando: el menú de Festivales plegado, las 1001 al galope, los filtros a una sola voz, el móvil pulsable y las cuatro fichas que faltaban.**
+**Seis agentes auditando y siete arreglando: el menú de Festivales plegado, las 1001 al galope, los filtros a una sola voz y el móvil pulsable.**
 
-### El menú de Festivales, plegado en tres categorías
+### El menú de Festivales, plegado
 
-Desplegado entero eran ~24 botones y en móvil casi tres pantallas antes de la primera película. Ahora arranca plegado en Festivales / Premios / Cánones (acordeón `openCat` en `Festivals.jsx`; las secciones de debut son un subgrupo rotulado dentro de Festivales, sin mezclarse con la competición principal) y la selección activa queda a la vista como chip dorado aunque su categoría esté plegada — clicarla la abre.
+Desplegado eran ~24 botones y en móvil casi tres pantallas antes de la primera película. Ahora arranca plegado en Festivales / Premios / Cánones, con las secciones de debut como subgrupo rotulado dentro de Festivales, y la selección activa queda a la vista como chip dorado aunque su categoría esté plegada.
 
 ### Las 1001 (y todos los palmareses gordos), rápidas
 
-Cuatro causas medidas, cuatro arreglos:
+- **Sin compresión HTTP**: el palmarés eran 282 KB de JSON en claro. `@fastify/compress` global los deja en ~70 KB, y beneficia a toda la API.
+- **`decorateLive` bloqueaba cada visita** con una llamada viva a MDBList: ~300-400 ms por petición cacheada y 50 peticiones del presupuesto diario. Ahora sirve con lo que hay en `mdb_ratings` y pide lo que falte en `setImmediate`: **300 ms → 11 ms** en caliente. `watchedIndex()` y el set de biblioteca se memoizan 60 s.
+- **La reconstrucción mensual eran ~1.001 GETs a TMDB**: `film_match` (v2→v3) solo guardaba `{id}` y el cartel venía de una caché de siete días ya caducada. Ahora la entrada guarda `poster_path` y `date` (TTL 365 días). El pool de `resolveFilms` sube de 5 a 10.
+- **La parrilla pintaba las 1001 tarjetas de golpe**: 15.176 nodos y cada clic re-renderizaba todo. Ahora pinta 120 y carga por tramos con `IntersectionObserver`, con la tarjeta en `React.memo` y props primitivas: **2.111 nodos** en el primer pintado.
 
-- **Sin compresión HTTP**: el palmarés de las 1001 eran 282 KB de JSON en claro. `@fastify/compress` global los deja en ~70 KB (brotli/gzip), y beneficia a toda la API.
-- **`decorateLive` bloqueaba cada visita** con una llamada viva a MDBList (`maxFetch: 50`): ~300-400 ms por petición cacheada y 50 peticiones del presupuesto diario. Ahora sirve con las notas que ya hay en `mdb_ratings` y pide las que falten en `setImmediate`. Medido: 300 ms → 11 ms la visita en caliente. Además `watchedIndex()` y el set de biblioteca se memoizan 60 s (en el Beelink eran ~12.400 filas recorridas por petición).
-- **La reconstrucción mensual eran ~1.001 GETs a TMDB**: `film_match` (v2→v3) solo guardaba `{id}` y el cartel/fecha venían de una caché de 7 días ya caducada. Ahora la propia entrada guarda `poster_path` y `date` (TTL 365 días) y `movieSummary` queda de respaldo. El pool de `resolveFilms` sube de 5 a `TMDB_CONCURRENCY` (10) para la carga en frío.
-- **La parrilla pintaba las 1001 tarjetas de golpe**: 15.176 nodos DOM y cada clic re-renderizaba todo. Ahora pinta 120 y carga por tramos con un sentinel de `IntersectionObserver` («N más…»), con la tarjeta extraída a `FestivalCard` en `React.memo` con props primitivas y `splitDirectors` memoizado por lista. 2.111 nodos en el primer pintado; los botones masivos siguen contando todas las visibles.
+### Las cuatro de las 1001 sin casar, cerradas
 
-### Las cuatro de las 1001 sin casar, cerradas con diagnóstico
-
-- `festivalWinners` **tiraba el `tmdb_id`** de las listas fijas antes de llegar a `resolveFilms` (que ya sabía respetarlo). Arreglado el mapeo, **The Killer** (Woo, 1989 → 10835) y **The Ear** (Ucho, 1970 → 88953; TMDB la fecha en 1990 por la prohibición y la ventana de ±1 año no podía verla) llevan su ficha fijada en el dataset con su porqué.
-- **The Sorrow and the Pity no existe como película en TMDB** (solo como entrada de televisión): `tv: true`, como **Lovers Rock** (episodio de Small Axe). `resolveFilms` ya no busca las filas `tv` contra TMDB y el contador «sin casar» las exime — el hueco explicado deja de parecer avería.
-- De propina: tres codirectores fantasma heredados de Wikidata fuera del dataset del Óscar (un Q-id crudo en No Country for Old Men, Alain Cuniot en Awakenings, James Tinling en The Ox-Bow Incident); la **Ł mayúscula** entra en el plegado de `names.js` («Łoziński» normalizaba a «ozinski»); los años vecinos con `year` nulo ya no lanzan búsquedas con `primary_release_year=1`; y las filas sin director pueden casar fuera de la ventana de año con título clavado o internacional exacto (el patrón The Ear, con test). Caché `festival` v10 → v11.
+- `festivalWinners` **tiraba el `tmdb_id`** de las listas fijas antes de llegar a `resolveFilms`, que ya sabía respetarlo. **The Killer** (Woo, 1989) y **The Ear** (Ucho, 1970; TMDB la fecha en 1990 por la prohibición, fuera de la ventana de ±1 año) llevan su ficha fijada en el dataset con su porqué.
+- **The Sorrow and the Pity no existe como película en TMDB**, solo como entrada de televisión: `tv: true`, como **Lovers Rock**, que es un episodio de Small Axe. Las filas `tv` ni se buscan ni cuentan como fallo — el hueco explicado deja de parecer avería.
+- De propina: tres codirectores fantasma heredados de Wikidata fuera del dataset del Óscar; la **Ł mayúscula** entra en el plegado de `names.js` («Łoziński» normalizaba a «ozinski»); los años vecinos con `year` nulo ya no lanzan búsquedas con `primary_release_year=1`; y las filas sin director pueden casar fuera de la ventana de año con título clavado. Caché `festival` v10 → v11.
 
 ### Los filtros, a una sola voz
 
-Un agente comparó las barras de filtros de las diez páginas: el mismo concepto tenía hasta cinco nombres. Ahora en `components.jsx` viven `OwnFilterBar` (Todas/Me faltan/Las tengo — antes «Las tienes», «No tengo (n)»…), `typeCounts` (las siete claves siempre contadas: se acabaron los chips fantasma sin recuento en Calendario, Descubrir y la ficha de persona), `SortSelect` («Ordenar:» único, «Título (A-Z)»/«Nombre (A-Z)») y `useMinScore` — el listón Σ pasa a una clave compartida: puesto en Estrenos te sigue a Festivales (hereda el valor viejo la primera vez). La nota de MDBList se llama «Nota combinada Σ» en todas partes (había cuatro nombres), el género de persona es «Género» con Mujer/Hombre en las cuatro páginas que lo ofrecen, «✕ Limpiar filtros» es una sola clave, y los demográficos de Personas y Descubrir comparten persistencia (`demo_filters`).
+El mismo concepto tenía hasta cinco nombres. En `components.jsx` viven ahora `OwnFilterBar` (Todas/Me faltan/Las tengo), `typeCounts` (las siete claves siempre contadas: se acabaron los chips fantasma sin recuento en Calendario, Descubrir y la ficha de persona), `SortSelect` y `useMinScore` — el listón Σ pasa a una clave compartida, así que puesto en Estrenos te sigue a Festivales. La nota de MDBList se llama «Nota combinada Σ» en todas partes (había cuatro nombres), y los demográficos de Personas y Descubrir comparten persistencia.
 
 ### Móvil pulsable, escritorio que avisa
 
-- Los tres controles de la barra móvil medían 18-20 px (el icono a pelo): ahora ~40 px de área táctil sin mover el dibujo, igual que la X de la Ficha y el ✎ de corregir emparejado. Los campos de texto suben a 16 px en móvil (`.input text-base sm:text-sm`): iOS Safari deja de hacer zoom al enfocar. El cajón usa `h-dvh` y el fondo se bloquea con cajón o modal abiertos (`useBloqueoDeFondo` enganchado en `useFocusTrap`, con `overscroll-contain`).
-- Borrar un canon propio, quitar un reto de Letterboxd o dejar de seguir una lista MDBList piden confirmación con su nombre; Favoritos, la ficha de persona y Listas comprueban `r.error` antes de cantar éxito (con el servidor caído la estrella mentía); el resultado del envío masivo se pinta en rojo cuando es error; el ↻ de MDBList tiene busy y toast.
-- La Biblioteca busca al teclear con debounce y guardia de carrera `reqId` (antes exigía Enter sin decirlo y una respuesta lenta pisaba a la nueva); la paleta ⌘K desplaza la fila activa con ↑/↓ (`scrollIntoView`).
+- Los tres controles de la barra móvil medían 18-20 px: ahora ~40 px de área táctil sin mover el dibujo, igual que la X de la Ficha y el ✎ de corregir emparejado. Los campos suben a 16 px en móvil, así que iOS deja de hacer zoom al enfocar. El cajón usa `h-dvh` y bloquea el fondo.
+- Borrar un canon propio, quitar un reto o dejar de seguir una lista piden confirmación con su nombre; Favoritos, la ficha de persona y Listas comprueban `r.error` antes de cantar éxito (con el servidor caído la estrella mentía).
+- La Biblioteca busca al teclear con debounce y guardia de carrera (antes exigía Enter sin decirlo y una respuesta lenta pisaba a la nueva); la paleta ⌘K desplaza la fila activa con ↑/↓.
 
 ### /novedades, en inglés
 
-`i18n/en/novedades.js` traduce los 88 textos del historial (17 titulares y 71 puntos). Regla nueva anotada en el propio fichero: cada versión exige sus claves EN. Cuatro claves EN sueltas que faltaban ('digital {date}' y las tres de reglas ya cubiertas), y el JSON de la «variante 2024» de las 1001 sale de `server/src/data` a `assets/estudios/` (nada lo importaba y se colaba en la imagen Docker).
+`i18n/en/novedades.js` traduce los 88 textos del historial. Regla anotada en el propio fichero: cada versión exige sus claves EN.
 
-Tests: 253 → 255 (segunda vuelta sin director y `resolveFilms` con filas `tv`/`tmdb_id` de dataset, con contador de URLs que demuestra que la fila `tv` no toca la red). Verificado en navegador en ES y EN, a 375 px y en escritorio.
+Tests 253 → **255**. Verificado en navegador en ES y EN, a 375 px y en escritorio.
 
 ## Beta 1.11 (1.0.11-beta) — 2026-08-10
 
@@ -497,75 +470,75 @@ Tests: 253 → 255 (segunda vuelta sin director y `resolveFilms` con filas `tv`/
 
 ### Las 1001 películas, como canon
 
-El libro de Schneider (15.ª edición, 2021 — la «edición 2024» que circula no existe como libro) entra en Cánones junto a Sight & Sound y Cahiers: 1001 fichas en el orden cronológico del libro, con 997 casadas contra TMDB a la primera. De las cuatro restantes, una está *bien* sin ficha: Lovers Rock es un episodio de Small Axe, no una película.
+El libro de Schneider (15.ª edición, 2021 — la «edición 2024» que circula no existe como libro) entra en Cánones junto a Sight & Sound y Cahiers: 1001 fichas en el orden cronológico del libro, 997 casadas a la primera. De las cuatro restantes, una está bien sin ficha: Lovers Rock es un episodio de Small Axe.
 
 ### Los palmareses de las paralelas de Cannes
 
-La **Cámara de Oro** —la mejor ópera prima de todo Cannes, el radar de debuts por excelencia— tiene entrada propia con sus 50 ganadoras desde 1978. Y Un Certain Regard (29 ganadoras desde 1998) y la Semana de la Crítica (26 del Gran Premio) ganan el botón de palmarés histórico. El motor de reglas los ofrece solo: todo sale del registro, sin listas a mano.
+La **Cámara de Oro** —la mejor ópera prima de todo Cannes, el radar de debuts por excelencia— tiene entrada propia con sus 50 ganadoras desde 1978. Un Certain Regard (29 desde 1998) y la Semana de la Crítica (26 del Gran Premio) ganan palmarés histórico. El motor de reglas los ofrece solo: todo sale del registro, sin listas a mano.
 
-### Sundance EE UU: de 21 fichas con 3 rotas a 47 con ninguna
+### Sundance EE UU: de 21 fichas con 3 rotas a 47 sin ninguna
 
-Lo destapó una captura de producción. El parser de la lista de Sundance fallaba de cuatro maneras distintas: las iniciales («A.V. Rockwell» — el veto casaba la A suelta), las partículas («Beth de Araújo»), un «by» que era parte del título («Precious: Based on the Novel "Push" **by Sapphire**» ponía a la novelista de directora) y el empate del 2000 sin partir en dos. Y encima el palmarés empezaba en 2005 porque copió el corte de la competición internacional, cuando el premio estadounidense es de 1984: Blood Simple, The Brothers McMullen y veintitrés más estaban fuera. La revisión adversarial cazó dos pérdidas más: el «U. S.» con espacio de 2013 borraba a **Fruitvale Station** en silencio, y los empates en dos líneas (Public Access, el debut de Bryan Singer) perdían la segunda ganadora. Resultado: 47 ganadoras desde 1984, las 47 con ficha.
+El parser fallaba de cuatro maneras: las iniciales («A.V. Rockwell»), las partículas («Beth de Araújo»), un «by» que era parte del título («Precious: Based on the Novel "Push" **by Sapphire**» ponía a la novelista de directora) y el empate del 2000 sin partir en dos. Y el palmarés empezaba en 2005 porque copió el corte de la competición internacional, cuando el premio estadounidense es de 1984: Blood Simple, The Brothers McMullen y veintitrés más quedaban fuera. La revisión adversarial cazó dos pérdidas más: el «U. S.» con espacio de 2013 borraba a **Fruitvale Station** en silencio, y los empates en dos líneas perdían la segunda ganadora.
 
 ### El Óscar, completo de verdad
 
-El dataset no solo perdía nominadas recientes: le faltaba hasta **Forrest Gump como ganadora**, y La La Land, Top Gun: Maverick, The Holdovers, Killers of the Flower Moon… La causa es fina: en Wikidata, la nominación al Óscar la tienen los *productores*, no las películas. Regenerado contra los artículos de las 98 ceremonias de Wikipedia: 621 filas, 98 ganadoras, las cuatro galas recientes con sus 10 nominadas, y un agente verificándolo después contra fuentes (que además cazó dos años mal y un director espurio, heredados de Wikidata).
+Al dataset le faltaba hasta **Forrest Gump como ganadora**, y La La Land, Top Gun: Maverick, The Holdovers… La causa es fina: en Wikidata la nominación al Óscar la tienen los *productores*, no las películas. Regenerado contra los artículos de las 98 ceremonias: 621 filas, 98 ganadoras, las cuatro galas recientes con sus 10 nominadas, y un agente verificándolo después contra fuentes (que cazó dos años mal y un director espurio).
 
 ### La cuarentena, sin códigos
 
-Los criterios se eligen por **nombre**: escribes «hindi» o «Taiwán», pulsas el chip, y listo — con buscador, sugerencias y los nombres en el idioma de la interfaz (los saca el navegador, sin datasets que mantener). Por debajo se guardan los mismos códigos de siempre: el motor y las copias no se enteran. Y la bandeja de pendientes dice «idioma hindi», no «idioma hi».
+Los criterios se eligen por **nombre**: escribes «hindi» o «Taiwán» y pulsas el chip, con buscador y sugerencias en el idioma de la interfaz (los saca el navegador, sin datasets que mantener). Por debajo se guardan los mismos códigos de siempre: el motor y las copias no se enteran.
 
 ### Más emparejado fino
 
-- Para filas sin director (las listas viejas de Sundance), el título es la única prueba y ahora se exige clavado — con tres tolerancias medidas: las erratas de letras dobladas («Angelo azzuro»), los subtítulos de verdad («Personal Velocity: Three Portraits», y un ordinal NO es un subtítulo: Halloween II no cuela), y el título internacional en inglés exacto («Three Seasons», que en TMDB es «Ba mùa»).
-- Los apellidos transliterados del francés pliegan sus dígrafos («Chukhrai»/«Tchoukhrai», el del palmarés de BAFTA) — pero solo cuando pliega un lado: Boucher y Butcher siguen siendo dos personas.
-- Los espacios finos y los marcadores de idioma de Wikipedia ya no rompen títulos («Veni Vidi Vici»), y los bloques de cortos de Orizzonti 2026 ya no se cuelan como películas.
+- Para filas sin director el título es la única prueba y ahora se exige clavado, con tres tolerancias medidas: las erratas de letras dobladas («Angelo azzuro»), los subtítulos de verdad («Personal Velocity: Three Portraits» — un ordinal NO es un subtítulo, Halloween II no cuela) y el título internacional exacto («Three Seasons», que en TMDB es «Ba mùa»).
+- Los apellidos transliterados del francés pliegan sus dígrafos («Chukhrai»/«Tchoukhrai»), pero solo cuando pliega un lado: Boucher y Butcher siguen siendo dos personas.
+- Los espacios finos y los marcadores de idioma de Wikipedia ya no rompen títulos («Veni Vidi Vici»), y los bloques de cortos de Orizzonti 2026 no se cuelan como películas.
 
 ### Y además
 
 - Los pesos de las cinco señales del detector de emergentes tienen interfaz en Ajustes → Automatismos (vacío = de fábrica).
-- En la ficha de cualquier película, todos los nombres de dirección y reparto son clicables aunque no estén en tu biblioteca; en Cine venidero, igual.
-- «Actualizar todo» ya no dice «sin configurar» cuando un paso semanal simplemente no toca esta semana: dice «al día» y cuándo fue la última vez.
-- Cuatro agentes (dos probadores en bucle, un revisor adversarial y un verificador de datos) repasaron el conjunto: todas las rutas pintan en los dos idiomas, y sus once hallazgos están arreglados y fijados con tests. La suite pasa de 234 a 253.
+- Dirección y reparto son clicables en cualquier ficha aunque no estén en tu biblioteca; en Cine venidero, igual.
+- «Actualizar todo» ya no dice «sin configurar» cuando un paso semanal simplemente no toca: dice «al día» y cuándo fue la última vez.
+- Cuatro agentes (dos probadores en bucle, un revisor adversarial y un verificador de datos) repasaron el conjunto: sus once hallazgos están arreglados y fijados con tests. Suite 234 → **253**.
 
 ## Beta 1.10 (1.0.10-beta) — 2026-08-09
 
 **La auditoría de cuatro agentes sobre el emparejado, y los nombres clicables.**
 
-Cuatro agentes recorrieron TODAS las secciones de Festivales y premios contra TMDB real —1.240 fichas entre competiciones, secciones de debut, premios y cánones—. Encontraron un fallo de parseo que llevaba ahí desde el principio y un agujero de verificación. Todos los hallazgos se comprobaron a mano antes de tocar nada.
+Cuatro agentes recorrieron todas las secciones de Festivales y premios contra TMDB real —1.240 fichas—. Todos los hallazgos se comprobaron a mano antes de tocar nada.
 
 ### El fallo que dejaba fichas sin cartel
 
-Cuando a una fila de Wikipedia le falta una celda, el parser suponía SIEMPRE que la que faltaba era el título original, y corría las columnas. Pero muy a menudo la que falta es el **país**, absorbido por el `rowspan` de la fila de arriba. Resultado: el campo del director acababa conteniendo el título original —`director: "Las palabras de Max"`— y, como el emparejado exige verificar la dirección, la película se descartaba. Invisible salvo por la ficha ausente.
+Cuando a una fila de Wikipedia le falta una celda, el parser suponía SIEMPRE que la que faltaba era el título original, y corría las columnas. Pero muy a menudo la que falta es el **país**, absorbido por el `rowspan` de la fila de arriba: el campo del director acababa conteniendo el título original —`director: "Las palabras de Max"`— y, como el emparejado exige verificar la dirección, la película se descartaba. Invisible salvo por la ficha ausente.
 
-Por número de celdas los dos casos no se distinguen. **Lo decide la cursiva**: en estas tablas los títulos van en `<i>` y las personas no. Con eso quedan a cero los directores corruptos en los cuatro palmareses grandes, y aparecen filas que antes se caían enteras (Berlinale 85 → 88, Cannes 100 → 103). Afectaba a *What Max Said*, *Red Desert*, *Last Year at Marienbad*, *The Tree of Wooden Clogs*, *The Railroad Man* y una docena más.
+Por número de celdas los dos casos no se distinguen. **Lo decide la cursiva**: en estas tablas los títulos van en `<i>` y las personas no. Quedan a cero los directores corruptos en los cuatro palmareses grandes y aparecen filas que se caían enteras (Berlinale 85 → 88, Cannes 100 → 103).
 
 ### Un agujero de verificación
 
-`normName` borra todo lo que no sea `a-z0-9`, así que un nombre en japonés, cirílico, árabe o griego se normalizaba a **cadena vacía** — y «contiene la cadena vacía» es siempre cierto. Cualquier película acreditada a alguien en su alfabeto **casaba con cualquier fila de Wikipedia** y podía colar la ficha de otra. Sin letras que comparar no hay verificación: ahora se dice que no.
+`normName` borra todo lo que no sea `a-z0-9`, así que un nombre en japonés, cirílico, árabe o griego se normalizaba a **cadena vacía** — y «contiene la cadena vacía» es siempre cierto. Cualquier película acreditada a alguien en su alfabeto casaba con cualquier fila de Wikipedia y podía colar la ficha de otra. Sin letras que comparar no hay verificación: ahora se dice que no.
 
 ### El emparejado, cerrado: 263 de 264 en el canon
 
-Comprobado contra TMDB real por el endpoint, no simulado. Cuatro causas distintas, todas arregladas:
+Comprobado contra TMDB real por el endpoint, no simulado:
 
-- **El corte de candidatos tiraba el año.** Se pedía «The Leopard» con año 1962 y luego se cortaba la lista a diez **por popularidad**, así que *Il gattopardo* se caía por el corte y nadie llegaba a comprobar su dirección. Ahora se ordena por año y título antes de cortar, y se prueban los años vecinos (el BFI fecha por producción y TMDB por estreno comercial).
-- **El nombre de quien dirige.** «Charles Chaplin» contra «Charlie Chaplin» tiraba todas las de Chaplin. También «The Wachowskis», «Larissa/Larisa» y «Forough/Forugh». Y TMDB acredita a Wang Bing como **王兵**: ahora se transcribe con el mismo mecanismo que ya usaba la app para los títulos.
-- **Buscar dentro de la filmografía del director**, cuando por título no sale. Así aparecen *L'Intrus* (entre doce «The Intruder») y *Tie Xi Qu*. Se prueban VARIAS personas por nombre: hay cuatro «Wang Bing» en TMDB y el bueno no es el más popular.
-- **Lo que NO se acepta:** «la única película suya de ese año». Con esa regla *Twin Peaks: The Return* —que es una serie— se emparejó con *Trial*, otro trabajo de Lynch. Fuera: sigue mandando «mejor sin ficha que la ficha de otra». Las series del canon ahora se marcan como tales en vez de dejar un hueco que parece avería.
+- **El corte de candidatos tiraba el año.** Se pedía «The Leopard» con año 1962 y luego se cortaba la lista a diez **por popularidad**, así que *Il gattopardo* se caía antes de que nadie comprobara su dirección. Ahora se ordena por año y título antes de cortar, y se prueban los años vecinos (el BFI fecha por producción y TMDB por estreno comercial).
+- **El nombre de quien dirige**: «Charles» contra «Charlie» Chaplin tiraba todas las suyas. También «The Wachowskis», «Larissa/Larisa» y «Forough/Forugh». Y TMDB acredita a Wang Bing como **王兵**: ahora se transcribe con el mismo mecanismo que ya usaba la app para los títulos.
+- **Buscar dentro de la filmografía del director** cuando por título no sale: así aparecen *L'Intrus* (entre doce «The Intruder») y *Tie Xi Qu*. Se prueban varias personas por nombre: hay cuatro «Wang Bing» en TMDB y el bueno no es el más popular.
+- **Lo que NO se acepta**: «la única película suya de ese año». Con esa regla *Twin Peaks: The Return* —que es una serie— se emparejó con *Trial*, otro trabajo de Lynch. Sigue mandando «mejor sin ficha que la ficha de otra», y las series del canon se marcan como tales en vez de dejar un hueco que parece avería.
 
 ### Secciones nuevas
 
-- **Cannes · Un Certain Regard**: la segunda competición oficial, y donde más nombres nuevos con recorrido aparecen. Comprobada contra Wikipedia de 2010 a 2026.
-- **Sundance · Competición de EE UU**: faltaba medio Sundance. La entrada anterior seguía solo el World Cinema Dramatic —el que clasifica para el Óscar—, así que el premio que ganó CODA no estaba en ninguna parte. 42 ganadoras de 1984 a 2026.
-- De paso, dos fallos del parser de Sundance: **2018, 2019 y 2020 se perdían enteros** (esos años la lista usa dos puntos en vez de guion y las filas se caían en silencio, sin contar siquiera como «sin emparejar»), y el paréntesis del título original se leía como director. El palmarés internacional pasa de 19 a 22 ganadoras.
+**Cannes · Un Certain Regard**, la segunda competición oficial, comprobada de 2010 a 2026. Y **Sundance · Competición de EE UU**: faltaba medio Sundance, porque la entrada anterior seguía solo el World Cinema Dramatic y el premio que ganó CODA no estaba en ninguna parte. 42 ganadoras de 1984 a 2026.
+
+De paso, dos fallos del parser de Sundance: **2018, 2019 y 2020 se perdían enteros** —esos años la lista usa dos puntos en vez de guion y las filas se caían en silencio, sin contar siquiera como «sin emparejar»— y el paréntesis del título original se leía como director. El palmarés internacional pasa de 19 a 22 ganadoras.
 
 ### La ganadora, marcada y la primera
 
-Al abrir una edición de un festival, su ganadora sale arriba del todo con su 🏆, como ya pasaba con las nominadas de los premios. Antes había que irse al palmarés histórico a mirar quién ganó ese año. Sale de las filas del premio, que ya están cacheadas; las secciones sin palmarés propio —Busan, Horizontes, las de debut— no marcan a nadie.
+Al abrir la edición de un festival, su ganadora sale arriba del todo con su 🏆. Sale de las filas del premio, que ya están cacheadas; las secciones sin palmarés propio no marcan a nadie.
 
 ### El nombre de cualquier director, clicable
 
-Da igual que esté en tus favoritos, en tu biblioteca o en ninguna parte: el nombre de quien dirige una película de Cannes lleva a su ficha, con su filmografía y su botón de seguir. La ruta admite el id local, el de TMDB o **solo el nombre**, que es todo lo que dan las tablas de Wikipedia, y se resuelve AL PULSAR: enlazar los doscientos nombres de un canon no cuesta ni una petición hasta que se usa uno.
+Esté en tus favoritos, en tu biblioteca o en ninguna parte. La ruta admite el id local, el de TMDB o **solo el nombre**, que es todo lo que dan las tablas de Wikipedia, y se resuelve al pulsar: enlazar los doscientos nombres de un canon no cuesta ni una petición hasta que se usa uno.
 
 Tests 230 → 234.
 
@@ -575,22 +548,22 @@ Tests 230 → 234.
 
 ### El emparejado buscaba en el idioma equivocado
 
-Ramón mandó una captura del canon de Sight & Sound con ocho fichas sin cartel. El diagnóstico partió el fallo en dos, y ninguna de las dos mitades era lo que parecía.
+Ocho fichas sin cartel en el canon de Sight & Sound, por dos causas distintas:
 
-- **Cinco fallaban por el IDIOMA DE LA BÚSQUEDA, y esto afectaba a todo, no solo al canon.** `tmdbGet` manda `language` en todas las llamadas, y TMDB compara la consulta contra el título original y contra el traducido al idioma que pidas, **pero no contra el inglés**. Con la interfaz en español, buscar «The Leopard» devolvía «El hombre leopardo», «The Leopard Lady» y «The Leopard Son» —las que de verdad se llaman así en español— y nunca «Il gattopardo». Como todos los cánones y todas las tablas de Wikipedia están escritos en inglés, **ninguna película con título original en otra lengua podía encontrarse jamás**. Ahora hay una vuelta extra en inglés: en festivales y cánones entra cuando la lista se queda corta (allí la verificación de dirección sigue filtrando), y en la resolución de Letterboxd solo cuando no se ha encontrado nada, porque ahí no hay verificación detrás y lo único que puede hacer es sumar.
-- **Tres fallaban por el NOMBRE DE QUIEN DIRIGE.** «The Wachowskis» contra «Lana / Lilly Wachowski», «Larissa» contra «Larisa», «Forough Farokhzad» contra «Forugh Farrokhzad». La comparación tolera ahora el artículo suelto, el plural de un colectivo, las letras dobles que cada fuente transcribe a su manera desde el ruso o el persa, y como último recurso una letra de diferencia en palabras largas. No relaja la regla de «mejor sin ficha que la ficha de otra»: esa comparación no elige película, solo confirma una que ya coincidió en título y año.
-- Al reescribir la comparación hice la abreviatura bidireccional y **«Carla Theron» empezó a colar como «Carl Th. Dreyer»**. Lo cazó su propio test. Solo el token largo puede empezar por el corto («Theodor» por «Th.»), nunca al revés.
+- **Cinco fallaban por el IDIOMA DE LA BÚSQUEDA**, y eso afectaba a todo, no solo al canon. `tmdbGet` manda `language` en todas las llamadas, y TMDB compara la consulta contra el título original y contra el traducido al idioma que pidas, **pero no contra el inglés**. Con la interfaz en español, «The Leopard» devolvía «El hombre leopardo», «The Leopard Lady» y «The Leopard Son» —las que de verdad se llaman así en español— y nunca «Il gattopardo». Como los cánones y las tablas de Wikipedia están escritos en inglés, **ninguna película con título original en otra lengua podía encontrarse**. Ahora hay una vuelta extra en inglés: en festivales y cánones cuando la lista se queda corta (allí la verificación de dirección sigue filtrando), y en Letterboxd solo cuando no se ha encontrado nada, porque ahí no hay verificación detrás.
+- **Tres fallaban por el NOMBRE de quien dirige**: «The Wachowskis» contra «Lana / Lilly Wachowski», «Larissa» contra «Larisa», «Forough Farokhzad» contra «Forugh Farrokhzad». La comparación tolera ahora el artículo suelto, el plural de un colectivo, las letras dobles que cada fuente transcribe a su manera y, como último recurso, una letra de diferencia en palabras largas. No relaja la regla de la casa: esa comparación no elige película, solo confirma una que ya coincidió en título y año.
+- Al reescribirla, la abreviatura bidireccional hizo que **«Carla Theron» colara como «Carl Th. Dreyer»**. Lo cazó su propio test: solo el token largo puede empezar por el corto («Theodor» por «Th.»), nunca al revés.
 
-Cachés `movie_cands2` → `movie_cands3` y `festival` v7 → v8, para que se reintente todo lo que quedó guardado como «sin ficha en TMDB».
+Cachés `movie_cands2` → `movie_cands3` y `festival` v7 → v8, para reintentar todo lo guardado como «sin ficha en TMDB».
 
 ### El logotipo
 
-Se cambia el nombre suelto por el logotipo del pliego de marca: el símbolo hace de inicial y el texto no repite la P ni la F, así que se lee **POWA / FLEX**. En la barra lateral va la versión apilada y en la de móvil la de una línea, que es para lo que existe.
+El símbolo hace de inicial y el texto no repite la P ni la F, así que se lee **POWA / FLEX**. Apilado en la barra lateral, de una línea en la de móvil.
 
 - No es una imagen sino tres piezas montadas —el monograma, el texto y una **X de película en SVG**, dos tiras perforadas cruzadas—, así que queda nítido a cualquier tamaño.
-- La tipografía va **fijada a Archivo Black** y no usa la clase `font-display`, porque esa variable cambia con el aspecto: en Cinemateca es una Bodoni con serifas, y el logotipo tiene que ser el mismo dibujo en los tres. Lo único que cambia es la tinta.
-- El símbolo usa una copia de `icon.png` **recortada a sangre**. El icono lleva un 16,6 % de aire transparente a los lados —lo necesita como favicon— y dentro del logotipo ese aire abría un hueco entre la P y «OWA» que rompía la palabra.
-- El logotipo es de una sola tinta, como manda el pliego: se va el «Flex» en dorado.
+- La tipografía va fijada a Archivo Black y no usa la clase `font-display`, porque esa variable cambia con el aspecto: en Cinemateca es una Bodoni con serifas. El logotipo es el mismo dibujo en los tres aspectos; lo único que cambia es la tinta.
+- El símbolo usa una copia de `icon.png` **recortada a sangre**: el icono lleva un 16,6 % de aire transparente que necesita como favicon, y dentro del logotipo abría un hueco entre la P y «OWA» que rompía la palabra.
+- De una sola tinta, como manda el pliego: se va el «Flex» en dorado.
 
 Tests 226 → 228.
 
@@ -600,68 +573,66 @@ Tests 226 → 228.
 
 ### Directores emergentes
 
-Quién puede ser un grande dentro de diez años. La ventaja injusta es que PowaFlex ya tiene parseadas y cacheadas las tablas de selección oficial de los festivales: ahí es donde aparecen los grandes antes de serlo, así que el detector se apoya en eso y no en notas agregadas.
+Quién puede ser un grande dentro de diez años. La ventaja injusta es que PowaFlex ya tiene parseadas y cacheadas las tablas de selección oficial: ahí aparecen los grandes antes de serlo, así que el detector se apoya en eso y no en notas agregadas.
 
-- **Cinco secciones de DEBUT nuevas en el registro** (`festivals.js`), que es el mayor salto de calidad de la señal: Semana de la Crítica y Quincena de Cannes, Orizzonti de Venecia, Perspectives/Encounters de la Berlinale y Nuevos Directores de San Sebastián. Hasta ahora solo se parseaba la competición principal, que es justo donde los emergentes **todavía no están**. Los nombres de sección se comprobaron uno a uno contra los artículos de 2010 a 2026: la Berlinale cambió Encounters por Perspectives en 2025 y Venecia titula la suya «Horizons (Orizzonti)» en los artículos viejos. Salen también en la página de Festivales, en su propia fila, y como fuente de regla.
-- **Módulo `emergentes.js`** con cinco señales: consagración institucional (la que más pesa; la **segunda** selección vale más que la primera y ganar dobla la plaza), consenso crítico, tracción real de Letterboxd con los votos de IMDb como umbral de ruido, aceleración (¿la segunda película sube en nota, volumen y nivel de festival?) y afinidad con lo que tú puntúas alto según la procedencia del director.
-- **«Sin dato no es cero».** La señal que no tiene datos sale del reparto y las demás se reparten su peso, para que un debut sin Metacritic no quede por detrás de una película mediana solo porque de la mediana haya más datos. Sin esto el detector premiaría lo más documentado, que es lo anglosajón.
-- **La ficha enseña el desglose**: cuántos puntos pone cada señal y con qué datos («Cannes · Semana de la Crítica 2025 🏆 · Busan 2021», «Metacritic 79 de media», «Letterboxd 3,9 con 18.400 marcas»). Sin desglose es un oráculo y de un oráculo no te fías. El servidor manda las piezas y las frases se componen en el cliente, así que la página se lee igual de bien en inglés.
-- **Página `/emergentes`** con parrilla, ★ de seguir (por id de TMDB ya verificado, no por nombre: resolverlo otra vez sería arriesgarse al homónimo), ✕ con deshacer, filtros de continente, país y sexo, y cuatro ordenaciones.
-- **Elegibilidad**: de uno a tres largometrajes estrenados, primer largo en los últimos ocho años, vivo, y ni seguido ni descartado. Los cortos, telefilmes y documentales no propios se descuentan con `enrichRuntimes`, que es lo que impide que un debutante parezca prolífico.
-- **Paso nocturno semanal** detrás de la vigía de festivales, que es cuando las ediciones ya están en caché. Tope de 90 personas resueltas contra TMDB por pasada, y **lo que el tope deja fuera se dice en el informe**: un tope silencioso se lee como «no había nadie más».
-- **Tipo de regla `emergentes`** en el motor de Radarr: «mándame la ópera prima de todo emergente con 70 o más». Su umbral es el del detector —la persona— y no la Σ de la película, y la interfaz lo dice para que no se confundan.
-- Las dos tablas (`emerging_directors`, `emerging_signals`) son **reconstruibles enteras**; la ✕ vive aparte, en `emerging_dismissed`, para que una reconstrucción no resucite a quien ya dijiste que no.
+- **Cinco secciones de DEBUT nuevas** en el registro, que es el mayor salto de calidad de la señal: Semana de la Crítica y Quincena de Cannes, Orizzonti, Perspectives/Encounters de la Berlinale y Nuevos Directores de San Sebastián. Hasta ahora solo se parseaba la competición principal, que es justo donde los emergentes **todavía no están**. Los nombres se comprobaron uno a uno de 2010 a 2026: la Berlinale cambió Encounters por Perspectives en 2025 y Venecia titula la suya «Horizons (Orizzonti)» en los artículos viejos.
+- **`emergentes.js`** con cinco señales: consagración institucional (la que más pesa; la **segunda** selección vale más que la primera y ganar dobla la plaza), consenso crítico, tracción real de Letterboxd con los votos de IMDb como umbral de ruido, aceleración (¿la segunda película sube en nota, volumen y nivel de festival?) y afinidad con lo que tú puntúas alto.
+- **«Sin dato no es cero»**: la señal sin datos sale del reparto y las demás se reparten su peso, para que un debut sin Metacritic no quede por detrás de una película mediana solo porque de la mediana haya más datos. Sin esto el detector premiaría lo más documentado, que es lo anglosajón.
+- **La ficha enseña el desglose**: cuántos puntos pone cada señal y con qué datos («Cannes · Semana de la Crítica 2025 🏆 · Busan 2021», «Metacritic 79 de media»). Sin desglose es un oráculo, y de un oráculo no te fías. El servidor manda las piezas y las frases se componen en el cliente, así que se lee igual en inglés.
+- **Página `/emergentes`** con parrilla, ★ de seguir por id de TMDB ya verificado —resolverlo otra vez sería arriesgarse al homónimo—, ✕ con deshacer, filtros de continente, país y sexo, y cuatro ordenaciones.
+- **Elegibilidad**: de uno a tres largometrajes estrenados, primer largo en los últimos ocho años, vivo, ni seguido ni descartado. Cortos, telefilmes y documentales ajenos se descuentan con `enrichRuntimes`, que es lo que impide que un debutante parezca prolífico.
+- **Paso nocturno semanal** detrás de la vigía de festivales, cuando las ediciones ya están en caché. Tope de 90 personas resueltas por pasada, y **lo que el tope deja fuera se dice en el informe**: un tope silencioso se lee como «no había nadie más».
+- **Tipo de regla `emergentes`**: «mándame la ópera prima de todo emergente con 70 o más». Su umbral es el del detector —la persona—, no la Σ de la película, y la interfaz lo dice.
+- Las dos tablas son reconstruibles enteras; la ✕ vive aparte, en `emerging_dismissed`, para que una reconstrucción no resucite a quien ya dijiste que no.
 
 ### Cuarentena pre-Radarr, terminada
 
-- **El aviso.** Lo que cae en cuarentena se anuncia en las novedades del Dashboard y pone un contador ámbar en Ajustes. Una bandeja metida en una pestaña de Ajustes que nadie mira no sirve de nada.
-- **El recuento sale en el pase nocturno**: una noche que aparta diez películas ya no se lee igual que una noche sin novedad.
-- **Cartel, y el motivo traducible.** El motivo viaja partido (`idioma` + `hi`) en vez de como frase hecha en castellano, así que la bandeja se lee en inglés. Y decidir «esta sí, esta no» sobre un título que no conoces necesita ver el cartel.
-- **Aprobar y vetar en bloque**, porque una regla sobre un país entero deja veinte esperando en una noche y de una en una la bandeja se abandona. Aprobar en bloque no se detiene en el primer fallo, y lo que Radarr rechazó se queda en la bandeja y se dice cuántas.
-- **La bandeja se purga sola** de lo que acabaste teniendo en Plex o en Radarr por tu cuenta y de lo que vetaste o descartaste en otra pantalla. Pedirte permiso para bajar algo que ya bajaste se lee como una avería.
-- Las casillas de criterios devuelven **lo que escribiste** («IN»), no la lista normalizada («in»).
+- **El aviso**: lo que cae en cuarentena sale en las novedades del Dashboard y pone un contador ámbar en Ajustes. Una bandeja metida en una pestaña que nadie mira no sirve de nada. El recuento sale también en el pase nocturno.
+- **Cartel, y el motivo traducible**: el motivo viaja partido (`idioma` + `hi`) en vez de como frase hecha en castellano, así que la bandeja se lee en inglés. Y decidir «esta sí, esta no» sobre un título que no conoces necesita ver el cartel.
+- **Aprobar y vetar en bloque**: una regla sobre un país entero deja veinte esperando en una noche y de una en una la bandeja se abandona. Aprobar en bloque no se detiene en el primer fallo, y lo que Radarr rechazó se queda en la bandeja y se dice cuántas.
+- **La bandeja se purga sola** de lo que acabaste teniendo en Plex o en Radarr por tu cuenta: pedirte permiso para bajar algo que ya bajaste se lee como una avería.
+- Las casillas de criterios devuelven lo que escribiste («IN»), no la lista normalizada.
 
 ### De paso
 
-- **Una fila-cabecera dentro de una tabla de Wikipedia ya no se cuela como película fantasma.** Las secciones paralelas de Cannes parten su tabla con filas de una sola celda («In Competition», «Feature films») y esas se estaban buscando en TMDB como si fueran títulos.
-- Los continentes (`Europa`, `Sudamérica`, `África`) ya se traducen: afecta también a los filtros de Personas, que comparten diccionario.
+- **Una fila-cabecera dentro de una tabla de Wikipedia ya no se cuela como película fantasma**: las paralelas de Cannes parten su tabla con filas de una sola celda («In Competition», «Feature films») que se estaban buscando en TMDB como si fueran títulos.
+- Los continentes se traducen, lo que afecta también a los filtros de Personas, que comparten diccionario.
 
-Tests 187 → 222.
+Tests 187 → **222**.
 
 ## Beta 1.07 (1.0.7-beta) — 2026-08-09
 
-**Reglas automáticas a Radarr.** El pase automático dejaba de ser un interruptor único —«los estrenos de mis directores favoritos»— y pasa a ser un motor de reglas: cada una vigila una cosa, se activa y se afina por separado, y se pueden tener todas las que se quieran.
+**Reglas automáticas a Radarr.** El pase automático deja de ser un interruptor único —«los estrenos de mis directores favoritos»— y pasa a ser un motor de reglas: cada una vigila una cosa, se activa y se afina por separado, y se pueden tener todas las que se quieran.
 
-- **Tres clases de regla.** *Festivales, premios y cánones*: los 16 del registro, cada uno con las vistas que de verdad tiene (Busan y Horizontes Latinos no ofrecen palmarés porque no lo tienen; Sight & Sound no ofrece edición por año; los premios ofrecen nominadas por año y ganadoras). *Estrenos*: las cuatro pestañas de cines y plataformas de España y EE UU. *Mis favoritos*: los seis oficios por separado, así que se puede seguir lo que dirige uno y lo que compone otro sin mezclarlos.
-- **Un umbral Σ de 0 a 100 por regla, con barrita.** En 0 no filtra: entra todo, tenga nota o no —hay a quien le interesa el palmarés entero y punto—. Con umbral, lo que aún no tiene nota **espera** a la siguiente pasada en vez de irse a ciegas, y hay una casilla para quien prefiera lo contrario.
-- **Los estrenos se vigilan una quincena antes y después de su fecha** (configurable). Mientras dura esa ventana, cada noche se vuelve a mirar su nota: entran el día que cruzan el umbral, no el día que se anuncian.
-- **Tope por pasada**, 20 por defecto. Un palmarés histórico son cientos de películas: sin tope, la primera noche te llena el disco.
-- **El auto-Radarr de siempre se migra a una regla** conservando tu horizonte, tu retrovisor y tus documentales, sin umbral y sin tope, que es como estaba. Si lo tenías apagado, nace apagada.
+- **Tres clases de regla.** *Festivales, premios y cánones*: los 16 del registro, cada uno con las vistas que de verdad tiene (Busan y Horizontes Latinos no ofrecen palmarés porque no lo tienen; Sight & Sound no ofrece edición por año). *Estrenos*: las cuatro pestañas de cines y plataformas de España y EE UU. *Mis favoritos*: los seis oficios por separado, así que se puede seguir lo que dirige uno y lo que compone otro sin mezclarlos.
+- **Umbral Σ de 0 a 100 por regla, con barrita.** En 0 no filtra: entra todo, tenga nota o no. Con umbral, lo que aún no tiene nota **espera** a la siguiente pasada en vez de irse a ciegas, y hay una casilla para quien prefiera lo contrario.
+- **Los estrenos se vigilan una quincena antes y después de su fecha** (configurable): cada noche se vuelve a mirar su nota, y entran el día que cruzan el umbral, no el día que se anuncian.
+- **Tope por pasada**, 20 por defecto: un palmarés histórico son cientos de películas y sin tope la primera noche te llena el disco.
+- **El auto-Radarr de siempre se migra a una regla** conservando tu horizonte, tu retrovisor y tus documentales. Si lo tenías apagado, nace apagada.
 - **Cada pasada explica lo que NO hizo**: ya la tienes, vetada, descartada, corto, documental, telefilme, papel testimonial, fuera de la ventana, esperando nota, bajo el umbral, aplazada por el tope. Un «0 añadidas» a secas es indistinguible de una avería.
-- **Historial de 30 días con un 🚫 por película.** Como las reglas se reevalúan cada noche, borrar algo de Radarr a mano no basta: volvería. El 🚫 del historial es lo que hace que no vuelva por ninguna regla.
+- **Historial de 30 días con un 🚫 por película**: como las reglas se reevalúan cada noche, borrar algo de Radarr a mano no basta, volvería. El 🚫 es lo que hace que no vuelva por ninguna regla.
 
-**Ajustes, por pestañas.** La página había llegado a quince bloques y once pantallas de scroll, con la numeración «1 · Plex … 6 · Descubrir huecos» rota por en medio y el botón de guardar enterrado a dos tercios. Ahora son cinco pestañas —Conexiones, Fuentes y notas, Automatismos, Interfaz y Mantenimiento— con «Actualizar todo» fuera de ellas y la barra de guardar fija abajo, que dice si hay cambios pendientes. Ninguna pestaña pasa de tres pantallas salvo Automatismos.
+**Ajustes, por pestañas.** La página había llegado a quince bloques y once pantallas de scroll, con la numeración «1 · Plex … 6 · Descubrir huecos» rota por en medio y el botón de guardar enterrado a dos tercios. Ahora son cinco pestañas —Conexiones, Fuentes y notas, Automatismos, Interfaz y Mantenimiento— con «Actualizar todo» fuera de ellas y la barra de guardar fija abajo. Los enlaces de otras páginas aterrizan en su pestaña.
 
-- **Arreglado de paso: los ajustes de la copia automática no se podían guardar.** Vivían por debajo del único botón de guardar de la página, así que marcabas la casilla de la copia nocturna y no pasaba nada.
-- Los enlaces de otras páginas aterrizan en su pestaña: el ⌘K y la vieja ruta `/letterboxd` van a Fuentes, los pasos de puesta en marcha de «¿Qué es PowaFlex?» a Conexiones, y «Últimas peticiones a Radarr» del Dashboard a Automatismos.
+De paso: **los ajustes de la copia automática no se podían guardar**, porque vivían por debajo del único botón de guardar de la página.
 
-**Últimas novedades.** Página nueva en el menú (y detrás de la placa de versión de abajo a la derecha) con lo que trae cada versión, en cristiano. No confundir con las «🔔 Novedades» del Dashboard, que son cosas que pasan en tu colección.
+**Últimas novedades**: página nueva con lo que trae cada versión, en cristiano. No confundir con las «🔔 Novedades» del Dashboard, que son cosas que pasan en tu colección.
 
-**Lo que encontró la revisión adversarial.** Antes de dar el lote por bueno, dos rondas de agentes atacando el código con cinco ángulos distintos y dos escépticos verificando cada hallazgo. De los 40 confirmados, los que importaban:
+**Lo que encontró la revisión adversarial** — dos rondas de agentes con cinco ángulos distintos y dos escépticos verificando cada hallazgo. De los 40 confirmados, los que importaban:
 
-- **El 🚫 no existía donde hacía falta.** El veto solo se podía poner desde Cine venidero, así que una película que entraba por una regla de festival volvía cada noche para siempre — y el propio aviso de la interfaz decía lo contrario. Ahora está en el historial de reglas.
-- **La reevaluación nocturna del umbral era una promesa falsa.** Las notas solo se pedían de lo que no tenía fila en la caché, y eso incluye la caché negativa: una película vista sin Σ la primera noche se quedaba sin nota para siempre. Ahora se vuelven a pedir las que siguen sin Σ y llevan más de tres días sin comprobarse, y si no se puede —sin clave de MDBList, cupo agotado— se dice en vez de callar.
-- **Vaciar «Tope por pasada» dejaba la regla sin tope.** La cadena vacía se convertía en 0, y 0 significa ilimitado: borrar la casilla para reteclearla te dejaba una regla capaz de vaciarte el disco.
+- **El 🚫 no existía donde hacía falta**: solo se podía vetar desde Cine venidero, así que una película que entraba por una regla de festival volvía cada noche para siempre — y el propio aviso de la interfaz decía lo contrario.
+- **La reevaluación nocturna del umbral era una promesa falsa**: las notas solo se pedían de lo que no tenía fila en la caché, y eso incluye la caché negativa. Ahora se vuelven a pedir las que siguen sin Σ y llevan más de tres días sin comprobarse, y si no se puede —sin clave, cupo agotado— se dice en vez de callar.
+- **Vaciar «Tope por pasada» dejaba la regla sin tope**: la cadena vacía se convertía en 0, y 0 significa ilimitado.
 - **El guardado de las tarjetas perdía cambios**: tocar dos ajustes seguidos guardaba solo el segundo, y salir de Ajustes en el medio segundo siguiente tiraba el cambio. Ahora se acumulan y se vuelcan al salir.
-- **En las reglas de festival los filtros de tipo eran decorativos.** Las fichas de Wikipedia no traen duración ni géneros, así que «Incluir documentales» no hacía nada y entraban cortos y telefilmes.
-- **Con Radarr a medias** (URL y clave pero sin perfil de calidad) las reglas corrían enteras cada noche sin añadir nada y el resumen decía «0 añadidas de 20 candidatas». Ahora se comprueba antes de gastar la pasada.
-- **Una pasada que reventaba se registraba como paso nocturno correcto.** Y si fallaban todas las altas, el error de la vez anterior se borraba.
+- **En las reglas de festival los filtros de tipo eran decorativos**: las fichas de Wikipedia no traen duración ni géneros, así que «Incluir documentales» no hacía nada y entraban cortos y telefilmes.
+- **Con Radarr a medias** —URL y clave pero sin perfil de calidad— las reglas corrían enteras cada noche sin añadir nada. Ahora se comprueba antes de gastar la pasada.
+- **Una pasada que reventaba se registraba como paso nocturno correcto**, y si fallaban todas las altas se borraba el error de la vez anterior.
 - **La pasada ya no se sirve dentro de la petición HTTP**: un palmarés entero se comía el tiempo de espera de cualquier proxy inverso con un 504 mientras Radarr seguía recibiendo altas.
 - **Seguir a un actor te descargaba sus cameos**, incluido cada documental donde sale tres segundos.
 - **La migración se quemaba en el primer arranque** aunque no hubiera nada que migrar, así que restaurar después una copia de ajustes con el auto-Radarr encendido ya no la aplicaba nunca.
 - Una regla de «Mis favoritos» con umbral no habría añadido nada jamás: la película salía de candidatas justo el día en que podía tener nota.
 
-Tests 153 → 177.
+Tests 153 → **177**.
 
 ## Beta 1.06 (1.0.6-beta) — 2026-08-07
 
@@ -721,33 +692,15 @@ seguridad automática, el veto al auto-Radarr y los mensajes del servidor en ing
 
 ## Beta 1.04 (1.0.4-beta) — 2026-08-06
 
-**El archivo y los oficios.** La versión más grande desde la reorganización: PowaFlex ya sabe si
-puedes ver de verdad lo que tienes, sigue a más gente que a directores y actores, y se hace su
-propia copia de seguridad.
+**El archivo y los oficios.** La versión más grande desde la reorganización: PowaFlex ya sabe si puedes ver de verdad lo que tienes, sigue a más gente que a directores y actores, y se hace su propia copia de seguridad.
 
-- **Subtítulos y audio, con criterio tuyo.** El sync ya descargaba las pistas de cada fichero y
-  las tiraba: ahora se guardan. En Ajustes eliges qué subtítulos te valen —**versión original,
-  español, inglés, en cualquier combinación**— y el Taller estrena tercera pestaña con lo que no
-  llega a ese listón, filtrable y con el botón para que **Bazarr** los busque, suelto o en bloque.
-  De regalo, la auditoría hermana: películas sin pista de audio en su idioma original.
-  Ojo: las pistas solo llegan al sincronizar el detalle, así que hace falta una
-  **re-sincronización completa** para analizar lo que ya tenías. La página lo avisa y no cuenta
-  como «sin subtítulos» lo que aún no ha mirado.
-- **Cuatro oficios nuevos**: guion, dirección de fotografía, música y montaje, con seguir, huecos
-  y completismo, y su faceta propia en Favoritos y en Descubrir. La **dirección conserva el lugar
-  central**: abre por defecto y mantiene su tratamiento; los demás van agrupados detrás. Los tres
-  que Plex no registra no tienen ranking «top de tu biblioteca» —no habría de dónde sacarlo— y
-  ofrecen búsqueda por nombre en TMDB.
-- **Notas de IMDb en local**: un volcado semanal de 8 MB que se suma a TMDB y Letterboxd como
-  tercera fuente del umbral de ruido de Descubrir, sin gastar ni una petición de API.
-- **Copia de seguridad automática** al final del pase nocturno, con rotación de las últimas N.
-  Viene apagada; enciéndela en Ajustes.
-- **Veto al auto-Radarr por película**: un 🚫 en cada ficha de Cine venidero para que el pase
-  automático no la coja. Y los descartes (✕ «no me interesa») **también** lo bloquean ahora: antes
-  podías descartar una película y encontrártela descargada esa misma noche.
-- Los **mensajes del servidor** (errores, validaciones) ya se traducen al inglés.
-- La ventana del pase nocturno se amplía a las 06:00: si a las 03:00 había una sincronización en
-  marcha, antes se saltaba el día entero sin reintentarlo.
+- **Subtítulos y audio, con criterio tuyo.** El sync ya descargaba las pistas de cada fichero y las tiraba: ahora se guardan. En Ajustes eliges qué subtítulos te valen —versión original, español, inglés o cualquier combinación— y el Taller estrena pestaña con lo que no llega a ese listón, con el botón para que **Bazarr** los busque, suelto o en bloque. Las pistas solo llegan al sincronizar el detalle, así que hace falta una **re-sincronización completa**; la página lo avisa y no cuenta como «sin subtítulos» lo que aún no ha mirado.
+- **Cuatro oficios nuevos**: guion, dirección de fotografía, música y montaje, con seguir, huecos y completismo, y faceta propia en Favoritos y en Descubrir. La dirección conserva el lugar central. Los tres que Plex no registra no tienen ranking «top de tu biblioteca» —no habría de dónde sacarlo— y ofrecen búsqueda por nombre en TMDB.
+- **Notas de IMDb en local**: un volcado semanal de 8 MB que se suma a TMDB y Letterboxd como tercera fuente del umbral de ruido de Descubrir, sin gastar ni una petición de API.
+- **Copia de seguridad automática** al final del pase nocturno, con rotación de las últimas N. Viene apagada.
+- **Veto al auto-Radarr por película**: un 🚫 en cada ficha de Cine venidero. Y los descartes (✕ «no me interesa») también lo bloquean: antes podías descartar una película y encontrártela descargada esa misma noche.
+- Los mensajes del servidor ya se traducen al inglés.
+- La ventana del pase nocturno se amplía a las 06:00: si a las 03:00 había una sincronización en marcha, antes se saltaba el día entero sin reintentarlo.
 
 ## Beta 1.03 (1.0.3-beta) — 2026-08-06
 
@@ -800,55 +753,19 @@ Además, la publicación de la imagen Docker se moderniza.
 
 ## Beta 1.00 (1.0.0-beta) — 2026-08-06
 
-**La gran reorganización.** Mismas funciones, la mitad de menú: la app se agrupa en 13 secciones
-(5 + 6 + 2), juntando lo que compartía dominio, estrenando la sección Estrenos y llevando los
-filtros a donde faltaban. Los marcadores viejos siguen funcionando: `/calidad`, `/salud`,
-`/colecciones`, `/directores` y `/letterboxd` redirigen a su nuevo hogar.
+**La gran reorganización.** Mismas funciones, la mitad de menú: 13 secciones (5 + 6 + 2), la sección Estrenos nueva y los filtros donde faltaban. Los marcadores viejos siguen funcionando: `/calidad`, `/salud`, `/colecciones`, `/directores` y `/letterboxd` redirigen a su nuevo hogar.
 
-- **Filtros demográficos en «Directores/as top» y «Actores/actrices top»** (Descubrir huecos):
-  los mismos selectores que la página Personas —género, vivos/fallecidos, continente y país de
-  nacimiento— acotan el ranking de los más presentes en tu biblioteca, aplicados en el servidor
-  («Ver más» recorre el ranking ya filtrado). Sirven para cazar huecos de «mis directores top
-  españoles», «mujeres directoras» o «cineastas asiáticos» sin salir de la pestaña.
-
-- **Taller** (nuevo): Calidad y disco + Salud de los datos, juntas bajo un techo con pestañas.
-  Compartían dominio (Radarr, duplicados, ficheros) y hasta bloques duplicados.
-- **Directores y actores** gana la ★ de seguir en cada tarjeta y el alta en bloque de «los N
-  primeros» con previsualización (que vivían en el ranking de Favoritos, ahora retirado por
-  duplicado — allí queda un puente).
-- El catálogo de **Directores en activo** se muda a **Favoritos → Añadir**, desplegable bajo
-  «Añadir directores en activo»: es una herramienta de captación de favoritos, no un listado de
-  tu biblioteca.
-- **Descubrir huecos** absorbe **Sagas** como quinta pestaña, y sus pestañas van ahora en la URL
-  (se puede enlazar `/descubrir?tab=sagas`).
-- **La página Letterboxd se disuelve**: el importador (zip + RSS) es configuración y se muda a
-  Ajustes; «tus notas vs. la comunidad» se muda a Visionado; y la watchlist se muda a Listas y
-  retos — donde por fin gana botón de Radarr en lo que te falta (era la única lista de faltantes
-  sin él).
-- **Estrenos** (sección nueva en La caza, bajo Festivales): qué acaba de llegar y qué viene a los
-  **cines de España**, a los **cines de EE UU** y a las **plataformas españolas**. La lista sale
-  del discover de TMDB por región y tipo de estreno (la fuente consistente de fechas por país); la
-  pestaña de plataformas usa la fecha de estreno digital y enseña **dónde verla** con los watch
-  providers de TMDB (datos de JustWatch licenciados), con filtro por plataforma concreta. Solo
-  cine largometraje: fuera series, cortos, telefilmes y vídeos. Ventana de 7/30/90 días más los
-  próximos 60, y todos los filtros de la casa: **listón Σ de MDBList** (lo aún sin nota no se
-  oculta), tipos, Me faltan / Las tengo, orden por Σ/popularidad/fecha/votos, descarte ✕
-  compartido con Descubrir, y Radarr suelto o en bloque sobre lo visible.
-- **⌘K busca de todo**: además de películas y personas, ahora sagas, listas seguidas, festivales y
-  premios, y saltar a cualquier sección — con navegación por teclado (↑/↓/Enter) y búsqueda
-  insensible a acentos.
-- **Biblioteca**: filtro por **colección de Plex** (el servidor lo sabía desde siempre y ninguna
-  página lo enseñaba), **rango de años** (desde/hasta), y el chip del filtro de persona ya dice
-  «Persona: Agnès Varda (dirige)» en vez de un id numérico crudo (y al quitarlo limpia también el
-  rol).
-- **Festivales**: filtros de contenido nuevos —Todas / Me faltan / Las tengo y el listón de nota
-  mínima Σ— y los botones masivos («mandar a Radarr», «seguir a sus directores») cuentan solo lo
-  visible, como en Descubrir. El corrector de emparejado ✎ ahora es el diálogo compartido de toda
-  la app (busca solo al abrirse, con el año de la edición).
-- **Homogeneización**: el listón «Nota mínima Σ» y el desplegable de filtros son ahora componentes
-  únicos compartidos (vivían copiados en Descubrir, la ficha de persona y varios selects crudos);
-  código muerto retirado del Dashboard.
-- About reescrito a la nueva taxonomía, con la ruta de primeros pasos actualizada.
+- **Taller** (nuevo): Calidad y disco + Salud de los datos, juntas bajo un techo con pestañas. Compartían dominio —Radarr, duplicados, ficheros— y hasta bloques duplicados.
+- **Estrenos** (sección nueva en La caza): qué acaba de llegar y qué viene a los **cines de España**, a los **cines de EE UU** y a las **plataformas españolas**. La lista sale del discover de TMDB por región y tipo de estreno, que es la fuente consistente de fechas por país; la pestaña de plataformas usa la fecha de estreno digital y enseña dónde verla con los watch providers de TMDB (datos de JustWatch licenciados). Solo cine largometraje. Ventana de 7/30/90 días más los próximos 60, con todos los filtros de la casa.
+- **Filtros demográficos en «Directores/as top» y «Actores/actrices top»**: los mismos selectores de Personas, aplicados en el servidor, así que «Ver más» recorre el ranking ya filtrado. Sirven para cazar huecos de «mis directores top españoles» o «mujeres directoras» sin salir de la pestaña.
+- **Directores y actores** gana la ★ de seguir en cada tarjeta y el alta en bloque de «los N primeros» con previsualización, que vivían en el ranking de Favoritos.
+- El catálogo de **Directores en activo** se muda a **Favoritos → Añadir**: es una herramienta de captación, no un listado de tu biblioteca.
+- **Descubrir huecos** absorbe **Sagas** como quinta pestaña, con las pestañas en la URL (`/descubrir?tab=sagas`).
+- **La página Letterboxd se disuelve**: el importador (zip + RSS) es configuración y se muda a Ajustes; «tus notas vs. la comunidad» a Visionado; y la watchlist a Listas y retos, donde por fin gana botón de Radarr en lo que te falta.
+- **⌘K busca de todo**: películas, personas, sagas, listas seguidas, festivales y premios, y saltar a cualquier sección, con teclado e insensible a acentos.
+- **Biblioteca**: filtro por colección de Plex —el servidor lo sabía desde siempre y ninguna página lo enseñaba—, rango de años, y el chip de persona dice «Persona: Agnès Varda (dirige)» en vez de un id numérico crudo.
+- **Festivales**: Todas / Me faltan / Las tengo y listón Σ, con los botones masivos contando solo lo visible. El ✎ es ya el diálogo compartido de toda la app.
+- **Homogeneización**: el listón Σ y el desplegable de filtros pasan a componentes únicos (vivían copiados en tres sitios); código muerto retirado del Dashboard.
 
 ## Alpha 0.9.16 (0.9.16-alpha) — 2026-08-05
 
@@ -920,61 +837,31 @@ Dos arreglos de identidad en el catálogo de directores, los dos reportados desd
 
 ## Alpha 0.9.13 (0.9.13-alpha) — 2026-08-05
 
-Versión de mantenimiento salida de una auditoría a fondo (seguridad, uso de APIs y limpieza).
-**Nada cambia de aspecto ni de funcionamiento**: lo que cambia es que gasta menos red, se
-defiende mejor y tiene 19 pruebas nuevas donde antes no había ninguna.
+Auditoría a fondo (seguridad, uso de APIs y limpieza). **Nada cambia de aspecto ni de funcionamiento**: gasta menos red, se defiende mejor y estrena 19 pruebas donde no había ninguna.
 
 **Seguridad**
 
-- **Actualizado el componente que sirve la web** (`@fastify/static`), que tenía un fallo conocido
-  por el que se podían leer ficheros fuera de su sitio saltándose incluso la contraseña opcional.
-  También al día `fast-uri` y `brace-expansion`.
-- **Las peticiones que cambian algo ya no se pueden disparar desde otra web.** Un formulario en
-  una página cualquiera podía hacer que tu PowaFlex sincronizara, se actualizara entero o lanzara
-  altas en Radarr sin que tú tocaras nada.
-- **La copia de seguridad de los ajustes guarda las credenciales de verdad**, no el texto cifrado:
-  restaurarla en otra instalación dejaba tokens inservibles sin avisar.
-- **Si no se pueden descifrar las credenciales** (perdiste `POWAFLEX_SECRET` o cambió), ahora se
-  dice claramente en el arranque y los campos salen como vacíos, en vez de mandar el criptograma a
-  Plex y recibir un «401» incomprensible.
-- La dirección de Plex y la de Radarr se validan al guardarlas, y el proxy de carátulas comprueba
-  que lo que llega es una imagen.
+- **Actualizado `@fastify/static`**, que tenía un fallo conocido por el que se podían leer ficheros fuera de su sitio saltándose incluso la contraseña opcional. También `fast-uri` y `brace-expansion`.
+- **Las peticiones que cambian algo ya no se pueden disparar desde otra web**: un formulario en una página cualquiera podía hacer que tu PowaFlex sincronizara, se actualizara entero o lanzara altas en Radarr.
+- **La copia de los ajustes guarda las credenciales de verdad**, no el texto cifrado: restaurarla en otra instalación dejaba tokens inservibles sin avisar.
+- **Si no se pueden descifrar las credenciales** —perdiste `POWAFLEX_SECRET` o cambió— se dice en el arranque y los campos salen vacíos, en vez de mandar el criptograma a Plex y recibir un «401» incomprensible.
+- La dirección de Plex y la de Radarr se validan al guardarlas, y el proxy de carátulas comprueba que lo que llega es una imagen.
 
 **Menos llamadas a las APIs**
 
-- **La ficha de cada película se pedía dos veces a TMDB** (una con reparto y otra sin), aunque la
-  primera ya lo traía todo. En un palmarés eran ~78 llamadas de más; con 30 directores en
-  favoritos, del orden de 700 por ciclo.
-- **El emparejado ya verificado de festivales dura ahora un año** en vez de caducar cada mes junto
-  a la página: al mes se repetía la comprobación completa de cada película en ráfaga, que es justo
-  lo que hacía que TMDB cortara el grifo.
-- **Los artículos de premios de Wikipedia se descargan una vez al día**, no en cada consulta:
-  pasear diez años de los Goya eran diez descargas del mismo texto, y la vigía nocturna repetía
-  esas descargas todas las noches para años aún sin publicar.
-- **Lo que MDBList no conoce deja de pedirse una y otra vez**: se recuerda que no lo tiene (y se
-  reintenta en el barrido semanal), así que abrir un canon antiguo ya no se come 50 peticiones de
-  tu cupo diario cada vez.
-- Si JustWatch falla, se espera un cuarto de hora antes de reintentar en vez de repetir cientos de
-  consultas fallidas; y el scraping de listas de Letterboxd respira entre páginas.
-- **Cine venidero podía no añadir NADA a Radarr** si tenías más de 300 películas pendientes: el
-  servidor rechazaba la tanda entera por pasarse del tope. Ahora manda las primeras 300, como el
-  resto de páginas.
-- Radarr: si la orden de volver a buscar una película recién salida en digital fallaba, esa
-  película se quedaba sin buscar para siempre. Ahora se reintenta a la noche siguiente.
+- **La ficha de cada película se pedía dos veces a TMDB** —una con reparto y otra sin— aunque la primera ya lo traía todo: ~78 llamadas de más en un palmarés, y del orden de 700 por ciclo con 30 directores en favoritos.
+- **El emparejado ya verificado de festivales dura un año** en vez de caducar cada mes junto a la página: al mes se repetía la comprobación completa en ráfaga, que es justo lo que hacía que TMDB cortara el grifo.
+- **Los artículos de premios se descargan una vez al día**: pasear diez años de los Goya eran diez descargas del mismo texto, y la vigía nocturna las repetía cada noche para años aún sin publicar.
+- **Lo que MDBList no conoce deja de pedirse una y otra vez**: se recuerda y se reintenta en el barrido semanal, así que abrir un canon antiguo ya no se come 50 peticiones del cupo diario.
+- Si JustWatch falla se espera un cuarto de hora antes de reintentar, y el scraping de listas de Letterboxd respira entre páginas.
+- **Cine venidero podía no añadir NADA a Radarr** con más de 300 pendientes: el servidor rechazaba la tanda entera por pasarse del tope. Ahora manda las primeras 300.
+- Radarr: si la orden de volver a buscar una película recién salida en digital fallaba, esa película se quedaba sin buscar para siempre. Ahora se reintenta a la noche siguiente.
 
 **Por dentro**
 
-- El mismo patrón de «repartir trabajo entre varios hilos» estaba copiado a mano 23 veces, el
-  bloque de «mandar a Radarr» en 6 páginas (ya con textos distintos), y el «qué día es hoy» en 7
-  módulos (el pase nocturno usaba encima otro huso). Ahora hay una sola versión de cada cosa.
-- **La decisión más delicada de la app** —cuál de los resultados de TMDB es la película de un
-  festival— se ha separado del código de red y tiene por fin pruebas: las cuatro rondas de fallos
-  que fuiste reportando (*In the Mood for Love* contra su making-of, *La infiltrada*, los cortes de
-  TMDB a media comprobación…) quedan fijadas para que no vuelvan.
-- Prueba también para el CSV de WebTools, cuya nota va de 0 a 10 y hay que dividir entre dos.
-- Cambiar de año rápido en Festivales ya no puede dejar la parrilla mostrando otra edición, el
-  corrector ✎ atrapa el foco como los demás diálogos, y Ajustes deja de preguntar dos veces por lo
-  mismo mientras actualiza.
+- El patrón de «repartir trabajo entre varios hilos» estaba copiado a mano 23 veces, el bloque de «mandar a Radarr» en 6 páginas —ya con textos distintos— y el «qué día es hoy» en 7 módulos, con el pase nocturno usando encima otro huso. Ahora hay una sola versión de cada cosa.
+- **La decisión más delicada de la app** —cuál de los resultados de TMDB es la película de un festival— se separa del código de red y tiene por fin pruebas: las cuatro rondas de fallos reportados (*In the Mood for Love* contra su making-of, *La infiltrada*, los cortes de TMDB a media comprobación) quedan fijadas.
+- Cambiar de año rápido en Festivales ya no deja la parrilla mostrando otra edición, el ✎ atrapa el foco como los demás diálogos, y Ajustes deja de preguntar dos veces por lo mismo mientras actualiza.
 
 ## Alpha 0.9.12 (0.9.12-alpha) — 2026-08-05
 
@@ -1060,46 +947,16 @@ defiende mejor y tiene 19 pruebas nuevas donde antes no había ninguna.
 
 ## Alpha 0.9.7 (0.9.7-alpha) — 2026-08-03
 
-- **Novedades en el Dashboard.** El pase nocturno ahora deja rastro de lo que detecta, y el
-  Dashboard lo cuenta arriba del todo: cada aviso llega una sola vez, con enlace directo.
-- **Vigía de festivales**: en cuanto un festival publica la sección de su edición nueva en
-  Wikipedia, aparece la novedad con deep-link a esa edición, donde ya esperan los botones de
-  «seguir a toda su dirección» y «mandar a Radarr las que faltan». Se acabó enterarse por la
-  prensa.
-- **Fases de estreno en las pedidas.** Cada película de «pedidas que siguen sin aparecer» dice
-  ahora POR QUÉ no aparece: 💿 ya en digital (debería caer), 💿 digital con fecha, 🎬 solo en
-  cines o sin fecha — con la API oficial de TMDB. Y cuando una pedida pasa a digital, PowaFlex
-  lo avisa como novedad y reordena su búsqueda en Radarr él solo (solo estrenos digitales
-  recientes: nada de machacar indexers con lo que lleva años sin aparecer).
-- **El canon Sight & Sound 2022 completo** en Festivales: las 264 películas de la lista extendida
-  de la encuesta de la crítica (empates incluidos), con su puesto, casadas con tu Plex y con
-  Radarr y «seguir al director/a» en cada una. Dataset empaquetado con la app: no depende de
-  nadie y no cambia hasta 2032.
-- **«Must-see» de Metacritic en Visionado**: lo que tienes sin ver con metascore ≥ 81 y volumen
-  de votos de aval — el listón de consenso crítico más exigente, sin gastar ni una petición.
-- **Los grandes premios anuales en Festivales**: el palmarés completo de los **Goya** (con sus ex
-  aequo), los **César**, los **BAFTA**, el **Premio del Cine Europeo** y el **Óscar a la mejor
-  película internacional** desde 1947 — todo con el mismo motor, verificado contra el director/a,
-  y con el selector de la página agrupado en Festivales · Premios · Cánones.
-- **Página nueva: Salud de los datos** (en «Tu colección»). Con 12.000 películas los emparejados
-  malos son estadísticamente seguros y solo se descubrían por casualidad: auditorías locales de
-  películas sin ficha TMDB, identidades repetidas, entradas de Letterboxd sin casar, peticiones
-  zombis de Radarr (6+ meses) y personas cuyo emparejado no se pudo demostrar — cada hallazgo con
-  su remedio al lado. Cero red: todo sale de tu propia base de datos.
-- **El pase nocturno ya no puede morir en silencio.** Cada pasada se guarda paso a paso (un
-  reinicio a mitad deja rastro de hasta dónde llegó), ningún paso puede colgarse más de 20
-  minutos, Ajustes enseña el histórico de 30 días con duraciones y errores por paso, y la barra
-  lateral avisa con un punto rojo si la última pasada falló o lleva más de 26 horas sin correr.
-- **Las filmografías solo se re-piden cuando cambian.** La partida más cara de TMDB era volver a
-  pedir TODAS las filmografías de tus favoritos cada noche; ahora el feed de cambios de TMDB dice
-  quién cambió y solo se refrescan esas (con re-pasada completa cada 7 días como red de
-  seguridad).
-- **El emparejado de festivales, más fino todavía** (con tus ejemplos de producción como tests):
-  los nombres ya casan aunque Wikipedia use el orden japonés («Imamura Shōhei» ≡ «Shohei
-  Imamura» — el caso de *The Eel*), las películas recién anunciadas sin equipo en TMDB entran
-  por título clavado (Hamaguchi, Zvyagintsev, Fukada…), y un corte de TMDB a mitad de
-  comprobación ya no se cachea como «sin ficha»: la página avisa y se cura sola al recargar.
-  Las «Σ 0» sin sentido de las películas sin estrenar ya no se pintan.
+- **Novedades en el Dashboard**: el pase nocturno deja rastro de lo que detecta y el Dashboard lo cuenta arriba del todo, cada aviso una sola vez y con enlace directo.
+- **Vigía de festivales**: en cuanto un festival publica la sección de su edición nueva en Wikipedia aparece la novedad, con enlace a esa edición, donde ya esperan los botones de «seguir a toda su dirección» y «mandar a Radarr las que faltan».
+- **Fases de estreno en las pedidas**: cada una dice POR QUÉ no aparece —💿 ya en digital, 💿 digital con fecha, 🎬 solo en cines o sin fecha—, con la API oficial de TMDB. Y cuando una pasa a digital, PowaFlex lo avisa y reordena su búsqueda en Radarr él solo, solo con estrenos digitales recientes.
+- **El canon Sight & Sound 2022 completo**: las 264 películas de la lista extendida con su puesto, casadas con tu Plex, con Radarr y «seguir al director/a» en cada una. Dataset empaquetado con la app: no depende de nadie y no cambia hasta 2032.
+- **«Must-see» de Metacritic en Visionado**: lo que tienes sin ver con metascore ≥ 81 y volumen de votos de aval, sin gastar ni una petición.
+- **Los grandes premios anuales**: palmarés completo de los **Goya** (con sus ex aequo), los **César**, los **BAFTA**, el **Premio del Cine Europeo** y el **Óscar internacional** desde 1947, con el mismo motor y verificado contra la dirección.
+- **Página nueva: Salud de los datos.** Con 12.000 películas los emparejados malos son estadísticamente seguros y solo se descubrían por casualidad: auditorías locales de películas sin ficha, identidades repetidas, Letterboxd sin casar, peticiones zombis y personas sin demostrar, cada hallazgo con su remedio. Cero red.
+- **El pase nocturno ya no puede morir en silencio**: se guarda paso a paso, ningún paso pasa de 20 minutos, Ajustes enseña el histórico de 30 días con duraciones y errores, y la barra lateral avisa con un punto rojo si la última pasada falló o lleva más de 26 horas sin correr.
+- **Las filmografías solo se re-piden cuando cambian.** La partida más cara de TMDB era pedirlas todas cada noche; ahora el feed de cambios dice quién cambió, con re-pasada completa cada 7 días como red de seguridad.
+- **El emparejado, más fino** (con ejemplos de producción como tests): los nombres casan aunque Wikipedia use el orden japonés («Imamura Shōhei» ≡ «Shohei Imamura», el caso de *The Eel*), las recién anunciadas sin equipo en TMDB entran por título clavado, y un corte de TMDB a mitad ya no se cachea como «sin ficha».
 
 ## Alpha 0.9.6 (0.9.6-alpha) — 2026-08-03
 
@@ -1174,92 +1031,51 @@ defiende mejor y tiene 19 pruebas nuevas donde antes no había ninguna.
 
 ## Alpha 0.9.3 (0.9.3-alpha) — 2026-08-02
 
-Versión de repaso a fondo: cuatro revisiones del código encontraron una lista larga de cosas
-que fallaban en silencio, y esto las arregla. Lo que más se nota:
+Versión de repaso a fondo: cuatro revisiones del código encontraron una lista larga de cosas que fallaban en silencio.
 
 ### Lo que se ve
 
-- **Media hoja de estilos no se estaba aplicando.** Cualquier color puesto sobre una tarjeta o un
-  botón se descartaba sin más, así que: la caja de avisos —justo la que dice «falta la API key de
-  TMDB»— era casi invisible, los seis chips de notas de la ficha salían todos del mismo color, las
-  etiquetas del calendario también, lo seleccionado apenas se distinguía de lo no seleccionado, el
-  botón «Vaciar» no se veía rojo y los paquetes de directores habían perdido su franja de color.
-- **Todas las barras de progreso se leían al revés**: la parte vacía era negra y la llena roja, así
-  que un 12 % de completismo parecía una barra casi llena.
-- «Calidad y disco» **ya no se descuadra al girar el móvil**.
-- Los avisos de error se leen en los tres aspectos, no solo sobre papel.
-- Las cápsulas sobre las carátulas (**4K, HDR, ★**) se veían como manchas grises: iban con tinta
-  oscura sobre un velo negro. Ahora son blancas, como debían.
-- Las leyendas de las gráficas tomaban el color de su propia barra y desaparecían sobre el papel.
-- Si actualizas el contenedor con una pestaña abierta, PowaFlex lo detecta y te dice que recargues,
-  en vez de soltarte un error incomprensible.
+- **Media hoja de estilos no se estaba aplicando**: cualquier color puesto sobre una tarjeta o un botón se descartaba. La caja de avisos —justo la que dice «falta la API key de TMDB»— era casi invisible, los seis chips de notas salían del mismo color, lo seleccionado apenas se distinguía de lo no seleccionado y el botón «Vaciar» no se veía rojo.
+- **Todas las barras de progreso se leían al revés**: la parte vacía era negra y la llena roja, así que un 12 % de completismo parecía una barra casi llena.
+- Las cápsulas sobre las carátulas (**4K, HDR, ★**) se veían como manchas grises: iban con tinta oscura sobre un velo negro.
+- Las leyendas de las gráficas tomaban el color de su propia barra y desaparecían sobre el papel; «Calidad y disco» ya no se descuadra al girar el móvil; y los avisos de error se leen en los tres aspectos.
+- Si actualizas el contenedor con una pestaña abierta, PowaFlex lo detecta y te dice que recargues.
 
 ### Lo que contaba mal
 
-- **«Próximos estrenos» de cada favorito decía siempre 0**, con toda la seguridad, aunque tuvieras
-  estrenos en el calendario.
-- **Un actor con muchos cameos ya no los cuenta como huecos** en su ficha ni en Favoritos. Antes
-  Descubrir los descartaba y las otras dos pantallas no: tres sitios, dos respuestas.
-- **Una lista de actores pegada podía envenenar el canon de directores** durante un mes: la búsqueda
-  de personas se guardaba sin distinguir si buscabas a alguien como director o como actor.
-- El recuento de «ocultas por tus filtros» se calculaba antes de saber cuáles eran cortos, así que
-  decía tres y aparecían ocho.
+- **«Próximos estrenos» de cada favorito decía siempre 0**, con toda la seguridad, aunque tuvieras estrenos en el calendario.
+- **Un actor con muchos cameos ya no los cuenta como huecos**: Descubrir los descartaba y las otras dos pantallas no — tres sitios, dos respuestas.
+- **Una lista de actores pegada podía envenenar el canon de directores** durante un mes: la búsqueda de personas se guardaba sin distinguir el oficio.
+- El recuento de «ocultas por tus filtros» se calculaba antes de saber cuáles eran cortos: decía tres y aparecían ocho.
 - Las sagas contaban archivos en vez de películas: con dos ediciones de la misma salía «4 de 3».
-- **«Directores/as que más has visto»**, una sección nueva en Visionado con quién te has visto más,
-  contando Plex y Letterboxd.
-- En **«Grandes ausentes»**, el nombre de cada director/a abre su ficha y hay un botón para
-  **añadirlo a favoritos** sin salir de la página.
-- Y en **Favoritos → Añadir**, un bloque nuevo de **«Listas y cánones»**: vuelca de golpe los 250 de
-  They Shoot Pictures, los 501 del libro, los que están en boga o cualquier lista tuya. A quien
-  hayas quitado con la ✕ no vuelve a entrar.
+
+### Lo nuevo
+
+- **«Directores/as que más has visto»** en Visionado, contando Plex y Letterboxd.
+- En **Grandes ausentes**, el nombre de cada director/a abre su ficha y hay botón para añadirlo a favoritos sin salir de la página.
+- En **Favoritos → Añadir**, bloque nuevo de **«Listas y cánones»**: vuelca de golpe los 250 de They Shoot Pictures, los 501 del libro o cualquier lista tuya. A quien quitaste con la ✕ no vuelve a entrar.
 
 ### Lo que se rompía sin avisar
 
-- **Añadir listas de Letterboxd por dirección volvía a funcionar.** Letterboxd renombró las
-  etiquetas de su página y PowaFlex dejó de reconocer las películas: cualquier lista daba «no se
-  pudieron leer películas». Ahora entiende el formato nuevo y el viejo, coge el nombre real de la
-  lista y explica qué mirar cuando de verdad falla.
-- **Si TMDB corta el grifo, la aplicación ya no se queda colgada.** Reintentaba sin fin: el refresco
-  se quedaba a medias «en marcha» y el trabajo nocturno no volvía a arrancar hasta reiniciar.
-- **Una biblioteca de Plex que responde vacía ya no borra tu colección.** Pasa mientras Plex
-  reescanea o si se le cae el disco; ahora se omite la limpieza y se avisa. Para vaciarla de verdad,
-  «Sincronización completa».
-- Un corte de MDBList ya no tira las notas que ya se habían descargado y pagado del cupo del día.
-- Si algo falla a mitad de construir una página, ya no se guarda como si estuviera completa durante
-  doce horas: se guarda marcada y se rehace a los veinte minutos.
-- Cambiar los umbrales de Descubrir o el tamaño del calendario **se nota al momento**, no al cabo de
-  medio día.
+- **Añadir listas de Letterboxd por dirección vuelve a funcionar**: renombraron las etiquetas de su página y cualquier lista daba «no se pudieron leer películas». Ahora entiende el formato nuevo y el viejo.
+- **Si TMDB corta el grifo, la aplicación ya no se queda colgada**: reintentaba sin fin, el refresco se quedaba a medias y el trabajo nocturno no volvía a arrancar hasta reiniciar.
+- **Una biblioteca de Plex que responde vacía ya no borra tu colección** —pasa mientras Plex reescanea o si se le cae el disco—: se omite la limpieza y se avisa.
+- Un corte de MDBList ya no tira las notas ya pagadas del cupo del día; una página construida a medias ya no se guarda como completa durante doce horas; y los umbrales de Descubrir se notan al momento, no al cabo de medio día.
 
 ### Cuando algo va mal, se nota
 
-- Un error del servidor ya no se disfraza de «aún no hay películas sincronizadas» ni de «¡lista
-  completa!». Y si algo se rompe de verdad, sale un aviso con botón de reintentar en vez de una
-  página en blanco.
-- Descartar una película de Descubrir **se puede deshacer** desde el propio aviso.
-- Guardar ajustes, seguir a alguien o descartar una película solo se dan por hechos si el servidor
-  lo confirma.
-- Si el servidor no responde, se dice; antes el spinner giraba para siempre.
+Un error del servidor ya no se disfraza de «aún no hay películas sincronizadas» ni de «¡lista completa!»; descartar una película se puede deshacer desde el propio aviso; guardar ajustes o seguir a alguien solo se dan por hechos si el servidor lo confirma; y si no responde, se dice, en vez de girar el spinner para siempre.
 
 ### Seguridad
 
-- **Los ajustes solo aceptan las claves que existen.** Antes se podía cambiar la dirección de Plex
-  por otra cualquiera y pedirle a la app que «probara la conexión», con lo que mandaba tu token a
-  esa dirección.
-- **Un zip preparado ya no puede tumbar el contenedor**: se rechaza antes de descomprimirlo, no
-  después.
-- La contraseña de `POWAFLEX_AUTH` ya no revela su longitud y aguanta la fuerza bruta, sin dejar
-  fuera a quien sí la sabe.
-- Sin contraseña puesta, el registro lo dice claramente al arrancar.
-- Las claves y tokens se escriben en campos ocultos.
+- **Los ajustes solo aceptan las claves que existen.** Antes se podía cambiar la dirección de Plex por otra cualquiera y pedirle a la app que «probara la conexión», con lo que mandaba tu token a esa dirección.
+- **Un zip preparado ya no puede tumbar el contenedor**: se rechaza antes de descomprimirlo, no después.
+- La contraseña de `POWAFLEX_AUTH` ya no revela su longitud y aguanta la fuerza bruta. Sin contraseña puesta, el registro lo dice al arrancar. Las claves y tokens se escriben en campos ocultos.
 
 ### Por dentro
 
-- **Pruebas de extremo a extremo**: arrancan el servidor de verdad y comprueban que las páginas
-  responden, que la interfaz se sirve, que la autenticación protege y que no falta ninguna ruta que
-  la aplicación llame. Con eso se cazaron dos fallos de esta misma versión.
-- Los nombres de personas en otros alfabetos se normalizan también en las fichas y buscadores.
-- El menú móvil cerrado ya no atrapa el tabulador; la zona para soltar el zip de Letterboxd se puede
-  usar con teclado; las fichas y el buscador se comportan como diálogos de verdad.
+- **Pruebas de extremo a extremo**: arrancan el servidor de verdad y comprueban que las páginas responden, que la autenticación protege y que no falta ninguna ruta que la aplicación llame. Con eso se cazaron dos fallos de esta misma versión.
+- Los nombres en otros alfabetos se normalizan también en fichas y buscadores; el menú móvil cerrado ya no atrapa el tabulador; y las fichas y el buscador se comportan como diálogos de verdad.
 
 ## Alpha 0.9.2 (0.9.2-alpha) — 2026-08-02
 

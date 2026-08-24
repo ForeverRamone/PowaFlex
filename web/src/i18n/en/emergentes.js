@@ -3,8 +3,8 @@
 // todas las piezas están aquí y no hay ni un mensaje compuesto sin traducir.
 export default {
   'Directores emergentes': 'Emerging directors',
-  'Quién puede ser un grande dentro de diez años. Sale de lo que PowaFlex ya tiene cacheado —las tablas de selección oficial, con las cinco secciones de debut que es donde de verdad estrena quien empieza, y los palmareses que alcanzan primeras películas, empezando por la Cámara de Oro— y se puntúa de 0 a 100. Cada ficha enseña con qué datos puntuó.':
-    'Who could be a great director ten years from now. It comes from what PowaFlex already has cached — the official line-up tables, including the five debut sections where people actually premiere when they are starting out, and the award lists that reach first features, starting with the Caméra d’Or — and is scored from 0 to 100. Every card shows the data behind its score.',
+  'Quién puede ser un grande dentro de diez años, puntuado de 0 a 100. Sale de las tablas de selección oficial —con las cinco secciones de debut— y de los palmareses que alcanzan primeras películas. Cada ficha enseña con qué datos puntuó.':
+    'Who could be a great in ten years, scored from 0 to 100. It comes from the official selection tables — including the five debut sections — and the award lists that reach first features. Each card shows the data behind its score.',
   'Cargando emergentes…': 'Loading emerging directors…',
 
   // señales
@@ -62,8 +62,8 @@ export default {
   'Todavía no hay lista: el detector se reconstruye una vez por semana en el pase nocturno.':
     'No list yet: the detector rebuilds once a week during the nightly run.',
   '✕ {nombre} fuera de la lista': '✕ {nombre} off the list',
-  'Cinco señales, con estos pesos: consagración institucional {i}, consenso crítico {c}, tracción real {tr}, aceleración {a} y afinidad contigo {af}. La señal que no tiene datos NO puntúa cero: sale del reparto y las demás se reparten su peso, para que un debut sin Metacritic no quede por detrás de una película mediana solo porque de la mediana haya más datos.':
-    'Five signals, with these weights: institutional standing {i}, critical consensus {c}, real traction {tr}, acceleration {a} and affinity with you {af}. A signal with no data does NOT score zero: it drops out of the split and the rest share its weight, so a debut without a Metacritic score does not end up behind a mediocre movie just because the mediocre one is better documented.',
+  'Cinco señales: consagración institucional {i}, consenso crítico {c}, tracción real {tr}, aceleración {a} y afinidad contigo {af}. La señal sin datos no puntúa cero: sale del reparto y las demás se reparten su peso.':
+    'Five signals: institutional recognition {i}, critical consensus {c}, real traction {tr}, acceleration {a} and affinity with you {af}. A signal with no data does not score zero: it drops out and the rest share its weight.',
   'Última detección: {d} · {n} ediciones leídas.': 'Last detection: {d} · {n} editions read.',
   'Sin detección todavía.': 'No detection yet.',
 
@@ -94,8 +94,8 @@ export default {
   'Solo la ópera prima': 'First feature only',
   'Puntuación mínima de emergente': 'Minimum emerging score',
   'la puntuación del detector, no la nota de la película': 'the detector’s score, not the movie’s rating',
-  'Nace pidiendo 70 de puntuación de emergente y con tope de 10 por pasada. Se apoya en el detector, que se reconstruye una vez por semana.':
-    'It starts asking for an emerging score of 70 and a cap of 10 per run. It leans on the detector, which rebuilds once a week.',
+  'Nace pidiendo 70 de puntuación y con tope de 10 por pasada. Se apoya en el detector, que se rehace cada semana.':
+    'It starts asking for a score of 70, capped at 10 per run. It leans on the detector, rebuilt weekly.',
   'el detector de emergentes aún no ha corrido: se reconstruye en el pase nocturno':
     'the emerging-directors detector has not run yet: it rebuilds during the nightly run',
   'Sin clave de TMDB no se pueden identificar los directores':

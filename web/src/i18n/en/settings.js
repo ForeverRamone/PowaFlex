@@ -12,8 +12,8 @@ export default {
   'Exporta tus datos en letterboxd.com → Settings → Data → Export y sube aquí ':
     'Export your data at letterboxd.com → Settings → Data → Export and upload here ',
   'el .zip completo': 'the full .zip',
-  ' tal cual (sin descomprimir): PowaFlex extrae diario, notas, vistas, watchlist y tus listas. También acepta CSV sueltos y el formato Letterboxd de WebTools-NG. Tus notas vs. la comunidad se ven en ':
-    ' as is (no need to unzip): PowaFlex extracts your diary, ratings, watched movies, watchlist and lists. Loose CSV files and the WebTools-NG Letterboxd format also work. Your ratings vs. the community live in ',
+  ' tal cual, sin descomprimir. También acepta CSV sueltos y el formato de WebTools-NG. Tus notas frente a la comunidad se ven en ':
+    ' as it is, no unzipping. It also takes loose CSVs and the WebTools-NG format. Your ratings against the community are in ',
   'Visionado': 'Viewing',
   '; la watchlist, en ': '; the watchlist, in ',
   'Listas y retos': 'Lists & challenges',
@@ -27,8 +27,8 @@ export default {
   '+ {n} listas importadas como retos (míralas en «Listas y retos»).':
     '+ {n} lists imported as challenges (see them in “Lists & challenges”).',
   'Feed RSS de tu perfil': 'Your profile RSS feed',
-  'Guarda tu usuario de Letterboxd y PowaFlex irá recogiendo tus últimas películas vistas automáticamente (cada noche, y cuando pulses aquí). Aparecerán en el Dashboard y se emparejan con tu biblioteca.':
-    'Save your Letterboxd username and PowaFlex will pick up your latest watched movies automatically (every night, and whenever you press here). They show up on the Dashboard and get matched with your library.',
+  'Con tu usuario de Letterboxd, tus últimas vistas se recogen solas cada noche y aparecen en el Dashboard.':
+    'With your Letterboxd username, your latest watches are collected every night and show up on the Dashboard.',
   'tu-usuario': 'your-username',
   'Sincronizando…': 'Syncing…',
   'Guardar y sincronizar': 'Save & sync',
@@ -49,8 +49,8 @@ export default {
   'Cuenta': 'Account',
   'Ajustes': 'Settings',
   'Actualizar todo': 'Refresh everything',
-  'Una sola rutina con todo lo que PowaFlex necesita, en orden: biblioteca de Plex, emparejado de Letterboxd, títulos en otros idiomas, notas de MDBList, lo que ya tienes en Radarr, calendario, huecos de tus favoritos y sagas. Es exactamente lo mismo que se ejecuta solo cada noche. Lo que no tengas configurado se salta.':
-    'One routine with everything PowaFlex needs, in order: Plex library, Letterboxd matching, titles in other languages, MDBList ratings, what you already have in Radarr, calendar, gaps for your favorites, and sagas. It is exactly what runs on its own every night. Anything you have not configured is skipped.',
+  'Una sola rutina, en orden: Plex, Letterboxd, títulos, notas, Radarr, calendario, huecos y sagas. Es lo mismo que corre cada noche, y se salta lo que no tengas configurado.':
+    'One single routine, in order: Plex, Letterboxd, titles, scores, Radarr, calendar, gaps and sagas. It is the same thing that runs every night, and it skips whatever you have not configured.',
   'Actualizando…': 'Updating…',
   '↻ Actualizar todo': '↻ Refresh everything',
   'Listando «{section}»… {n}': 'Listing “{section}”… {n}',
@@ -67,8 +67,8 @@ export default {
   'Bibliotecas de películas a sincronizar': 'Movie libraries to sync',
   '(las de series no aparecen: PowaFlex solo gestiona cine)':
     '(TV libraries are not listed: PowaFlex only handles movies)',
-  'Guarda los ajustes y sincroniza: las películas de bibliotecas desmarcadas se retiran de PowaFlex en la siguiente sincronización (en Plex no se toca nada).':
-    'Save settings and sync: movies from unchecked libraries are removed from PowaFlex on the next sync (nothing is touched in Plex).',
+  'Al sincronizar, lo de las bibliotecas desmarcadas se retira de PowaFlex. En Plex no se toca nada.':
+    'On the next sync, anything from unticked libraries is dropped from PowaFlex. Nothing is touched in Plex.',
   '¿Cómo consigo mi X-Plex-Token?': 'How do I get my X-Plex-Token?',
   '1. Abre ': '1. Open ',
   ' en el navegador y entra en tu servidor.': ' in your browser and go into your server.',
@@ -104,8 +104,8 @@ export default {
   'Carpeta raíz': 'Root folder',
   'Sincronizar lo ya añadido a Radarr': 'Sync what is already in Radarr',
   '{n} películas en Radarr': '{n} movies in Radarr',
-  'Guarda un listado local de lo que ya tienes en Radarr para que las fichas muestren el recuadro verde «✓ en Radarr» en vez de intentar añadirlo y fallar con «ya existe».':
-    'Keeps a local list of what you already have in Radarr so movie cards show the green “✓ in Radarr” box instead of trying to add it and failing with “already exists”.',
+  'Guarda lo que ya tienes en Radarr para que las fichas digan «✓ en Radarr» en vez de fallar con «ya existe».':
+    'Stores what you already have in Radarr so entries say “✓ in Radarr” instead of failing with “already exists”.',
   'Lanzar a Radarr automáticamente cada noche los estrenos de mis directores/as favoritos/as vivos':
     'Automatically send to Radarr every night the upcoming releases of my living favorite directors',
   'de los próximos': 'within the next',
@@ -140,8 +140,8 @@ export default {
   'Detectar automáticamente': 'Detect automatically',
   'Gratuita (1.000 peticiones/día)': 'Free (1,000 requests/day)',
   'Supporter (25.000/día)': 'Supporter (25,000/day)',
-  'Define cuántas notas se refrescan al día: con cuenta gratuita el llenado inicial se reparte en varios días; con Supporter cabe la biblioteca entera de una tanda.':
-    'Sets how many ratings refresh per day: with a free account the initial fill spreads over several days; with Supporter the whole library fits in one batch.',
+  'Cuántas notas se refrescan al día. Con cuenta gratuita el llenado inicial se reparte en varios días; con Supporter cabe entera.':
+    'How many scores are refreshed per day. On a free account the initial fill spreads over several days; on Supporter it fits in one go.',
   'Límite {n}/día': 'Limit {n}/day',
   ' · usadas hoy {n}': ' · used today {n}',
   'Sincronizar notas ahora': 'Sync ratings now',
@@ -151,27 +151,27 @@ export default {
   '1. Cuenta en ': '1. Sign up at ',
   ' (puedes entrar con Trakt).': ' (you can log in with Trakt).',
   ' y copia la key.': ' and copy the key.',
-  '3. La cuenta gratuita da 1.000 peticiones/día; las Supporter, bastantes más. PowaFlex respeta el límite y reparte el trabajo.':
-    '3. The free account gives 1,000 requests/day; Supporter accounts, quite a few more. PowaFlex respects the limit and spreads the work out.',
+  '3. La gratuita da 1.000 peticiones al día y las Supporter bastantes más. PowaFlex reparte el trabajo dentro del límite.':
+    '3. The free account gives 1,000 requests a day and Supporter accounts far more. PowaFlex spreads the work within the limit.',
 
   // ── Notas de IMDb ──────────────────────────────────────────────────────────
   'Notas de IMDb': 'IMDb ratings',
   '(opcional: el volcado público, sin API)': '(optional: the public dump, no API)',
-  'IMDb publica a diario un fichero con las notas y los votos de todo su catálogo. PowaFlex lo usa para el umbral de ruido de Descubrir sin gastar ni una petición de API.':
-    'IMDb publishes a daily file with the ratings and vote counts for its whole catalogue. PowaFlex uses it for the Discover noise threshold without spending a single API request.',
+  'IMDb publica a diario las notas y los votos de todo su catálogo. Sirve para el umbral de ruido de Descubrir sin gastar API.':
+    'IMDb publishes the scores and vote counts for its whole catalogue daily. It feeds the noise threshold in Find gaps without spending any API calls.',
   'Descargando…': 'Downloading…',
   'Descargar ahora': 'Download now',
   '{n} títulos guardados · {date}': '{n} titles stored · {date}',
   'nunca descargadas': 'never downloaded',
   '✓ {n} notas de IMDb descargadas': '✓ {n} IMDb ratings downloaded',
-  'La descarga son unos 8 MB comprimidos y tarda un par de minutos. El pase nocturno la repite sola una vez por semana, así que no hace falta que la lances a mano.':
-    'The download is about 8 MB compressed and takes a couple of minutes. The nightly run repeats it on its own once a week, so you do not need to trigger it by hand.',
+  'Son unos 8 MB y un par de minutos. El pase nocturno la repite solo una vez por semana.':
+    'It is about 8 MB and a couple of minutes. The nightly job repeats it once a week on its own.',
 
 
   // ── Aspecto ────────────────────────────────────────────────────────────────
   'Aspecto': 'Appearance',
-  'Cambia el lenguaje visual de toda la app. Se aplica al instante y se guarda en el servidor, así que te sigue en cualquier navegador.':
-    'Changes the visual language of the whole app. Applies instantly and is saved on the server, so it follows you to any browser.',
+  'Cambia el aspecto de toda la app. Se guarda en el servidor, así que te sigue en cualquier navegador.':
+    'Changes the look of the whole app. It is stored on the server, so it follows you to any browser.',
   'Cartelera': 'Marquee',
   'Cinemateca': 'Cinematheque',
   'Clásico': 'Classic',
@@ -180,47 +180,47 @@ export default {
   'Carbón neutro, titulares en Bodoni, oro reservado': 'Neutral charcoal, Bodoni headlines, restrained gold',
   'El aspecto anterior al rediseño: carbón azulado y fuente del sistema':
     'The look before the redesign: blue-tinted charcoal and the system font',
-  '«Clásico» recupera la paleta y la tipografía anteriores al rediseño. Los iconos y la agrupación del menú son comunes a los dos.':
-    '“Classic” brings back the palette and typography from before the redesign. Icons and menu grouping are shared by both.',
+  '«Clásico» recupera la paleta y la tipografía anteriores al rediseño.':
+    '“Classic” brings back the palette and typography from before the redesign.',
 
 
   // ── Notas y puntuaciones ───────────────────────────────────────────────────
   'Notas y puntuaciones que mostrar': 'Ratings and scores to show',
-  'Elige de qué webs aparecen las notas en las fichas de película (necesita MDBList para tenerlas). Desmarca las que no te interesen.':
-    'Choose which sites show ratings on movie cards (needs MDBList to have them). Untick the ones you do not care about.',
+  'De qué webs aparecen las notas en cada ficha. Necesita MDBList.':
+    'Which sites’ scores appear on each film. Requires MDBList.',
   'Rotten Tomatoes (crítica)': 'Rotten Tomatoes (critics)',
   'Rotten Tomatoes (público)': 'Rotten Tomatoes (audience)',
   'Nota combinada (Σ)': 'Combined rating (Σ)',
   'Nota principal en las portadas (junto al título)': 'Main rating on posters (next to the title)',
   'Nota combinada MDBList (Σ)': 'MDBList combined rating (Σ)',
-  'Es la nota que aparece en la vista de portada pequeña. Si una película no tiene esa nota, se usa la primera disponible. Necesita MDBList sincronizado.':
-    'This is the rating shown in the small poster view. If a movie lacks that rating, the first available one is used. Needs MDBList synced.',
+  'La nota que sale en el póster. Si falta, se usa la primera disponible.':
+    'The score shown on the poster. If it is missing, the first available one is used.',
 
   // ── Calendario ─────────────────────────────────────────────────────────────
   'Calendario de cine venidero': 'Upcoming cinema calendar',
   'El calendario lo mandan ': 'The calendar is driven by ',
   'tus favoritos': 'your favorites',
-  ', cada uno en la faceta por la que le sigues: de un director/a se vigila lo que dirige, de un actor/actriz lo que interpreta. Si además quieres vigilar a los más presentes en tu biblioteca aunque no les sigas, sube estos números (0 = solo tus favoritos).':
-    ', each in the role you follow them for: a director is watched for what they direct, an actor for what they act in. If you also want to watch the people most present in your library even if you do not follow them, raise these numbers (0 = only your favorites).',
+  ', cada uno en la faceta por la que le sigues. Para vigilar además a los más presentes en tu biblioteca, sube estos números (0 = solo tus favoritos).':
+    ', each in the role you follow them for. To also watch the most present names in your library, raise these numbers (0 = your favorites only).',
   'Extra: directores/as top de tu biblioteca': 'Extra: top directors from your library',
   'Extra: actores/actrices top de tu biblioteca': 'Extra: top actors from your library',
   'Consultando fechas de nacimiento/fallecimiento en TMDB…': 'Checking birth/death dates on TMDB…',
   '✓ {a} personas actualizadas · {b} fallecidas detectadas': '✓ {a} people updated · {b} deceased detected',
   'Actualizar estado vital (vivos/muertos)': 'Update life status (living/deceased)',
-  'Marca quién ha fallecido para no vigilar sus estrenos ni incluirlos en el auto-Radarr. En Favoritos puedes quitar de golpe a los fallecidos.':
-    'Marks who has died so their releases are no longer watched or included in auto-Radarr. In Favorites you can remove all deceased people at once.',
+  'Marca quién ha fallecido para no vigilar sus estrenos. En Favoritos se les puede quitar de golpe.':
+    'Flags who has died so their releases are not watched. In Favorites you can remove them in bulk.',
 
   // ── Umbral de ruido ────────────────────────────────────────────────────────
   'Descubrir huecos: umbral de ruido': 'Discover gaps: noise threshold',
   'Una película cuenta como hueco si llega al umbral de votos en TMDB ':
     'A movie counts as a gap if it reaches the vote threshold on TMDB ',
   'o': 'or',
-  ' en Letterboxd (vía MDBList, donde la haya): en TMDB apenas vota nadie y el listón solo descartaba cine de verdad. Sube el umbral si los huecos te traen demasiada morralla; baja a 0 para el completismo absoluto.':
-    ' on Letterboxd (via MDBList, where available): hardly anyone votes on TMDB and the bar was only discarding real cinema. Raise the threshold if gaps bring you too much junk; drop it to 0 for absolute completism.',
+  ' en Letterboxd, donde la haya. Sube el umbral si los huecos traen demasiada morralla; 0 para el completismo absoluto.':
+    ' on Letterboxd, where there is one. Raise it if the gaps bring too much filler; 0 for absolute completeness.',
   'Votos mínimos · huecos de directores/as': 'Minimum votes · director gaps',
   'Votos mínimos · huecos de actores/actrices': 'Minimum votes · actor gaps',
-  'La nota mínima Σ y los filtros de cortos/documentales/TV/cameos se ajustan directamente en la página de Descubrir.':
-    'The minimum Σ rating and the shorts/documentaries/TV/cameo filters are set directly on the Discover page.',
+  'La nota mínima Σ y los filtros de ruido se ajustan en la propia página de Descubrir.':
+    'The minimum Σ and the noise filters are set on the Find gaps page itself.',
 
   // ── Pestañas y barra de guardar ────────────────────────────────────────────
   'Conexiones': 'Connections',
@@ -228,10 +228,10 @@ export default {
   'Automatismos': 'Automation',
   'Interfaz': 'Interface',
   'Mantenimiento': 'Maintenance',
-  'Los tres servicios que gobiernas. Plex y TMDB son imprescindibles; Radarr es lo que convierte «me falta» en «pedida».':
-    'The three services you run. Plex and TMDB are essential; Radarr is what turns “I’m missing it” into “requested”.',
-  'De dónde salen las notas y qué has visto. Todo esto es opcional: sin ello PowaFlex funciona, pero se queda ciego para ordenar y para saber qué has visto fuera de Plex.':
-    'Where the ratings come from and what you have watched. All of it is optional: PowaFlex works without it, but it goes blind for sorting and for knowing what you watched outside Plex.',
+  'Plex y TMDB son imprescindibles. Radarr es lo que convierte «me falta» en «pedida».':
+    'Plex and TMDB are essential. Radarr is what turns “missing” into “requested”.',
+  'De dónde salen las notas y qué has visto. Opcional, pero sin ello no hay con qué ordenar ni cómo saber lo que ves fuera de Plex.':
+    'Where the scores come from and what you have watched. Optional, but without it there is nothing to sort by and no way to know what you watch outside Plex.',
   'Lo que PowaFlex hace solo cada noche: qué manda a Radarr, a quién vigila el calendario y qué cuenta como hueco.':
     'What PowaFlex does on its own every night: what it sends to Radarr, who the calendar watches and what counts as a gap.',
   'Las reglas de qué se manda solo a Radarr están en Automatismos →':
@@ -244,8 +244,8 @@ export default {
 
   // ── Sincronización con Plex ────────────────────────────────────────────────
   'Sincronización con Plex': 'Plex sync',
-  'La primera sincronización descarga los detalles de cada película (reparto completo, pistas de vídeo, HDR…): con ~12.000 películas puede tardar varios minutos. Después es incremental y además se ejecuta sola cada noche a las 03:30.':
-    'The first sync downloads details for every movie (full cast, video tracks, HDR…): with ~12,000 movies it can take several minutes. After that it is incremental, and it also runs on its own every night at 03:30.',
+  'La primera descarga los detalles de cada película: con ~12.000 puede tardar varios minutos. Después es incremental y se repite sola a las 03:30.':
+    'The first one downloads every film’s details: with ~12,000 it can take several minutes. After that it is incremental and repeats itself at 03:30.',
   'Listando biblioteca «{section}»… {n}': 'Listing library “{section}”… {n}',
   'Sincronizar ahora': 'Sync now',
   'Vuelve a descargar los detalles de todas las películas': 'Downloads details for every movie again',
@@ -254,8 +254,8 @@ export default {
 
   // ── Histórico del pase nocturno ────────────────────────────────────────────
   'Histórico de actualizaciones (30 días)': 'Refresh history (30 days)',
-  'Cada pasada del cron nocturno o de «Actualizar todo», con lo que hizo cada paso. Se guarda paso a paso: si el contenedor se reinicia a mitad, aquí queda hasta dónde llegó.':
-    'Every run of the nightly cron or “Refresh everything”, with what each step did. Saved step by step: if the container restarts midway, how far it got stays here.',
+  'Cada pasada del pase nocturno o de «Actualizar todo», paso a paso. Si el contenedor se reinicia a mitad, aquí queda hasta dónde llegó.':
+    'Every run of the nightly job or “Update everything”, step by step. If the container restarts mid-run, how far it got stays here.',
   'Cargando…': 'Loading…',
   'Aún no hay pasadas registradas.': 'No runs recorded yet.',
   'nocturna': 'nightly',
@@ -264,13 +264,13 @@ export default {
 
   // ── Copia de seguridad ─────────────────────────────────────────────────────
   'Copia de seguridad': 'Backup',
-  'Para reinstalar el contenedor sin empezar de cero. La base de datos lo incluye todo (biblioteca, notas, favoritos, ajustes…); el fichero de ajustes solo guarda la configuración (claves API, conexiones, umbrales) y se puede importar aquí mismo.':
-    'For reinstalling the container without starting from scratch. The database includes everything (library, ratings, favorites, settings…); the settings file only stores configuration (API keys, connections, thresholds) and can be imported right here.',
+  'Para reinstalar sin empezar de cero. La base lo incluye todo; el fichero de ajustes solo la configuración, y se importa aquí mismo.':
+    'For reinstalling without starting from scratch. The database holds everything; the settings file holds only the configuration, and imports right here.',
   '⬇ Descargar base de datos': '⬇ Download database',
   '⬇ Exportar ajustes (.json)': '⬇ Export settings (.json)',
   '⬆ Importar ajustes': '⬆ Import settings',
-  'Ambos ficheros contienen tus claves API y token de Plex: guárdalos en un sitio seguro. Para restaurar la base de datos entera, copia el ':
-    'Both files contain your API keys and Plex token: keep them somewhere safe. To restore the whole database, copy the ',
+  'Los dos llevan tus claves API y tu token de Plex: guárdalos a buen recaudo. Para restaurar la base entera, copia el ':
+    'Both files carry your API keys and Plex token: keep them somewhere safe. To restore the whole database, copy the ',
   ' como': ' as',
   ' en la carpeta de datos del contenedor (parado) y arráncalo.':
     ' into the container data folder (while stopped) and start it up.',
@@ -280,19 +280,19 @@ export default {
   'Hacer una copia ahora': 'Back up now',
   'Copiando…': 'Backing up…',
   '✓ Copia hecha: {file} ({mb} MB)': '✓ Backup done: {file} ({mb} MB)',
-  'Se hace sola al final del pase nocturno, con la base ya al día, y va rotando: al pasar del número que pongas se borra la más vieja. Guarda ahí solo la base de datos; los ajustes se exportan aparte con el botón de arriba.':
-    'It runs on its own at the end of the nightly run, with the database already up to date, and rotates: once past the number you set, the oldest one is deleted. It only stores the database; settings are exported separately with the button above.',
+  'Se hace sola al final del pase nocturno y va rotando: al pasar del número que pongas se borra la más vieja. Solo la base; los ajustes se exportan con el botón de arriba.':
+    'It runs itself at the end of the nightly job and rotates: past the number you set, the oldest is deleted. Database only; settings are exported with the button above.',
 
   // lista de vetadas al pase automático
   '🚫 {n} fuera del pase automático': '🚫 {n} skipped by the nightly job',
-  'El automático las ignora. Se siguen viendo en Cine venidero y puedes mandarlas a Radarr a mano cuando quieras.':
-    'The nightly job ignores them. They stay visible in Upcoming cinema and you can send them to Radarr by hand whenever you want.',
+  'El automático las ignora. Se siguen viendo en Cine venidero y se mandan a mano cuando quieras.':
+    'The automation ignores them. They still show in Upcoming cinema and can be sent by hand whenever you like.',
   'quitar el veto': 'undo',
 
   // pesos del detector de emergentes (Ajustes → Automatismos)
   'Detector de directores emergentes': 'Emerging-directors detector',
-  'Cuánto pesa cada señal en la puntuación de emergente (0–100). La señal sin datos no puntúa cero: sale del reparto y las demás se reparten su peso. Deja un campo vacío para volver al peso de fábrica.':
-    'How much each signal weighs in the emerging score (0–100). A signal with no data does not score zero: it drops out of the split and the rest share its weight. Leave a field empty to go back to the factory weight.',
+  'Cuánto pesa cada señal en la puntuación de emergente. La que no tiene datos sale del reparto en vez de puntuar cero. Vacío = peso de fábrica.':
+    'How much each signal weighs in the emerging score. A signal with no data drops out of the average instead of scoring zero. Empty = factory weight.',
   'Consagración institucional': 'Institutional standing',
   'Consenso crítico': 'Critical consensus',
   'Tracción real': 'Real traction',
@@ -301,6 +301,6 @@ export default {
   'Los pesos suman 100.': 'The weights add up to 100.',
   'Los pesos suman {n} (no pasa nada: son relativos, pero 100 es la escala pensada).':
     'The weights add up to {n} (that’s fine: they are relative, but 100 is the intended scale).',
-  'El detector se rehace una vez por semana en el pase nocturno; el cambio de pesos se nota en la siguiente detección (o al forzarla desde la página de Emergentes).':
-    'The detector rebuilds once a week during the nightly run; a weight change shows up in the next detection (or force one from the Emerging page).',
+  'El detector se rehace una vez por semana; los pesos nuevos se notan en la siguiente detección, o al forzarla desde Emergentes.':
+    'The detector is rebuilt once a week; new weights take effect on the next run, or when you force one from Emerging.',
 };

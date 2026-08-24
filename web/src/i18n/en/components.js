@@ -43,8 +43,8 @@ export default {
   'Película, persona, saga, lista, festival o sección…': 'Movie, person, saga, list, festival or section…',
   '{n} títulos': '{n} titles',
   'Nada encontrado.': 'Nothing found.',
-  'Escribe para buscar películas, personas, sagas, listas, festivales o saltar a una sección. ↑↓ para moverte, Enter para abrir. Atajo: Ctrl/⌘ + K.':
-    'Type to search movies, people, sagas, lists or festivals, or jump to a section. ↑↓ to move, Enter to open. Shortcut: Ctrl/⌘ + K.',
+  'Busca películas, personas, sagas, listas y festivales, o salta a una sección. ↑↓ para moverte, Enter para abrir.':
+    'Search films, people, sagas, lists and festivals, or jump to a section. ↑↓ to move, Enter to open.',
 
   // Dropzone
   'Elegir archivos para importar': 'Choose files to import',
@@ -67,8 +67,8 @@ export default {
   'Listo': 'Done',
   // el 100 % no es el final: los datos están, la página aún no
   'Datos completos · montando la página…': 'Data in · building the page…',
-  'Esta consulta va de una pieza: el servidor no dice por dónde va, así que no hay porcentaje que enseñar. Sigue en marcha.':
-    'This one runs in a single piece: the server never says how far along it is, so there is no honest percentage to show. It is still running.',
+  'Esta consulta va de una pieza: el servidor no dice por dónde va. Sigue en marcha.':
+    'This query runs in one piece: the server does not report progress. It is still going.',
   'El porcentaje no se mueve porque cada paso salta de golpe al terminar, no poco a poco. Sigue en marcha.':
     'The percentage sits still because each step jumps when it finishes, rather than creeping up. It is still running.',
 
@@ -147,10 +147,10 @@ export default {
   // /api/build-progress tiene una sola casilla para doce tareas: si la espera no
   // dice cuál es la suya, el número se atribuye a la que de verdad esté corriendo
   'Tarea del servidor en marcha: {tarea}': 'Server task running: {tarea}',
-  'El servidor todavía no ha dicho por dónde va, así que un porcentaje aquí sería inventado. Sigue en marcha.':
-    'The server has not reported its position yet, so any percentage here would be made up. It is still running.',
-  'El servidor ya ha recorrido la lista entera; ahora la ordena, la guarda en caché y la manda. Sigue en marcha.':
-    'The server has been through the whole list; now it sorts it, caches it and sends it over. It is still running.',
+  'El servidor aún no ha dicho por dónde va. Sigue en marcha.':
+    'The server has not reported progress yet. It is still going.',
+  'Recorrida la lista entera; ahora la ordena y la manda. Sigue en marcha.':
+    'The whole list has been walked; now it is being sorted and sent. Still going.',
 
   // TypeFilterBar
   'Mostrar:': 'Show:',
@@ -180,8 +180,8 @@ export default {
   'Elegir a mano su ficha de TMDB': 'Hand-pick its TMDB entry',
   'emparejado a mano': 'matched by hand',
   'corregir emparejado con TMDB': 'fix TMDB matching',
-  'Elige su ficha de TMDB. De ahí salen las notas, el reparto y el completismo de su gente. La corrección se recuerda y sobrevive a las sincronizaciones de Plex.':
-    'Pick its TMDB entry. That\'s where the ratings, the cast and its people\'s completism come from. The correction is remembered and survives Plex syncs.',
+  'Elige su ficha de TMDB: de ahí salen las notas, el reparto y el completismo. La corrección se recuerda.':
+    'Pick its TMDB entry: scores, cast and completeness come from there. The correction is remembered.',
   'Quitar la corrección y volver a lo que diga Plex': 'Remove the correction and go back to whatever Plex says',
   'Lucha libre y eventos': 'Wrestling and live events',
 
