@@ -10,7 +10,8 @@
     "test": "node --test",
     "snapshot": "node tools/snapshot-palmares.mjs",
     "snapshot:fa": "node tools/snapshot-filmaffinity.mjs",
-    "snapshot:fa1000": "node tools/snapshot-fa-top1000.mjs"
+    "snapshot:fa1000": "node tools/snapshot-fa-top1000.mjs",
+    "snapshot:paises": "node tools/snapshot-paises.mjs"
   },
   "dependencies": {
     "@fastify/compress": "^9.2.0",

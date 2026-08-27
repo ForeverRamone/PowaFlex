@@ -45,6 +45,7 @@ import { REGISTRY, filasEmpaquetadas } from './festivals.js';
 import { mapPool, cedeElHilo } from './pool.js';
 import { normName } from './names.js';
 import { cachePrefix } from './cache-versions.js';
+import { PAQUETES } from './data/paises/index.js';
 
 /**
  * La versión del ÍNDICE construido (no la de la caché de TMDB, que vive en
@@ -733,10 +734,18 @@ export async function construirPais(iso, { hasta = new Date().getFullYear() } = 
     // nada, se calla, y `conNota` queda en cero—, y el país bueno de ayer
     // desaparecía por pulsar un botón. Antes que eso, no se toca nada y se dice
     // por qué.
-    if (sinCupo > 0 && admitidas.length < yaConstruidas(ISO) / 2) {
+    const previas = yaConstruidas(ISO);
+    // Se corta por lo sano en los DOS casos, y no solo al reconstruir: un país
+    // que se construye POR PRIMERA VEZ con el cupo corto se guardaba entero y
+    // sin error, o sea que quedaba a medias con pinta de completo — y luego se
+    // empaquetaba así en el repositorio, que es peor todavía. Un décimo de las
+    // notas sin pedir ya deforma el orden: lo que falta no es un ruido, es
+    // justamente lo que no se ha podido puntuar.
+    if (sinCupo > porPedir / 10 || (previas && admitidas.length < previas / 2)) {
       throw new Error(
-        `Cupo de MDBList agotado: faltaban ${sinCupo} notas por pedir y saldría un ${nombre} a medias. ` +
-          'No se ha tocado el que ya había. Vuelve a intentarlo mañana.'
+        `Cupo de MDBList agotado: quedaban ${sinCupo} notas por pedir de ${porPedir} y ${nombre} saldría a medias. ` +
+          (previas ? 'No se ha tocado el que ya había. ' : 'No se ha guardado nada. ') +
+          'Vuelve a intentarlo mañana, cuando el cupo se reponga.'
       );
     }
 
@@ -864,6 +873,72 @@ export function apuntarFallo(iso, mensaje, fuente = 'lb') {
  * parrilla las pinta juntas —la estrella de vista va sobre el cartel— y son la
  * diferencia entre una lista y una caza.
  */
+/**
+ * LOS PAÍSES QUE VIENEN HECHOS.
+ *
+ * Construir un país son minutos de TMDB y unas cuatro mil peticiones de
+ * MDBList, y el cupo diario son veinte mil: el catálogo entero serían más de
+ * diez días. Así que los que están construidos VIAJAN con el software, en
+ * `data/paises/XX.js`, y la primera vez que se piden se siembran en la tabla.
+ * Desde ahí todo funciona igual —el cruce con tu Plex, el ✎, Radarr—, y quien
+ * quiera rehacer uno sigue teniendo el botón.
+ *
+ * Se carga al vuelo y no de golpe: son nueve megas si se empaquetan los setenta
+ * y dos, y no tiene sentido tenerlos todos en memoria para mirar uno.
+ */
+export const PAQUETE_VERSION = 1;
+const MOTIVO_DE = { 1: 'director', 2: 'origen', 3: 'manual' };
+
+export async function sembrarPais(iso) {
+  const ISO = String(iso || '').toUpperCase();
+  if (!esPaisConocido(ISO)) return false;
+  // si ya está construido (o sembrado) en esta base, no se toca nada
+  if (db.prepare("SELECT 1 FROM country_builds WHERE iso = ? AND fuente = 'lb'").get(ISO)) return false;
+
+  let paquete;
+  try {
+    ({ PAIS: paquete } = await import(`./data/paises/${ISO}.js`));
+  } catch {
+    return false; // ese país no viene empaquetado todavía
+  }
+  if (!paquete?.filas?.length) return false;
+
+  const sembrar = db.transaction(() => {
+    const ins = db.prepare(
+      `INSERT OR REPLACE INTO country_films
+         (iso, fuente, tmdb_id, title, year, poster, lb, lb_votes, sigma, avales, ganados,
+          director, motivo, rank_global, rank_anio)
+       VALUES (@iso, 'lb', @tmdb_id, @title, @year, @poster, @lb, @lb_votes, @sigma, @avales, @ganados,
+          @director, @motivo, @rank_global, @rank_anio)`
+    );
+    for (const t of paquete.filas) {
+      const [rank_global, rank_anio, tmdb_id, year, lb, lb_votes, sigma, avales, ganados, motivo, title, poster, director] = t;
+      ins.run({
+        iso: ISO, tmdb_id, title, year, poster, lb, lb_votes, sigma, avales, ganados, director,
+        motivo: MOTIVO_DE[motivo] || 'origen', rank_global, rank_anio,
+      });
+    }
+    guardarBuild({
+      iso: ISO,
+      fuente: 'lb',
+      at: Date.parse(`${paquete.hasta}T12:00:00Z`) || Date.now(),
+      candidatos: paquete.candidatos || 0,
+      con_nota: paquete.con_nota || 0,
+      guardadas: paquete.guardadas || paquete.filas.length,
+      del_palmares: paquete.del_palmares || 0,
+      sin_cupo: 0,
+      segundos: 0,
+      error: null,
+    });
+  });
+  sembrar();
+  // Las correcciones a mano mandan también sobre lo que viene de fábrica.
+  for (const o of overridesDePais(ISO)) {
+    if (o.modo === 'drop') db.prepare('DELETE FROM country_films WHERE iso = ? AND tmdb_id = ?').run(ISO, o.tmdb_id);
+  }
+  return true;
+}
+
 const libreria = () => {
   const tengo = new Set();
   const visto = new Set();
@@ -887,7 +962,10 @@ export function catalogoPaises() {
       iso,
       ...p,
       ...TIERS[p.tier],
-      build: construidos.get(`${iso}:lb`) || null,
+      // Un país empaquetado cuenta como construido aunque esta base no lo haya
+      // sembrado todavía: se siembra sola en cuanto se pide, y decir «sin
+      // construir» de algo que abre hecho sería mentir en el desplegable.
+      build: construidos.get(`${iso}:lb`) || (PAQUETES[iso] ? { ...PAQUETES[iso], deFabrica: true } : null),
       buildFa: construidos.get(`${iso}:fa`) || null,
     }))
     .sort((a, b) => a.es.localeCompare(b.es, 'es'));

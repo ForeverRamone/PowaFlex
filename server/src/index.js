@@ -93,7 +93,7 @@ import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
 import { avalesDe, conteoAvales, indiceAvales, avalesDeFilmografia } from './avales.js';
 import {
   catalogoPaises, peliculasDePais, aniosDePais, esPaisConocido, PAISES,
-  ponerOverride, quitarOverride, overridesDePais, arrancarPais, paisesStatus,
+  ponerOverride, quitarOverride, overridesDePais, arrancarPais, paisesStatus, sembrarPais,
 } from './paises.js';
 import { tieneRanking, hayPaqueteFA, paqueteHasta } from './filmaffinity.js';
 import { ROLES } from './roles.js';
@@ -869,6 +869,9 @@ app.get('/api/paises/:iso', async (req, reply) => {
     return { error: 'El año tiene que ser un número' };
   }
   const fuente = req.query.fuente === 'fa' ? 'fa' : 'lb';
+  // Si viene empaquetado y esta base no lo tiene, se siembra AQUÍ: así la
+  // primera visita ya lo encuentra hecho, sin construir ni gastar cupo.
+  if (fuente === 'lb') await sembrarPais(iso);
   const ficha = catalogoPaises().find((p) => p.iso === iso);
   return {
     iso,
