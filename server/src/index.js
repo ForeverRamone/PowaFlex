@@ -91,6 +91,11 @@ import {
 } from './rules.js';
 import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
 import { avalesDe, conteoAvales, indiceAvales, avalesDeFilmografia } from './avales.js';
+import {
+  catalogoPaises, peliculasDePais, aniosDePais, esPaisConocido, PAISES,
+  ponerOverride, quitarOverride, overridesDePais, arrancarPais, paisesStatus,
+} from './paises.js';
+import { tieneRanking, hayPaqueteFA, paqueteHasta } from './filmaffinity.js';
 import { ROLES } from './roles.js';
 import { importImdbRatings, imdbInfo } from './imdb.js';
 import { listarCopias, hacerCopia, BACKUP_DIR } from './backup.js';
@@ -827,6 +832,128 @@ app.post('/api/directors/follow', async (req, reply) => {
   }
   if (added) invalidateFavoritesCaches();
   return { ok: true, added, total: nombres.length, notFound };
+});
+
+// --- el cine por países ---------------------------------------------------------
+//
+// Construir un país es un trabajo largo (ver `paisesStatus` en paises.js): se
+// arranca y se sondea. Lo demás son consultas a la tabla ya construida y van
+// dentro de la petición, que es instantáneo.
+
+// `fa` dice si ese país tiene ranking en FilmAffinity: no lo tienen todos
+// (Islandia, India, China, Dinamarca e Irán no), y la pestaña necesita saberlo
+// para explicar el vacío en vez de enseñarlo a secas.
+app.get('/api/paises', async () => ({
+  paises: catalogoPaises().map((p) => ({ ...p, fa: tieneRanking(p.iso) && hayPaqueteFA(p.iso) })),
+  status: paisesStatus,
+}));
+
+app.get('/api/paises/status', async () => paisesStatus);
+
+app.get('/api/paises/:iso', async (req, reply) => {
+  const iso = String(req.params.iso || '').toUpperCase();
+  if (!esPaisConocido(iso)) {
+    reply.code(404);
+    return { error: 'Ese país no está en el catálogo' };
+  }
+  // el año llega como texto de la URL: un «?anio=pepe» no puede acabar en una
+  // consulta con NaN, que en SQLite no casa con nada y devuelve cero filas sin
+  // decir por qué
+  const crudo = req.query.anio;
+  const anio = crudo === undefined || crudo === '' ? null : Number(crudo);
+  // El rango se comprueba, no solo el tipo: un «?anio=0» o un «?anio=1e20» no
+  // son un año, y devolver la lista histórica como si nada deja al titular de
+  // la página diciendo un año que no se ha filtrado por ningún lado.
+  if (anio !== null && (!Number.isInteger(anio) || anio < 1870 || anio > 2200)) {
+    reply.code(400);
+    return { error: 'El año tiene que ser un número' };
+  }
+  const fuente = req.query.fuente === 'fa' ? 'fa' : 'lb';
+  const ficha = catalogoPaises().find((p) => p.iso === iso);
+  return {
+    iso,
+    nombre: PAISES[iso].es,
+    fuente,
+    // el ranking de FilmAffinity no se reparte por años: devolver el año que
+    // pidieron dejaba el titular diciendo «lo mejor de 1973» sobre la lista
+    // entera
+    anio: fuente === 'lb' ? anio : null,
+    peliculas: peliculasDePais(iso, { anio, fuente }),
+    // la regleta de años es de la lista nuestra: el ranking de FilmAffinity es
+    // uno solo y no se reparte por años
+    anios: fuente === 'lb' ? aniosDePais(iso) : [],
+    overrides: overridesDePais(iso),
+    build: (fuente === 'fa' ? ficha?.buildFa : ficha?.build) || null,
+    fa: tieneRanking(iso),
+    faHasta: paqueteHasta(iso),
+  };
+});
+
+app.post('/api/paises/:iso/build', async (req, reply) => {
+  const iso = String(req.params.iso || '').toUpperCase();
+  if (!esPaisConocido(iso)) {
+    reply.code(404);
+    return { error: 'Ese país no está en el catálogo' };
+  }
+  if (paisesStatus.running) {
+    reply.code(409);
+    return { error: `Ya se está construyendo ${PAISES[paisesStatus.iso]?.es || paisesStatus.iso}` };
+  }
+  // La barra de progreso es UNA para toda la aplicación, y construir un país
+  // son minutos: arrancando encima del pase nocturno los dos se pisan la barra
+  // y se disputan el mismo cupo de MDBList.
+  if (refreshStatus?.running) {
+    reply.code(409);
+    return { error: 'Hay una actualización general en marcha: espera a que termine' };
+  }
+  const fuente = req.query.fuente === 'fa' ? 'fa' : 'lb';
+  if (!getSetting('tmdb_key')) {
+    reply.code(400);
+    return { error: 'Sin clave de TMDB no hay de dónde sacar las películas' };
+  }
+  // MDBList solo hace falta para la lista nuestra: el ranking de FilmAffinity
+  // ya viene ordenado por ellos y solo hay que emparejarlo con TMDB
+  if (fuente === 'lb' && !getSetting('mdblist_key')) {
+    reply.code(400);
+    return { error: 'Sin clave de MDBList no hay notas de Letterboxd que ordenar' };
+  }
+  if (fuente === 'fa' && !tieneRanking(iso)) {
+    reply.code(400);
+    return { error: `FilmAffinity no tiene ranking de ${PAISES[iso].es}` };
+  }
+  // tener ranking y tenerlo empaquetado no es lo mismo: sin el paquete la ruta
+  // decía «empezado» y el fallo aparecía después, escondido en el estado
+  if (fuente === 'fa' && !hayPaqueteFA(iso)) {
+    reply.code(400);
+    return { error: `El ranking de ${PAISES[iso].es} no está empaquetado en esta versión` };
+  }
+  return arrancarPais(iso, fuente);
+});
+
+/**
+ * El ✎ de la página: meter o quitar una película de un país a mano.
+ *
+ * No es un adorno. TMDB tiene a «Viridiana» por mexicana y da «La batalla de
+ * Chile» por española, así que la corrección es parte del funcionamiento
+ * normal, no una excepción.
+ */
+app.post('/api/paises/:iso/override', async (req, reply) => {
+  try {
+    const { tmdbId, modo, title } = req.body || {};
+    return ponerOverride(req.params.iso, tmdbId, modo, title || null);
+  } catch (err) {
+    reply.code(400);
+    return { error: String(err.message || err) };
+  }
+});
+
+app.delete('/api/paises/:iso/override/:tmdbId', async (req, reply) => {
+  try {
+    return quitarOverride(req.params.iso, req.params.tmdbId);
+  } catch (err) {
+    reply.code(400);
+    return { error: String(err.message || err) };
+  }
 });
 
 // --- directores emergentes -----------------------------------------------------

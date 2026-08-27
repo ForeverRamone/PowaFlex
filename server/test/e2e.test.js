@@ -27,6 +27,21 @@ let salida = '';
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Matar el proceso NO es esperar a que muera: kill() vuelve enseguida y el hijo
+ * sigue un instante con la base abierta. En Windows eso basta para que borrar
+ * la carpeta dé EPERM — allí no se puede borrar un fichero con handles vivos.
+ * Así que esperamos al 'exit' de verdad, y aun así reintentamos el borrado.
+ */
+async function matar(proc) {
+  if (!proc || proc.exitCode !== null || proc.signalCode !== null) return;
+  const muerto = new Promise((r) => proc.once('exit', r));
+  proc.kill('SIGKILL');
+  await Promise.race([muerto, dormir(5000)]);
+}
+
+const borrar = (dir) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+
 async function esperarVivo(intentos = 60) {
   for (let i = 0; i < intentos; i++) {
     try {
@@ -54,9 +69,9 @@ before(async () => {
   await esperarVivo();
 });
 
-after(() => {
-  servidor?.kill('SIGKILL');
-  fs.rmSync(dataDir, { recursive: true, force: true });
+after(async () => {
+  await matar(servidor);
+  borrar(dataDir);
 });
 
 test('arranca de cero, sin base de datos previa, y responde', async () => {
@@ -217,8 +232,8 @@ test('con contraseña puesta, nada pasa sin ella (salvo /api/version)', async ()
     const mal = { Authorization: `Basic ${Buffer.from('ramon:otra').toString('base64')}` };
     assert.equal((await fetch(`${base2}/api/settings`, { headers: mal })).status, 401, 'una contraseña que no es, no pasa');
   } finally {
-    proc.kill('SIGKILL');
-    fs.rmSync(dir2, { recursive: true, force: true });
+    await matar(proc);
+    borrar(dir2);
   }
 });
 

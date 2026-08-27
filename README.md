@@ -2,7 +2,7 @@
 
 # 🎬 PowaFlex
 
-> **Beta 1.23** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
+> **Beta 1.24** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
 > de filmografías, calendario de estrenos venideros conectado a TMDB y envío directo a Radarr.
 
 PowaFlex vive junto a tu servidor Plex (en Docker), lee tu biblioteca **directamente por la API**

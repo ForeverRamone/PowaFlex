@@ -107,6 +107,8 @@ export const CACHE_VERSIONS = {
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)
   releases: 2,
+  // v1: el recorrido por años de cada país (una entrada por país, año y página)
+  paises: 1,
 };
 
 /** Prefijo con versión de una caché: `calendar:v8`, `discover_gaps:v10`… */

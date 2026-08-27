@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // base propia: este fichero crea y borra reglas
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'powaflex-test-'));
@@ -220,7 +220,7 @@ test('el auto-Radarr viejo SÍ se migra cuando hay ajustes que migrar, y tambié
   const arranca = (extra = '') =>
     execFileSync(process.execPath, ['--input-type=module', '-e', `
       process.env.DATA_DIR = ${JSON.stringify(dir)};
-      const m = await import(${JSON.stringify(path.join(raiz, 'server/src/db.js'))});
+      const m = await import(${JSON.stringify(pathToFileURL(path.join(raiz, 'server/src/db.js')).href)});
       ${extra}
       console.log(JSON.stringify(m.db.prepare('SELECT kind, source, enabled, months, cap, min_score FROM radarr_rules').all()));
     `], { encoding: 'utf8' }).trim().split('\n').pop();

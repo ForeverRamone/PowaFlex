@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useNavigate, use
 import {
   LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy,
   Eye, Wrench, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award, Ticket, Sparkles,
-  TrendingUp,
+  TrendingUp, Globe2,
 } from 'lucide-react';
 import { Spinner, Toaster, GlobalSearch, ErrorBoundary, useBloqueoDeFondo } from './components.jsx';
 import { api, applyTheme } from './api.js';
@@ -26,6 +26,7 @@ const Lists = lazy(() => import('./pages/Lists.jsx'));
 const Festivals = lazy(() => import('./pages/Festivals.jsx'));
 const Emergentes = lazy(() => import('./pages/Emergentes.jsx'));
 const Estrenos = lazy(() => import('./pages/Estrenos.jsx'));
+const Paises = lazy(() => import('./pages/Paises.jsx'));
 const About = lazy(() => import('./pages/About.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Novedades = lazy(() => import('./pages/Novedades.jsx'));
@@ -53,6 +54,7 @@ const NAV_GROUPS = [
       { to: '/festivales', label: t('Festivales y premios'), Icon: Award },
       { to: '/emergentes', label: t('Directores emergentes'), Icon: TrendingUp },
       { to: '/estrenos', label: t('Estrenos'), Icon: Ticket },
+      { to: '/paises', label: t('Por países'), Icon: Globe2 },
       { to: '/listas', label: t('Listas y retos'), Icon: Trophy },
     ],
   },
@@ -375,6 +377,7 @@ function Shell() {
           <Route path="/festivales" element={<Festivals />} />
           <Route path="/emergentes" element={<Emergentes />} />
           <Route path="/estrenos" element={<Estrenos />} />
+          <Route path="/paises" element={<Paises />} />
           <Route path="/taller" element={<Taller />} />
           <Route path="/acerca" element={<About />} />
           <Route path="/ajustes" element={<Settings />} />

@@ -6,6 +6,104 @@ Lo que ve quien usa la app está en `/novedades`, que es otro texto para otro p�
 Formato: un titular en negrita, secciones cortas y los hechos con sus cifras. La crónica de cómo
 se llegó a cada arreglo vive en el mensaje del commit, no aquí.
 
+## Beta 1.24 (1.0.24-beta) — 2026-08-27
+
+**El cine por países: setenta y dos cinematografías, con dos opiniones enfrentadas.**
+
+Página nueva en «La caza», debajo de Estrenos. Lo mejor de cada país, de siempre y año a año, con
+dos fuentes que dicen cosas distintas a propósito: la lista de la casa —ordenada por la nota de
+Letterboxd— y el ranking de FilmAffinity. El top español de la primera empieza por «Todo sobre mi
+madre»; el de la segunda, por «El verdugo».
+
+### Por qué ordena Letterboxd y no la Σ
+
+La nota de TMDB es popular y reciente: ordenando España por ella, «Culpa mía» —4,8 en Letterboxd
+con 376.874 votos— sale por delante de «El espíritu de la colmena». La Σ de MDBList es peor
+todavía, porque castiga a quien no tiene Metacritic ni Rotten Tomatoes, o sea a casi todo el cine
+no anglosajón anterior a los setenta: «Vida en sombras» tiene 7,2 en Letterboxd y una Σ de **16**.
+De las cinco fuentes probadas, Letterboxd es la única que puntúa las doce clásicas de la muestra.
+
+La nota llega con un decimal, así que empata a mansalva: en el top-100 de España la nota de corte
+es 7,6 y hay **49 películas con exactamente 7,6**. Desempatan los premios y los cánones que ya
+indexa la app, no los votos: desempatar por votos sería desempatar por popularidad, que es el sesgo
+del que se venía huyendo.
+
+### El país de una película es el de quien la dirige
+
+El país de origen de TMDB falla en las dos direcciones: da «Viridiana» por mexicana y «La batalla
+de Chile» por española, cuando España no aparece ni entre sus productoras. Cruzándolo con la
+nacionalidad de la dirección salen bien los ocho casos que se midieron antes de escribir la regla.
+
+Con una válvula, que costó una segunda vuelta: que quien dirige haya nacido en otro sitio solo
+descarta si **ese país es además uno de los de la propia película**. Sin ella, Alemania se quedaba
+sin «M» ni «Metrópolis» —Fritz Lang nació en Viena— y España sin «Tesis» ni «El extraño viaje».
+Alemania pasa de 1.218 películas a 1.485 con la válvula puesta.
+
+Se recorre año por año y no un charco global: «Vida en sombras» tiene **doce** votos en TMDB, y
+bajar un listón global hasta alcanzarla llena la lista de conciertos y monólogos. En España 1949
+hay 49 películas en toda la base, y la buena es la más votada de las 49.
+
+### FilmAffinity viaja empaquetado
+
+Su servidor contesta 403 a Node —distingue por la huella TLS del cliente— y 200 a curl. En vez de
+pelearse con eso, la descarga y el emparejado pasan una vez en desarrollo, y al contenedor viaja un
+fichero de datos, como los palmareses de Wikipedia. Son **14 países**, los que tienen ranking, con
+cien películas cada uno.
+
+Sus códigos no son los ISO: Reino Unido es «uk» e Italia es «italy». Y un ranking inexistente
+responde **200 con la página vacía**, así que el código HTTP no sirve para darlo por bueno.
+
+### Once emparejados falsos, cazados uno a uno
+
+El emparejador de la casa acepta una ficha cuando el nombre de quien dirige casa, aunque el título
+no. Por ahí entraron **once películas que eran otra**: una prueba de cámara de Marlene Dietrich de
+cuatro minutos por «El ángel azul», el making-of de «Sonata de otoño» —206 minutos— por la
+película, la Parte II de «Guerra y paz» por la película entera, y un esbozo vacío chino por «El
+crack» de Garci. Ahora cada ficha se verifica contra TMDB: fecha, duración, distancia de año y
+marcas de obra derivada.
+
+Las marcas de parte se comprueban con límites de palabra sobre el título real, no sobre el
+normalizado: buscando «parti» dentro de la cadena sin espacios se rechazaban «Una jornada
+particular», «Sin señas particulares» y «Desierto Particular», que eran las correctas.
+
+### Los dos países que TMDB llama de otra manera
+
+«CS» no es Checoslovaquia para TMDB: son **90 películas serbias** de los 2000. Y «DD» devuelve
+cero. Los suyos son «XC», con 7.844, y «XG», con 1.144. Sin esto, Checoslovaquia habría servido
+cine serbio bajo el rótulo equivocado, que es peor que servir una lista vacía.
+
+### Lo que se dice cuando algo no se puede hacer
+
+- **Reconstruir sin cupo de MDBList ya no borra el país bueno.** El guardado empieza por un borrado,
+  así que con el cupo del día gastado el país no salía peor: salía vacío y sin error. Ahora se
+  cuentan las notas que faltarían y, si saldría a medias, no se toca nada.
+- **Un fallo ya no pisa las cifras de la última construcción buena**: la tabla conservaba 1.230
+  películas mientras el letrero decía «0 candidatas».
+- **Una nota imposible no es una nota.** MDBList devolvió un 14,6 sobre 10 y el orden lo ponía de
+  número uno de la Unión Soviética.
+- **La barra late durante el paso que se paga.** Eran minutos en una sola espera, y a los sesenta
+  segundos el progreso se daba por muerto mientras el trabajo seguía.
+
+### Correcciones a mano
+
+El ✎ de cada película la saca del país en las dos listas y sobrevive a las reconstrucciones. No es
+un remate para casos raros: TMDB da «Los otros» por estadounidense y «As bestas» por francesa, y
+esas dos no llegan siquiera a candidatas, porque el recorrido solo puede filtrar por el país de
+origen.
+
+### Además
+
+- Tres tablas nuevas con sus columnas aseguradas: una base con la tabla a medias dejaba el servidor
+  **sin arrancar**, que en Docker es el contenedor en bucle de reinicio.
+- El lugar de nacimiento se lee con las anotaciones de TMDB quitadas —«USSR (Russia)», «West
+  Germany [now Germany]»— y treinta alias más. Georgia contesta «no se sabe»: es ambigua, y
+  «Savannah, Georgia» salía georgiana.
+- Los países de una coproducción se leen con coma **y** con espacio. El palmarés escribe «Spain
+  France Italy», y partiendo solo por coma «Los lunes al sol» no llegaba a candidata española.
+- En Windows, `npm run dev` levanta las dos partes: era sintaxis de shell POSIX y solo arrancaba
+  Vite.
+- Cincuenta y una pruebas nuevas. La suite pasa de 340 a 390.
+
 ## Beta 1.23 (1.0.23-beta) — 2026-08-24
 
 **106 KB de prosa fuera. Ni una línea de código tocada.**

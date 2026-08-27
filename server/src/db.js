@@ -656,6 +656,83 @@ db.exec(`CREATE TABLE IF NOT EXISTS imdb_ratings (
   votes INTEGER
 );`);
 
+// EL CINE POR PAÍSES.
+//
+// `country_films` es el índice construido: las mejores de cada país según
+// Letterboxd, con su puesto histórico y su puesto dentro de su año. Es una
+// tabla y no una entrada de `tmdb_cache` porque se consulta POR AÑO, y filtrar
+// eso dentro de un JSON cacheado obliga a traerse el país entero para pintar
+// una década.
+//
+// `motivo` guarda por qué entró cada película —el país de origen de TMDB, la
+// nacionalidad de quien dirige, o tu mano— porque la atribución falla en las
+// dos direcciones y sin el motivo delante no se puede juzgar si falló.
+db.exec(`CREATE TABLE IF NOT EXISTS country_films (
+  iso TEXT NOT NULL,
+  fuente TEXT NOT NULL DEFAULT 'lb',   -- lb (Letterboxd, la nuestra) | fa (el ranking de FilmAffinity)
+  tmdb_id INTEGER NOT NULL,
+  title TEXT,
+  original_title TEXT,
+  year INTEGER,
+  poster TEXT,
+  lb REAL,                 -- nota de Letterboxd (un decimal: es lo que da MDBList)
+  lb_votes INTEGER,
+  sigma INTEGER,           -- la Σ de MDBList, que se ENSEÑA pero no ordena
+  imdb REAL,
+  avales INTEGER DEFAULT 0,   -- en cuántos premios y cánones está: el desempate
+  ganados INTEGER DEFAULT 0,
+  director TEXT,
+  director_iso TEXT,
+  origen TEXT,             -- los iso de origin_country de TMDB, separados por coma
+  motivo TEXT,             -- origen | director | manual
+  rank_global INTEGER,
+  rank_anio INTEGER,
+  PRIMARY KEY (iso, fuente, tmdb_id)
+);
+
+-- Las correcciones a mano, que aquí NO son un lujo: TMDB tiene a «Viridiana»
+-- por mexicana y da «La batalla de Chile» por española. Sobreviven a cada
+-- reconstrucción, como las de Festivales.
+CREATE TABLE IF NOT EXISTS country_overrides (
+  iso TEXT NOT NULL,
+  tmdb_id INTEGER NOT NULL,
+  modo TEXT NOT NULL,      -- add | drop
+  title TEXT,
+  at INTEGER,
+  PRIMARY KEY (iso, tmdb_id)
+);
+
+CREATE TABLE IF NOT EXISTS country_builds (
+  iso TEXT NOT NULL,
+  fuente TEXT NOT NULL DEFAULT 'lb',
+  at INTEGER,
+  candidatos INTEGER,
+  con_nota INTEGER,
+  guardadas INTEGER,
+  del_palmares INTEGER DEFAULT 0,   -- cuántas candidatas puso el palmarés y no TMDB
+  sin_cupo INTEGER DEFAULT 0,       -- notas que quedaron por pedir al agotarse el cupo de MDBList
+  segundos INTEGER,
+  error TEXT,
+  PRIMARY KEY (iso, fuente)
+);`);
+
+// Las columnas que llegaron después del primer CREATE. `IF NOT EXISTS` da por
+// buena una tabla vieja y sigue, así que sin esto el CREATE INDEX de arriba
+// —o el primer INSERT— revienta contra una columna que no está. Y como todo
+// esto corre al IMPORTAR el módulo, no es una página rota: es el servidor que
+// no arranca, o sea el contenedor en bucle de reinicio con el fallo enterrado
+// en los logs. Cuesta tres líneas y quita esa clase de avería entera.
+ensureColumn('country_films', 'fuente', "fuente TEXT NOT NULL DEFAULT 'lb'");
+ensureColumn('country_builds', 'fuente', "fuente TEXT NOT NULL DEFAULT 'lb'");
+ensureColumn('country_builds', 'del_palmares', 'del_palmares INTEGER DEFAULT 0');
+ensureColumn('country_builds', 'sin_cupo', 'sin_cupo INTEGER DEFAULT 0');
+
+// Los índices van DETRÁS de las columnas, no dentro del CREATE TABLE: si la
+// tabla ya existía sin `fuente`, un índice que la nombra revienta antes de que
+// nadie haya podido añadirla.
+db.exec(`CREATE INDEX IF NOT EXISTS idx_cf_global ON country_films(iso, fuente, rank_global);
+CREATE INDEX IF NOT EXISTS idx_cf_anio ON country_films(iso, fuente, year, rank_anio);`);
+
 // --- settings helpers -------------------------------------------------------
 
 const getStmt = db.prepare('SELECT value FROM settings WHERE key = ?');

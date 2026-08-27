@@ -25,6 +25,18 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.24',
+    fecha: '2026-08-27',
+    titular: 'El cine por países, con dos opiniones enfrentadas',
+    puntos: [
+      'Página nueva en «La caza»: lo mejor de cada país, de siempre y año a año. Setenta y dos cinematografías, con lo que tienes y lo que te falta, y el botón de Radarr en cada hueco.',
+      'Dos listas que dicen cosas distintas a propósito. La de la casa ordena por la nota de Letterboxd —la única fuente que puntúa el cine del mundo— y el top español empieza por «Todo sobre mi madre»; la de FilmAffinity va en su orden y empieza por «El verdugo». Catorce países tienen las dos.',
+      'El país de una película es el de quien la dirige, no el que le pone TMDB, que da «Viridiana» por mexicana. Con una excepción que costó una segunda vuelta: que quien dirige naciera fuera solo cuenta si ese país es además de la película, porque si no Alemania se quedaba sin «M» ni «Metrópolis».',
+      'Cuando dos películas empatan a nota —y empatan mucho, porque la nota trae un decimal— desempatan los premios y los cánones que ya conoce la app.',
+      'El ✎ de cada película la saca del país si crees que no es de ahí, y aguanta las reconstrucciones. Hace falta: TMDB da «Los otros» por estadounidense y «As bestas» por francesa.',
+    ],
+  },
+  {
     label: 'Beta 1.23',
     fecha: '2026-08-24',
     titular: 'Los textos de la app, a la mitad',

@@ -11,3 +11,6 @@ web/dist
 .DS_Store
 docs
 assets
+
+# la base y la caché de carteles del desarrollo: nunca al contexto de build
+server/data/

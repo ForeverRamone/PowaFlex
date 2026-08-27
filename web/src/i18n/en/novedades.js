@@ -3,6 +3,20 @@
 // cabecera de la página vive en en/app.js, igual que el titular «Festivales y
 // premios» de la Alpha 0.9.5, que allí ya es nombre de página.
 export default {
+  // ── Beta 1.24 ──────────────────────────────────────────────
+  'El cine por países, con dos opiniones enfrentadas':
+    'World cinema by country, with two opinions that disagree',
+  'Página nueva en «La caza»: lo mejor de cada país, de siempre y año a año. Setenta y dos cinematografías, con lo que tienes y lo que te falta, y el botón de Radarr en cada hueco.':
+    'A new page under “The hunt”: the best of every country, all time and year by year. Seventy-two national cinemas, showing what you own and what you are missing, with a Radarr button on every gap.',
+  'Dos listas que dicen cosas distintas a propósito. La de la casa ordena por la nota de Letterboxd —la única fuente que puntúa el cine del mundo— y el top español empieza por «Todo sobre mi madre»; la de FilmAffinity va en su orden y empieza por «El verdugo». Catorce países tienen las dos.':
+    'Two lists that disagree on purpose. Ours ranks by the Letterboxd rating — the only source that scores world cinema — and its Spanish top starts with “All About My Mother”; FilmAffinity’s keeps their own order and starts with “The Executioner”. Fourteen countries have both.',
+  'El país de una película es el de quien la dirige, no el que le pone TMDB, que da «Viridiana» por mexicana. Con una excepción que costó una segunda vuelta: que quien dirige naciera fuera solo cuenta si ese país es además de la película, porque si no Alemania se quedaba sin «M» ni «Metrópolis».':
+    'A film belongs to the country its director comes from, not the one TMDB gives it — TMDB calls “Viridiana” Mexican. With one exception that took a second pass: the director being born elsewhere only counts if that country is also one of the film’s own, because otherwise Germany lost both “M” and “Metropolis”.',
+  'Cuando dos películas empatan a nota —y empatan mucho, porque la nota trae un decimal— desempatan los premios y los cánones que ya conoce la app.':
+    'When two films tie on rating — and they tie constantly, because the rating comes with one decimal — the awards and canons the app already knows break the tie.',
+  'El ✎ de cada película la saca del país si crees que no es de ahí, y aguanta las reconstrucciones. Hace falta: TMDB da «Los otros» por estadounidense y «As bestas» por francesa.':
+    'The ✎ on each film takes it out of the country if you think it does not belong there, and it survives every rebuild. It is needed: TMDB calls “The Others” American and “The Beasts” French.',
+
   // ── Beta 1.23 ──────────────────────────────────────────────
   'Los textos de la app, a la mitad':
     'The app’s text, halved',

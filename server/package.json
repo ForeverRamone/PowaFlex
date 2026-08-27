@@ -1,14 +1,15 @@
 {
   "name": "powaflex-server",
-  "version": "1.0.23-beta",
-  "versionLabel": "Beta 1.23",
+  "version": "1.0.24-beta",
+  "versionLabel": "Beta 1.24",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "test": "node --test",
-    "snapshot": "node tools/snapshot-palmares.mjs"
+    "snapshot": "node tools/snapshot-palmares.mjs",
+    "snapshot:fa": "node tools/snapshot-filmaffinity.mjs"
   },
   "dependencies": {
     "@fastify/compress": "^9.2.0",

@@ -1,16 +1,20 @@
 {
   "name": "powaflex",
-  "version": "1.0.23-beta",
+  "version": "1.0.24-beta",
   "private": true,
   "workspaces": [
     "server",
     "web"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=web & npm run dev --workspace=server & wait",
+    "dev": "node tools/dev.mjs",
     "dev:server": "npm run dev --workspace=server",
     "dev:web": "npm run dev --workspace=web",
     "build": "npm run build --workspace=web",
     "start": "npm run start --workspace=server"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.25.12": true
   }
 }
