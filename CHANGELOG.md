@@ -6,6 +6,73 @@ Lo que ve quien usa la app está en `/novedades`, que es otro texto para otro p�
 Formato: un titular en negrita, secciones cortas y los hechos con sus cifras. La crónica de cómo
 se llegó a cada arreglo vive en el mensaje del commit, no aquí.
 
+## Beta 1.26 (1.0.26-beta) — 2026-08-27
+
+**Los 72 países vienen hechos. Y MDBList nunca estuvo racionando nada: nos racionábamos solos.**
+
+La página Por países abría diciendo «sin construir» en los setenta y dos, y construir uno son
+minutos. Ahora vienen construidos de fábrica: 30.282 películas empaquetadas en
+`server/src/data/paises/`, un fichero por país. Medido: España pasa de tres minutos de
+construcción a servirse en **172 ms**, sin gastar una sola petición.
+
+### El fallo que estaba detrás de todo
+
+La aplicación llevaba su propia cuenta del cupo diario de MDBList y la llevaba **mal por un factor
+de casi sesenta**. En `fetchRatingsBatch` se apuntaba una petición por TÍTULO, con un comentario
+que decía «the batch endpoint is billed per title». Es falso: se cobra por petición HTTP, lleve
+dentro un título o cien.
+
+Medido contra su propio contador, el mismo día:
+
+```
+límite diario:                25.000
+gastadas según MDBList:          388
+gastadas según PowaFlex:      22.369
+```
+
+Comprobado además a mano: un lote de veinte títulos mueve su contador **una** unidad.
+
+La consecuencia no era teórica. La aplicación se declaraba «sin cupo diario» teniendo el 98% del
+día libre, y a partir de ahí las notas dejaban de funcionar para todo lo demás: las reglas de
+Radarr, Estrenos, los festivales, las listas. Ahora la cuenta la lleva la función que hace la
+petición, que es lo único que ellos facturan, y las dos unidades van separadas: peticiones y
+títulos no son lo mismo.
+
+De paso, la reserva que se deja sin gastar baja del 20% al 5%. Con el 20%, el margen valía un país
+entero al día; con el 5% quedan 1.250 peticiones de colchón sobre una cuenta Supporter, que sigue
+siendo holgado para cubrir el desfase entre su contador y el nuestro.
+
+### Lo que ya no se cuela en las listas
+
+- **Los conciertos filmados.** «Pink Floyd: Live at Pompeii» y un directo de BTS abrían el top de
+  Reino Unido con 8,8, entre «Lawrence de Arabia» y «Las zapatillas rojas»; «Dua Lipa: Live from
+  Mexico» era la número uno de México, por delante de «El laberinto del fauno». El público los
+  puntúa como lo que son —un buen concierto— y así se cuelan. La firma es tener género musical y
+  ningún otro, o musical y documental; cuando ni eso basta —«Flight of the Conchords: Live in
+  London» viene como comedia— lo remata el «Live in / at / from» del título. Los musicales de
+  verdad se quedan: ninguno va solo de género musical.
+- **Lo que aún no se ha estrenado.** Una película sin estrenar con un 8,8 no tiene una nota: tiene
+  la expectación de quien la espera, y un canon histórico no puede incluir lo que todavía no
+  existe.
+
+### Construir un país a medias ya no se guarda
+
+La salvaguarda del cupo protegía de RECONSTRUIR un país a medias, pero no de construirlo por
+primera vez a medias, que es peor: quedaba incompleto con pinta de completo y así se habría
+empaquetado. Ahora corta en los dos casos si falta más de un décimo de las notas.
+
+### Además
+
+- Un país empaquetado se siembra solo la primera vez que se pide, y desde ahí todo funciona igual:
+  el cruce con tu Plex, el ✎ y Radarr. Quien quiera rehacer uno sigue teniendo el botón.
+- El desplegable dice «viene hecho» leyendo un manifiesto de unos cientos de bytes, en vez de
+  cargar los 3,5 MB de datos para pintar una lista.
+- Cargar el país que se mira, y solo ese: con las claves puestas Alemania ocupaba 205 KB y en
+  tuplas son 133.
+- La consulta de un país no puede devolver un 500 mudo: si algo falla al cargarlo, lo dice.
+- Cinco pruebas nuevas para los conciertos y los estrenos, incluida la que impide que «Carne
+  trémula» —«Live Flesh» en inglés— se caiga de la lista española por su nombre.
+
 ## Beta 1.25 (1.0.25-beta) — 2026-08-27
 
 **El Top 1000 de FilmAffinity entra en los cánones. 998 de las mil, con ficha.**

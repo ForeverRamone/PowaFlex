@@ -27,6 +27,10 @@ async function mdbFetch(path, { method = 'GET', body = null, params = {} } = {})
     throw err;
   }
   if (!res.ok) throw new Error(`MDBList ${res.status} en ${path}`);
+  // La cuenta se lleva AQUÍ, que es lo único que ellos cobran: UNA petición
+  // HTTP, lleve dentro un título o cien. El 429 no se apunta porque no se
+  // sirvió nada, pero cualquier otra respuesta sí: un 404 les cuenta igual.
+  addUsage(1);
   return res.json();
 }
 
@@ -43,13 +47,28 @@ export async function mdbTest() {
 
 // --- daily budget by account tier ---------------------------------------------
 
+/**
+ * LA RESERVA que se deja sin gastar, y por qué no es cero.
+ *
+ * Nuestra cuenta y la de MDBList pueden desfasarse: aquí se apunta lo que se
+ * pide, pero un lote que muere a medias, otro cliente con la misma clave o un
+ * reintento suyo cuentan allí y no aquí. Apurar al 100% es comprarse un 429 en
+ * mitad de un pase largo, que es justo cuando más duele.
+ *
+ * Estaba en el 20% y era demasiado prudente para lo que se hace ahora:
+ * construir un país son unas cuatro mil peticiones, así que ese margen valía un
+ * país entero al día. Con el 5% quedan 1.250 de colchón sobre una cuenta
+ * Supporter, que sigue siendo holgado.
+ */
+const RESERVA = 0.05;
+
 function dailyBudget() {
   const tier = getSetting('mdblist_tier') || 'auto';
   if (tier === 'free') return 900;
-  if (tier === 'supporter') return 20000;
+  if (tier === 'supporter') return Math.floor(25000 * (1 - RESERVA));
   // auto: el límite que declara /user, guardado por `asegurarLimiteDiario`
   const cached = Number(getSetting('mdblist_detected_limit') || 0);
-  return cached > 1000 ? Math.floor(cached * 0.8) : 900;
+  return cached > 1000 ? Math.floor(cached * (1 - RESERVA)) : 900;
 }
 
 /**
@@ -73,7 +92,6 @@ async function asegurarLimiteDiario() {
   setSetting('mdblist_limit_at', hoy); // aunque falle: una vez al día, no una por petición
   try {
     const u = await mdbFetch('/user');
-    addUsage(1);
     const limite = Number(u.api_requests ?? 0);
     if (limite > 0) setSetting('mdblist_detected_limit', String(limite));
   } catch {
@@ -96,9 +114,21 @@ function addUsage(n) {
   setSetting('mdblist_usage', JSON.stringify(u));
 }
 
+/** Peticiones que quedan hoy. */
 export function remainingBudget() {
   return Math.max(0, dailyBudget() - usage().count);
 }
+
+// Cuántos títulos caben en un lote. Es el tamaño con el que se trocea en todos
+// los sitios que piden notas, y lo que convierte peticiones en títulos.
+export const POR_LOTE = 100;
+
+/**
+ * Cuántos TÍTULOS se pueden pedir todavía hoy. Que no es lo mismo que peticiones:
+ * cien títulos viajan en una sola, y confundirlo es lo que tenía a la aplicación
+ * racionándose a sí misma.
+ */
+export const titulosQueCaben = () => remainingBudget() * POR_LOTE;
 
 /** ¿Hay clave de MDBList? Sin ella no hay Σ, y las reglas con umbral no pueden
  *  decidir nada: tienen que poder decirlo en vez de callar. */
@@ -139,7 +169,7 @@ export async function refrescarNotasDeReglas(items, { maxFetch = 200, caducaMs =
   );
   const pendientes = ids.filter((id) => !frescas.has(id));
   if (!pendientes.length) return vacío();
-  const presupuesto = remainingBudget();
+  const presupuesto = titulosQueCaben();
   if (presupuesto <= 0) return { ...vacío('sin_presupuesto'), pendientes: pendientes.length };
 
   const aPedir = pendientes.slice(0, Math.min(maxFetch, presupuesto));
@@ -206,16 +236,27 @@ function parseItem(item) {
  * propagates (it is not a per-title failure: the whole sync has to stop), and
  * only the requests actually issued are charged to the daily budget.
  */
+/**
+ * UN LOTE DE CIEN TÍTULOS CUESTA UNA PETICIÓN, NO CIEN.
+ *
+ * Aquí se apuntaba `used = tmdbIds.length` con el comentario «the batch endpoint
+ * is billed per title», y era falso. Medido contra su propio contador
+ * (`/user` → `api_requests_count`): un lote de veinte títulos movió el contador
+ * UNA unidad. La app se creía a 22.369 peticiones de las 25.000 cuando ellos
+ * habían contado 388 — un factor de casi sesenta.
+ *
+ * La consecuencia no era teórica: con esa cuenta, la aplicación se declaraba sin
+ * cupo teniendo el 98% del día libre, y a partir de ahí las notas «no
+ * funcionaban» para todo lo demás. Ahora la cuenta la lleva `mdbFetch`, que es
+ * quien hace la petición: una por llamada, que es lo que ellos cobran.
+ */
 export async function fetchRatingsBatch(tmdbIds) {
   apiKey(); // no key = no request leaves: must not spend budget either
   let items = null;
-  let used = 0;
   let parsed = [];
   try {
     try {
-      used = 1;
       const res = await mdbFetch('/tmdb/movie', { method: 'POST', body: { ids: tmdbIds } });
-      used = tmdbIds.length; // the batch endpoint is billed per title
       items = Array.isArray(res) ? res : res.movies || res.results || null;
     } catch (err) {
       if (err.rateLimited) throw err;
@@ -224,7 +265,6 @@ export async function fetchRatingsBatch(tmdbIds) {
     if (!items) {
       items = [];
       for (const id of tmdbIds) {
-        used++;
         try {
           items.push(await mdbFetch(`/tmdb/movie/${id}`));
         } catch (err) {
@@ -233,7 +273,6 @@ export async function fetchRatingsBatch(tmdbIds) {
       }
     }
   } finally {
-    if (used) addUsage(used);
     // Guardar va en el finally a propósito: un 429 a mitad de lote se lleva por
     // delante el resto, pero las que YA se descargaron están pagadas del
     // presupuesto del día y tirarlas obligaba a volver a pedirlas mañana.
@@ -294,7 +333,7 @@ export async function syncRatings() {
       .all(cutoff)
       .map((r) => r.tmdb_id);
 
-    const budget = remainingBudget();
+    const budget = titulosQueCaben();
     const work = pending.slice(0, budget);
     mdbSyncStatus.total = work.length;
 
@@ -327,7 +366,14 @@ export function ratingsCoverage() {
        WHERE COALESCE(r.score, r.imdb, r.rt_critic, r.rt_audience, r.metacritic, r.letterboxd, r.trakt) IS NOT NULL`
     )
     .get().n;
-  return { total, withRatings, remainingBudget: remainingBudget(), usedToday: usage().count };
+  // las dos unidades, porque no son lo mismo: cien títulos caben en UNA petición
+  return {
+    total,
+    withRatings,
+    remainingBudget: remainingBudget(),
+    titulosQueCaben: titulosQueCaben(),
+    usedToday: usage().count,
+  };
 }
 
 /**
@@ -348,7 +394,7 @@ export async function enrichWithScores(items, { fetchMissing = true, maxFetch = 
     try {
       apiKey();
       await asegurarLimiteDiario();
-      const missing = ids.filter((id) => !rows.has(id)).slice(0, Math.min(maxFetch, remainingBudget()));
+      const missing = ids.filter((id) => !rows.has(id)).slice(0, Math.min(maxFetch, titulosQueCaben()));
       for (let i = 0; i < missing.length; i += 100) {
         for (const p of await fetchRatingsBatch(missing.slice(i, i + 100))) {
           rows.set(p.tmdb_id, p);
@@ -420,7 +466,6 @@ export function insights() {
 
 export async function searchLists(query) {
   const res = await mdbFetch('/lists/search', { params: { query } });
-  addUsage(1);
   const arr = Array.isArray(res) ? res : res.lists || res.results || [];
   return arr.map((l) => ({
     mdb_id: l.id,
@@ -434,7 +479,6 @@ export async function searchLists(query) {
 
 async function fetchListInfoByPath(userName, slug) {
   const res = await mdbFetch(`/lists/${userName}/${slug}`);
-  addUsage(1);
   const l = Array.isArray(res) ? res[0] : res;
   if (!l?.id) throw new Error('Lista no encontrada en MDBList');
   return l;
@@ -446,7 +490,6 @@ async function fetchListItems(mdbId) {
   const LIMIT = 1000;
   for (;;) {
     const res = await mdbFetch(`/lists/${mdbId}/items`, { params: { limit: LIMIT, offset } });
-    addUsage(1);
     const movies = Array.isArray(res) ? res : res.movies || [];
     for (const it of movies) {
       const tmdbId = it?.ids?.tmdb ?? it?.tmdb_id ?? it?.id;

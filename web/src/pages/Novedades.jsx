@@ -25,6 +25,18 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.26',
+    fecha: '2026-08-27',
+    titular: 'Los 72 países vienen hechos, y MDBList nunca estuvo racionando',
+    puntos: [
+      'Por países abría diciendo «sin construir» en los setenta y dos, y construir uno son minutos. Ahora vienen construidos de fábrica: 30.282 películas, y España se sirve en 172 milisegundos en vez de tres minutos.',
+      'Detrás había un fallo de los que explican otras cosas: la app llevaba su propia cuenta del cupo de MDBList y la llevaba mal por un factor de casi sesenta, porque apuntaba una petición por título cuando se cobra por llamada. El día que lo medimos ella se creía a 22.369 peticiones y MDBList había contado 388. Por eso se declaraba «sin cupo» con el 98% del día libre, y con ella se quedaban sin notas las reglas, Estrenos y los festivales.',
+      'Fuera los conciertos filmados: «Pink Floyd: Live at Pompeii» y un directo de BTS abrían el top de Reino Unido entre «Lawrence de Arabia» y «Las zapatillas rojas», y un concierto de Dua Lipa era el número uno de México. Los musicales de verdad se quedan.',
+      'Y fuera lo que aún no se ha estrenado: una película sin estrenar no tiene una nota alta, tiene la expectación de quien la espera.',
+      'Construir un país con el cupo corto ya no lo guarda a medias con pinta de completo, ni al hacerlo por primera vez.',
+    ],
+  },
+  {
     label: 'Beta 1.25',
     fecha: '2026-08-27',
     titular: 'El Top 1000 de FilmAffinity, en los cánones',

@@ -10,7 +10,7 @@ process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'powaflex-paises-')
 const {
   atribuir, isoDeLugar, isosDeTexto, ordenar, notaValida, codigoTmdb, PAISES, TIERS, tierDe, esPaisConocido,
   ponerOverride, quitarOverride, overridesDePais, peliculasDePais, aniosDePais, catalogoPaises,
-  apuntarFallo, guardarBuild,
+  apuntarFallo, guardarBuild, esConcierto, estaEstrenada,
 } = await import('../src/paises.js');
 const { RANKINGS, parsearFichas, partirTitulo, tieneRanking } = await import('../src/filmaffinity.js');
 const { FA_RANKINGS } = await import('../src/data/filmaffinity-2026.js');
@@ -222,6 +222,46 @@ test('CHECOSLOVAQUIA Y ALEMANIA DEL ESTE se le piden a TMDB con SU código', () 
   assert.equal(codigoTmdb('ES'), 'ES');
   assert.equal(codigoTmdb('SU'), 'SU');
   assert.equal(codigoTmdb('YU'), 'YU');
+});
+
+// --- lo que NO es una película que buscar ------------------------------------
+
+const conGeneros = (title, ids) => ({ title, original_title: title, genres: ids.map((id) => ({ id })) });
+
+test('UN CONCIERTO FILMADO NO ES CINE, aunque el público lo puntúe alto', () => {
+  // «Pink Floyd: Live at Pompeii» y un directo de BTS abrían el top de Reino
+  // Unido con 8,8, entre «Lawrence de Arabia» y «Las zapatillas rojas»; «Dua
+  // Lipa: Live from Mexico» era la número uno de México por delante de «El
+  // laberinto del fauno».
+  assert.equal(esConcierto(conGeneros('Dua Lipa: Live from Mexico', [10402])), true, 'solo género musical');
+  assert.equal(esConcierto(conGeneros('Pink Floyd: Live at Pompeii', [10402, 99])), true, 'musical y documental');
+  // y el que no delatan los géneros, porque viene como comedia: lo dice el título
+  assert.equal(esConcierto(conGeneros('Flight of the Conchords: Live in London', [35, 10402])), true);
+});
+
+test('…pero un MUSICAL sí lo es, y no se puede echar con la misma vara', () => {
+  // un musical de verdad nunca va solo de género musical
+  assert.equal(esConcierto(conGeneros('Cabaret', [18, 10402])), false);
+  assert.equal(esConcierto(conGeneros('La La Land', [35, 18, 10749, 10402])), false);
+  assert.equal(esConcierto(conGeneros('A Hard Day’s Night', [35, 10402])), false);
+});
+
+test('el título solo cuenta si además hay género musical', () => {
+  // «Carne trémula» se llama «Live Flesh» en inglés: sin la condición del
+  // género, se caería de la lista española por su nombre
+  assert.equal(esConcierto(conGeneros('Live Flesh', [18, 80])), false);
+  assert.equal(esConcierto(conGeneros('The Live-In Maid', [18])), false);
+});
+
+test('lo que no se ha estrenado no entra en un canon histórico', () => {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const dentroDeUnAño = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  assert.equal(estaEstrenada({ release_date: dentroDeUnAño }), false, 'su nota alta son las ganas de verla');
+  assert.equal(estaEstrenada({ release_date: hoy }), true);
+  assert.equal(estaEstrenada({ release_date: '1957-01-01' }), true);
+  // sin fecha SÍ entra: hay clásicos con la ficha incompleta y eso no es motivo
+  assert.equal(estaEstrenada({}), true);
+  assert.equal(estaEstrenada({ release_date: '' }), true);
 });
 
 // --- el catálogo --------------------------------------------------------------

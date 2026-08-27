@@ -39,7 +39,7 @@
 import { db } from './db.js';
 import { tmdbGet, movieDetail, personDetails, setBuildProgress, clearBuildProgress, classifyGenres } from './tmdb.js';
 import { esLargometraje } from './releases.js';
-import { enrichWithScores, hayClaveMdblist, remainingBudget } from './mdblist.js';
+import { enrichWithScores, hayClaveMdblist, titulosQueCaben } from './mdblist.js';
 import { conteoAvales } from './avales.js';
 import { REGISTRY, filasEmpaquetadas } from './festivals.js';
 import { mapPool, cedeElHilo } from './pool.js';
@@ -399,6 +399,54 @@ export function atribuir({ iso, origen = [], produccion = [], directorIso = null
 const clasificar = (d) => classifyGenres({ ...d }, (d.genres || []).map((g) => g.id));
 
 /**
+ * ¿Está estrenada YA?
+ *
+ * Sin fecha se acepta: hay clásicos con la ficha incompleta y no es motivo para
+ * echarlos. Lo que se echa es lo que TIENE fecha y esa fecha es futura, que es
+ * otra cosa: una película sin estrenar no puede estar en un top histórico, y su
+ * nota alta no es una nota sino la expectación de quien la espera.
+ */
+/**
+ * ¿ES UN CONCIERTO FILMADO?
+ *
+ * `classifyGenres` marca como música lo que lleva Música Y Documental, y así
+ * caza «Pink Floyd: Live at Pompeii». Pero «Dua Lipa: Live from Mexico» lleva
+ * SOLO Música —125 minutos, sin más géneros— y se plantó de número uno de
+ * México, por delante de «El laberinto del fauno» y «El ángel exterminador».
+ *
+ * La firma de un concierto es justamente esa: Música y nada más, o Música y
+ * Documental. Un musical de verdad nunca va solo — «Cabaret» es Drama y Música,
+ * «La La Land» es Comedia, Drama, Romance y Música—, así que exigir que no haya
+ * ningún otro género deja los musicales dentro y echa los directos.
+ */
+const MUSICA = 10402;
+const DOCUMENTAL = 99;
+
+/**
+ * Y el que no se deja cazar por los géneros: «Flight of the Conchords: Live in
+ * London» viene como Comedia y Música, así que el «ningún otro género» no lo
+ * pilla, y se plantó de séptimo de Nueva Zelanda. Cuando hay género musical,
+ * el «Live in / at / from» del título termina de decidirlo.
+ *
+ * La condición del género es imprescindible: sin ella, «Live Flesh» —«Carne
+ * trémula» de Almodóvar— saldría de la lista española por llamarse como se
+ * llama.
+ */
+const EN_DIRECTO = /\b(live (at|from|in|on)|en (directo|vivo)|unplugged)\b/i;
+
+export const esConcierto = (d) => {
+  const ids = (d.genres || []).map((g) => g.id);
+  if (!ids.includes(MUSICA)) return false;
+  if (ids.every((id) => id === MUSICA || id === DOCUMENTAL)) return true;
+  return EN_DIRECTO.test(d.title || '') || EN_DIRECTO.test(d.original_title || '');
+};
+
+export const estaEstrenada = (d) => {
+  const fecha = String(d.release_date || '').slice(0, 10);
+  return !fecha || fecha <= new Date().toISOString().slice(0, 10);
+};
+
+/**
  * LOS CANDIDATOS QUE APORTA EL PALMARÉS.
  *
  * El recorrido por años pregunta a TMDB por `with_origin_country`, así que una
@@ -604,8 +652,10 @@ export async function construirPais(iso, { hasta = new Date().getFullYear() } = 
     //    que falta tiene que DECIRSE, no colarse como un cero.
     const yaSabidas = contarConNota(candidatos.map((c) => c.tmdb_id));
     const porPedir = candidatos.length - yaSabidas;
-    const cupo = remainingBudget();
-    const sinCupo = Math.max(0, porPedir - cupo);
+    // Se compara en TÍTULOS, no en peticiones: cien títulos viajan en una sola
+    // llamada, y confundir las dos unidades es lo que tenía a la aplicación
+    // racionándose a sí misma con el 98% del día libre.
+    const sinCupo = Math.max(0, porPedir - titulosQueCaben());
 
     // Va en tandas y no de una sola vez PARA QUE LATA. `enrichWithScores` no
     // admite callback, así que pedir los cuatro mil de golpe dejaba la barra
@@ -637,7 +687,19 @@ export async function construirPais(iso, { hasta = new Date().getFullYear() } = 
         // cuelan los cortos y los telefilmes —a Islandia le entró
         // «Næturvaktin», que es una serie— y una lista de las mejores de un
         // país con una sitcom dentro no se puede enseñar.
-        if (!esLargometraje(clasificar(d))) return;
+        const clasificada = clasificar(d);
+        if (!esLargometraje(clasificada)) return;
+        // Y FUERA LOS CONCIERTOS. El top de Reino Unido abría con «Pink Floyd:
+        // Live at Pompeii» y un directo de BTS, las dos con 8,8 de Letterboxd:
+        // el público las puntúa como lo que son, un buen concierto, y así se
+        // cuelan entre «Lawrence de Arabia» y «Las zapatillas rojas». Filmar un
+        // concierto no es hacer cine, y una lista de las mejores películas de
+        // un país con dos directos dentro no se puede enseñar.
+        if (clasificada.isMusic || esConcierto(d)) return;
+        // Y LO QUE NO SE HA ESTRENADO. «La Odisea» de Nolan aparecía tercera de
+        // Reino Unido con un 8,8 que no es una nota: son las ganas de verla. Un
+        // canon histórico no puede incluir lo que todavía no existe.
+        if (!estaEstrenada(d)) return;
         const dirs = (d.credits?.crew || []).filter((x) => x.job === 'Director');
         const origen = d.origin_country || [];
         const produccion = (d.production_countries || []).map((x) => x.iso_3166_1);

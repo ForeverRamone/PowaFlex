@@ -3,6 +3,20 @@
 // cabecera de la página vive en en/app.js, igual que el titular «Festivales y
 // premios» de la Alpha 0.9.5, que allí ya es nombre de página.
 export default {
+  // ── Beta 1.26 ──────────────────────────────────────────────
+  'Los 72 países vienen hechos, y MDBList nunca estuvo racionando':
+    'All 72 countries ship ready-made, and MDBList was never rationing us',
+  'Por países abría diciendo «sin construir» en los setenta y dos, y construir uno son minutos. Ahora vienen construidos de fábrica: 30.282 películas, y España se sirve en 172 milisegundos en vez de tres minutos.':
+    'By country opened saying “not built yet” for all seventy-two, and building one takes minutes. They now ship ready-made: 30,282 films, and Spain is served in 172 milliseconds instead of three minutes.',
+  'Detrás había un fallo de los que explican otras cosas: la app llevaba su propia cuenta del cupo de MDBList y la llevaba mal por un factor de casi sesenta, porque apuntaba una petición por título cuando se cobra por llamada. El día que lo medimos ella se creía a 22.369 peticiones y MDBList había contado 388. Por eso se declaraba «sin cupo» con el 98% del día libre, y con ella se quedaban sin notas las reglas, Estrenos y los festivales.':
+    'Behind it was the kind of bug that explains other things: the app kept its own count of the MDBList quota and got it wrong by a factor of almost sixty, because it logged one request per title when they charge per call. The day we measured it, the app believed it had spent 22,369 requests and MDBList had counted 388. That is why it declared itself “out of quota” with 98% of the day still free, taking the rules, Releases and the festivals down with it.',
+  'Fuera los conciertos filmados: «Pink Floyd: Live at Pompeii» y un directo de BTS abrían el top de Reino Unido entre «Lawrence de Arabia» y «Las zapatillas rojas», y un concierto de Dua Lipa era el número uno de México. Los musicales de verdad se quedan.':
+    'Filmed concerts are out: “Pink Floyd: Live at Pompeii” and a BTS live show opened the UK top between “Lawrence of Arabia” and “The Red Shoes”, and a Dua Lipa concert was Mexico’s number one. Actual musicals stay.',
+  'Y fuera lo que aún no se ha estrenado: una película sin estrenar no tiene una nota alta, tiene la expectación de quien la espera.':
+    'And so is anything not yet released: an unreleased film does not have a high rating, it has the anticipation of the people waiting for it.',
+  'Construir un país con el cupo corto ya no lo guarda a medias con pinta de completo, ni al hacerlo por primera vez.':
+    'Building a country on a short quota no longer saves it half-done looking complete, not even the first time round.',
+
   // ── Beta 1.25 ──────────────────────────────────────────────
   'El Top 1000 de FilmAffinity, en los cánones':
     'FilmAffinity’s Top 1000 joins the canons',

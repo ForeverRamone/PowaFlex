@@ -869,9 +869,18 @@ app.get('/api/paises/:iso', async (req, reply) => {
     return { error: 'El año tiene que ser un número' };
   }
   const fuente = req.query.fuente === 'fa' ? 'fa' : 'lb';
-  // Si viene empaquetado y esta base no lo tiene, se siembra AQUÍ: así la
-  // primera visita ya lo encuentra hecho, sin construir ni gastar cupo.
-  if (fuente === 'lb') await sembrarPais(iso);
+  try {
+    // Si viene empaquetado y esta base no lo tiene, se siembra AQUÍ: así la
+    // primera visita ya lo encuentra hecho, sin construir ni gastar cupo.
+    if (fuente === 'lb') await sembrarPais(iso);
+  } catch (err) {
+    // Sembrar toca la base y lee un fichero de datos: si algo de eso falla, la
+    // página tiene que poder DECIRLO. Un 500 pelado en la pantalla es
+    // indistinguible de una avería del servidor entero.
+    app.log.error({ err, iso }, 'no se pudo sembrar el país empaquetado');
+    reply.code(502);
+    return { error: `No se pudo cargar ${PAISES[iso].es}: ${String(err.message || err).slice(0, 200)}` };
+  }
   const ficha = catalogoPaises().find((p) => p.iso === iso);
   return {
     iso,
