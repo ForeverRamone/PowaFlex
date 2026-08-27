@@ -203,6 +203,6 @@ export default {
   'National Film Registry': 'National Film Registry',
   'Biblioteca del Congreso de EE UU: cine conservado por su valor cultural, histórico o estético (25 al año desde 1989)':
     'US Library of Congress: films preserved for their cultural, historical or aesthetic value (25 a year since 1989)',
-  'Sesenta y cinco fuentes: secciones oficiales, palmareses y nominadas, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el AFI, Criterion y el registro estadounidense).':
-    'Sixty-five sources: official selections, winners and nominees, guild critics, animation and documentary, and the canons (Sight & Sound, the 1001, the AFI, Criterion and the US registry).',
+  'Sesenta y seis fuentes: secciones oficiales, palmareses y nominadas, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el Top 1000 de FilmAffinity, el AFI, Criterion y el registro estadounidense).':
+    'Sixty-six sources: official selections, winners and nominees, guild critics, animation and documentary, and the canons (Sight & Sound, the 1001, FilmAffinity’s Top 1000, the AFI, Criterion and the US registry).',
 };

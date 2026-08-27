@@ -25,6 +25,18 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.25',
+    fecha: '2026-08-27',
+    titular: 'El Top 1000 de FilmAffinity, en los cánones',
+    puntos: [
+      'Sexta lista de la sección Cánones, junto a Sight & Sound, las 1001, el AFI, Criterion y el registro estadounidense. Es la que vota el público en español, y se nota: donde las listas en inglés abren el cine español con «Todo sobre mi madre», esta empieza por «El verdugo».',
+      'Cuenta como aval en toda la app, así que pesa en el desempate de Por países, en Descubrir y en la ficha de cada película. «El Padrino» pasa a seis avales y «Viridiana» a cuatro.',
+      'Novecientas noventa y ocho de las mil tienen ficha. Seis apuntaban a otra película —un making-of de catorce minutos por «Wild Strawberries», una prueba de cámara de cuatro por «El ángel azul»— y se cazaron verificando cada una contra TMDB.',
+      'Las veinte que faltaban se emparejaron a mano, y ninguna era oscura: fallaban por el título. FilmAffinity dice «The Downfall: Hitler and the End of the Third Reich» donde TMDB dice «Downfall», y «Love» donde dice «Amour».',
+      'Dos se quedan sin ficha a propósito: los OVA de Rurouni Kenshin son televisión, y una serie en un canon no es una película que buscar.',
+    ],
+  },
+  {
     label: 'Beta 1.24',
     fecha: '2026-08-27',
     titular: 'El cine por países, con dos opiniones enfrentadas',

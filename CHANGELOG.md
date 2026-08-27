@@ -6,6 +6,52 @@ Lo que ve quien usa la app está en `/novedades`, que es otro texto para otro p�
 Formato: un titular en negrita, secciones cortas y los hechos con sus cifras. La crónica de cómo
 se llegó a cada arreglo vive en el mensaje del commit, no aquí.
 
+## Beta 1.25 (1.0.25-beta) — 2026-08-27
+
+**El Top 1000 de FilmAffinity entra en los cánones. 998 de las mil, con ficha.**
+
+Sexta fuente de la sección Cánones, junto a Sight & Sound, las 1001, el AFI, Criterion y el
+registro estadounidense. Es el canon que vota el público en español, y por eso no se parece a los
+otros: donde las listas en inglés abren el cine español con «Todo sobre mi madre», esta empieza por
+«El verdugo».
+
+Cuenta como aval en toda la aplicación, así que pesa en el desempate de Por países, en Descubrir y
+en la ficha de cada película: «El Padrino» pasa a seis avales y «Viridiana» a cuatro.
+
+### Seis fichas eran de otra película
+
+Se emparejaron las mil contra TMDB con la misma verificación que se estrenó en el ranking por
+países, y volvió a hacer falta: el emparejador da por buena una ficha cuando el nombre de quien
+dirige casa aunque el título no.
+
+- «Wild Strawberries» apuntaba a un making-of de catorce minutos.
+- «Autumn Sonata», a «The Making of Autumn Sonata».
+- «The Blue Angel», a una prueba de cámara de Marlene Dietrich de cuatro minutos.
+- «Crash» y «Perfect Blue», a fichas huérfanas sin fecha ni duración.
+
+Y una que se salvó sola: «A Short Film About Killing» recibía la ficha de «A Short Film About
+Love», que ya la tenía en su propio puesto. Se quedó sin cartel antes que robársela.
+
+### Las veinte que faltaban, emparejadas a mano
+
+Ninguna era oscura: casi todas fallaban por el título. FilmAffinity escribe «The Downfall: Hitler
+and the End of the Third Reich» donde TMDB dice «Downfall», «Love» donde dice «Amour», «The Cry»
+donde dice «Il grido» y «The Tale of Princess Kaguya» sin el segundo artículo. Van escritas en la
+herramienta que genera el dataset, con el porqué de cada una, para que sobrevivan a la próxima
+regeneración.
+
+Dos se quedan **sin ficha a propósito**: los OVA de Rurouni Kenshin son televisión en TMDB, y su
+entrada de película es un duplicado con cero minutos y siete votos. Una serie en un canon no es una
+película que buscar, como ya pasaba con las miniseries de Criterion.
+
+### Además
+
+- Herramienta nueva, `npm run snapshot:fa1000`, que convierte el CSV del ranking en el dataset
+  empaquetado. Como el de países, no se baja en caliente: el servidor de FilmAffinity contesta 403
+  a Node.
+- La cabecera de Festivales pasa de sesenta y cinco fuentes a **sesenta y seis**, en los dos
+  idiomas.
+
 ## Beta 1.24 (1.0.24-beta) — 2026-08-27
 
 **El cine por países: setenta y dos cinematografías, con dos opiniones enfrentadas.**

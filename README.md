@@ -2,7 +2,7 @@
 
 # 🎬 PowaFlex
 
-> **Beta 1.24** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
+> **Beta 1.25** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
 > de filmografías, calendario de estrenos venideros conectado a TMDB y envío directo a Radarr.
 
 PowaFlex vive junto a tu servidor Plex (en Docker), lee tu biblioteca **directamente por la API**
@@ -19,7 +19,7 @@ el cine que tienes* y *cazar el que te falta*. Todo en local, sin cuentas ni tel
 | 🎞️ **Biblioteca** | La colección en parrilla de pósters, con filtros estilo Letterboxd (género, país, década, metraje, resolución, HDR, notas mínimas) y la ordenación que quieras. La nota del póster la eliges tú. |
 | 🎭 **Directores/as y actores/actrices** | Ranking por presencia con filtros demográficos. Cada ficha cruza la filmografía de TMDB con lo que tienes: completismo, lo que falta (**+ Radarr**) y proyectos anunciados. |
 | 🗓️ **Cine venidero** | Calendario mensual de estrenos y proyectos de tu gente, con envío a Radarr en un clic. |
-| 🎪 **Festivales, premios y cánones** | Sesenta y cinco fuentes: secciones oficiales edición a edición, palmareses y nominadas por año, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el AFI, Criterion, el registro estadounidense). Más **«Lo mejor del año»**, el corte transversal. Cada ficha se corrige a mano (✎), manda a Radarr lo que falte y el pase nocturno vigila las ediciones nuevas. |
+| 🎪 **Festivales, premios y cánones** | Sesenta y seis fuentes: secciones oficiales edición a edición, palmareses y nominadas por año, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el AFI, Criterion, el registro estadounidense). Más **«Lo mejor del año»**, el corte transversal. Cada ficha se corrige a mano (✎), manda a Radarr lo que falte y el pase nocturno vigila las ediciones nuevas. |
 | ⭐ **Favoritos** | Tu gente de cabecera, por una faceta o por las dos. Paquetes temáticos, el catálogo de 680 directores en activo de Wikidata, pegar listas de nombres y exportar la tuya. Alimentan el calendario y el auto-Radarr. |
 | 🧭 **Descubrir huecos** | Lo que falta de tus favoritos y de tus top, los grandes ausentes del canon y tus sagas a medias, con listón de nota y filtros de ruido. |
 | 🏆 **Listas y retos** | Listas de MDBList y retos de Letterboxd con anillos de «tengo» vs «visto», y envío en bloque a Radarr. |

@@ -27,6 +27,7 @@ import { enrichWithScores } from './mdblist.js';
 import { watchedIndex, isWatched } from './letterboxd.js';
 import { SIGHT_AND_SOUND_2022 } from './data/sight-and-sound-2022.js';
 import { MIL_UNA_2021 } from './data/1001-movies-2021.js';
+import { FA_TOP1000 } from './data/fa-top1000.js';
 import { OSCAR_BEST_PICTURE } from './data/oscar-best-picture.js';
 import { PALMARES } from './data/palmares-2026.js';
 
@@ -406,6 +407,31 @@ export const REGISTRY = {
     staticSource: 'https://en.wikipedia.org/wiki/1001_Movies_You_Must_See_Before_You_Die',
     staticNote:
       'Las 1001 del libro (15.ª edición, 2021), en su orden cronológico. Cuatro bloques que el libro trata como una sola entrada (Toy Story, El Señor de los Anillos, Iván el Terrible y Olympia) aparecen con su primera película.',
+  },
+  /**
+   * El canon del público hispanohablante, y el contrapeso de los otros dos.
+   *
+   * Sight & Sound es la crítica y las 1001 son un libro anglosajón; este lo vota
+   * quien ve cine en español. Se nota en cuanto se miran juntos: su top español
+   * empieza por «El verdugo», «Los santos inocentes» y «Plácido», mientras que
+   * las listas en inglés colocan primero «Todo sobre mi madre». No es que uno
+   * acierte más: es que miran desde sitios distintos, y para un completista eso
+   * vale más que un promedio.
+   *
+   * Dataset fijo, como los otros dos. No se baja en caliente porque el servidor
+   * de FilmAffinity contesta 403 a Node —distingue por la huella TLS del
+   * cliente—: se genera con `npm run snapshot:fa1000` desde el CSV del ranking.
+   * Veinte de las mil se quedan sin ficha de TMDB a propósito, cuando el
+   * emparejado no es seguro; se corrigen con el ✎ de cada una.
+   */
+  fatop1000: {
+    name: 'Top 1000 de FilmAffinity',
+    award: 'Las mil mejores según la nota de los usuarios de FilmAffinity',
+    group: 'canon',
+    onlyWinners: true,
+    staticList: FA_TOP1000,
+    staticSource: 'https://www.filmaffinity.com/es/ranking.php?rn=ranking_fa_movies',
+    staticNote: `Las mil del ranking histórico de FilmAffinity, en su orden. Es el canon que vota el público en español, y por eso no se parece a Sight & Sound ni a las 1001: donde aquellas ponen «Todo sobre mi madre», esta empieza el cine español por «El verdugo». ${FA_TOP1000.filter((r) => !r.tmdb_id).length} no tienen ficha de TMDB segura y se quedan sin cartel hasta que se corrijan a mano.`,
   },
   // --- LOS CATÁLOGOS Y CANONES TABULADOS ------------------------------------
   //

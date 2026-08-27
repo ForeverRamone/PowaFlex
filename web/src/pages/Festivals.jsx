@@ -384,7 +384,7 @@ export default function Festivals() {
       <PageHeader
         eyebrow={t('La caza')}
         title={t('Festivales y premios')}
-        subtitle={t('Sesenta y cinco fuentes: secciones oficiales, palmareses y nominadas, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el AFI, Criterion y el registro estadounidense).')}
+        subtitle={t('Sesenta y seis fuentes: secciones oficiales, palmareses y nominadas, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el Top 1000 de FilmAffinity, el AFI, Criterion y el registro estadounidense).')}
       />
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">

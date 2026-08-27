@@ -3,6 +3,20 @@
 // cabecera de la página vive en en/app.js, igual que el titular «Festivales y
 // premios» de la Alpha 0.9.5, que allí ya es nombre de página.
 export default {
+  // ── Beta 1.25 ──────────────────────────────────────────────
+  'El Top 1000 de FilmAffinity, en los cánones':
+    'FilmAffinity’s Top 1000 joins the canons',
+  'Sexta lista de la sección Cánones, junto a Sight & Sound, las 1001, el AFI, Criterion y el registro estadounidense. Es la que vota el público en español, y se nota: donde las listas en inglés abren el cine español con «Todo sobre mi madre», esta empieza por «El verdugo».':
+    'A sixth list under Canons, next to Sight & Sound, the 1001, the AFI, Criterion and the US registry. This is the one Spanish-speaking audiences vote for, and it shows: where the English lists open Spanish cinema with “All About My Mother”, this one starts with “The Executioner”.',
+  'Cuenta como aval en toda la app, así que pesa en el desempate de Por países, en Descubrir y en la ficha de cada película. «El Padrino» pasa a seis avales y «Viridiana» a cuatro.':
+    'It counts as an endorsement across the whole app, so it weighs in the tie-breaks of By country, in Find gaps and on every film’s card. “The Godfather” goes up to six endorsements and “Viridiana” to four.',
+  'Novecientas noventa y ocho de las mil tienen ficha. Seis apuntaban a otra película —un making-of de catorce minutos por «Wild Strawberries», una prueba de cámara de cuatro por «El ángel azul»— y se cazaron verificando cada una contra TMDB.':
+    'Nine hundred and ninety-eight of the thousand have a TMDB entry. Six pointed at a different film — a fourteen-minute making-of standing in for “Wild Strawberries”, a four-minute screen test for “The Blue Angel” — and were caught by checking every single one against TMDB.',
+  'Las veinte que faltaban se emparejaron a mano, y ninguna era oscura: fallaban por el título. FilmAffinity dice «The Downfall: Hitler and the End of the Third Reich» donde TMDB dice «Downfall», y «Love» donde dice «Amour».':
+    'The remaining twenty were matched by hand, and none of them was obscure: they failed on the title. FilmAffinity says “The Downfall: Hitler and the End of the Third Reich” where TMDB says “Downfall”, and “Love” where it says “Amour”.',
+  'Dos se quedan sin ficha a propósito: los OVA de Rurouni Kenshin son televisión, y una serie en un canon no es una película que buscar.':
+    'Two are left without an entry on purpose: the Rurouni Kenshin OVAs are television, and a series in a canon is not a film to hunt for.',
+
   // ── Beta 1.24 ──────────────────────────────────────────────
   'El cine por países, con dos opiniones enfrentadas':
     'World cinema by country, with two opinions that disagree',
