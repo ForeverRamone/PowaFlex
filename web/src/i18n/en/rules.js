@@ -32,6 +32,8 @@ export default {
   'quedan notas por pedir: se completan en las siguientes pasadas':
     'some scores are still pending: they will be filled in on later runs',
   'Radarr no está configurado: las reglas no se ejecutarán.': 'Radarr is not configured: the rules will not run.',
+  'Sin clave de MDBList no hay nota Σ: las reglas con umbral se quedarán esperando sin añadir nada.':
+    'Without an MDBList key there is no Σ rating: rules with a threshold will sit waiting and add nothing.',
   'Previsualizar todas': 'Preview all',
   'Ejecutar todas': 'Run all',
   'Ejecutando reglas…': 'Running rules…',

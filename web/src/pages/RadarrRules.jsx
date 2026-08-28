@@ -940,6 +940,14 @@ export default function RadarrRulesSection() {
       {!data.radarrConfigurado && (
         <p className="text-[11px] text-red-400 mt-1">{t('Radarr no está configurado: las reglas no se ejecutarán.')}</p>
       )}
+      {/* Una regla con umbral y sin clave de MDBList no añade nada NUNCA: se
+          queda esperando una nota que no va a llegar. Hasta ahora eso solo se
+          sabía ejecutándola y leyendo el aviso de la pasada. */}
+      {data.mdblistConfigurado === false && data.rules?.some((r) => r.enabled && r.min_score > 0) && (
+        <p className="text-[11px] text-red-400 mt-1">
+          {t('Sin clave de MDBList no hay nota Σ: las reglas con umbral se quedarán esperando sin añadir nada.')}
+        </p>
+      )}
 
       {corriendo && <div className="text-xs text-zinc-400 mt-3">{t('Ejecutando reglas…')}</div>}
       {status?.error && <div className="text-xs text-red-400 mt-3">⚠️ {status.error}</div>}

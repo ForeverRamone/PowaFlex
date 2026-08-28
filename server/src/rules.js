@@ -182,21 +182,33 @@ const entero = (v, min, max, def) => {
  */
 const dado = (v) => v != null && String(v).trim() !== '';
 
+/**
+ * ¿Un número negativo? NINGUNO de estos campos admite uno: sus mínimos son 0 o 1.
+ *
+ * Y recortarlo al mínimo era peligroso justo donde más duele: `cap: -7` se
+ * convertía en 0, que significa SIN TOPE, así que un signo menos de más dejaba
+ * una regla de palmarés histórico bajando cientos de películas la primera
+ * noche. Un negativo no es un valor tecleado a propósito: se trata como la
+ * casilla vacía y no cambia lo que ya estaba guardado.
+ */
+const negativo = (v) => Number(v) < 0;
+const valido = (v) => dado(v) && !negativo(v);
+
 /** Los límites de cada campo, en un sitio: la API y la interfaz no pueden discrepar. */
 export function normalizarCampos(body = {}, previo = {}) {
   const v = { ...previo };
   if (body.enabled != null) v.enabled = body.enabled ? 1 : 0;
-  if (dado(body.min_score)) v.min_score = entero(body.min_score, 0, 100, 0);
+  if (valido(body.min_score)) v.min_score = entero(body.min_score, 0, 100, 0);
   if (body.allow_unrated != null) v.allow_unrated = body.allow_unrated ? 1 : 0;
-  if (dado(body.cap)) v.cap = entero(body.cap, 0, 500, 20);
+  if (valido(body.cap)) v.cap = entero(body.cap, 0, 500, 20);
   // el tope de 90 no es capricho: `releases()` solo mira 90 días hacia atrás,
   // así que una ventana mayor prometía datos que la fuente no tiene
-  if (dado(body.window_days)) v.window_days = entero(body.window_days, 1, 90, 15);
-  if (dado(body.editions)) v.editions = entero(body.editions, 1, 10, 1);
-  if (dado(body.months)) v.months = entero(body.months, 1, 24, 6);
-  if (dado(body.lookback_days)) v.lookback_days = entero(body.lookback_days, 0, 365, 0);
+  if (valido(body.window_days)) v.window_days = entero(body.window_days, 1, 90, 15);
+  if (valido(body.editions)) v.editions = entero(body.editions, 1, 10, 1);
+  if (valido(body.months)) v.months = entero(body.months, 1, 24, 6);
+  if (valido(body.lookback_days)) v.lookback_days = entero(body.lookback_days, 0, 365, 0);
   if (body.include_docs != null) v.include_docs = body.include_docs ? 1 : 0;
-  if (dado(body.min_emerging)) v.min_emerging = entero(body.min_emerging, 0, 100, 70);
+  if (valido(body.min_emerging)) v.min_emerging = entero(body.min_emerging, 0, 100, 70);
   return v;
 }
 
@@ -873,14 +885,22 @@ export async function aprobarPendiente(tmdbId) {
 /**
  * Rechazar: fuera de la bandeja Y vetada. Sin el veto volvería a caer en
  * cuarentena la noche siguiente, y la bandeja se convertiría en una noria.
+ *
+ * El veto sale de lo que HAY en la bandeja, nunca de un id suelto. Vetar algo
+ * que ya no está fabricaba vetos fantasma: un segundo clic en el 🚫, o el de
+ * una pestaña que aún enseñaba una película aprobada en otra, dejaba en «fuera
+ * del pase automático» una fila sin título —y esa película quedaba prohibida
+ * para siempre justo después de haberla mandado a Radarr. Para vetar a mano
+ * está el 🚫 del historial, que es otra puerta (/api/radarr/auto/veto).
  */
 export function rechazarPendiente(tmdbId) {
   const id = Number(tmdbId);
   const fila = db.prepare('SELECT * FROM radarr_pending WHERE tmdb_id = ?').get(id);
+  if (!fila) return { ok: true, vetada: false };
   db.prepare('INSERT OR REPLACE INTO auto_radarr_vetoed (tmdb_id, title, at) VALUES (?, ?, ?)')
-    .run(id, fila?.title || null, Date.now());
+    .run(id, fila.title || null, Date.now());
   db.prepare('DELETE FROM radarr_pending WHERE tmdb_id = ?').run(id);
-  return { ok: true };
+  return { ok: true, vetada: true };
 }
 
 /**
@@ -894,8 +914,9 @@ export function rechazarPendiente(tmdbId) {
 export async function resolverTodasLasPendientes(accion) {
   const filas = pendientes();
   if (accion === 'rechazar') {
-    for (const f of filas) rechazarPendiente(f.tmdb_id);
-    return { ok: true, rechazadas: filas.length };
+    let rechazadas = 0;
+    for (const f of filas) if (rechazarPendiente(f.tmdb_id).vetada) rechazadas++;
+    return { ok: true, rechazadas };
   }
   const falta = radarrListoParaAñadir();
   if (falta) throw new Error(falta);
@@ -934,5 +955,9 @@ export function rulesOverview() {
     criterios: criteriosCuarentena(),
     pendientes: pendientes(),
     radarrConfigurado: !!(getSetting('radarr_url') && getSetting('radarr_key')),
+    // Sin clave de MDBList no hay Σ, y una regla con umbral no puede decidir
+    // NADA: se queda esperando nota cada noche. Hasta ahora eso solo se sabía
+    // ejecutándola y leyendo el aviso de la pasada — es decir, después.
+    mdblistConfigurado: hayClaveMdblist(),
   };
 }

@@ -442,6 +442,50 @@ export const esConcierto = (d) => {
   return EN_DIRECTO.test(d.title || '') || EN_DIRECTO.test(d.original_title || '');
 };
 
+/**
+ * ¿ES UN MONÓLOGO GRABADO?
+ *
+ * El hermano del concierto, y el que se escapaba: un especial de stand-up no
+ * lleva género musical, así que `esConcierto` no lo ve. Viene como Comedia a
+ * secas, dura entre 60 y 120 minutos y el público lo puntúa como lo que es —un
+ * buen espectáculo—, así que se cuela arriba. Medido sobre los 72 paquetes:
+ * VEINTINUEVE filas, y no en el fondo de la lista sino «Nanette» de quinta de
+ * Australia, «Hannah Gadsby: Douglas» PRIMERA de 2020, «Eddie Izzard: Glorious»
+ * primera de 1997 en Reino Unido y «La Pelota de Letras» de única de 2005 en
+ * Colombia. Uno de ellos —un Franco Escamilla— ya estaba a mano en
+ * `no-es-cine.js`, pero en México hay otros tres del mismo cómico: la lista por
+ * id no alcanza cuando el cómico tiene franquicia.
+ *
+ * LA FIRMA ES EL REPARTO, NO EL TÍTULO. Un monólogo tiene UNA persona haciendo
+ * de sí misma. Las dos condiciones hacen falta y ninguna sobra:
+ *
+ *  - **Exactamente uno de «sí mismo».** Con TRES, lo que hay es un documental
+ *    coral: «Riverboom», segunda de Suiza, son tres periodistas en Afganistán
+ *    acreditados los tres como «Self», y echarla sería justo el daño que esto
+ *    viene a evitar.
+ *  - **Y un reparto corto.** Sin el tope, la condición del «uno de sí mismo» la
+ *    cumple cualquier comedia con un cameo: medido, entraban «Happy Gilmore»,
+ *    «Borat» y «Il giudizio universale». Tres y no uno porque «Glorious» lleva
+ *    dos figurantes sin acreditar detrás de Izzard.
+ *
+ * Con las dos, las veintinueve que casan son las veintinueve que son, y no cae
+ * ninguna película de ficción. Manda la regla de la casa: antes dejar dentro un
+ * monólogo que echar un documental bueno.
+ */
+const COMEDIA = 35;
+const SI_MISMO = /^(him|her|them|it)?self$/i;
+
+export const esMonologo = (d) => {
+  const ids = (d.genres || []).map((g) => g.id);
+  if (!ids.includes(COMEDIA)) return false;
+  // Comedia sola, o Comedia y Documental: un monólogo no es nada más. Con
+  // cualquier otro género delante hay una película.
+  if (!ids.every((id) => id === COMEDIA || id === DOCUMENTAL)) return false;
+  const reparto = d.credits?.cast || [];
+  if (!reparto.length || reparto.length > 3) return false;
+  return reparto.filter((p) => SI_MISMO.test(String(p.character || '').trim())).length === 1;
+};
+
 export const estaEstrenada = (d) => {
   const fecha = String(d.release_date || '').slice(0, 10);
   return !fecha || fecha <= new Date().toISOString().slice(0, 10);
@@ -613,11 +657,18 @@ export const ordenar = (a, b) =>
  *     no del país. Sacándolo del propio país se aplanaban las cinematografías
  *     pequeñas —donde NADA tiene votos— justo lo que se quería evitar: medido
  *     sobre los 72 paquetes, con el percentil 25 Armenia movía el 69 % de sus
- *     notas y le cambiaba el orden de los diez primeros; con el cien fijo, los
- *     diez primeros de Armenia, España, Estados Unidos, Reino Unido, Senegal y
- *     Bosnia se quedan EXACTAMENTE como estaban y la corrección muerde donde
- *     tenía que morder — «Vestida de azul», un 8,4 con 3.355 votos, deja de
- *     salir séptima de España por delante de «Dolor y gloria».
+ *     notas y le cambiaba el orden de los diez primeros; con el cien fijo el
+ *     top-10 de Armenia aguanta, y con él el de España, Estados Unidos, Reino
+ *     Unido, Japón e Italia. La corrección muerde donde tenía que morder —
+ *     «Vestida de azul», un 8,4 con 3.355 votos, deja de salir séptima de
+ *     España por delante de «Dolor y gloria».
+ *
+ *     LO QUE NO HAY QUE CREERSE: que no mueva ningún top-10. Medido sobre los
+ *     72, lo cambia en ONCE (Suiza, Portugal, Chequia, Israel, Rumanía, Serbia,
+ *     Sudáfrica, Islandia, Vietnam, Lituania y Marruecos), y en el cuerpo de la
+ *     lista mueve el 41 % de las filas de mediana. Es el efecto buscado, no un
+ *     daño colateral, pero la muestra de seis países con la que se eligió la
+ *     constante estaba sesgada y conviene que quede escrito.
  *
  * La nota que la interfaz pinta sigue siendo la de Letterboxd, sin tocar: esto
  * solo decide el orden.
@@ -642,10 +693,17 @@ export function notaAsentada(lb, votos, media) {
  * Ordena la lista entera de un país: pone la nota asentada en cada fila y
  * ordena con ella. Va sobre la lista COMPLETA y no fila a fila porque la media
  * del país es la de esa lista.
+ *
+ * `media` se pasa cuando la lista que llega NO es el país entero. Le pasa al
+ * SEMBRADO: el paquete es un recorte —el top global más el top de cada año—,
+ * así que Estados Unidos viaja con 2.165 filas de las 3.773 que guardó su
+ * construcción, y la media de ese recorte está sesgada hacia arriba. Los
+ * paquetes generados desde la 1.28 traen la media buena; los anteriores no, y
+ * ahí se cae a la del recorte, que es lo único que hay.
  */
-export function ordenarPais(lista) {
-  const media = mediaDelPais(lista);
-  for (const x of lista) x.orden = notaAsentada(x.lb, x.lb_votes, media);
+export function ordenarPais(lista, media = null) {
+  const m = typeof media === 'number' ? media : mediaDelPais(lista);
+  for (const x of lista) x.orden = notaAsentada(x.lb, x.lb_votes, m);
   lista.sort(ordenar);
   return lista;
 }
@@ -761,6 +819,9 @@ export async function construirPais(iso, { hasta = new Date().getFullYear() } = 
         // concierto no es hacer cine, y una lista de las mejores películas de
         // un país con dos directos dentro no se puede enseñar.
         if (clasificada.isMusic || esConcierto(d)) return;
+        // Y el hermano del concierto: el monólogo grabado, que no lleva género
+        // musical y por eso se colaba entero (ver `esMonologo`).
+        if (esMonologo(d)) return;
         // Y LO QUE NO SE HA ESTRENADO. «La Odisea» de Nolan aparecía tercera de
         // Reino Unido con un 8,8 que no es una nota: son las ganas de verla. Un
         // canon histórico no puede incluir lo que todavía no existe.
@@ -1042,8 +1103,13 @@ export async function sembrarPais(iso) {
   if (!paquete?.filas?.length) return false;
 
   // El paquete trae los puestos que le calculó su generación, y aquí se
-  // RECALCULAN: es la única forma de que un país sembrado y uno reconstruido
-  // digan lo mismo cuando cambian las reglas del orden. Lo que necesita el
+  // RECALCULAN: sin esto, un país que viene hecho se ordenaría con las reglas
+  // de cuando se empaquetó y uno reconstruido con las de hoy.
+  //
+  // No los deja IDÉNTICOS, y conviene saberlo: el paquete es un recorte (50 de
+  // los 72 traen menos filas de las que guardó su construcción), así que aquí
+  // se ordenan 2.165 películas donde una reconstrucción ordena 3.773. Lo que sí
+  // se arregla es la media, que viaja en el paquete desde la 1.28. Lo que necesita el
   // orden —nota, votos y avales— viaja dentro del paquete, así que no cuesta
   // ni una petición. De paso se cae lo que no es cine (ver `no-es-cine.js`),
   // que el paquete se generó antes de tener esa lista.
@@ -1053,7 +1119,7 @@ export async function sembrarPais(iso) {
       motivo: MOTIVO_DE[motivo] || 'origen',
     }))
     .filter((f) => !noEsCine(f.tmdb_id));
-  ordenarPais(filas);
+  ordenarPais(filas, typeof paquete.media === 'number' ? paquete.media : null);
   filas.forEach((f, i) => {
     f.rank_global = i + 1;
   });

@@ -109,7 +109,16 @@ export const CACHE_VERSIONS = {
   // el hueco. El del Premio del Público de Toronto renombró su sección a
   // «Winners and runners-up» y perdía el palmarés entero. Lo cacheado antes
   // tiene los dos truncados.
-  festival: 19,
+  // v20: el rótulo de la sección de competición alterna entre «In Competition» y
+  // «Main Competition» de un año a otro, y cada festival tenía declarado solo
+  // uno: nueve ediciones se servían como error (Cannes 2016, Berlinale 2012,
+  // Venecia 1980, 1981 y 1992, San Sebastián 2018, 2019, 2020 y 2022). San
+  // Sebastián 2021 servía Perlak como si fuera la Sección Oficial, con «El
+  // poder del perro» de aspirante a la Concha. Y la ganadora se marcaba por
+  // título normalizado, así que en la Berlinale de 2025 —dos películas
+  // tituladas «Dreams»— coronaba la de Michel Franco en vez del Oso de Oro de
+  // Dag Johan Haugerud. Lo cacheado antes lleva las tres cosas.
+  festival: 20,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

@@ -3,6 +3,22 @@
 // cabecera de la página vive en en/app.js, igual que el titular «Festivales y
 // premios» de la Alpha 0.9.5, que allí ya es nombre de página.
 export default {
+  // ── Beta 1.28 ──────────────────────────────────────────────
+  'Nueve ediciones de festival que salían como error, y «Nanette» quinta de Australia':
+    'Nine festival editions that came back as errors, and “Nanette” fifth in Australia',
+  'Wikipedia titula la sección de competición «In Competition» un año y «Main Competition» al siguiente, y solo estaba declarado uno: se perdían Cannes 2016, Berlinale 2012, Venecia 1980, 1981 y 1992, y San Sebastián 2018, 2019, 2020 y 2022. San Sebastián 2021 enseñaba Perlak como si fuera la Sección Oficial, con «El poder del perro» de aspirante a la Concha de Oro.':
+    'Wikipedia calls the competition section “In Competition” one year and “Main Competition” the next, and only one was declared: Cannes 2016, Berlinale 2012, Venice 1980, 1981 and 1992, and San Sebastián 2018, 2019, 2020 and 2022 were all lost. San Sebastián 2021 was showing Perlak as if it were the Official Selection, with “The Power of the Dog” up for the Golden Shell.',
+  'La Berlinale de 2025 coronaba a la película equivocada: hay dos tituladas «Dreams» y salía la de Michel Franco en vez del Oso de Oro de Dag Johan Haugerud.':
+    'The 2025 Berlinale crowned the wrong film: there are two titled “Dreams” and it picked Michel Franco’s instead of Dag Johan Haugerud’s Golden Bear.',
+  'Por países: el monólogo grabado entraba entero. «Nanette» de Hannah Gadsby salía quinta de Australia y un Eddie Izzard era la primera de 1997 en Reino Unido. Se reconocen por el reparto, no por el título: un solo intérprete haciendo de sí mismo.':
+    'By country: filmed stand-up was getting in wholesale. Hannah Gadsby’s “Nanette” ranked fifth in Australia and an Eddie Izzard special was the UK’s number one of 1997. They are now spotted by the cast, not the title: a single performer credited as themselves.',
+  'Pedir la biblioteca con un límite negativo devolvía las doce mil películas de una vez, y restaurar un fichero de ajustes se saltaba la comprobación de la dirección de Plex, que es la que decide a dónde sale tu credencial.':
+    'Asking for the library with a negative limit returned all twelve thousand films at once, and restoring a settings file skipped the check on the Plex address — the one that decides where your credential is sent.',
+  'Un tope negativo en una regla de Radarr significaba «sin tope»: un signo de más y la regla bajaba sin límite. Y rechazar de la cuarentena algo que ya no estaba dejaba vetada para siempre una película recién aprobada.':
+    'A negative cap on a Radarr rule meant “no cap”: one stray minus sign and the rule downloaded without limit. And rejecting something no longer in quarantine permanently vetoed a film you had just approved.',
+  'Tres desbordes horizontales en móvil, y las etiquetas de los cánones ya no salen en castellano con la interfaz en inglés.':
+    'Three horizontal overflows on mobile, and canon labels no longer show up in Spanish with the interface in English.',
+
   // ── Beta 1.27 ──────────────────────────────────────────────
   'Vuelve la ganadora a Cannes, y el emparejado deja de coger el making-of':
     'The winner is back at Cannes, and matching stops picking the making-of',

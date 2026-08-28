@@ -65,6 +65,21 @@ for (const iso of pedidos) {
     .all(iso, tier.global, tier.anio);
 
   const build = db.prepare("SELECT * FROM country_builds WHERE iso = ? AND fuente = 'lb'").get(iso);
+  /**
+   * LA MEDIA DEL PAÍS, sacada de TODAS sus películas y no de las que caben aquí.
+   *
+   * El paquete es un RECORTE —el top global más el top de cada año—, así que
+   * Estados Unidos viaja con 2.165 filas de las 3.773 que guardó su
+   * construcción. Como es un recorte sesgado hacia arriba, su media no es la
+   * del país, y `notaAsentada` acerca las notas flojas justamente a esa media:
+   * sin este campo, un país SEMBRADO y uno RECONSTRUIDO se ordenan distinto,
+   * que es lo contrario de lo que promete `sembrarPais`.
+   *
+   * Se calcula aquí porque es el único sitio donde están las filas completas.
+   */
+  const media = db
+    .prepare("SELECT ROUND(AVG(lb), 1) m FROM country_films WHERE iso = ? AND fuente = 'lb' AND lb IS NOT NULL")
+    .get(iso)?.m ?? null;
   const tuplas = filas.map((f) => [
     f.rank_global, f.rank_anio, f.tmdb_id, f.year, f.lb, f.lb_votes, f.sigma,
     f.avales, f.ganados, MOTIVOS[f.motivo] || 2, f.title, f.poster, f.director,
@@ -83,6 +98,7 @@ for (const iso of pedidos) {
       candidatos: build?.candidatos ?? 0,
       con_nota: build?.con_nota ?? 0,
       guardadas: build?.guardadas ?? 0,
+      media,
       del_palmares: build?.del_palmares ?? 0,
       filas: tuplas,
     })};`,

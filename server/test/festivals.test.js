@@ -4,7 +4,7 @@ import {
   REGISTRY, parseSelectionTable, parseSundanceWinners, parseWinnersTables, stripTags, directorsMatch, cleanTableTitle,
   parseCahiersTables, splitDirectors, elegirCandidato, faltaElTituloOriginal, esGrisNeutro, filaResaltada,
   expandirColspan, expandirTabla, partePorSalto, parteEnCursivas, esSerieConocida, anuarioKeys, parseEditionRows,
-  filasEmpaquetadas, empaquetadoHasta,
+  filasEmpaquetadas, empaquetadoHasta, seccionesCandidatas, marcarGanadoras,
 } from '../src/festivals.js';
 import { PALMARES } from '../src/data/palmares-2026.js';
 import { mismoDiminutivo } from '../src/names.js';
@@ -1251,4 +1251,200 @@ test('columnas.director: null sigue significando «esta tabla no tiene direcció
 </table>`;
   const rows = parseWinnersTables(tabla, { sinDirector: true, columnas: REGISTRY.sitges.awardColumns });
   assert.deepEqual(rows.map((r) => [r.title, r.director]), [['The Cremator', null]]);
+});
+
+/**
+ * Elegir la SECCIÓN de la que sale la selección oficial.
+ *
+ * Los árboles de secciones de estos tests son los que devuelve de verdad
+ * `action=parse&prop=sections` de la Wikipedia inglesa para esas ediciones:
+ * índice, numeración jerárquica y rótulo, tal cual.
+ */
+const secs = (...filas) => filas.map(([index, number, line]) => ({ index, number, line }));
+
+// 2016 Cannes Film Festival: la sección oficial se titula «Main Competition»,
+// el mismo rótulo que el jurado (bajo «Juries») y casi el del palmarés.
+const CANNES_2016 = secs(
+  [1, '1', 'Juries'],
+  [2, '1.1', 'Main competition'],
+  [5, '1.4', 'Cinéfondation and Short Films Competition'],
+  [10, '2', 'Official Selection'],
+  [11, '2.1', 'Main Competition'],
+  [13, '2.3', 'Out of Competition'],
+  [23, '4', 'Official Awards'],
+  [24, '4.1', 'In Competition'],
+);
+
+// 62nd Berlin International Film Festival (2012): aquí Wikipedia la titula «In
+// competition», el rótulo que la Berlinale NO tenía declarado.
+const BERLINALE_2012 = secs(
+  [1, '1', 'Juries'],
+  [2, '1.1', 'Main Competition'],
+  [5, '2', 'Official Sections'],
+  [6, '2.1', 'In competition'],
+  [7, '2.2', 'Out of competition'],
+  [9, '3', 'Official Awards'],
+  [10, '3.1', 'Main Competition'],
+);
+
+// 69th San Sebastián (2021): el único «In competition» del artículo cuelga de
+// PERLAK, que es la sección de películas ya premiadas en otros festivales.
+const SANSEBASTIAN_2021 = secs(
+  [1, '1', 'Juries'],
+  [2, '2', 'Sections'],
+  [3, '2.1', 'Official Selection'],
+  [7, '2.5', 'Perlak'],
+  [8, '2.5.1', 'In competition'],
+  [9, '2.5.2', 'Out of competition'],
+  [13, '3', 'Official Selection Awards'],
+);
+
+// 71st San Sebastián (2023): aquí sí hay anidamiento, y la buena es la hija.
+const SANSEBASTIAN_2023 = secs(
+  [3, '2.1', 'Main Competition'],
+  [8, '3', 'Sections'],
+  [9, '3.1', 'Official selection'],
+  [10, '3.1.1', 'In competition'],
+  [11, '3.1.2', 'Out of Competition'],
+  [15, '3.5', 'Perlak'],
+  [18, '4.1', 'Main Competition'],
+  [19, '4.2', 'Other official awards'],
+);
+
+const elegida = (secciones, re) => seccionesCandidatas(secciones, re).map((s) => s.index);
+
+test('Cannes 2016: «Main Competition» es la sección oficial, no el jurado ni el palmarés', () => {
+  // Los tres se llaman casi igual; solo la cabecera madre los distingue. Con el
+  // rótulo anclado a «(in )?competition» esta edición entera daba error.
+  assert.deepEqual(elegida(CANNES_2016, REGISTRY.cannes.section), [11]);
+});
+
+test('Berlinale 2012: la Berlinale también titula «In competition» algunos años', () => {
+  assert.deepEqual(elegida(BERLINALE_2012, REGISTRY.berlinale.section), [6]);
+});
+
+test('San Sebastián 2021: el «In competition» de Perlak NO es la Sección Oficial', () => {
+  // Servía El poder del perro, The French Dispatch y Petite Maman como
+  // aspirantes a la Concha de Oro, y ninguna competía en Donostia.
+  assert.deepEqual(elegida(SANSEBASTIAN_2021, REGISTRY.sansebastian.section), [3]);
+});
+
+test('San Sebastián 2023: entre dos candidatas anidadas gana la hija', () => {
+  // La madre «Official selection» arrastra «Out of Competition» consigo: coger
+  // la madre metía las fuera de concurso entre las aspirantes al premio.
+  assert.deepEqual(elegida(SANSEBASTIAN_2023, REGISTRY.sansebastian.section), [10]);
+});
+
+test('«Official Selection Awards» es el palmarés, no la selección', () => {
+  // Anclado por los dos extremos. San Sebastián titula así su palmarés unos
+  // años y «Official selection jury awards» otros.
+  const re = REGISTRY.sansebastian.section;
+  assert.equal(re.test('Official Selection'), true);
+  assert.equal(re.test('In competition'), true);
+  assert.equal(re.test('Official Selection Awards'), false);
+  assert.equal(re.test('Official selection jury awards'), false);
+});
+
+// 49th Venice International Film Festival (1992): la Mostra vieja también
+// titula «Main Competition», y encima tres veces (jurado, sección y palmarés).
+const VENECIA_1992 = secs(
+  [1, '1', 'Jury'],
+  [2, '1.1', 'Main Competition'],
+  [3, '2', 'Official Sections'],
+  [4, '2.1', 'Main Competition'],
+  [5, '2.2', 'Out of competition'],
+  [10, '4', 'Official Awards'],
+  [11, '4.1', 'Main Competition'],
+);
+
+test('Venecia 1992: de tres «Main Competition» idénticas, la que cuelga de las secciones', () => {
+  assert.deepEqual(elegida(VENECIA_1992, REGISTRY.venecia.section), [4]);
+});
+
+test('los tres grandes aceptan los dos rótulos que Wikipedia les alterna', () => {
+  // Cada uno tenía declarado solo el suyo, y perdían las ediciones del otro:
+  // Cannes 2016, Berlinale 2012 y la Mostra de 1980, 1981 y 1992.
+  for (const key of ['cannes', 'venecia', 'berlinale']) {
+    const re = REGISTRY[key].section;
+    assert.equal(re.test('In Competition'), true, `${key}: In Competition`);
+    assert.equal(re.test('Main Competition'), true, `${key}: Main Competition`);
+    assert.equal(re.test('In competition'), true, `${key}: In competition`);
+    assert.equal(re.test('Out of Competition'), false, `${key}: Out of Competition NO`);
+    assert.equal(re.test('Short Films Competition'), false, `${key}: Short Films Competition NO`);
+  }
+});
+
+test('ningún festival se queda con una sección que cuelgue de un jurado o de un palmarés', () => {
+  for (const [key, arbol] of [
+    ['cannes', CANNES_2016],
+    ['berlinale', BERLINALE_2012],
+    ['sansebastian', SANSEBASTIAN_2021],
+    ['sansebastian', SANSEBASTIAN_2023],
+  ]) {
+    const numeros = seccionesCandidatas(arbol, REGISTRY[key].section).map((s) => s.number);
+    const prohibidas = arbol.filter((s) => /jur|award/i.test(s.line)).map((s) => s.number);
+    for (const n of numeros) {
+      assert.ok(
+        !prohibidas.some((p) => n === p || n.startsWith(`${p}.`)),
+        `${key}: la sección ${n} cuelga de un jurado o de un palmarés`
+      );
+    }
+  }
+});
+
+/**
+ * Marcar QUIÉN ganó dentro de una edición.
+ */
+
+test('dos películas del mismo título en la misma edición: solo gana la que ganó', () => {
+  // Berlinale 2025: «Dreams» de Dag Johan Haugerud se llevó el Oso de Oro y
+  // «Dreams» de Michel Franco no. Casando por título salían las dos coronadas,
+  // y la de Franco además la primera de la lista.
+  const films = [
+    { title: 'Dreams', original_title: 'Dreams', director: 'Michel Franco', tmdb_id: 1134463 },
+    { title: 'Dreams', original_title: 'Drømmer', director: 'Dag Johan Haugerud', tmdb_id: 1228682 },
+  ];
+  marcarGanadoras(films, [
+    { year: 2025, title: 'Dreams', original_title: 'Drømmer', director: 'Dag Johan Haugerud', tmdb_id: 1228682 },
+  ]);
+  assert.deepEqual(
+    films.map((f) => [f.director, !!f.winner]),
+    [
+      ['Dag Johan Haugerud', true],
+      ['Michel Franco', false],
+    ]
+  );
+});
+
+test('sin ficha en el palmarés, el título tiene que venir avalado por la dirección', () => {
+  const films = [
+    { title: 'Dreams', director: 'Michel Franco', tmdb_id: 1134463 },
+    { title: 'Dreams', original_title: 'Drømmer', director: 'Dag Johan Haugerud', tmdb_id: 1228682 },
+  ];
+  marcarGanadoras(films, [{ year: 2025, title: 'Dreams', director: 'Dag Johan Haugerud' }]);
+  assert.deepEqual(
+    films.filter((f) => f.winner).map((f) => f.director),
+    ['Dag Johan Haugerud']
+  );
+});
+
+test('la ganadora sube al principio y el resto conserva el orden de la tabla', () => {
+  const films = [
+    { title: 'American Honey', director: 'Andrea Arnold', tmdb_id: 340485 },
+    { title: 'Aquarius', director: 'Kleber Mendonça Filho', tmdb_id: 377273 },
+    { title: 'I, Daniel Blake', director: 'Ken Loach', tmdb_id: 374473 },
+  ];
+  marcarGanadoras(films, [{ year: 2016, title: 'I, Daniel Blake', director: 'Ken Loach', tmdb_id: 374473 }]);
+  assert.deepEqual(
+    films.map((f) => f.title),
+    ['I, Daniel Blake', 'American Honey', 'Aquarius']
+  );
+});
+
+test('el palmarés manda por ficha aunque el título esté traducido de otra forma', () => {
+  // El palmarés viene en inglés y la edición en título original: lo que las une
+  // es el id de TMDB, no la cadena.
+  const films = [{ title: 'O corno', original_title: 'O corno', director: 'Jaione Camborda', tmdb_id: 816888 }];
+  marcarGanadoras(films, [{ year: 2023, title: 'The Rye Horn', director: 'Jaione Camborda', tmdb_id: 816888 }]);
+  assert.equal(films[0].winner, true);
 });

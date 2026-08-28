@@ -25,6 +25,19 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.28',
+    fecha: '2026-08-28',
+    titular: 'Nueve ediciones de festival que salían como error, y «Nanette» quinta de Australia',
+    puntos: [
+      'Wikipedia titula la sección de competición «In Competition» un año y «Main Competition» al siguiente, y solo estaba declarado uno: se perdían Cannes 2016, Berlinale 2012, Venecia 1980, 1981 y 1992, y San Sebastián 2018, 2019, 2020 y 2022. San Sebastián 2021 enseñaba Perlak como si fuera la Sección Oficial, con «El poder del perro» de aspirante a la Concha de Oro.',
+      'La Berlinale de 2025 coronaba a la película equivocada: hay dos tituladas «Dreams» y salía la de Michel Franco en vez del Oso de Oro de Dag Johan Haugerud.',
+      'Por países: el monólogo grabado entraba entero. «Nanette» de Hannah Gadsby salía quinta de Australia y un Eddie Izzard era la primera de 1997 en Reino Unido. Se reconocen por el reparto, no por el título: un solo intérprete haciendo de sí mismo.',
+      'Pedir la biblioteca con un límite negativo devolvía las doce mil películas de una vez, y restaurar un fichero de ajustes se saltaba la comprobación de la dirección de Plex, que es la que decide a dónde sale tu credencial.',
+      'Un tope negativo en una regla de Radarr significaba «sin tope»: un signo de más y la regla bajaba sin límite. Y rechazar de la cuarentena algo que ya no estaba dejaba vetada para siempre una película recién aprobada.',
+      'Tres desbordes horizontales en móvil, y las etiquetas de los cánones ya no salen en castellano con la interfaz en inglés.',
+    ],
+  },
+  {
     label: 'Beta 1.27',
     fecha: '2026-08-28',
     titular: 'Vuelve la ganadora a Cannes, y el emparejado deja de coger el making-of',

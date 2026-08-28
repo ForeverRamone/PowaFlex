@@ -243,7 +243,9 @@ function CanonPacks({ role, faceta, canons, enMarcha, onDone }) {
         {canons.map((c) => (
           <div key={c.key} className="card p-3 flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-zinc-200 truncate">{c.label}</div>
+              {/* etiqueta del servidor en los de serie; la de una lista pegada
+                  a mano es el nombre que le puso su dueño y no se traduce */}
+              <div className="text-sm font-medium text-zinc-200 truncate">{c.builtin ? t(c.label) : c.label}</div>
               <div className="text-[11px] text-zinc-500">
                 {c.count != null ? t('{n} nombres', { n: c.count }) : t('se actualiza sola con TMDB')}
               </div>

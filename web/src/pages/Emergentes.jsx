@@ -112,8 +112,11 @@ function Ficha({ d, onFollow, onDescartar, busy }) {
   const [fotoRota, setFotoRota] = useState(false);
   const foto = d.profile_path && !fotoRota ? tmdbImg(d.profile_path, 'w185') : null;
 
+  // min-w-0: como celda de rejilla, el card hereda min-width:auto y no baja de
+  // su ancho mínimo de contenido; en un móvil de 375 se quedaba en 386 y sacaba
+  // scroll horizontal a la página entera
   return (
-    <div className={`card p-3 ${d.tracked ? '!border-gold-400/50' : ''}`}>
+    <div className={`card p-3 min-w-0 ${d.tracked ? '!border-gold-400/50' : ''}`}>
       <div className="flex gap-3 items-start">
         <div className="w-11 h-11 rounded-full overflow-hidden bg-ink-800 shrink-0 flex items-center justify-center">
           {foto ? (

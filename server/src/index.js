@@ -99,7 +99,7 @@ import { tieneRanking, hayPaqueteFA, paqueteHasta } from './filmaffinity.js';
 import { ROLES } from './roles.js';
 import { importImdbRatings, imdbInfo } from './imdb.js';
 import { listarCopias, hacerCopia, BACKUP_DIR } from './backup.js';
-import { festivalsIndex, festivalEdition, festivalWinners, festivalYear, festivalOverrideKey, festivalDirectorPacks } from './festivals.js';
+import { REGISTRY, festivalsIndex, festivalEdition, festivalWinners, festivalYear, festivalOverrideKey, festivalDirectorPacks } from './festivals.js';
 import { DIRECTORS_2026 } from './data/directors-2026.js';
 import { dataHealth } from './datahealth.js';
 import { runFullRefresh, refreshStatus, refreshHistory, nightlyHealth } from './refresh.js';
@@ -229,6 +229,63 @@ app.addHook('onRequest', async (req, reply) => {
   }
 });
 
+/**
+ * Un número que llega de fuera y va a acabar dentro de una consulta.
+ *
+ * SQLite no acepta un decimal en un LIMIT ni en un OFFSET: `?limit=1.5`,
+ * `?offset=1e20` o un `days=1.5` guardado en un marcador terminaban en un 500
+ * con «SQLITE_MISMATCH: datatype mismatch», que no le dice nada a nadie. Y un
+ * `?limit=-1` era peor que un error: en SQLite un LIMIT negativo significa «sin
+ * límite», así que una parrilla devolvía la biblioteca entera de una vez.
+ *
+ * Aquí se trunca y se acota, así que lo peor que puede salir es una página
+ * vacía. Se conserva el `Number(x) || N` de siempre para el 0 y para el vacío.
+ */
+function entero(valor, porDefecto, { min = 0, max = Number.MAX_SAFE_INTEGER, ceroVale = false } = {}) {
+  // un parámetro repetido en la URL llega como array: manda el primero
+  const crudo = Array.isArray(valor) ? valor[0] : valor;
+  if (crudo === undefined || crudo === null || crudo === '') return porDefecto;
+  const n = Math.trunc(Number(crudo));
+  if (!Number.isFinite(n)) return porDefecto;
+  // el 0 cae al valor por defecto como en el `Number(x) || N` de siempre, SALVO
+  // donde cero es una respuesta: un tope de cero significa «ninguna», y
+  // convertirlo en «sin tope» es el error que más caro sale
+  if (n === 0 && !ceroVale) return porDefecto;
+  return Math.min(Math.max(n, min), max);
+}
+
+/** Un id de TMDB de verdad: entero, positivo y dentro del rango seguro. */
+const idTmdbValido = (v) => Number.isSafeInteger(Number(v)) && Number(v) > 0;
+
+// Rutas de disco fuera de los mensajes de error: un ENOENT trae la ruta entera
+// del contenedor, y eso no pinta en una pantalla.
+const sinRutas = (t) =>
+  String(t).replace(/[A-Za-z]:\\[^\s'"]+|\/(?:home|Users|app|var|tmp|data)\/[^\s'"]+/g, '…');
+
+/**
+ * Ningún fallo puede acabar en un 500 mudo.
+ *
+ * Sin esto, cualquier excepción que se escapara de una ruta salía con el cuerpo
+ * de serie de Fastify —`{"error":"Internal Server Error"}`— y el cliente, que
+ * lee `error`, pintaba justo eso: nada. Ahora se dice QUÉ petición se cayó y
+ * con qué motivo, recortado y sin rutas de disco ni traza. Los 4xx que genera
+ * el propio Fastify (JSON roto, tipo de contenido no soportado) conservan su
+ * código pero pasan al mismo `{ error }` que usa el resto de la API, porque
+ * «Bad Request» a secas tampoco explicaba nada.
+ */
+app.setErrorHandler((err, req, reply) => {
+  const cliente = err.statusCode >= 400 && err.statusCode < 500;
+  const code = cliente ? err.statusCode : 500;
+  if (!cliente) app.log.error({ err, url: req.raw.url, method: req.method }, 'ruta rota');
+  const motivo = sinRutas(err.message || err).slice(0, 200);
+  reply.code(code);
+  return {
+    error: cliente
+      ? motivo
+      : `Falló ${req.method} ${(req.raw.url || '').split('?')[0]}: ${motivo}`,
+  };
+});
+
 // --- settings ----------------------------------------------------------------
 
 // la lista vive en db.js, que es quien cifra: una sola fuente de verdad
@@ -299,8 +356,14 @@ app.put('/api/settings', async (req, reply) => {
   const ignoradas = [];
   let invalidar = false;
   for (const [k, v] of Object.entries(body)) {
-    if (typeof v !== 'string' && v !== null) continue;
-    if (!WRITABLE_SETTINGS.has(k)) { ignoradas.push(k); continue; }
+    // La misma puerta que la importación, y en el mismo orden: un valor que no
+    // es texto se descartaba con un `continue` PUESTO ANTES del `ignoradas`, así
+    // que mandar `{"backup_keep": 14}` contestaba «ok» y no guardaba nada. Un
+    // ajuste que no se aplica tiene que salir en la respuesta.
+    if (!WRITABLE_SETTINGS.has(k) || (typeof v !== 'string' && v !== null)) {
+      ignoradas.push(k);
+      continue;
+    }
     if (URL_SETTINGS.has(k) && !urlDeServicioValida(v)) {
       reply.code(400);
       return { error: `La dirección de ${k === 'plex_url' ? 'Plex' : 'Radarr'} debe ser una URL http(s) sin parámetros ni «#» (por ejemplo http://192.168.1.50:32400)` };
@@ -371,9 +434,15 @@ app.get('/api/festivals/match-candidates', async (req, reply) => {
 // fijar (o borrar, con tmdbId null) una corrección manual de emparejado
 app.post('/api/festivals/match', async (req, reply) => {
   const { title, year, director = null, tmdbId = null } = req.body || {};
-  if (!title || !Number(year)) {
+  if (!title || !Number.isInteger(Number(year))) {
     reply.code(400);
     return { error: 'Faltan el título o el año de la fila a corregir' };
+  }
+  // la corrección manual manda sobre el emparejado automático: si el id no es
+  // un id, la fila se queda enganchada a una ficha que no existe
+  if (tmdbId != null && !idTmdbValido(tmdbId)) {
+    reply.code(400);
+    return { error: 'El id de TMDB no es válido' };
   }
   const key = festivalOverrideKey(title, Number(year), director);
   if (tmdbId) {
@@ -393,16 +462,34 @@ app.post('/api/festivals/match', async (req, reply) => {
 // lo mejor de un año: la ganadora de cada premio, de una vez. Va ANTES que
 // «/:key/:year» porque «anuario» encajaría como si fuera la clave de un premio.
 app.get('/api/festivals/anuario/:year', async (req, reply) => {
+  // «/anuario/1e20» contestaba 200 con «year: 100000000000000000000» y la lista
+  // de premios pendientes: un titular con un año que no existe es peor que un
+  // error. El rango se comprueba aquí, igual que en la edición de un festival.
+  const year = Number(req.params.year);
+  if (!Number.isInteger(year) || year < 1870 || year > 2200) {
+    reply.code(400);
+    return { error: 'El año tiene que ser un número' };
+  }
   try {
-    return await festivalYear(Number(req.params.year), { refresh: req.query.refresh === '1' });
+    return await festivalYear(year, { refresh: req.query.refresh === '1' });
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
   }
 });
 
+// Una clave que no existe es culpa de quien pregunta, no de Wikipedia: 404. El
+// 502 se guarda para lo que sí es un fallo de la fuente, que es lo que distingue
+// «te has equivocado de premio» de «Wikipedia está caída».
+const premioConocido = (key, reply) => {
+  if (REGISTRY[key]) return true;
+  reply.code(404);
+  return false;
+};
+
 // palmarés histórico del premio que clasifica (antes que :year para no chocar)
 app.get('/api/festivals/:key/palmares', async (req, reply) => {
+  if (!premioConocido(req.params.key, reply)) return { error: 'Ese premio no está en el catálogo' };
   try {
     return await festivalWinners(req.params.key, { refresh: req.query.refresh === '1' });
   } catch (err) {
@@ -412,10 +499,17 @@ app.get('/api/festivals/:key/palmares', async (req, reply) => {
 });
 
 app.get('/api/festivals/:key/:year', async (req, reply) => {
+  if (!premioConocido(req.params.key, reply)) return { error: 'Ese premio no está en el catálogo' };
+  // «/cannes/pepe» contestaba 502 con «Cannes no tiene esta sección antes de
+  // 1946», porque Number('pepe') es NaN y la comparación de rango lo dejaba
+  // pasar hasta el mensaje equivocado. Un año que no es un año es un 400.
+  const year = Number(req.params.year);
+  if (!Number.isInteger(year) || year < 1870 || year > 2200) {
+    reply.code(400);
+    return { error: 'El año tiene que ser un número' };
+  }
   try {
-    return await festivalEdition(req.params.key, Number(req.params.year), {
-      refresh: req.query.refresh === '1',
-    });
+    return await festivalEdition(req.params.key, year, { refresh: req.query.refresh === '1' });
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };
@@ -470,6 +564,14 @@ app.post('/api/backup/settings', async (req, reply) => {
     if (!WRITABLE_SETTINGS.has(k) || (typeof v !== 'string' && v !== null)) {
       ignoradas.push(k);
       continue;
+    }
+    // …y la MISMA comprobación de las URL de servicio, que aquí faltaba: por
+    // esta puerta entraba un `plex_url` con query, con «#» o con usuario y
+    // contraseña, que es exactamente lo que decide a dónde sale el token de
+    // Plex. Un fichero de ajustes retocado valía por sí solo.
+    if (URL_SETTINGS.has(k) && !urlDeServicioValida(v)) {
+      reply.code(400);
+      return { error: `La dirección de ${k === 'plex_url' ? 'Plex' : 'Radarr'} de ese fichero no es una URL http(s) limpia: ${String(v).slice(0, 80)}` };
     }
     setSetting(k, v);
     aplicadas++;
@@ -552,7 +654,7 @@ app.get('/api/stats/recent', async () => {
 // enrich birthday/deathday for all tracked/favorite people ("vivos y muertos")
 app.post('/api/people/life-sync', async (req) => {
   const ids = db.prepare('SELECT person_id FROM tracked_people').all().map((r) => r.person_id);
-  const limit = Math.min(Number(req?.query?.limit) || 500, 3000);
+  const limit = entero(req?.query?.limit, 500, { min: 1, max: 3000 });
   const top = db
     .prepare(
       `SELECT person_id FROM movie_people GROUP BY person_id ORDER BY COUNT(*) DESC LIMIT ?`
@@ -567,6 +669,11 @@ app.get('/api/movies', async (req) => {
   for (const k of ['genres', 'countries', 'resolution']) {
     if (typeof query[k] === 'string') query[k] = query[k].split(',').filter(Boolean);
   }
+  // la paginación se normaliza AQUÍ, en el borde: un `?limit=-1` de un marcador
+  // viejo se traducía a «LIMIT -1», que en SQLite es «todas», y una parrilla
+  // devolvía las 12.400 películas en un JSON
+  query.limit = entero(query.limit, 60, { min: 1, max: 200 });
+  query.offset = entero(query.offset, 0, { min: 0, max: 5_000_000 });
   return q.listMovies(query);
 });
 
@@ -587,7 +694,7 @@ app.get('/api/movies/:id', async (req, reply) => {
  * pantalla de huecos manda tranquilamente 300 ids, y eso no cabe en una URL.
  */
 app.post('/api/avales', async (req, reply) => {
-  const ids = Array.isArray(req.body?.tmdbIds) ? req.body.tmdbIds.map(Number).filter(Boolean) : [];
+  const ids = Array.isArray(req.body?.tmdbIds) ? req.body.tmdbIds.map(Number).filter(idTmdbValido) : [];
   if (!ids.length) {
     reply.code(400);
     return { error: 'Faltan los ids' };
@@ -695,8 +802,8 @@ app.get('/api/search', async (req) => {
 app.get('/api/people', async (req) => {
   return q.topPeople({
     role: asRole(req.query.role, 'director'),
-    limit: Math.min(Number(req.query.limit) || 30, 500),
-    offset: Number(req.query.offset) || 0,
+    limit: entero(req.query.limit, 30, { min: 1, max: 500 }),
+    offset: entero(req.query.offset, 0, { min: 0, max: 5_000_000 }),
     search: req.query.search || '',
     gender: req.query.gender || '',
     life: req.query.life || '',
@@ -785,6 +892,12 @@ app.get('/api/directors/catalog', async () => {
  * que el cliente no vuelva a preguntar por él.
  */
 app.post('/api/directors/photos', async (req, reply) => {
+  // `names` tiene que ser una lista: con una cadena suelta, el .filter reventaba
+  // y el cliente recibía «(intermediate value).filter is not a function»
+  if (req.body?.names != null && !Array.isArray(req.body.names)) {
+    reply.code(400);
+    return { error: 'names tiene que ser una lista de nombres' };
+  }
   const nombres = [...new Set((req.body?.names || []).filter((n) => typeof n === 'string' && n.trim()))].slice(0, 150);
   if (!nombres.length) return { photos: {} };
   // sin clave de TMDB no hay fotos, pero la página funciona igual
@@ -810,6 +923,12 @@ app.post('/api/directors/photos', async (req, reply) => {
  * de nacimiento contra el que comprobar, así que se usa.
  */
 app.post('/api/directors/follow', async (req, reply) => {
+  // `names` tiene que ser una lista: con una cadena suelta, el .filter reventaba
+  // y el cliente recibía «(intermediate value).filter is not a function»
+  if (req.body?.names != null && !Array.isArray(req.body.names)) {
+    reply.code(400);
+    return { error: 'names tiene que ser una lista de nombres' };
+  }
   const nombres = [...new Set((req.body?.names || []).filter((n) => typeof n === 'string' && n.trim()))].slice(0, 150);
   if (!nombres.length) {
     reply.code(400);
@@ -1177,6 +1296,7 @@ app.post('/api/tracked/tmdb-bulk', async (req, reply) => {
     let skipped = 0;
     for (const p of people.slice(0, 200)) {
       const tmdbId = p.tmdbId ?? p.tmdb_id;
+      if (!idTmdbValido(tmdbId)) { skipped++; continue; }
       // if this person is already known and blocked, don't re-add automatically.
       // Plex-synced people are born without tmdb_id, so check by name too —
       // otherwise trackByTmdb finds them by name and re-follows past the block
@@ -1409,7 +1529,11 @@ app.get('/api/justwatch/:tmdbId', async (req, reply) => {
  */
 app.post('/api/justwatch/batch', async (req, reply) => {
   try {
-    const ids = [...new Set((req.body?.tmdbIds || []).map(Number).filter(Boolean))].slice(0, 400);
+    if (req.body?.tmdbIds != null && !Array.isArray(req.body.tmdbIds)) {
+      reply.code(400);
+      return { error: 'tmdbIds tiene que ser una lista de ids' };
+    }
+    const ids = [...new Set((req.body?.tmdbIds || []).map(Number).filter(idTmdbValido))].slice(0, 400);
     if (!ids.length) {
       reply.code(400);
       return { error: 'Falta tmdbIds' };
@@ -1467,13 +1591,20 @@ app.post('/api/tracked/bulk', async (req, reply) => {
 
   // confirmed selection coming back from the preview dialog
   if (Array.isArray(personIds) && personIds.length) {
+    // un id que no es un entero se cuela hasta tracked_people y deja una fila
+    // huérfana que ningún JOIN con `people` va a volver a encontrar
+    const limpios = personIds.slice(0, 1000).map(Number).filter((n) => Number.isSafeInteger(n) && n > 0);
+    if (!limpios.length) {
+      reply.code(400);
+      return { error: 'Ninguno de esos personIds es un id de persona (entero positivo)' };
+    }
     let added = 0;
     const tx = db.transaction(() => {
-      for (const id of personIds.slice(0, 1000)) added += followFacets(Number(id), followRole).added ? 1 : 0;
+      for (const id of limpios) added += followFacets(id, followRole).added ? 1 : 0;
     });
     tx();
     if (added) invalidateFavoritesCaches();
-    return { ok: true, added, total: personIds.length };
+    return { ok: true, added, total: limpios.length };
   }
 
   // el alta por «top de tu biblioteca» sale de los créditos que guarda Plex:
@@ -1497,7 +1628,7 @@ app.post('/api/tracked/bulk', async (req, reply) => {
          ${soloGuionistas}
        GROUP BY p.id ORDER BY n DESC, p.name LIMIT ?`
     )
-    .all(role, followRole, Math.min(Number(top), 1000));
+    .all(role, followRole, entero(top, 20, { min: 1, max: 1000 }));
   // with preview the client shows the candidates first: no more blind top-N adds
   if (preview) return { candidates };
   let added = 0;
@@ -1628,9 +1759,9 @@ app.get('/api/discover/dismissed', async () =>
 );
 app.post('/api/discover/dismiss', async (req, reply) => {
   const tmdbId = Number(req.body?.tmdbId);
-  if (!tmdbId) {
+  if (!idTmdbValido(tmdbId)) {
     reply.code(400);
-    return { error: 'Falta tmdbId' };
+    return { error: 'Falta tmdbId, o no es un id de TMDB (entero positivo)' };
   }
   db.prepare('INSERT OR REPLACE INTO dismissed_movies (tmdb_id, title, at) VALUES (?, ?, ?)').run(
     tmdbId,
@@ -1652,9 +1783,9 @@ app.get('/api/radarr/auto/veto', async () =>
 );
 app.post('/api/radarr/auto/veto', async (req, reply) => {
   const tmdbId = Number(req.body?.tmdbId);
-  if (!tmdbId) {
+  if (!idTmdbValido(tmdbId)) {
     reply.code(400);
-    return { error: 'Falta tmdbId' };
+    return { error: 'Falta tmdbId, o no es un id de TMDB (entero positivo)' };
   }
   db.prepare('INSERT OR REPLACE INTO auto_radarr_vetoed (tmdb_id, title, at) VALUES (?, ?, ?)').run(
     tmdbId,
@@ -1775,9 +1906,11 @@ app.delete('/api/tracked/:personId', async (req, reply) => {
 app.post('/api/people/from-tmdb', async (req, reply) => {
   const tmdbId = Number(req.body?.tmdbId);
   const name = String(req.body?.name || '').trim();
-  if (!tmdbId || !name) {
+  // un id decimal se guardaba tal cual en `people.tmdb_id`, y de ahí salían
+  // peticiones a «/person/1.5/movie_credits» que ensuciaban el calendario
+  if (!idTmdbValido(tmdbId) || !name) {
     reply.code(400);
-    return { error: 'Faltan datos de la persona' };
+    return { error: 'Faltan datos de la persona, o el id de TMDB no es un entero positivo' };
   }
   const ya = db.prepare('SELECT id FROM people WHERE tmdb_id = ?').get(tmdbId);
   if (ya) return { personId: ya.id };
@@ -1835,10 +1968,10 @@ app.get('/api/discover/gaps', async (req, reply) => {
       // valen los oficios que Plex guarda; pedir otro es un error, no un
       // «director» silencioso
       role: req.query.role ? req.query.role : 'director',
-      people: Math.min(Number(req.query.people) || 20, 60),
-      perPerson: Math.min(Number(req.query.perPerson) || 8, 20),
+      people: entero(req.query.people, 20, { min: 1, max: 60 }),
+      perPerson: entero(req.query.perPerson, 8, { min: 1, max: 20 }),
       // the ranking can be walked down to the first 500 people
-      offset: Math.min(Math.max(Number(req.query.offset) || 0, 0), 500),
+      offset: entero(req.query.offset, 0, { min: 0, max: 500 }),
       refresh: req.query.refresh === '1',
       // mismos filtros demográficos que la página Personas
       gender: req.query.gender || '',
@@ -1855,7 +1988,7 @@ app.get('/api/discover/gaps', async (req, reply) => {
 app.get('/api/discover/favorites', async (req, reply) => {
   try {
     return await favoritesGaps({
-      perPerson: Math.min(Number(req.query.perPerson) || 8, 20),
+      perPerson: entero(req.query.perPerson, 8, { min: 1, max: 20 }),
       role: asRole(req.query.role),
       refresh: req.query.refresh === '1',
     });
@@ -1882,7 +2015,7 @@ app.delete('/api/discover/canons/:key', async (req) => deleteCanon(req.params.ke
 app.get('/api/discover/absent', async (req, reply) => {
   try {
     return await absentGreats({
-      perPerson: Math.min(Number(req.query.perPerson) || 6, 12),
+      perPerson: entero(req.query.perPerson, 6, { min: 1, max: 12 }),
       refresh: req.query.refresh === '1',
       canon: String(req.query.canon || 'alltime').slice(0, 60),
     });
@@ -1905,7 +2038,9 @@ app.post('/api/sagas/stats', async (req) => {
 app.post('/api/sagas/scan', async (req) => {
   const force = !!req.body?.force;
   // scan everything by default; the nightly job is the one that batches
-  const budget = req.body?.budget === undefined ? Infinity : Number(req.body.budget) || Infinity;
+  // `budget: 0` es «ninguna», no «todas»: el `Number(x) || Infinity` de antes
+  // convertía un tope de cero en un escaneo entero de la biblioteca
+  const budget = entero(req.body?.budget, Infinity, { min: 0, ceroVale: true });
   if (!sagaScanStatus.running) scanSagas({ force, budget }).catch(() => {});
   return sagaScanState();
 });
@@ -1934,7 +2069,7 @@ app.get('/api/radarr/ids', async () => radarrOwnedIds());
 
 // historial de capturas (del snapshot local: sin red)
 app.get('/api/radarr/captures', async (req) =>
-  radarrCaptures(Math.min(Number(req.query.days) || 30, 365), Math.min(Number(req.query.limit) || 60, 200)));
+  radarrCaptures(entero(req.query.days, 30, { min: 1, max: 365 }), entero(req.query.limit, 60, { min: 1, max: 200 })));
 
 // auditorías locales de calidad del dato (huérfanos, homónimos, zombis…)
 app.get('/api/datahealth', async () => dataHealth());
@@ -1968,7 +2103,7 @@ app.post('/api/datahealth/verify-people', async (req, reply) => {
        GROUP BY p.id ORDER BY COUNT(mp.movie_id) DESC
        LIMIT ?`
     )
-    .all(Math.min(Number(req.body?.limit) || 1500, 5000))
+    .all(entero(req.body?.limit, 1500, { min: 1, max: 5000 }))
     .map((r) => r.id);
 
   Object.assign(verifyPeopleStatus, {
@@ -2008,7 +2143,7 @@ app.get('/api/datahealth/verify-people', async () => verifyPeopleStatus);
 app.get('/api/events', async (req) =>
   db
     .prepare('SELECT * FROM app_events WHERE created_at >= ? ORDER BY created_at DESC LIMIT ?')
-    .all(Date.now() - Math.min(Number(req.query.days) || 14, 90) * 24 * 3600 * 1000, Math.min(Number(req.query.limit) || 30, 100)));
+    .all(Date.now() - entero(req.query.days, 14, { min: 1, max: 90 }) * 24 * 3600 * 1000, entero(req.query.limit, 30, { min: 1, max: 100 })));
 
 // lo que Radarr aún debe: pedidas sin archivo y con archivo bajo el corte
 app.get('/api/radarr/wanted', async (req, reply) => {
@@ -2139,11 +2274,11 @@ app.post('/api/radarr/pending/all', async (req, reply) => {
 // Lo que el pase de favoritos ha mandado solo a Radarr, con la persona por la
 // que entró cada película. Lo pinta el Dashboard.
 app.get('/api/radarr/rules/sent', async (req) =>
-  enviosDeFavoritos({ days: Number(req.query?.days) || 30, limit: Number(req.query?.limit) || 30 })
+  enviosDeFavoritos({ days: entero(req.query?.days, 30, { min: 1, max: 3650 }), limit: entero(req.query?.limit, 30, { min: 1, max: 500 }) })
 );
 
 app.get('/api/radarr/rules/log', async (req) =>
-  rulesLog({ ruleId: req.query?.ruleId ?? null, limit: Number(req.query?.limit) || 200 })
+  rulesLog({ ruleId: req.query?.ruleId ?? null, limit: entero(req.query?.limit, 200, { min: 1, max: 1000 }) })
 );
 
 // atajo histórico: solo las reglas de «mis favoritos»
@@ -2173,7 +2308,11 @@ app.post('/api/radarr/add', async (req, reply) => {
 
 app.post('/api/radarr/add-bulk', async (req, reply) => {
   try {
-    const ids = (req.body?.tmdbIds || []).map(Number).filter(Boolean);
+    if (req.body?.tmdbIds != null && !Array.isArray(req.body.tmdbIds)) {
+      reply.code(400);
+      return { error: 'tmdbIds tiene que ser una lista de ids' };
+    }
+    const ids = (req.body?.tmdbIds || []).map(Number).filter(idTmdbValido);
     if (!ids.length) {
       reply.code(400);
       return { error: 'Falta tmdbIds' };
@@ -2254,7 +2393,7 @@ app.delete('/api/mdblist/lists/:id', async (req) => {
 
 app.get('/api/quality/overview', async () => q.qualityOverview());
 app.get('/api/quality/upgrades', async (req) =>
-  q.upgradeCandidates({ limit: Math.min(Number(req.query.limit) || 100, 500) })
+  q.upgradeCandidates({ limit: entero(req.query.limit, 100, { min: 1, max: 500 }) })
 );
 app.get('/api/quality/duplicates', async () => q.duplicates());
 

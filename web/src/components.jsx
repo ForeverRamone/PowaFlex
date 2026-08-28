@@ -1049,8 +1049,11 @@ export function ProgressBar({ pct, done = null, total = null, label = null }) {
  * uno puesto — ahí la opción vacía salía como un duplicado del primer orden.
  */
 export function Select({ value, onChange, options, placeholder = null, className = '' }) {
+  // max-w-full: un <select> con w-auto mide lo que su opción más larga, y una
+  // lista de países lo estiraba a 383 px dentro de un móvil de 375, sacando
+  // scroll horizontal a la página entera
   return (
-    <select className={`input !w-auto ${className}`} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select className={`input !w-auto max-w-full ${className}`} value={value} onChange={(e) => onChange(e.target.value)}>
       {placeholder != null && <option value="">{placeholder}</option>}
       {options.map(([v, l]) => (
         <option key={v} value={v}>{l}</option>

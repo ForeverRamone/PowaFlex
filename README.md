@@ -2,12 +2,11 @@
 
 # 🎬 PowaFlex
 
-> **Beta 1.27** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
+> **Beta 1.28** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
 > de filmografías, calendario de estrenos venideros conectado a TMDB y envío directo a Radarr.
 
-PowaFlex vive junto a tu servidor Plex (en Docker), lee tu biblioteca **directamente por la API**
-—sin exports ni CSV—, la cruza con **TMDB** y con **Radarr** y la convierte en dos cosas: *conocer
-el cine que tienes* y *cazar el que te falta*. Todo en local, sin cuentas ni telemetría.
+Vive junto a tu Plex en Docker, lee la biblioteca **por la API** —sin exports ni CSV— y la cruza
+con **TMDB** y **Radarr**: *conocer el cine que tienes* y *cazar el que te falta*. Todo en local.
 
 ---
 
@@ -16,22 +15,19 @@ el cine que tienes* y *cazar el que te falta*. Todo en local, sin cuentas ni tel
 | Sección | Qué encuentras |
 |---|---|
 | 📊 **Dashboard** | Totales y gráficas por década, género, país y resolución, con el ritmo de crecimiento y tus tops. |
-| 🎞️ **Biblioteca** | La colección en parrilla de pósters, con filtros estilo Letterboxd (género, país, década, metraje, resolución, HDR, notas mínimas) y la ordenación que quieras. La nota del póster la eliges tú. |
-| 🎭 **Directores/as y actores/actrices** | Ranking por presencia con filtros demográficos. Cada ficha cruza la filmografía de TMDB con lo que tienes: completismo, lo que falta (**+ Radarr**) y proyectos anunciados. |
+| 🎞️ **Biblioteca** | Parrilla de pósters con filtros estilo Letterboxd (género, país, década, metraje, resolución, HDR, nota mínima). Eliges qué nota va en el póster. |
+| 🎭 **Directores/as y actores/actrices** | Ranking por presencia, con filtros demográficos. Cada ficha cruza su filmografía de TMDB con lo que tienes: completismo, lo que falta (**+ Radarr**) y lo anunciado. |
 | 🗓️ **Cine venidero** | Calendario mensual de estrenos y proyectos de tu gente, con envío a Radarr en un clic. |
-| 🎪 **Festivales, premios y cánones** | Sesenta y seis fuentes: secciones oficiales edición a edición, palmareses y nominadas por año, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el AFI, Criterion, el registro estadounidense). Más **«Lo mejor del año»**, el corte transversal. Cada ficha se corrige a mano (✎), manda a Radarr lo que falte y el pase nocturno vigila las ediciones nuevas. |
-| ⭐ **Favoritos** | Tu gente de cabecera, por una faceta o por las dos. Paquetes temáticos, el catálogo de 680 directores en activo de Wikidata, pegar listas de nombres y exportar la tuya. Alimentan el calendario y el auto-Radarr. |
+| 🎪 **Festivales, premios y cánones** | Sesenta y seis fuentes: secciones oficiales edición a edición, palmareses y nominadas, crítica gremial, y los cánones (Sight & Sound, las 1001, el AFI, Criterion). Más **«Lo mejor del año»**, el corte transversal. Se corrige a mano (✎) y el pase nocturno vigila las ediciones nuevas. |
+| ⭐ **Favoritos** | Tu gente de cabecera, por dirección o por reparto. Paquetes temáticos, 680 directores en activo de Wikidata, pegar y exportar listas. Alimentan el calendario y el auto-Radarr. |
 | 🧭 **Descubrir huecos** | Lo que falta de tus favoritos y de tus top, los grandes ausentes del canon y tus sagas a medias, con listón de nota y filtros de ruido. |
 | 🏆 **Listas y retos** | Listas de MDBList y retos de Letterboxd con anillos de «tengo» vs «visto», y envío en bloque a Radarr. |
 | 👁️ **Visionado** | Lo visto contra lo pendiente por década y género, de quién te queda más, joyas y discrepancias frente a tu nota de Letterboxd. |
-| 🔧 **Taller** | Calidad y disco (resoluciones, upgrades con comprobación en JustWatch, duplicados, deuda de Radarr) y salud de los datos: auditorías locales, cada una con su remedio. |
+| 🔧 **Taller** | Calidad y disco: resoluciones, upgrades comprobados en JustWatch, duplicados, deuda de Radarr. Y auditorías de los datos, cada una con su remedio. |
 
-Además: buscador global (Ctrl/⌘ + K), ficha de película en cualquier póster, notas de IMDb, Rotten
-Tomatoes, Metacritic y Letterboxd vía MDBList, cifrado opcional de credenciales
-(`POWAFLEX_SECRET`) y auto-Radarr diario de los estrenos de tus favoritos vivos.
-
-La sincronización con Plex es incremental y se repite sola cada noche, con histórico de cada
-pasada y aviso en la barra lateral si algo falló.
+Además: buscador global (Ctrl/⌘ + K), ficha en cualquier póster, notas de IMDb, Rotten Tomatoes,
+Metacritic y Letterboxd vía MDBList, cifrado opcional de credenciales (`POWAFLEX_SECRET`) y
+auto-Radarr diario. La sincronización con Plex es incremental, nocturna y con histórico.
 
 ## 📋 Requisitos
 
@@ -104,10 +100,9 @@ Las mismas guías están dentro de la app (Ajustes → desplegables bajo cada ca
 
 **MDBList** (opcional, recomendado)
 - Cuenta en [mdblist.com](https://mdblist.com) → **Preferences → API Access**.
-- Añade a toda la app las notas de IMDb, Rotten Tomatoes (crítica y público), Metacritic,
-  Letterboxd y Trakt (filtros, ordenaciones, joyas/discrepancias) y las listas como retos.
-- PowaFlex respeta el límite diario de tu cuenta (gratuita o Supporter, configurable en Ajustes)
-  repartiendo la sincronización de notas en varios días si hace falta.
+- Añade las notas de IMDb, Rotten Tomatoes, Metacritic, Letterboxd y Trakt a toda la app, y las
+  listas como retos.
+- Respeta el límite diario de tu cuenta, repartiendo la sincronización en varios días si hace falta.
 
 ## 🧑‍💻 Desarrollo local
 
@@ -126,16 +121,15 @@ Los datos van a `server/data/` (configurable con `DATA_DIR`).
 - Todo corre y se guarda en tu máquina (SQLite en `/data`). Sin cuentas, sin telemetría.
 - De tu red solo salen las consultas a los servicios que conectes: TMDB, MDBList, JustWatch,
   Letterboxd y Wikipedia (festivales).
-- Autenticación básica opcional con `POWAFLEX_AUTH="usuario:contraseña"`. Aun así está pensada
-  para red local: no la expongas a internet sin un proxy con autenticación delante.
-- En **Ajustes → Copia de seguridad** puedes descargar la base de datos entera y
-  exportar/importar la configuración para reinstalar sin empezar de cero.
+- Autenticación básica opcional con `POWAFLEX_AUTH="usuario:contraseña"`. Está pensada para red
+  local: no la expongas a internet sin un proxy con autenticación delante.
+- En **Ajustes → Copia de seguridad** te llevas la base entera y la configuración.
 
 ## 🙏 Créditos
 
-- Datos de cine por cortesía de [TMDB](https://www.themoviedb.org). Este producto usa la API de
-  TMDB pero no está avalado ni certificado por TMDB.
-- Gracias a los proyectos [Plex](https://plex.tv), [Radarr](https://radarr.video) y
+- Datos de cine por cortesía de [TMDB](https://www.themoviedb.org). Usa su API, pero no está
+  avalado ni certificado por TMDB.
+- Gracias a [Plex](https://plex.tv), [Radarr](https://radarr.video) y
   [Letterboxd](https://letterboxd.com) por sus APIs y formatos abiertos.
 
 Licencia [MIT](LICENSE).

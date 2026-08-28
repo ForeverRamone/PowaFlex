@@ -51,7 +51,11 @@ export const REGISTRY = {
     name: 'Cannes',
     award: 'Palma de Oro',
     article: (y) => `${y} Cannes Film Festival`,
-    section: /^(in )?competition/i,
+    // Wikipedia alterna «In Competition» y «Main Competition» de un año a otro
+    // sin criterio: 2016 se llamó «Main Competition» y la edición entera se
+    // servía como error. Los dos rótulos, y el jurado (que usa los mismos) lo
+    // descarta el filtro por sección padre.
+    section: /^(in |main )?competition/i,
     sinceYear: 1946,
     awardPage: "Palme d'Or",
     awardSection: /^winners$/i,
@@ -73,7 +77,10 @@ export const REGISTRY = {
     name: 'Venecia',
     award: 'León de Oro',
     article: (y) => `${nth(y - 1943)} Venice International Film Festival`,
-    section: /^in competition/i,
+    // la Mostra titula «Main Competition» sus ediciones viejas y «In
+    // Competition (Venezia 81)» las nuevas: con solo «in competition» se
+    // perdían 1980, 1981 y 1992
+    section: /^(in |main )?competition/i,
     sinceYear: 1980, // numeración moderna estable; antes hubo años sin mostra
     awardPage: 'Golden Lion',
     awardSection: /^winners$/i,
@@ -82,7 +89,9 @@ export const REGISTRY = {
     name: 'Berlinale',
     award: 'Oso de Oro',
     article: (y) => `${nth(y - 1950)} Berlin International Film Festival`,
-    section: /^(main )?competition/i,
+    // el mismo baile de rótulo que en Cannes, y con el mismo precio: la 62.ª
+    // (2012) titula «In competition» y se quedaba sin edición
+    section: /^(in |main )?competition/i,
     sinceYear: 1951,
     awardPage: 'Golden Bear',
     awardSection: /^winners$/i,
@@ -156,7 +165,17 @@ export const REGISTRY = {
     name: 'San Sebastián',
     award: 'Concha de Oro',
     article: (y) => `${nth(y - 1952)} San Sebastián International Film Festival`,
-    section: /^in competition/i,
+    // Donostia titula su competición «Official Selection» tanto como «In
+    // competition», y no siempre en el mismo sitio del árbol. Anclado por los
+    // dos extremos: «Official Selection Awards» y «Official selection jury
+    // awards» son el palmarés, no la selección. Los años que anidan «In
+    // competition» dentro de «Official selection» los resuelve la regla de
+    // «gana la hija». En 2021 no hay tal anidamiento y el único «In
+    // competition» del artículo cuelga de Perlak: la app servía El poder del
+    // perro y The French Dispatch como aspirantes a la Concha. Ahora la
+    // Sección Oficial también es candidata, va antes en el artículo y es la
+    // que se sirve.
+    section: /^(in competition|official selection)$/i,
     sinceYear: 1953,
     awardPage: 'Golden Shell',
     awardSection: /^winners$/i,
@@ -2931,6 +2950,48 @@ export async function resolveFilms(rows, yearOf) {
 
 // --- edición de un festival ----------------------------------------------------
 
+// Un rótulo de sección no dice por sí solo si es la selección o el palmarés:
+// «Main Competition» aparece hasta tres veces en el mismo artículo (jurado,
+// sección oficial y premios) con las MISMAS palabras. Lo que las distingue es
+// de quién cuelgan, y eso la API lo numera: «1.1» cuelga de «1».
+const numeroDeSeccion = (s) => String(s?.number || '');
+const esSeccionAncestro = (a, b) => {
+  const na = numeroDeSeccion(a);
+  const nb = numeroDeSeccion(b);
+  return !!na && !!nb && na !== nb && nb.startsWith(`${na}.`);
+};
+
+// Ni jurados ni palmareses: ni la sección ni ninguna de sus cabeceras madre.
+const RX_NO_ES_SELECCION = /jur(y|ies|ado)|award|prize|palmar[eé]s|premio/i;
+
+/**
+ * Qué secciones del artículo pueden ser la selección oficial, en el orden en
+ * que hay que probarlas.
+ *
+ * Mirar solo el rótulo propio costó dos ediciones enteras: el jurado de Cannes
+ * 2016 se titula «Main competition» sin la palabra «jurado» por ningún lado, y
+ * solo su madre, «Juries», lo delata; el palmarés cuelga de «Official Awards».
+ * Y entre dos candidatas ANIDADAS gana la hija: San Sebastián llama «Official
+ * selection» a la cabecera que contiene «In competition» y «Out of
+ * Competition», así que quedarse con la madre metía las películas fuera de
+ * concurso entre las aspirantes a la Concha de Oro.
+ */
+export function seccionesCandidatas(secciones, sectionRe) {
+  const linaje = (s) => [s, ...secciones.filter((o) => esSeccionAncestro(o, s))].map((o) => stripTags(o.line));
+  const validas = secciones.filter(
+    (s) => sectionRe.test(stripTags(s.line)) && !linaje(s).some((t) => RX_NO_ES_SELECCION.test(t))
+  );
+  const hijas = validas.filter((s) => !validas.some((o) => esSeccionAncestro(s, o)));
+  // Y de lo que quede, solo lo que cuelgue más ARRIBA del artículo. En Donostia
+  // 2021 el «In competition» de Perlak sobrevive a todo lo anterior —no es
+  // jurado ni palmarés, y nadie lo contiene— pero está un nivel más hondo que
+  // la Sección Oficial. Dejarlo de reserva era dejar puesta la trampa: el día
+  // que la sección buena no tenga tabla, la edición se serviría con las perlas.
+  const profundidad = (s) => numeroDeSeccion(s).split('.').length;
+  const minima = Math.min(...hijas.map(profundidad));
+  return hijas.filter((s) => profundidad(s) === minima);
+}
+
 /**
  * Solo la parte de Wikipedia de una edición: la tabla de la sección oficial ya
  * parseada, SIN casar nada contra TMDB. La usan buildEdition (que después
@@ -2945,11 +3006,15 @@ async function fetchSelectionRows(key, f, year) {
 
   const page = f.article(year);
   // el mismo síntoma significa cosas distintas según el año: hacia delante,
-  // programa aún sin publicar; hacia atrás, edición que no se celebró
+  // programa aún sin publicar; hacia atrás, o no se celebró o Wikipedia no lo
+  // ha escrito. No es lo mismo y no hay que dar por hecho lo primero: San
+  // Sebastián se celebra sin faltar un año desde 1953 y sus ediciones de 2010 a
+  // 2016 no tienen artículo en la Wikipedia inglesa; decirle al cinéfilo que
+  // «seguramente ese año no se celebró» era mentirle sobre siete ediciones.
   const sinEdicion =
     year >= new Date().getFullYear()
       ? `Wikipedia aún no tiene el programa de ${f.name} ${year}. Vuelve cuando se anuncie la selección.`
-      : `Wikipedia no tiene la edición de ${f.name} de ${year}: seguramente ese año no se celebró.`;
+      : `La Wikipedia inglesa no tiene artículo de ${f.name} ${year}: esa edición no está escrita, o no se celebró.`;
   let meta;
   try {
     meta = await wikiParse({ page, prop: 'sections' });
@@ -2957,13 +3022,7 @@ async function fetchSelectionRows(key, f, year) {
     if (/doesn'?t exist|missingtitle/i.test(String(err.message || ''))) throw new Error(sinEdicion);
     throw err;
   }
-  // «Main Competition» puede aparecer tres veces en el mismo artículo (jurado,
-  // sección oficial, palmarés): fuera los jurados, y del resto se queda la
-  // primera candidata que tenga una tabla de películas de verdad. El palmarés
-  // no cuela porque la sección oficial siempre va antes en el artículo.
-  const candidates = (meta.sections || []).filter(
-    (s) => sectionRe.test(stripTags(s.line)) && !/jur/i.test(stripTags(s.line))
-  );
+  const candidates = seccionesCandidatas(meta.sections || [], sectionRe);
   if (!candidates.length) {
     throw new Error(
       year >= new Date().getFullYear()
@@ -2988,6 +3047,38 @@ async function fetchSelectionRows(key, f, year) {
   return { rows, section: stripTags(sec.line), note: special?.note || null, page };
 }
 
+/**
+ * Marca en las películas de una edición cuáles ganaron el premio, comparándolas
+ * con las filas del palmarés, y las sube al principio.
+ *
+ * Casar por TÍTULO a secas marcaba de más: la Berlinale 2025 llevó a
+ * competición dos películas llamadas «Dreams», la de Dag Johan Haugerud (que se
+ * llevó el Oso de Oro) y la de Michel Franco (que no). Las dos salían coronadas
+ * y la de Franco, además, la primera de la lista. Cuando los dos lados tienen
+ * ficha manda el `tmdb_id`, que es identidad de verdad; cuando falta, el título
+ * tiene que venir avalado por la dirección. Vale la regla de la casa: mejor no
+ * marcar a nadie que coronar a otra.
+ */
+export function marcarGanadoras(films, filasDelPremio) {
+  const esLaGanadora = (pelicula, fila) => {
+    if (pelicula.tmdb_id && fila.tmdb_id && pelicula.tmdb_id === fila.tmdb_id) return true;
+    const t = normName(pelicula.title);
+    const o = normName(pelicula.original_title || '');
+    const mismoTitulo = (t && normName(fila.title) === t) || (o && normName(fila.original_title || '') === o);
+    if (!mismoTitulo) return false;
+    // dos fichas distintas con el mismo título son dos películas distintas: ahí
+    // el título ya no prueba nada y sin dirección que lo avale no se marca
+    if (pelicula.tmdb_id && fila.tmdb_id && !normName(fila.director || '')) return false;
+    return directorsMatch(fila.director, splitDirectors(pelicula.director));
+  };
+  for (const pelicula of films) {
+    if ((filasDelPremio || []).some((fila) => esLaGanadora(pelicula, fila))) pelicula.winner = true;
+  }
+  // estable: solo sube la ganadora, el resto conserva el orden de la tabla
+  films.sort((a, b) => (b.winner ? 1 : 0) - (a.winner ? 1 : 0));
+  return films;
+}
+
 async function buildEdition(key, f, year) {
   // los premios sí tienen «edición por año»: sus nominadas
   if (f.awardNominees) return buildAwardYear(key, f, year);
@@ -3003,15 +3094,7 @@ async function buildEdition(key, f, year) {
   // (Busan, Horizontes, las de debut) simplemente no marcan ninguna.
   try {
     const delAño = (await winnersRowsLight(key)).filter((w) => Math.abs(Number(w.year) - year) <= 1);
-    for (const f of films) {
-      const t = normName(f.title);
-      const o = normName(f.original_title || '');
-      if (delAño.some((w) => (t && normName(w.title) === t) || (o && normName(w.original_title || '') === o))) {
-        f.winner = true;
-      }
-    }
-    // estable: solo sube la ganadora, el resto conserva el orden de la tabla
-    films.sort((a, b) => (b.winner ? 1 : 0) - (a.winner ? 1 : 0));
+    marcarGanadoras(films, delAño);
   } catch {
     // sin palmarés utilizable la edición se sirve igual, sin marcar a nadie
   }

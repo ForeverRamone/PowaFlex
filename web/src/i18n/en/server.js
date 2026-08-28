@@ -51,4 +51,12 @@ export default {
   // ── imágenes ──
   'sin imagen': 'no image',
   'error de imagen': 'image error',
+
+  // ── etiquetas de los cánones de serie (CANONS en server/src/discover.js) ──
+  // Las pintan Descubrir y el catálogo de Favoritos; solo las de serie pasan
+  // por t(), porque el nombre de una lista pegada a mano es de su dueño.
+  'TSPDT · Top 250 de siempre': 'TSPDT · All-time Top 250',
+  'TSPDT · Top 100 del siglo XXI': 'TSPDT · Top 100 of the 21st century',
+  '501 Directors · el libro': '501 Directors · the book',
+  'En boga ahora · TMDB': 'Trending now · TMDB',
 };

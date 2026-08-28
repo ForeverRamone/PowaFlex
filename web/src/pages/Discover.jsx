@@ -584,7 +584,11 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
               title={c.count ? t('{n} nombres', { n: c.count }) : t('Se actualiza solo con el ranking de TMDB')}
               className={`btn-ghost !py-1 text-sm ${canon === c.key ? '!border-gold-400 text-gold-400' : ''}`}
             >
-              {c.label}
+              {/* los cánones de serie traen su etiqueta del servidor, en
+                  castellano: se traduce como el resto de sus mensajes. Las
+                  listas que pega Ramón llevan el nombre que él les puso y se
+                  pintan tal cual. */}
+              {c.builtin ? t(c.label) : c.label}
             </button>
             {!c.builtin && (
               <button
@@ -632,7 +636,9 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
           if (!top.length) return null;
           return (
           <section key={d.tmdb_id} className="card p-4 mb-5">
-            <div className="flex items-center gap-3 mb-3">
+            {/* flex-wrap: el botón de añadir en bloque no encoge, y en un móvil
+                de 375 se salía por cuatro píxeles; ahora baja de línea */}
+            <div className="flex items-center gap-3 mb-3 flex-wrap">
               {d.profile_path ? (
                 <img src={tmdbImg(d.profile_path, 'w185')} alt="" className="w-12 h-12 rounded-full object-cover" />
               ) : (

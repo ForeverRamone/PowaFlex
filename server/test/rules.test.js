@@ -261,17 +261,32 @@ test('crear, afinar y borrar una regla', () => {
 
 test('los valores fuera de rango se recortan en vez de guardarse tal cual', () => {
   const v = normalizarCampos(
-    { min_score: 500, cap: -3, window_days: 9999, months: 0, editions: 99, lookback_days: -1 },
+    { min_score: 500, window_days: 9999, months: 0, editions: 99 },
     valoresPorDefecto('estrenos')
   );
   assert.equal(v.min_score, 100);
-  assert.equal(v.cap, 0);
   assert.equal(v.window_days, 90); // releases() solo tiene 90 días hacia atrás
   assert.equal(v.months, 1);
   assert.equal(v.editions, 10);
-  assert.equal(v.lookback_days, 0);
   // y la basura no borra lo que había
   assert.equal(normalizarCampos({ min_score: 'hola' }, { min_score: 60 }).min_score, 0);
+});
+
+test('un NEGATIVO en el tope no puede significar «sin tope»', () => {
+  // Recortar al mínimo daba el valor MÁS PERMISIVO justo en el campo que
+  // protege el disco: `cap: -7` se convertía en 0, que es SIN TOPE, y una regla
+  // de palmarés histórico se bajaba cientos de películas la primera noche. Un
+  // negativo no es un valor tecleado a propósito: se deja lo que había.
+  const previo = { cap: 20, min_score: 70, window_days: 15, months: 6, editions: 2, lookback_days: 30, min_emerging: 70 };
+  const v = normalizarCampos(
+    { cap: -7, min_score: -1, window_days: -30, months: -2, editions: -1, lookback_days: -5, min_emerging: -9 },
+    previo
+  );
+  assert.deepEqual(v, previo, 'ningún negativo puede cambiar lo guardado');
+  // el 0 TECLEADO sigue siendo «sin tope», que es una opción de verdad
+  assert.equal(normalizarCampos({ cap: '0' }, previo).cap, 0);
+  // y una regla NUEVA con un tope negativo nace con el tope por defecto, no suelta
+  assert.equal(normalizarCampos({ cap: -7 }, valoresPorDefecto('festival')).cap, 20);
 });
 
 test('vaciar un campo NO es escribir cero (y en el tope, cero es SIN TOPE)', () => {
@@ -386,6 +401,18 @@ test('rechazar de la cuarentena VETA, para que la bandeja no sea una noria', asy
   assert.equal(db.prepare('SELECT COUNT(*) n FROM auto_radarr_vetoed WHERE tmdb_id = 5551').get().n, 1);
 });
 
+test('vetar lo que NO está en la bandeja no fabrica un veto fantasma', async () => {
+  // Un segundo clic en el 🚫, o el de una pestaña que aún enseñaba una película
+  // aprobada en otra, metía en «fuera del pase automático» una fila sin título
+  // — y dejaba prohibida para siempre una película recién mandada a Radarr.
+  const { rechazarPendiente } = await import('../src/rules.js');
+  const antes = db.prepare('SELECT COUNT(*) n FROM auto_radarr_vetoed').get().n;
+  const r = rechazarPendiente(777777);
+  assert.equal(r.vetada, false);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM auto_radarr_vetoed WHERE tmdb_id = 777777').get().n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM auto_radarr_vetoed').get().n, antes);
+});
+
 test('la bandeja se purga de lo que ya tienes o ya decidiste', async () => {
   // una bandeja que te pide permiso para bajar algo que ya bajaste se lee como
   // una avería, y una decisión tomada en otra pantalla no puede seguir esperando
@@ -427,6 +454,23 @@ test('aprobar con Radarr caído NO la borra de la bandeja', async () => {
   db.prepare('INSERT OR REPLACE INTO radarr_pending (tmdb_id, title, at) VALUES (?, ?, ?)').run(5552, 'Otra', 1);
   await assert.rejects(() => aprobarPendiente(5552));
   assert.equal(db.prepare('SELECT COUNT(*) n FROM radarr_pending WHERE tmdb_id = 5552').get().n, 1);
+});
+
+test('la pantalla sabe, ANTES de ejecutar, que sin MDBList un umbral no decide nada', async () => {
+  // Una regla con umbral y sin clave se queda «esperando nota» cada noche sin
+  // añadir jamás. Eso solo se sabía ejecutándola y leyendo el aviso de la
+  // pasada: es decir, después.
+  const { rulesOverview } = await import('../src/rules.js');
+  const { setSetting } = await import('../src/db.js');
+  setSetting('mdblist_key', null);
+  assert.equal(rulesOverview().mdblistConfigurado, false);
+  setSetting('mdblist_key', 'abc');
+  assert.equal(rulesOverview().mdblistConfigurado, true);
+  setSetting('mdblist_key', null);
+
+  // y la interfaz tiene que leer esa bandera, o el aviso no existe
+  const jsx = fs.readFileSync(path.join(raiz, 'web/src/pages/RadarrRules.jsx'), 'utf8');
+  assert.ok(/mdblistConfigurado/.test(jsx), 'RadarrRules.jsx no mira mdblistConfigurado');
 });
 
 // --- el eje nuevo, en TODOS los sitios que enumeran los viejos -----------------

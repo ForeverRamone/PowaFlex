@@ -264,8 +264,8 @@ export default {
 
   // ── Copia de seguridad ─────────────────────────────────────────────────────
   'Copia de seguridad': 'Backup',
-  'Para reinstalar sin empezar de cero. La base lo incluye todo; el fichero de ajustes solo la configuración, y se importa aquí mismo.':
-    'For reinstalling without starting from scratch. The database holds everything; the settings file holds only the configuration, and imports right here.',
+  'Para reinstalar sin empezar de cero. La base lo incluye todo; el .json solo lleva conexiones y preferencias, no las reglas de Radarr ni lo que espera en cuarentena.':
+    'For reinstalling without starting from scratch. The database holds everything; the .json only carries connections and preferences, not your Radarr rules or what is waiting in quarantine.',
   '⬇ Descargar base de datos': '⬇ Download database',
   '⬇ Exportar ajustes (.json)': '⬇ Export settings (.json)',
   '⬆ Importar ajustes': '⬆ Import settings',

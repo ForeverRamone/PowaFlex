@@ -11,7 +11,7 @@ const {
   atribuir, isoDeLugar, isosDeTexto, ordenar, notaValida, codigoTmdb, PAISES, TIERS, tierDe, esPaisConocido,
   notaAsentada, mediaDelPais, ordenarPais, VOTOS_PARA_ASENTAR,
   ponerOverride, quitarOverride, overridesDePais, peliculasDePais, aniosDePais, catalogoPaises,
-  apuntarFallo, guardarBuild, esConcierto, estaEstrenada,
+  apuntarFallo, guardarBuild, esConcierto, esMonologo, estaEstrenada,
 } = await import('../src/paises.js');
 const { RANKINGS, parsearFichas, partirTitulo, tieneRanking } = await import('../src/filmaffinity.js');
 const { FA_RANKINGS } = await import('../src/data/filmaffinity-2026.js');
@@ -252,6 +252,57 @@ test('el título solo cuenta si además hay género musical', () => {
   // género, se caería de la lista española por su nombre
   assert.equal(esConcierto(conGeneros('Live Flesh', [18, 80])), false);
   assert.equal(esConcierto(conGeneros('The Live-In Maid', [18])), false);
+});
+
+// --- el monólogo grabado ------------------------------------------------------
+//
+// Las fichas son las de TMDB, con su reparto tal y como viene: los personajes
+// están comprobados uno a uno contra `movie_cr:<id>:es-ES` de la caché.
+const conReparto = (title, ids, personajes) => ({
+  title,
+  original_title: title,
+  genres: ids.map((id) => ({ id })),
+  credits: { cast: personajes.map((character, i) => ({ name: `Fulano ${i}`, character })) },
+});
+
+test('UN MONÓLOGO GRABADO NO ES CINE, y no lo delata el género musical', () => {
+  // Los cuatro que peor salían de los veintinueve medidos sobre los paquetes.
+  assert.equal(esMonologo(conReparto('Hannah Gadsby: Nanette', [35], ['Self'])), true, 'quinta de Australia');
+  assert.equal(esMonologo(conReparto('Hannah Gadsby: Douglas', [35], ['Self'])), true, 'primera de 2020');
+  assert.equal(esMonologo(conReparto('La Pelota de Letras', [35], ['Himself'])), true, 'la única de 2005 en Colombia');
+  // dos figurantes sin acreditar detrás no lo convierten en una película
+  assert.equal(
+    esMonologo(conReparto('Eddie Izzard: Glorious', [35], ['Herself', 'Groupie (uncredited)', 'Groupie (uncredited)'])),
+    true,
+    'primera de 1997 en Reino Unido'
+  );
+  // y con género documental también: «Whindersson Nunes: Isso não é um culto»
+  assert.equal(esMonologo(conReparto('Isso não é um culto', [35, 99], ['Himself'])), true);
+});
+
+test('…pero un DOCUMENTAL CORAL no, aunque todos hagan de sí mismos', () => {
+  // «Riverboom», segunda de Suiza: tres periodistas en Afganistán, los tres
+  // acreditados «Self». Es la razón de que se exija UNO y no «al menos uno».
+  assert.equal(esMonologo(conReparto('Riverboom', [99, 35], ['Self', 'Self', 'Self'])), false);
+  assert.equal(esMonologo(conReparto('Heimaleikurinn', [99, 35], ['Self', 'Self', 'Self', 'Self'])), false);
+});
+
+test('…y una comedia con un cameo tampoco: por eso el reparto va con tope', () => {
+  // Sin el tope, la condición del «uno de sí mismo» la cumplían «Happy
+  // Gilmore» (Bob Barker) y «Borat»: son películas, y con reparto de sesenta.
+  const muchos = ['Protagonista', 'Secundario', 'Otro', 'Self'];
+  assert.equal(esMonologo(conReparto('Happy Gilmore', [35], muchos)), false);
+  assert.equal(esMonologo(conReparto('Borat Subsequent Moviefilm', [35], muchos)), false);
+  // y una comedia normal, sin nadie haciendo de sí mismo, ni se acerca
+  assert.equal(esMonologo(conReparto('Alan Partridge: Alpha Papa', [35], ['Alan Partridge', 'Pat Farrell'])), false);
+});
+
+test('el género manda: con otro género delante hay una película', () => {
+  // «Nanette» con un drama al lado ya no es la firma de un especial, y echarla
+  // por el reparto sería tirar cine
+  assert.equal(esMonologo(conReparto('Una comedia dramática', [35, 18], ['Self'])), false);
+  assert.equal(esMonologo(conReparto('Un documental', [99], ['Self'])), false, 'sin comedia no se mira');
+  assert.equal(esMonologo(conReparto('Sin reparto', [35], [])), false, 'sin reparto no se puede decidir');
 });
 
 test('lo que no se ha estrenado no entra en un canon histórico', () => {

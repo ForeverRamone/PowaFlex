@@ -870,8 +870,11 @@ function SeccionCopias() {
   return (
     <section className="card p-5 mb-5">
       <h2 className="font-semibold text-zinc-100 mb-1">{t('Copia de seguridad')}</h2>
+      {/* «solo la configuración» se leía como «todo lo que has configurado», y
+          las reglas de Radarr son una tabla de la base: quien exporte el .json
+          creyéndose cubierto reinstala sin ninguna de sus reglas. */}
       <p className="text-xs text-zinc-500 mb-3">
-        {t('Para reinstalar sin empezar de cero. La base lo incluye todo; el fichero de ajustes solo la configuración, y se importa aquí mismo.')}
+        {t('Para reinstalar sin empezar de cero. La base lo incluye todo; el .json solo lleva conexiones y preferencias, no las reglas de Radarr ni lo que espera en cuarentena.')}
       </p>
       <div className="flex gap-2 items-center flex-wrap">
         <a className="btn-gold" href="/api/backup/database" download>
@@ -904,6 +907,10 @@ function SeccionCopias() {
         </label>
         <div className="flex flex-wrap items-center gap-2 mt-2 ml-6">
           <span className="text-xs text-zinc-400">{t('guardando las últimas')}</span>
+          {/* El min/max de un <input type=number> no impide teclear un 0 ni un
+              −5: se guardaban tal cual y el servidor los leía como 7, así que
+              la casilla enseñaba un número que no era el que mandaba. Al salir
+              del campo se recorta al rango de verdad. */}
           <input
             type="number"
             min="1"
@@ -911,6 +918,11 @@ function SeccionCopias() {
             className="input !w-20 text-center"
             value={s.backup_keep ?? '7'}
             onChange={set('backup_keep')}
+            onBlur={(e) => {
+              const n = Math.round(Number(e.target.value));
+              const bueno = String(Number.isFinite(n) && n > 0 ? Math.min(n, 60) : 7);
+              if (bueno !== String(s.backup_keep ?? '')) setS({ ...s, backup_keep: bueno });
+            }}
           />
           <span className="text-xs text-zinc-400">{t('copias')}</span>
           <button
