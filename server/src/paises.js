@@ -46,6 +46,7 @@ import { mapPool, cedeElHilo } from './pool.js';
 import { normName } from './names.js';
 import { cachePrefix } from './cache-versions.js';
 import { PAQUETES } from './data/paises/index.js';
+import { noEsCine } from './data/paises/no-es-cine.js';
 
 /**
  * La versión del ÍNDICE construido (no la de la caché de TMDB, que vive en
@@ -585,10 +586,69 @@ const overridesDe = (iso) =>
 export const notaValida = (n) => (typeof n === 'number' && n >= 0 && n <= 10 ? n : null);
 
 export const ordenar = (a, b) =>
-  (b.lb ?? -1) - (a.lb ?? -1) ||
+  (b.orden ?? b.lb ?? -1) - (a.orden ?? a.lb ?? -1) ||
   (b.avales || 0) - (a.avales || 0) ||
   (b.ganados || 0) - (a.ganados || 0) ||
   (b.lb_votes || 0) - (a.lb_votes || 0);
+
+/**
+ * LA NOTA CON LA QUE SE ORDENA, QUE NO ES LA QUE SE ENSEÑA.
+ *
+ * Un 7,8 con 300 votos adelantaba a un 7,6 con 27.000, y eso no es una nota
+ * mejor: es una nota con menos gente detrás. La corrección es la clásica —la
+ * del Top 250 de IMDb—: acercar la nota a la media del país mientras no haya
+ * votos suficientes para creérsela, y dejar de moverla en cuanto los haya.
+ *
+ * DOS DECISIONES QUE HACEN QUE ESTO NO ROMPA NADA:
+ *
+ *  1. **Se redondea al décimo, que es la única precisión que da Letterboxd.**
+ *     Sin redondear, la nota corregida es un número continuo que NUNCA empata,
+ *     y eso se cargaba el desempate por canon —la regla de la casa— dejando
+ *     media lista ordenada por votos, que es justo el sesgo del que se venía
+ *     huyendo: en el top de Reino Unido «La Odisea» adelantaba a «Lawrence de
+ *     Arabia» por tener nueve veces más votos con la misma nota. Redondeando,
+ *     los empates siguen siendo empates y los sigue decidiendo el canon.
+ *  2. **El cien es una constante, no un percentil del país.** Cuántos votos
+ *     hacen falta para que una nota esté asentada es propiedad de Letterboxd,
+ *     no del país. Sacándolo del propio país se aplanaban las cinematografías
+ *     pequeñas —donde NADA tiene votos— justo lo que se quería evitar: medido
+ *     sobre los 72 paquetes, con el percentil 25 Armenia movía el 69 % de sus
+ *     notas y le cambiaba el orden de los diez primeros; con el cien fijo, los
+ *     diez primeros de Armenia, España, Estados Unidos, Reino Unido, Senegal y
+ *     Bosnia se quedan EXACTAMENTE como estaban y la corrección muerde donde
+ *     tenía que morder — «Vestida de azul», un 8,4 con 3.355 votos, deja de
+ *     salir séptima de España por delante de «Dolor y gloria».
+ *
+ * La nota que la interfaz pinta sigue siendo la de Letterboxd, sin tocar: esto
+ * solo decide el orden.
+ */
+export const VOTOS_PARA_ASENTAR = 100;
+
+/** La media de las notas del país, al décimo. */
+export const mediaDelPais = (lista) => {
+  const con = lista.filter((x) => typeof x.lb === 'number');
+  if (!con.length) return 0;
+  return Math.round((con.reduce((s, x) => s + x.lb, 0) / con.length) * 10) / 10;
+};
+
+/** La nota de una película acercada a `media` mientras le falten votos. */
+export function notaAsentada(lb, votos, media) {
+  if (typeof lb !== 'number') return null;
+  const v = Math.max(0, Number(votos) || 0);
+  return Math.round((((v * lb) + VOTOS_PARA_ASENTAR * media) / (v + VOTOS_PARA_ASENTAR)) * 10) / 10;
+}
+
+/**
+ * Ordena la lista entera de un país: pone la nota asentada en cada fila y
+ * ordena con ella. Va sobre la lista COMPLETA y no fila a fila porque la media
+ * del país es la de esa lista.
+ */
+export function ordenarPais(lista) {
+  const media = mediaDelPais(lista);
+  for (const x of lista) x.orden = notaAsentada(x.lb, x.lb_votes, media);
+  lista.sort(ordenar);
+  return lista;
+}
 
 /**
  * Construye (o reconstruye) el índice de un país. Devuelve el resumen que se
@@ -689,6 +749,11 @@ export async function construirPais(iso, { hasta = new Date().getFullYear() } = 
         // país con una sitcom dentro no se puede enseñar.
         const clasificada = clasificar(d);
         if (!esLargometraje(clasificada)) return;
+        // Y lo que no es cine por más que TMDB lo guarde como película: el
+        // documental promocional de una serie, el monólogo grabado, el «cómo se
+        // hizo» del DVD. Ninguna regla de duración o de género los separa —ver
+        // `no-es-cine.js`—, así que van por id y con su motivo escrito.
+        if (noEsCine(c.tmdb_id)) return;
         // Y FUERA LOS CONCIERTOS. El top de Reino Unido abría con «Pink Floyd:
         // Live at Pompeii» y un directo de BTS, las dos con 8,8 de Letterboxd:
         // el público las puntúa como lo que son, un buen concierto, y así se
@@ -703,9 +768,20 @@ export async function construirPais(iso, { hasta = new Date().getFullYear() } = 
         const dirs = (d.credits?.crew || []).filter((x) => x.job === 'Director');
         const origen = d.origin_country || [];
         const produccion = (d.production_countries || []).map((x) => x.iso_3166_1);
-        // Con codirección basta con que UNO sea del país.
+        // Con codirección basta con que UNO sea del país: es lo justo para los
+        // hermanos Coen, para los Dardenne o para una pareja que firma junta.
+        //
+        // LA PELÍCULA DE EPISODIOS ROMPE ESA REGLA. La firman cinco o veinte
+        // personas de cinco o veinte sitios, y «basta con que uno sea del país»
+        // la metía en el ranking de TODOS ellos: una misma película contada
+        // como cine estadounidense, japonés y mexicano a la vez. A partir de
+        // TRES direcciones de países distintos manda la nacionalidad de la
+        // película —origen y producción, que están en la ficha— y la dirección
+        // deja de atribuir. Tres y no dos: una codirección de dos países es una
+        // coproducción de verdad y pertenece a los dos.
         const isos = (await Promise.all(dirs.map((x) => isoDeDirector(x.id)))).filter(Boolean);
-        const directorIso = isos.includes(ISO) ? ISO : isos[0] || null;
+        const deEpisodios = dirs.length >= 3 && new Set(isos).size > 1;
+        const directorIso = deEpisodios ? null : isos.includes(ISO) ? ISO : isos[0] || null;
         // La ficha de TMDB trae SU código (XC, XG), no el ISO que enseñamos:
         // hay que comparar con el mismo con el que se preguntó.
         const codigo = codigoTmdb(ISO);
@@ -772,7 +848,7 @@ export async function construirPais(iso, { hasta = new Date().getFullYear() } = 
       a.avales = avales[a.tmdb_id]?.total || 0;
       a.ganados = avales[a.tmdb_id]?.ganados || 0;
     }
-    admitidas.sort(ordenar);
+    ordenarPais(admitidas);
     admitidas.forEach((a, i) => {
       a.rank_global = i + 1;
     });
@@ -965,6 +1041,30 @@ export async function sembrarPais(iso) {
   }
   if (!paquete?.filas?.length) return false;
 
+  // El paquete trae los puestos que le calculó su generación, y aquí se
+  // RECALCULAN: es la única forma de que un país sembrado y uno reconstruido
+  // digan lo mismo cuando cambian las reglas del orden. Lo que necesita el
+  // orden —nota, votos y avales— viaja dentro del paquete, así que no cuesta
+  // ni una petición. De paso se cae lo que no es cine (ver `no-es-cine.js`),
+  // que el paquete se generó antes de tener esa lista.
+  const filas = paquete.filas
+    .map(([, , tmdb_id, year, lb, lb_votes, sigma, avales, ganados, motivo, title, poster, director]) => ({
+      tmdb_id, year, lb, lb_votes, sigma, avales, ganados, title, poster, director,
+      motivo: MOTIVO_DE[motivo] || 'origen',
+    }))
+    .filter((f) => !noEsCine(f.tmdb_id));
+  ordenarPais(filas);
+  filas.forEach((f, i) => {
+    f.rank_global = i + 1;
+  });
+  const porAnio = new Map();
+  for (const f of filas) {
+    const lista = porAnio.get(f.year) || [];
+    lista.push(f);
+    porAnio.set(f.year, lista);
+  }
+  for (const lista of porAnio.values()) lista.forEach((f, i) => { f.rank_anio = i + 1; });
+
   const sembrar = db.transaction(() => {
     const ins = db.prepare(
       `INSERT OR REPLACE INTO country_films
@@ -973,11 +1073,11 @@ export async function sembrarPais(iso) {
        VALUES (@iso, 'lb', @tmdb_id, @title, @year, @poster, @lb, @lb_votes, @sigma, @avales, @ganados,
           @director, @motivo, @rank_global, @rank_anio)`
     );
-    for (const t of paquete.filas) {
-      const [rank_global, rank_anio, tmdb_id, year, lb, lb_votes, sigma, avales, ganados, motivo, title, poster, director] = t;
+    for (const f of filas) {
       ins.run({
-        iso: ISO, tmdb_id, title, year, poster, lb, lb_votes, sigma, avales, ganados, director,
-        motivo: MOTIVO_DE[motivo] || 'origen', rank_global, rank_anio,
+        iso: ISO, tmdb_id: f.tmdb_id, title: f.title, year: f.year, poster: f.poster, lb: f.lb,
+        lb_votes: f.lb_votes, sigma: f.sigma, avales: f.avales, ganados: f.ganados,
+        director: f.director, motivo: f.motivo, rank_global: f.rank_global, rank_anio: f.rank_anio,
       });
     }
     guardarBuild({
@@ -986,7 +1086,7 @@ export async function sembrarPais(iso) {
       at: Date.parse(`${paquete.hasta}T12:00:00Z`) || Date.now(),
       candidatos: paquete.candidatos || 0,
       con_nota: paquete.con_nota || 0,
-      guardadas: paquete.guardadas || paquete.filas.length,
+      guardadas: filas.length, // las que de verdad se han sembrado, no las del paquete
       del_palmares: paquete.del_palmares || 0,
       sin_cupo: 0,
       segundos: 0,

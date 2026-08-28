@@ -161,3 +161,101 @@ test('el título clavado del alias puede estar solo en el internacional', async 
   );
   assert.equal(tmdbId, 10835);
 });
+
+// --- LA OBRA DERIVADA, QUE COMPARTE DIRECCIÓN CON LA PELÍCULA ----------------
+//
+// La puerta que las dejaba entrar decía
+//
+//     directorsMatch(...) && (row.director || tituloBastaSinDirector(c))
+//
+// y con `row.director` puesto el segundo paréntesis era siempre cierto: a las
+// filas con dirección no se les miraba el título. El making-of, la prueba de
+// cámara y el reportaje están firmados por quien firma la película y se llaman
+// casi igual, así que pasaban con la única prueba que se pedía. Once fichas
+// falsas en el ranking por países y seis en el Top 1000 salieron de aquí.
+
+test('una prueba de cámara no es la película, aunque la firme el mismo director', async () => {
+  const row = { title: 'The Blue Angel', original_title: 'Der blaue Engel', director: 'Josef von Sternberg' };
+  const cands = [
+    { id: 1, title: 'Marlene Dietrich Screen Test for The Blue Angel', original_title: 'Marlene Dietrich Screen Test for The Blue Angel', date: '1930-01-01', votes: 6 },
+  ];
+  const { tmdbId } = await elegirCandidato(row, 1930, cands, SIN_LIB, dirsFijos({ 1: ['Josef von Sternberg'] }));
+  assert.equal(tmdbId, null, 'mejor sin ficha que la ficha de otra');
+});
+
+test('el making-of tampoco, ni cuando es el único candidato', async () => {
+  const row = { title: 'Autumn Sonata', original_title: 'Höstsonaten', director: 'Ingmar Bergman' };
+  const cands = [
+    { id: 2, title: 'The Making of Autumn Sonata', original_title: 'Bakom Höstsonaten', date: '1978-01-01', votes: 30 },
+  ];
+  const { tmdbId } = await elegirCandidato(row, 1978, cands, SIN_LIB, dirsFijos({ 2: ['Ingmar Bergman'] }));
+  assert.equal(tmdbId, null);
+});
+
+test('con la película delante, la derivada ya no puede ni empatar', async () => {
+  const row = { title: 'Wild Strawberries', original_title: 'Smultronstället', director: 'Ingmar Bergman' };
+  const cands = [
+    { id: 3, title: 'Bakomfilm Smultronstället', original_title: 'Bakomfilm Smultronstället', date: '1957-01-01', votes: 4 },
+    { id: 4, title: 'Fresas salvajes', original_title: 'Smultronstället', date: '1957-12-26', votes: 1400 },
+  ];
+  const { tmdbId } = await elegirCandidato(row, 1957, cands, SIN_LIB, dirsFijos({ 3: ['Ingmar Bergman'], 4: ['Ingmar Bergman'] }));
+  assert.equal(tmdbId, 4);
+});
+
+test('EL TÍTULO ESCRITO DE OTRA MANERA NO SE PIERDE: es el nivel 2', async () => {
+  // Medido en producción: exigir el título clavado costaba cinco fichas de 228
+  // filas en Locarno, Karlovy Vary y Rotterdam, y las cinco eran CORRECTAS —
+  // «Khamosh Pani» es «Silent Waters» en TMDB, «Seryozha» es «Серёжа»—. Una
+  // transliteración no es una obra derivada: se llama de otra manera, no de la
+  // misma manera más algo.
+  const row = { title: 'Khamosh Pani', original_title: 'Khamosh Pani', director: 'Sabiha Sumar' };
+  const cands = [{ id: 100086, title: 'El silencio del agua', original_title: 'خاموش پانی', date: '2003-08-15', votes: 14 }];
+  const { tmdbId } = await elegirCandidato(row, 2003, cands, SIN_LIB, dirsFijos({ 100086: ['Sabiha Sumar'] }));
+  assert.equal(tmdbId, 100086);
+});
+
+test('el título internacional sigue siendo el nivel 1, y gana al respaldo', async () => {
+  // «West of the Tracks» es 铁西区 de título Y de original en TMDB: su nombre
+  // inglés vive solo en la traducción. Con dos candidatas del mismo director,
+  // la que clava el internacional gana a la que solo tiene la dirección.
+  const row = { title: 'West of the Tracks', original_title: 'West of the Tracks', director: 'Wang Bing' };
+  const cands = [
+    { id: 8, title: 'Otra suya de esos años', original_title: 'Otra suya de esos años', date: '2003-06-01', votes: 200 },
+    { id: 5, title: '铁西区', original_title: '铁西区', date: '2003-01-01', votes: 120 },
+  ];
+  const { tmdbId } = await elegirCandidato(
+    row, 2003, cands, SIN_LIB, dirsFijos({ 5: ['Wang Bing'], 8: ['Wang Bing'] }),
+    enFijos({ 5: 'West of the Tracks' })
+  );
+  assert.equal(tmdbId, 5, 'dos pruebas ganan a una');
+});
+
+test('EL ÁNGEL AZUL: con la derivada vetada, se lleva la película', async () => {
+  // La fila trae el título en inglés y TMDB lo tiene en alemán y en castellano,
+  // así que la ficha BUENA tampoco clava el título. Antes ganaba la prueba de
+  // cámara por orden de búsqueda; ahora la prueba de cámara está vetada y el
+  // respaldo por dirección se lleva la película, que es el acierto que la
+  // versión estricta tampoco conseguía.
+  const row = { title: 'The Blue Angel', original_title: 'The Blue Angel', director: 'Josef von Sternberg' };
+  const cands = [
+    { id: 1, title: 'Marlene Dietrich Screen Test for The Blue Angel', original_title: 'Marlene Dietrich Screen Test for The Blue Angel', date: '1930-01-01', votes: 6 },
+    { id: 2, title: 'El ángel azul', original_title: 'Der blaue Engel', date: '1930-04-01', votes: 900 },
+  ];
+  const { tmdbId } = await elegirCandidato(row, 1930, cands, SIN_LIB, dirsFijos({ 1: ['Josef von Sternberg'], 2: ['Josef von Sternberg'] }));
+  assert.equal(tmdbId, 2);
+});
+
+test('si la FILA se llama «The Making of…», el veto no la deja sin ficha', async () => {
+  // Hay películas que de verdad se titulan así y son la obra, no el reportaje:
+  // «Sembène: The Making of African Cinema» es un documental sobre Ousmane
+  // Sembène. Barridos los 30.281 títulos empaquetados de Por países, es el
+  // único caso — y es justo el que convertiría el veto en un falso negativo.
+  const row = {
+    title: 'Sembène: The Making of African Cinema',
+    original_title: 'Sembène: The Making of African Cinema',
+    director: 'Manthia Diawara',
+  };
+  const cands = [{ id: 364418, title: 'Sembène: The Making of African Cinema', original_title: 'Sembène: The Making of African Cinema', date: '1994-01-01', votes: 245 }];
+  const { tmdbId } = await elegirCandidato(row, 1994, cands, SIN_LIB, dirsFijos({ 364418: ['Manthia Diawara'] }));
+  assert.equal(tmdbId, 364418);
+});

@@ -869,36 +869,61 @@ app.get('/api/paises/:iso', async (req, reply) => {
     return { error: 'El año tiene que ser un número' };
   }
   const fuente = req.query.fuente === 'fa' ? 'fa' : 'lb';
+  /**
+   * EL 500 QUE RAMÓN VIO EN PRODUCCIÓN Y AQUÍ NO SE REPRODUCE.
+   *
+   * La 1.26 puso un guardián, pero solo alrededor del sembrado: todo lo de
+   * abajo —el catálogo, la lista, la regleta de años, las correcciones, el
+   * paquete de FilmAffinity— seguía fuera, y un fallo ahí daba exactamente el
+   * mismo 500 mudo. Ahora cada paso dice su nombre, así que el próximo se
+   * diagnostica leyendo la pantalla en vez de pidiendo `docker logs`.
+   *
+   * No es el arreglo del fallo: es que el fallo deje de ser anónimo. Sigue sin
+   * reproducirse con la base vacía, con la base llena y con ocho combinaciones
+   * de URL, todas 200.
+   */
+  let paso = 'sembrar el país empaquetado';
   try {
     // Si viene empaquetado y esta base no lo tiene, se siembra AQUÍ: así la
     // primera visita ya lo encuentra hecho, sin construir ni gastar cupo.
     if (fuente === 'lb') await sembrarPais(iso);
-  } catch (err) {
-    // Sembrar toca la base y lee un fichero de datos: si algo de eso falla, la
-    // página tiene que poder DECIRLO. Un 500 pelado en la pantalla es
-    // indistinguible de una avería del servidor entero.
-    app.log.error({ err, iso }, 'no se pudo sembrar el país empaquetado');
-    reply.code(502);
-    return { error: `No se pudo cargar ${PAISES[iso].es}: ${String(err.message || err).slice(0, 200)}` };
-  }
-  const ficha = catalogoPaises().find((p) => p.iso === iso);
-  return {
-    iso,
-    nombre: PAISES[iso].es,
-    fuente,
-    // el ranking de FilmAffinity no se reparte por años: devolver el año que
-    // pidieron dejaba el titular diciendo «lo mejor de 1973» sobre la lista
-    // entera
-    anio: fuente === 'lb' ? anio : null,
-    peliculas: peliculasDePais(iso, { anio, fuente }),
+    paso = 'leer el catálogo de países';
+    const ficha = catalogoPaises().find((p) => p.iso === iso);
+    paso = 'leer la lista de películas';
+    const peliculas = peliculasDePais(iso, { anio, fuente });
     // la regleta de años es de la lista nuestra: el ranking de FilmAffinity es
     // uno solo y no se reparte por años
-    anios: fuente === 'lb' ? aniosDePais(iso) : [],
-    overrides: overridesDePais(iso),
-    build: (fuente === 'fa' ? ficha?.buildFa : ficha?.build) || null,
-    fa: tieneRanking(iso),
-    faHasta: paqueteHasta(iso),
-  };
+    paso = 'leer los años con película';
+    const anios = fuente === 'lb' ? aniosDePais(iso) : [];
+    paso = 'leer tus correcciones';
+    const overrides = overridesDePais(iso);
+    paso = 'mirar el ranking de FilmAffinity';
+    const fa = tieneRanking(iso);
+    const faHasta = paqueteHasta(iso);
+    return {
+      iso,
+      nombre: PAISES[iso].es,
+      fuente,
+      // el ranking de FilmAffinity no se reparte por años: devolver el año que
+      // pidieron dejaba el titular diciendo «lo mejor de 1973» sobre la lista
+      // entera
+      anio: fuente === 'lb' ? anio : null,
+      peliculas,
+      anios,
+      overrides,
+      build: (fuente === 'fa' ? ficha?.buildFa : ficha?.build) || null,
+      fa,
+      faHasta,
+    };
+  } catch (err) {
+    // Un 500 pelado en la pantalla es indistinguible de una avería del servidor
+    // entero. Aquí se dice el país, el paso y el motivo.
+    app.log.error({ err, iso, anio, fuente, paso }, 'falló la página de un país');
+    reply.code(502);
+    return {
+      error: `No se pudo cargar ${PAISES[iso].es} al ${paso}: ${String(err.message || err).slice(0, 200)}`,
+    };
+  }
 });
 
 app.post('/api/paises/:iso/build', async (req, reply) => {

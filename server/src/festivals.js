@@ -55,6 +55,19 @@ export const REGISTRY = {
     sinceYear: 1946,
     awardPage: "Palme d'Or",
     awardSection: /^winners$/i,
+    // El artículo de la Palma dejó de titular «Director(s)» a su cuarta
+    // columna y ahora pone «Recipient(s)». Como la columna de dirección es la
+    // que verifica el emparejado, sin ella el parser descarta la tabla entera:
+    // las nueve décadas se caían y solo sobrevivía la del Palme d'Or especial,
+    // que conserva el nombre viejo. Una fila.
+    //
+    // Va DECLARADO aquí y no ensanchando `RX_COLUMNA_DIRECCION`, porque
+    // «recipient» no significa lo mismo en todas partes: en BIFA empieza
+    // siendo quien dirige y desde 2020 lista al equipo entero —«Rocks» acredita
+    // a Sarah Gavron con dos productoras y dos guionistas—, y en Un Certain
+    // Regard mezcla dirección con intérpretes, porque esa tabla lleva varios
+    // premios. En la Palma está comprobado que es la dirección y solo ella.
+    awardColumns: { director: /director|recipient/ },
   },
   venecia: {
     name: 'Venecia',
@@ -1373,12 +1386,17 @@ export function parseWinnersTables(html, { keepAll = false, sinDirector = false,
     const columnasTitulo = headers
       .map((h, i) => ((columnas?.title || RX_COLUMNA_TITULO).test(h) ? i : -1))
       .filter((i) => i >= 0);
-    // `columnas.director: null` es «esta tabla NO tiene columna de dirección»,
-    // que no es lo mismo que no haber encontrado ninguna: ver `columnas`.
-    const columnasDir =
-      columnas && 'director' in columnas && !columnas.director
-        ? []
-        : headers.map((h, i) => (RX_COLUMNA_DIRECCION.test(h) ? i : -1)).filter((i) => i >= 0);
+    // `columnas.director` admite tres valores: ausente (se adivina con el
+    // regex de la casa), `null` —«esta tabla NO tiene columna de dirección»,
+    // que no es lo mismo que no haber encontrado ninguna— y un regex propio,
+    // para el artículo que llama a esa columna de otra manera (la Palma dice
+    // «Recipient(s)»). Se declara por premio y no se ensancha el regex común
+    // porque el mismo encabezado significa cosas distintas según el artículo:
+    // ver `awardColumns` de `cannes`.
+    const rxDir = columnas && 'director' in columnas ? columnas.director : RX_COLUMNA_DIRECCION;
+    const columnasDir = rxDir
+      ? headers.map((h, i) => (rxDir.test(h) ? i : -1)).filter((i) => i >= 0)
+      : [];
     const idxOrig = headers.findIndex((h) => RX_COLUMNA_ORIGINAL.test(h));
     const idxCountry = headers.findIndex((h) => RX_COLUMNA_PAIS.test(h));
     if (idxYear === -1 || !columnasTitulo.length) continue;
@@ -2162,7 +2180,7 @@ export function festivalOverrideKey(title, year, director) {
  * avales lo lee también, y tenerlo escrito en dos sitios ya se pagó una vez —al
  * subir la versión aquí, allí se seguía leyendo la anterior en silencio.
  */
-export const CLAVE_MATCH = 'film_match:v7:';
+export const CLAVE_MATCH = 'film_match:v9:';
 
 export const FICHA_FANTASMA = Symbol('TMDB 404');
 
@@ -2226,6 +2244,44 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
   const tituloBastaSinDirector = (c) =>
     tituloClavado(c) ||
     deseados.some((w) => contiene(normName(c.title), w) || contiene(normName(c.original_title || ''), w));
+
+  /**
+   * ¿ESTA FICHA ES LA PELÍCULA O ES ALGO QUE SE HIZO SOBRE ELLA?
+   *
+   * El making-of, la prueba de cámara y el reportaje comparten dirección con la
+   * película y se llaman casi igual, así que verificar el nombre no los separa:
+   * por ahí entraron una prueba de cámara de Marlene Dietrich de cuatro minutos
+   * por «El ángel azul» y «The Making of Autumn Sonata» por la película.
+   *
+   * Se reconocen por DOS marcas, y basta una:
+   *
+   *  1. Lo dicen en el título («making of», «bakom», «screen test»…).
+   *  2. Su título es el de la fila MÁS material. Esa es la firma: un reportaje
+   *     se llama «Bakomfilm Smultronstället» y una prueba de cámara «Marlene
+   *     Dietrich Screen Test for The Blue Angel». Se pide OCHO letras de
+   *     sobrante para no confundirlo con un subtítulo («@ In the Mood for
+   *     Love» sobra dos), y que el título de la fila tenga cuerpo: con «M» o
+   *     «Ran» dentro, cualquier ficha parecería derivada y no quedaría ninguna.
+   *
+   * Lo que NO es: un título distinto. «Khamosh Pani» y «Silent Waters» son la
+   * misma película escrita de dos maneras, y eso no es una obra derivada — es
+   * el pan de cada día del cine que no se distribuye en inglés.
+   */
+  const RX_DERIVADA = /\b(making[ -]of|the making\b|bakom|behind the scenes|screen test|c[óo]mo se hizo|el rodaje de)\b/i;
+  const CUERPO_PARA_JUZGAR = 6;
+  // …salvo que la FILA se llame así. Hay películas que de verdad se titulan
+  // «The Making of…» y son la obra, no el reportaje: «Sembène: The Making of
+  // African Cinema» es un documental sobre Ousmane Sembène. Barridos los 30.281
+  // títulos empaquetados de la página por países, es el único caso, pero es
+  // justo el que convertiría el veto en un falso negativo.
+  const filaYaLoDice = RX_DERIVADA.test(row.title || '') || RX_DERIVADA.test(row.original_title || '');
+  const esObraDerivada = (c) => {
+    if (!filaYaLoDice && (RX_DERIVADA.test(c.title || '') || RX_DERIVADA.test(c.original_title || ''))) return true;
+    const suyos = [normName(c.title), normName(c.original_title || '')].filter(Boolean);
+    return deseados.some(
+      (w) => w.length >= CUERPO_PARA_JUZGAR && suyos.some((n) => n.includes(w) && n.length - w.length >= 8)
+    );
+  };
   const distAño = (c) => (c.date && Number.isFinite(year) ? Math.abs(Number(c.date.slice(0, 4)) - year) : 0.5);
   enVentana.sort(
     (a, b) =>
@@ -2308,10 +2364,44 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
     }
   }
 
-  // El bucle de siempre, SOLO para las filas que traen dirección: ahí el primero
-  // que casa nombre y título es la respuesta, y seguir mirando sería gastar
-  // peticiones. Las que no la traen ya se han decidido arriba, y si allí no hubo
-  // un ganador claro siguen su camino por las vueltas de abajo.
+  /**
+   * EL BUCLE DE LAS FILAS CON DIRECCIÓN, EN DOS NIVELES.
+   *
+   * Decía `directorsMatch(...) && (row.director || tituloBastaSinDirector(c))`,
+   * y con `row.director` puesto el segundo paréntesis era SIEMPRE cierto: el
+   * título no se miraba y bastaba que el nombre casara. Por ahí entra lo que
+   * comparte dirección con la película y se llama casi igual —una prueba de
+   * cámara de Marlene Dietrich de cuatro minutos por «El ángel azul», «The
+   * Making of Autumn Sonata» por la película, el making-of de
+   * «Smultronstället»—: once emparejados falsos en el ranking por países y seis
+   * en el Top 1000, tapados a mano uno a uno con el agujero abierto para los 65
+   * palmareses.
+   *
+   * EXIGIR EL TÍTULO CLAVADO NO ERA LA SOLUCIÓN, Y ESTÁ MEDIDO. Se probó, y en
+   * Locarno, Karlovy Vary y Rotterdam costaba cinco fichas de 228 filas, las
+   * cinco CORRECTAS: «Khamosh Pani», que TMDB titula «Silent Waters»;
+   * «Seryozha», que TMDB guarda como «Серёжа»; «A Lover's Romance», que allí es
+   * «Romance for Lovers»; «And Quiet Flows the Don», que es «Тихий Дон»; y
+   * «With Love. Lilya», que es «With Love, Lilly». Un título escrito de otra
+   * manera es el pan de cada día del cine que no se distribuye en inglés, y
+   * pedir la letra exacta se lleva por delante esa familia entera.
+   *
+   * Lo que sí las separa es que la obra derivada se llama como la película MÁS
+   * algo (ver `esObraDerivada`), mientras que una transliteración se llama de
+   * otra manera. Así que dos niveles, y no se mezclan:
+   *
+   *  1. **Dirección Y título** —clavado o el internacional exacto—. Dos pruebas:
+   *     gana en cuanto aparece, que para eso `enVentana` pone delante las que
+   *     clavan el título.
+   *  2. **Dirección sola**, y solo si la ficha NO huele a obra derivada. Es lo
+   *     de siempre menos el agujero.
+   *
+   * De propina, el nivel 2 acierta donde antes no se acertaba: en «El ángel
+   * azul» la ficha buena tampoco clava el título (la fila lo trae en inglés y
+   * TMDB lo tiene en alemán y en castellano), así que ahora se lleva la
+   * película en vez de la prueba de cámara.
+   */
+  let soloPorDireccion = null;
   for (const c of row.director ? enVentana : []) {
     // null = fallo de red (no «sin créditos»). Se ABORTA la resolución de esta
     // película: seguir probando dejaría ganar a un candidato peor solo porque
@@ -2322,29 +2412,31 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
       break;
     }
     if (dirs === FICHA_FANTASMA) continue; // ficha borrada que la búsqueda aún sirve
-    if (dirs.length) {
-      // Sin director en la fila no hay contra qué verificar (directorsMatch
-      // pasa por diseño), así que la ÚNICA prueba que queda es el título: se
-      // exige clavado. Antes, una fila de dos celdas que dejaba el director en
-      // null se emparejaba con el primer candidato con créditos de la ventana
-      // — un falso positivo esperando su momento.
-      let vale = directorsMatch(row.director, dirs) && (row.director || tituloBastaSinDirector(c));
-      // El título clavado puede vivir SOLO en la traducción inglesa: «Three
-      // Seasons» (Sundance 1999) es «Tres estaciones» de título y «Ba mùa» de
-      // original en TMDB. Para una fila sin director, el título internacional
-      // EXACTO es la misma prueba que el clavado — y se consulta solo cuando
-      // los otros dos ya fallaron, que es cuando merece la llamada (cacheada).
-      if (!vale && !row.director && tituloEnDe) {
-        vale = clava(await tituloEnDe(c.id));
-      }
-      if (vale) {
-        tmdbId = c.id;
-        break;
-      }
-    } else {
+    if (!dirs.length) {
       sinCreditos.push(c);
+      continue;
     }
+    if (!directorsMatch(row.director, dirs)) continue;
+    // NIVEL 1: las dos pruebas. El título clavado puede vivir SOLO en la
+    // traducción inglesa —«West of the Tracks» es 铁西区 en los dos campos que
+    // trae la búsqueda—, así que se consulta el internacional cuando los otros
+    // dos fallan. Cuesta una petición (cacheada) y solo se paga con la dirección
+    // ya verificada, que es como mucho una o dos veces por fila.
+    let titulo = tituloClavado(c);
+    if (!titulo && tituloEnDe) titulo = clava(await tituloEnDe(c.id));
+    if (titulo) {
+      tmdbId = c.id;
+      break;
+    }
+    // NIVEL 2: se guarda como respaldo, salvo que huela a obra derivada. No se
+    // corta el bucle: si más adelante aparece una que además clave el título,
+    // esa gana, que son dos pruebas contra una.
+    if (!soloPorDireccion && !esObraDerivada(c)) soloPorDireccion = c;
   }
+  // El respaldo solo se usa si el bucle llegó al final: un fallo de red lo
+  // ABORTA a media lista, y ahí la candidata buena puede ser una de las que no
+  // se han llegado a mirar.
+  if (!tmdbId && !fallosRed && soloPorDireccion) tmdbId = soloPorDireccion.id;
   // SEGUNDA VUELTA, sin ventana de año. Los cánones y los palmareses fechan por
   // producción o por estreno en festival, y TMDB por estreno comercial: «Beau
   // travail» es 1998 para Sight & Sound y 2000 para TMDB, y «Partie de
@@ -2499,12 +2591,34 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
     }
   }
 
-  // Solo si NADIE con créditos lo demostró (y sin cortes de red a medias),
-  // valen las fichas sin equipo por título clavado — las recién anunciadas.
-  // El título clavado se exige SIEMPRE: en las filas sin director era la única
-  // prueba disponible y ni esa se pedía.
+  /**
+   * Solo si NADIE con créditos lo demostró (y sin cortes de red a medias),
+   * valen las fichas sin equipo por título clavado — las recién anunciadas.
+   * El título clavado se exige SIEMPRE: en las filas sin director era la única
+   * prueba disponible y ni esa se pedía.
+   *
+   * …PERO UNA FICHA VACÍA DE UN AÑO VIEJO NO ES UNA FICHA. Sin equipo, sin
+   * fecha y sin un solo voto se entiende en una película RECIÉN ANUNCIADA: TMDB
+   * todavía no tiene qué listar, y para eso está este camino. En una fila de
+   * hace diez años no se sostiene — una película premiada en 2014 existe y
+   * tiene fecha—: eso es un esbozo que alguien abrió y dejó a medias, y su
+   * único mérito es llamarse igual.
+   *
+   * El año de la FILA es lo que los separa, porque en la ficha no hay nada que
+   * los distinga: los dos llegan igual de vacíos de la búsqueda.
+   *
+   * Destapado comparando el paquete de palmareses viejo con uno regenerado: hay
+   * un «Birdman» de 21 minutos, sin fecha, sin créditos y con cero votos que le
+   * ganaba a la de Iñárritu —que tiene 13.768 votos y no clava el título porque
+   * se llama «Birdman or (The Unexpected Virtue of Ignorance)»— en los Globos y
+   * en Critics' Choice. Sin ficha es mejor que con esa: es la regla de la casa.
+   */
   if (!tmdbId && !fallosRed) {
-    const c = sinCreditos.find((x) => (row.director ? tituloClavado(x) : tituloBastaSinDirector(x)));
+    const esEsbozo = (x) =>
+      !x.date && !(Number(x.votes) || 0) && Number.isFinite(year) && year < new Date().getFullYear();
+    const c = sinCreditos.find(
+      (x) => !esEsbozo(x) && (row.director ? tituloClavado(x) : tituloBastaSinDirector(x))
+    );
     if (c) tmdbId = c.id;
   }
   return { tmdbId, fallosRed, porEquipo };
@@ -2569,7 +2683,15 @@ export async function peliculaPorDirector({ title, year, director }, { personasP
     const cercanas = dirigidas.filter((c) => distancia(c) <= 4).sort((a, b) => distancia(a) - distancia(b)).slice(0, 12);
     for (const c of cercanas) {
       const en = await tituloIngles(c.id);
-      if (en && (normName(en) === buscado || normName(en).includes(buscado))) return c.id;
+      if (!en) continue;
+      // Que el título internacional CONTENGA al de la fila vale porque el
+      // internacional lleva a veces el original transcrito delante («Tie Xi Qu:
+      // West of the Tracks»), pero solo con cuerpo: es la misma vara que la
+      // segunda vuelta del emparejado general. Dejar que «M» o «Vertigo» casen
+      // por estar dentro de otro título sería colar cualquier cosa — y por aquí
+      // pasan ahora más filas que antes, porque la vuelta de la ventana ya no
+      // acepta una ficha sin mirarle el título.
+      if (normName(en) === buscado || (buscado.length >= 8 && normName(en).includes(buscado))) return c.id;
     }
 
     // Y NO hay regla 3. La tentación era aceptar «la única película suya de ese
@@ -2626,6 +2748,13 @@ export async function resolveFilms(rows, yearOf) {
       // entre todos los que claven el título, en vez de quedarse con el primero
       // (ver `elegirSinDireccion`). Sin subirlo, la «Flow» equivocada del Óscar
       // de animación sobreviviría un año entero en esta caché.
+      // v9: a las filas CON dirección se les VETA la obra derivada, que hasta
+      // ahora entraba porque bastaba con que el nombre casara. Lo cacheado antes
+      // tiene emparejada la prueba de cámara de «El ángel azul», «The Making of
+      // Autumn Sonata» y las de su clase en los 65 palmareses, que es
+      // exactamente lo que hay que barrer. (La v8 fue un intento intermedio que
+      // exigía el título clavado: costaba cinco fichas correctas de 228 filas
+      // —«Khamosh Pani», «Seryozha»…— y no llegó a desplegarse.)
       // OJO: esta caché dura un AÑO y NO la barre el bump de `festival`, así
       // que cuando cambian las reglas del emparejado hay que subir ESTE número
       // o los aciertos viejos —«Smultronstället» emparejado con su making-of—
@@ -3127,13 +3256,23 @@ async function getAwardRows(f, { keepAll = false, hasta = null, sinPaquete = fal
     if (f.awardSection) {
       const meta = await wikiParse({ lang, page: f.awardPage, prop: 'sections' });
       const sec = (meta.sections || []).find((x) => f.awardSection.test(stripTags(x.line)));
-      if (!sec) throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
-      const parsed = await wikiParse({ lang, page: f.awardPage, section: String(sec.index), prop: 'text' });
-      rows = parseWinnersTables(parsed.text, opciones);
+      // Que la sección no aparezca NO es motivo para rendirse: es el mismo caso
+      // que encontrarla vacía, y para eso está el respaldo de página entera que
+      // viene justo debajo. Renombrarla es lo más fácil que le pasa a un
+      // artículo —el del Premio del Público de Toronto pasó de «Winners» a
+      // «Winners and runners-up» y se llevó por delante el palmarés entero—, y
+      // el parser ya descarta por su cuenta las tablas que no son de películas.
+      if (sec) {
+        const parsed = await wikiParse({ lang, page: f.awardPage, section: String(sec.index), prop: 'text' });
+        rows = parseWinnersTables(parsed.text, opciones);
+      }
     }
     if (!rows.length) {
       const full = await wikiParse({ lang, page: f.awardPage, prop: 'text' });
       rows = parseWinnersTables(full.text, opciones);
+    }
+    if (!rows.length) {
+      throw new Error(`No se encontró la lista de ganadoras en «${f.awardPage}» de Wikipedia.`);
     }
     return conEdicionesRecientes(f, rows, keepAll);
   };
@@ -3150,6 +3289,18 @@ async function getAwardRows(f, { keepAll = false, hasta = null, sinPaquete = fal
       // palmarés entero en un mensaje de error.
       return empaquetadas;
     }
+    // ¿SIGUE SIENDO LEGIBLE EL ARTÍCULO? Un parseo puede derrumbarse sin lanzar
+    // nada: la Palma renombró su columna de dirección y el artículo pasó de 101
+    // ganadoras a UNA sin una sola excepción. Como el paquete cubre hasta 2024,
+    // los años de antes seguían saliendo perfectos y solo faltaban los nuevos —
+    // la avería llevaba meses escondida detrás de lo empaquetado.
+    //
+    // El contraste es gratis y no admite discusión: el artículo tiene que
+    // volver a contar los años que YA están empaquetados. Si de esos trae menos
+    // de la mitad, lo que devuelve no es un palmarés y su tramo reciente
+    // tampoco vale: se sirve el paquete y no se mezcla basura.
+    const solapan = recientes.filter((r) => Number(r.year) <= corte).length;
+    if (solapan * 2 < empaquetadas.length) return empaquetadas;
     // Cada tramo, de su fuente: lo cerrado del paquete —con su `tmdb_id` ya
     // resuelto— y lo que va después, de Wikipedia.
     return [...recientes.filter((r) => Number(r.year) > corte), ...empaquetadas];

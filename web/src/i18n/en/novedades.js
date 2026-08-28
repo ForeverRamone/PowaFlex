@@ -3,6 +3,24 @@
 // cabecera de la página vive en en/app.js, igual que el titular «Festivales y
 // premios» de la Alpha 0.9.5, que allí ya es nombre de página.
 export default {
+  // ── Beta 1.27 ──────────────────────────────────────────────
+  'Vuelve la ganadora a Cannes, y el emparejado deja de coger el making-of':
+    'The winner is back at Cannes, and matching stops picking the making-of',
+  'En la vista por años de Cannes habían desaparecido las ganadoras de 2025 y 2026. Wikipedia le cambió el nombre a una columna del artículo de la Palma de Oro y el palmarés entero se quedó en una sola fila; los años anteriores seguían saliendo bien porque vienen dentro de la app, y eso escondió la avería. Vuelven marcadas y las primeras: «It Was Just an Accident» y «Fjord».':
+    'The 2025 and 2026 winners had vanished from the by-year view of Cannes. Wikipedia renamed a column in the Palme d’Or article and the whole roll of honour collapsed to a single row; earlier years still looked right because they ship inside the app, and that hid the breakage. They are back, flagged and first: “It Was Just an Accident” and “Fjord”.',
+  'Repasados los sesenta y cinco palmareses uno a uno: había un segundo roto por lo mismo, el Premio del Público de Toronto, que había renombrado su sección. De cero a cuarenta y ocho ganadoras.':
+    'All sixty-five rolls of honour were checked one by one: a second one was broken the same way, Toronto’s People’s Choice Award, whose section had been renamed. From zero to forty-eight winners.',
+  'El emparejado con TMDB se quedaba con el making-of. Cuando la fila traía quien dirige, no se le miraba el título, y lo que comparte dirección con una película y se llama casi igual es justamente el reportaje, la prueba de cámara o el «cómo se hizo»: «El ángel azul» era una prueba de cámara de Marlene Dietrich de cuatro minutos y «Sonata de otoño» su making-of. Ahora la obra derivada está vetada, y el cine que se distribuye con otro título —«Khamosh Pani», «Seryozha»— sigue encontrándose igual.':
+    'TMDB matching kept settling for the making-of. When the row named a director, the title was never checked, and what shares a director with a film and is named almost the same is precisely the featurette, the screen test or the behind-the-scenes: “The Blue Angel” was a four-minute Marlene Dietrich screen test, and “Autumn Sonata” was its making-of. Derivative works are now vetoed, and films released under a different title — “Khamosh Pani”, “Seryozha” — are still found just as before.',
+  'Por países: fuera lo que no es cine. Un documental promocional sobre «La Casa de Papel», un monólogo de Franco Escamilla y los dos «cómo se hizo» que eran el número 1 de 1998 y el número 2 de 2006 de Nueva Zelanda.':
+    'By country: anything that is not cinema is out. A promotional documentary about “Money Heist”, a Franco Escamilla stand-up special, and the two behind-the-scenes films that were New Zealand’s number 1 of 1998 and number 2 of 2006.',
+  'La nota que ordena ya cuenta cuánta gente hay detrás: un 7,8 con trescientos votos adelantaba a un 7,6 con veintisiete mil. Las notas con pocos votos se acercan a la media de su país, sin aplanar las cinematografías pequeñas y sin tocar la nota que se enseña. Los diez primeros de España, Armenia, Estados Unidos y Reino Unido se quedan como estaban.':
+    'The rating that sets the order now counts how many people are behind it: a 7.8 with three hundred votes used to beat a 7.6 with twenty-seven thousand. Thin ratings are pulled towards their country’s average, without flattening small cinemas and without touching the rating on display. The top ten of Spain, Armenia, the United States and the United Kingdom are unchanged.',
+  'Una película de episodios firmada por gente de cinco países ya no entra en el ranking de los cinco.':
+    'An omnibus film signed by people from five countries no longer enters all five rankings.',
+  'Y una ficha vacía de un año viejo ya no es una ficha: había un «Birdman» de veintiún minutos, sin fecha y sin un solo voto, que le ganaba a la de Iñárritu en los Globos porque se llamaba exactamente igual.':
+    'And an empty record from an old year no longer counts as a record: there was a twenty-one-minute “Birdman”, with no date and not a single vote, beating Iñárritu’s at the Golden Globes purely because it was named exactly the same.',
+
   // ── Beta 1.26 ──────────────────────────────────────────────
   'Los 72 países vienen hechos, y MDBList nunca estuvo racionando':
     'All 72 countries ship ready-made, and MDBList was never rationing us',

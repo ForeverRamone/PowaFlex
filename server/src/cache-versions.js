@@ -102,7 +102,14 @@ export const CACHE_VERSIONS = {
   // ficha candidata (TMDB guarda a John Woo como «Wu Yu-Sheng»), siempre con el
   // título clavado. Lo cacheado antes tiene sin ficha «The Killer», «Hard
   // Boiled» y compañía — el pan de cada día del cine asiático.
-  festival: 18,
+  // v19: el artículo de la Palma renombró su columna de dirección a
+  // «Recipient(s)» y el parser descartaba las nueve tablas por década: el
+  // palmarés de Cannes se había quedado en UNA fila y las ediciones de 2025 y
+  // 2026 salían sin ganadora, porque lo empaquetado —que llega a 2024— tapaba
+  // el hueco. El del Premio del Público de Toronto renombró su sección a
+  // «Winners and runners-up» y perdía el palmarés entero. Lo cacheado antes
+  // tiene los dos truncados.
+  festival: 19,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

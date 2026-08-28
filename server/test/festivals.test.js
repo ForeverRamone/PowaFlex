@@ -748,10 +748,28 @@ test('las fichas sin equipo son el último recurso, nunca antes que una verifica
 });
 
 test('sin nadie que lo demuestre, una ficha sin equipo vale si el título es clavado', async () => {
+  // Una película recién anunciada llega así de vacía y es la buena: el año va
+  // calculado y no escrito, para que la prueba no caduque en enero.
   const row = { title: 'Sheep in the Box', director: 'Hirokazu Kore-eda' };
   const cands = [{ id: 40, title: 'Sheep in the Box', original_title: 'Sheep in the Box', date: null }];
-  const { tmdbId } = await elegirCandidato(row, 2026, cands, SIN_LIB, dirsFijos({ 40: [] }));
+  const { tmdbId } = await elegirCandidato(row, new Date().getFullYear(), cands, SIN_LIB, dirsFijos({ 40: [] }));
   assert.equal(tmdbId, 40);
+});
+
+test('UNA FICHA VACÍA DE UN AÑO VIEJO NO ES UNA FICHA', async () => {
+  // Destapado comparando el paquete de palmareses con uno regenerado: hay un
+  // «Birdman» de 21 minutos, sin fecha, sin créditos y con cero votos que le
+  // ganaba a la de Iñárritu en los Globos y en Critics' Choice, porque la de
+  // Iñárritu no clava el título —se llama «Birdman or (The Unexpected Virtue of
+  // Ignorance)»— y el esbozo sí. Una película premiada en 2014 existe y tiene
+  // fecha: sin ficha es mejor que con esa.
+  const row = { title: 'Birdman', original_title: 'Birdman', director: null };
+  const cands = [
+    { id: 875169, title: 'Birdman', original_title: 'Birdman', date: null, votes: 0 },
+    { id: 194662, title: 'Birdman o la inesperada virtud de la ignorancia', original_title: 'Birdman or (The Unexpected Virtue of Ignorance)', date: '2014-10-17', votes: 13768 },
+  ];
+  const { tmdbId } = await elegirCandidato(row, 2014, cands, SIN_LIB, dirsFijos({ 875169: [], 194662: ['Alejandro González Iñárritu'] }));
+  assert.equal(tmdbId, null, 'mejor sin ficha que un esbozo de 21 minutos');
 });
 
 // un 429 a mitad de comprobación dejaba ganar al siguiente de la fila, y encima
@@ -1178,4 +1196,59 @@ test('el paquete trae el emparejado hecho: es para lo que está', () => {
   // el emparejado ronda el 97 %; por debajo del 90 es que algo se rompió al
   // generar y se estaría empaquetando el fallo
   assert.ok(conFicha / filas.length > 0.9, `solo ${Math.round((conFicha / filas.length) * 100)} % con ficha`);
+});
+
+/**
+ * LA COLUMNA QUE CAMBIÓ DE NOMBRE.
+ *
+ * El artículo «Palme d'Or» dejó de titular «Director(s)» a su cuarta columna y
+ * pasó a «Recipient(s)». Como la dirección es lo que verifica el emparejado,
+ * una tabla sin ella se descarta entera: las nueve tablas por década se caían y
+ * el palmarés de Cannes se quedaba en UNA fila, la del Palme d'Or especial, que
+ * conserva el encabezado viejo. Nadie lo vio durante meses porque el palmarés
+ * empaquetado llega a 2024 y tapaba el hueco: solo faltaban las ganadoras de
+ * 2025 y 2026 en la vista por años.
+ */
+const TABLA_RECIPIENT = `
+<table class="wikitable unsortable">
+<tr><th>Year</th><th>English Title</th><th>Original Title</th><th>Recipient(s)</th><th>Production Country</th><th>Ref.</th></tr>
+<tr><th>2024</th><td><i>Anora</i></td><td>Sean Baker</td><td>United States</td><td></td></tr>
+<tr><th>2025</th><td><i>It Was Just an Accident</i></td><td><i>یک تصادف ساده</i></td><td>Jafar Panahi</td><td>Iran, France, Luxembourg</td><td></td></tr>
+</table>`;
+
+test('Cannes: «Recipient(s)» es la columna de dirección, y va declarada en el REGISTRY', () => {
+  const rows = parseWinnersTables(TABLA_RECIPIENT, { columnas: REGISTRY.cannes.awardColumns });
+  assert.deepEqual(
+    rows.map((r) => [r.year, r.title, r.original_title, r.director, r.country]),
+    [
+      // de la más reciente a la más antigua, como el resto de palmareses
+      [2025, 'It Was Just an Accident', 'یک تصادف ساده', 'Jafar Panahi', 'Iran, France, Luxembourg'],
+      // 2024 trae una celda de menos: la que falta es el título original, no el
+      // país, y lo decide la cursiva (ver faltaElTituloOriginal)
+      [2024, 'Anora', 'Anora', 'Sean Baker', 'United States'],
+    ]
+  );
+});
+
+test('«Recipient» NO es dirección en general: sin declararlo, esa tabla se descarta', () => {
+  // Falla cerrado a propósito. El mismo encabezado significa otra cosa en otros
+  // artículos: en BIFA empieza siendo quien dirige y desde 2020 lista al equipo
+  // entero («Rocks» acredita a Sarah Gavron con dos productoras y dos
+  // guionistas), y en Un Certain Regard mezcla dirección con intérpretes porque
+  // esa tabla lleva varios premios. Ensanchar RX_COLUMNA_DIRECCION metería
+  // productores en el campo del director, que es el fallo que costó la 1.15.
+  assert.deepEqual(parseWinnersTables(TABLA_RECIPIENT), []);
+});
+
+test('columnas.director: null sigue significando «esta tabla no tiene dirección»', () => {
+  // Sitges depende de ello: su tabla pone cuatro premios en columnas y su
+  // «Best Director» es de OTRA película. Que ahora `director` admita un regex
+  // no puede haber convertido el null en «adivínala».
+  const tabla = `
+<table class="wikitable">
+<tr><th>Year</th><th>Best Film</th><th>Best Director</th></tr>
+<tr><td>1972</td><td><i>The Cremator</i></td><td>Robert Mulligan</td></tr>
+</table>`;
+  const rows = parseWinnersTables(tabla, { sinDirector: true, columnas: REGISTRY.sitges.awardColumns });
+  assert.deepEqual(rows.map((r) => [r.title, r.director]), [['The Cremator', null]]);
 });

@@ -28,6 +28,7 @@ import { enrichWithScores } from './mdblist.js';
 import { conteoAvales } from './avales.js';
 import { mapPool } from './pool.js';
 import { PAISES, esPaisConocido, notaValida } from './paises.js';
+import { noEsCine } from './data/paises/no-es-cine.js';
 import { FA_RANKINGS } from './data/filmaffinity-2026.js';
 
 export const FA_VERSION = 1;
@@ -201,6 +202,9 @@ export async function construirPaisFA(iso) {
         // nuestra: solo largometraje de cine, y los conciertos fuera.
         const clasificada = classifyGenres({ ...d }, (d.genres || []).map((g) => g.id));
         if (!esLargometraje(clasificada) || clasificada.isMusic) a.fuera = true;
+        // la misma lista que en el índice por Letterboxd: lo que no es cine no
+        // lo es tampoco cuando lo trae el ranking de FilmAffinity
+        if (noEsCine(a.tmdb_id)) a.fuera = true;
       } catch {
         /* sin ficha se queda sin cartel, que es mejor que no salir */
       }

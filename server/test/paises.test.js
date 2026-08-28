@@ -9,6 +9,7 @@ process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'powaflex-paises-')
 
 const {
   atribuir, isoDeLugar, isosDeTexto, ordenar, notaValida, codigoTmdb, PAISES, TIERS, tierDe, esPaisConocido,
+  notaAsentada, mediaDelPais, ordenarPais, VOTOS_PARA_ASENTAR,
   ponerOverride, quitarOverride, overridesDePais, peliculasDePais, aniosDePais, catalogoPaises,
   apuntarFallo, guardarBuild, esConcierto, estaEstrenada,
 } = await import('../src/paises.js');
@@ -482,4 +483,73 @@ test('el catálogo dice el estado de cada país por separado en cada fuente', ()
 test('el catálogo va ordenado por nombre castellano, que es como se lee', () => {
   const nombres = catalogoPaises().map((p) => p.es);
   assert.deepEqual(nombres, [...nombres].sort((a, b) => a.localeCompare(b, 'es')));
+});
+
+// --- LA NOTA ASENTADA ---------------------------------------------------------
+//
+// Un 7,8 con 300 votos adelantaba a un 7,6 con 27.000, y eso no es una nota
+// mejor: es una nota con menos gente detrás. La corrección clásica —la del Top
+// 250 de IMDb— acerca la nota a la media mientras faltan votos. Aquí tenía dos
+// trampas, y las dos están fijadas abajo.
+
+test('la nota asentada acerca a la media lo que tiene pocos votos, y deja en paz lo demás', () => {
+  const media = 6.6;
+  // 100 votos es la mitad del camino, por definición de la constante
+  assert.equal(notaAsentada(8.6, VOTOS_PARA_ASENTAR, media), 7.6);
+  // sin un solo voto no hay nota propia: la del país
+  assert.equal(notaAsentada(9.0, 0, media), 6.6);
+  // con votos de sobra, la nota es la suya
+  assert.equal(notaAsentada(8.4, 305282, media), 8.4);
+  // y sin nota no hay nada que asentar
+  assert.equal(notaAsentada(null, 5000, media), null);
+});
+
+test('EL CASO DE RAMÓN: el 7,8 de 300 votos deja de adelantar al 7,6 de 27.000', () => {
+  // La corrección es RELATIVA A LA MEDIA DEL PAÍS, así que el país tiene que
+  // existir: con dos películas sueltas la media es 7,7 y no hay nada que
+  // corregir. Aquí el relleno pone la media donde la tiene España, en 6,7.
+  const relleno = Array.from({ length: 30 }, () => ({ lb: 6.6, lb_votes: 5000, avales: 0, ganados: 0, title: 'relleno' }));
+  const flojo = { lb: 7.8, lb_votes: 300, avales: 0, ganados: 0, title: 'flojo' };
+  const solido = { lb: 7.6, lb_votes: 27000, avales: 0, ganados: 0, title: 'sólido' };
+  const orden = ordenarPais([flojo, solido, ...relleno]);
+  assert.equal(mediaDelPais(orden), 6.7);
+  assert.deepEqual(orden.slice(0, 2).map((x) => x.title), ['sólido', 'flojo']);
+  assert.equal(flojo.orden, 7.5, 'el 7,8 con 300 votos se asienta en 7,5');
+  assert.equal(solido.orden, 7.6, 'el 7,6 con 27.000 no se mueve');
+});
+
+test('SE REDONDEA AL DÉCIMO para no cargarse el desempate por canon', () => {
+  // Sin redondear, la nota corregida es continua y NUNCA empata: el desempate
+  // por avales no llegaba a consultarse y media lista quedaba ordenada por
+  // votos, que es el sesgo del que se venía huyendo. Medido sobre el paquete
+  // de Reino Unido, «La Odisea» adelantaba así a «Lawrence de Arabia».
+  const lawrence = { lb: 8.8, lb_votes: 402647, avales: 7, ganados: 3 };
+  const odisea = { lb: 8.8, lb_votes: 3847008, avales: 0, ganados: 0 };
+  const orden = ordenarPais([odisea, lawrence]);
+  assert.equal(orden[0].avales, 7, 'con la misma nota manda el canon, no los votos');
+  assert.equal(orden[0].orden, orden[1].orden, 'y para eso las dos notas tienen que empatar');
+});
+
+test('LAS CINEMATOGRAFÍAS PEQUEÑAS NO SE APLANAN: la constante no sale del país', () => {
+  // Armenia tiene 32 películas y ninguna pasa de 1.600 votos. Sacando la
+  // constante de un percentil del propio país se movía el 69 % de sus notas y
+  // le cambiaba el orden de los diez primeros; con el cien fijo, el orden de
+  // Armenia se queda como estaba y solo se mueve lo que de verdad no tiene
+  // gente detrás.
+  const armenia = [
+    { lb: 7.8, lb_votes: 1584, avales: 0, ganados: 0, title: 'Aurora' },
+    { lb: 7.8, lb_votes: 954, avales: 0, ganados: 0, title: 'Kyank' },
+    { lb: 7.4, lb_votes: 641, avales: 0, ganados: 0, title: 'Avetik' },
+    { lb: 7.4, lb_votes: 331, avales: 0, ganados: 0, title: '1489' },
+    { lb: 7.2, lb_votes: 1116, avales: 0, ganados: 0, title: 'Vodka Lemon' },
+  ];
+  assert.deepEqual(
+    ordenarPais([...armenia]).map((x) => x.title),
+    ['Aurora', 'Kyank', 'Avetik', '1489', 'Vodka Lemon']
+  );
+});
+
+test('la media del país es la de sus notas, al décimo, y las sin nota no cuentan', () => {
+  assert.equal(mediaDelPais([{ lb: 7 }, { lb: 8 }, { lb: null }]), 7.5);
+  assert.equal(mediaDelPais([{ lb: null }]), 0);
 });

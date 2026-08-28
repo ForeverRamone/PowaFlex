@@ -25,6 +25,20 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.27',
+    fecha: '2026-08-28',
+    titular: 'Vuelve la ganadora a Cannes, y el emparejado deja de coger el making-of',
+    puntos: [
+      'En la vista por años de Cannes habían desaparecido las ganadoras de 2025 y 2026. Wikipedia le cambió el nombre a una columna del artículo de la Palma de Oro y el palmarés entero se quedó en una sola fila; los años anteriores seguían saliendo bien porque vienen dentro de la app, y eso escondió la avería. Vuelven marcadas y las primeras: «It Was Just an Accident» y «Fjord».',
+      'Repasados los sesenta y cinco palmareses uno a uno: había un segundo roto por lo mismo, el Premio del Público de Toronto, que había renombrado su sección. De cero a cuarenta y ocho ganadoras.',
+      'El emparejado con TMDB se quedaba con el making-of. Cuando la fila traía quien dirige, no se le miraba el título, y lo que comparte dirección con una película y se llama casi igual es justamente el reportaje, la prueba de cámara o el «cómo se hizo»: «El ángel azul» era una prueba de cámara de Marlene Dietrich de cuatro minutos y «Sonata de otoño» su making-of. Ahora la obra derivada está vetada, y el cine que se distribuye con otro título —«Khamosh Pani», «Seryozha»— sigue encontrándose igual.',
+      'Por países: fuera lo que no es cine. Un documental promocional sobre «La Casa de Papel», un monólogo de Franco Escamilla y los dos «cómo se hizo» que eran el número 1 de 1998 y el número 2 de 2006 de Nueva Zelanda.',
+      'La nota que ordena ya cuenta cuánta gente hay detrás: un 7,8 con trescientos votos adelantaba a un 7,6 con veintisiete mil. Las notas con pocos votos se acercan a la media de su país, sin aplanar las cinematografías pequeñas y sin tocar la nota que se enseña. Los diez primeros de España, Armenia, Estados Unidos y Reino Unido se quedan como estaban.',
+      'Una película de episodios firmada por gente de cinco países ya no entra en el ranking de los cinco.',
+      'Y una ficha vacía de un año viejo ya no es una ficha: había un «Birdman» de veintiún minutos, sin fecha y sin un solo voto, que le ganaba a la de Iñárritu en los Globos porque se llamaba exactamente igual.',
+    ],
+  },
+  {
     label: 'Beta 1.26',
     fecha: '2026-08-27',
     titular: 'Los 72 países vienen hechos, y MDBList nunca estuvo racionando',

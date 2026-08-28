@@ -6,6 +6,142 @@ Lo que ve quien usa la app está en `/novedades`, que es otro texto para otro p�
 Formato: un titular en negrita, secciones cortas y los hechos con sus cifras. La crónica de cómo
 se llegó a cada arreglo vive en el mensaje del commit, no aquí.
 
+## Beta 1.27 (1.0.27-beta) — 2026-08-28
+
+**La Palma cambió el nombre de una columna en Wikipedia y se llevó por delante su palmarés. Y el emparejador dejó de dar por buena la obra derivada.**
+
+### La ganadora que faltaba en Cannes 2025 y 2026
+
+El artículo «Palme d'Or» dejó de titular «Director(s)» a su cuarta columna y ahora pone
+«Recipient(s)». Como la columna de dirección es la que verifica el emparejado, el parser
+descartaba la tabla entera: **de las diez tablas del artículo solo sobrevivía una**, la del Palme
+d'Or especial, que conserva el encabezado viejo.
+
+```
+palmarés de Cannes, filas leídas de Wikipedia:    1   (año más alto: 2018)
+tras el arreglo:                                103   (año más alto: 2026)
+```
+
+Nadie lo vio durante meses porque **el palmarés empaquetado llega a 2024 y tapaba el hueco**: los
+años cerrados salían perfectos y solo faltaban las ganadoras de 2025 y 2026 en la vista por año.
+Vuelven marcadas y las primeras: «It Was Just an Accident» (Panahi) y «Fjord» (Mungiu).
+
+`Recipient` va declarado **solo para Cannes**, en `awardColumns`, y no ensanchando el regex común:
+el mismo encabezado significa otra cosa en otros artículos. En BIFA empieza siendo quien dirige y
+desde 2020 lista al equipo entero —«Rocks» acredita a Sarah Gavron con dos productoras y dos
+guionistas— y en Un Certain Regard mezcla dirección con intérpretes.
+
+### Barrido de los 65 palmareses: había un segundo roto
+
+El Premio del Público de Toronto renombró su sección de «Winners» a «Winners and runners-up» y
+perdía el palmarés **entero**. Ahora una sección que no aparece ya no aborta: se cae al respaldo de
+página completa, que es lo que ya se hacía cuando la sección llegaba vacía. De cero filas a 48.
+
+Los otros 63 están sanos. El Cóndor de Plata se para en 2020 y el registro estadounidense en 2014,
+pero eso es lo que dicen sus fuentes, no un fallo nuestro.
+
+Y una guarda para que esto no vuelva a esconderse: si el artículo vivo trae **menos de la mitad**
+de los años que ya están empaquetados, lo que devuelve no es un palmarés y no se mezcla.
+
+### El emparejador ya no se queda con el making-of
+
+Este renglón de `elegirCandidato` decidía las fichas de los 65 palmareses:
+
+```js
+vale = directorsMatch(...) && (row.director || tituloBastaSinDirector(c))
+```
+
+Con `row.director` puesto, el segundo paréntesis es **siempre cierto**: a las filas con dirección
+no se les miraba el título. Bastaba con que el nombre casara, y lo que comparte dirección con una
+película y se llama casi igual es justamente la obra derivada.
+
+Medido con los candidatos reales de TMDB, la derivada es **la primera que devuelve la búsqueda** en
+los tres casos:
+
+```
+«The Blue Angel» 1930    →  antes: prueba de cámara de Marlene Dietrich, 3 votos
+                            ahora: «Der blaue Engel», 108 min, 375 votos
+«Autumn Sonata» 1978     →  antes: «The Making of Autumn Sonata», 1 voto
+                            ahora: «Höstsonaten», 99 min, 722 votos
+«Wild Strawberries» 1957 →  antes: «Bakomfilm Smultronstället», 3 votos
+                            ahora: «Smultronstället», 91 min, 1.848 votos
+```
+
+**Exigir el título clavado no era la solución, y está medido.** Se probó, y en Locarno, Karlovy
+Vary y Rotterdam costaba cinco fichas de 228 filas, las cinco correctas: «Khamosh Pani», que TMDB
+titula «Silent Waters»; «Seryozha», que allí es «Серёжа»; «A Lover's Romance», que es «Romance for
+Lovers»; «And Quiet Flows the Don», que es «Тихий Дон»; y «With Love. Lilya», que es «With Love,
+Lilly». Un título escrito de otra manera es el pan de cada día del cine que no se distribuye en
+inglés.
+
+Lo que sí las separa: **la obra derivada se llama como la película más algo; una transliteración se
+llama de otra manera.** Así que dos niveles que no se mezclan —dirección Y título gana en cuanto
+aparece; dirección sola vale de respaldo salvo que la ficha lleve las marcas de obra derivada o su
+título sea el de la fila con ocho letras de sobra—. A/B sobre los tres palmareses vivos:
+
+```
+228 filas · pierden ficha: 0 · cambian de ficha: 0
+```
+
+Sube `film_match` a v9: lo cacheado antes lleva esas fichas.
+
+### Una ficha vacía de un año viejo no es una ficha
+
+Destapado al comparar el paquete de palmareses con uno regenerado. Hay un «Birdman» de 21 minutos,
+**sin fecha, sin créditos y con cero votos**, que le ganaba a la de Iñárritu en los Globos y en
+Critics' Choice: la de Iñárritu no clava el título —se llama «Birdman or (The Unexpected Virtue of
+Ignorance)»— y el esbozo sí.
+
+El camino de las fichas sin equipo existe para la película **recién anunciada**, que llega igual de
+vacía y es la buena. Lo que los separa es el año de la FILA: una película premiada en 2014 existe y
+tiene fecha. En la ficha no hay nada que los distinga.
+
+### Lo que la regeneración del paquete confirmó, y por qué no viaja todavía
+
+Regenerado el paquete de palmareses con el emparejador arreglado para ver qué cambiaba. Sobre 3.716
+filas comparables, **tres aciertos nuevos y todos de la clase que perseguíamos**:
+
+```
+César 1981   «Slow Motion»  «Voyage à travers un film», 0 votos  →  «Sauve qui peut (la vie)»
+Globos 2020  «Hamilton»     «…Hamilton In-Depth», 33 min         →  «Hamilton», 160 min
+Cahiers 1997 «Face/Off»     sin ficha                            →  la de John Woo
+```
+
+**No se incluye**: esa pasada perdió 14 premios por 503 de Wikipedia (siete de ellos ya
+empaquetados) y metió las dos regresiones de arriba. Queda como mantenimiento, con Wikipedia
+descansada y revisando el diff fila a fila.
+
+### Por países
+
+- **Lo que no es cine, fuera.** Cuatro fichas que ningún filtro de duración ni de género separa: el
+  documental promocional de «La Casa de Papel» (57 min, sobre una serie), un monólogo de Franco
+  Escamilla, y los «cómo se hizo» de «Agárrame esos fantasmas» y del «King Kong» de Peter Jackson —
+  que eran el **número 1 de 1998 y el número 2 de 2006** de Nueva Zelanda. Van por id y con su
+  motivo escrito en `data/paises/no-es-cine.js`, y la lista viaja con el software, así que llega a
+  lo empaquetado sin reconstruir nada. España pasa de 1.045 a 1.043 y Nueva Zelanda de 190 a 188.
+- **La nota que ordena ya cuenta cuánta gente hay detrás.** Un 7,8 con 300 votos adelantaba a un
+  7,6 con 27.000. Se acerca a la media del país mientras faltan votos —la corrección del Top 250 de
+  IMDb— con dos decisiones medidas sobre los 72 paquetes: se **redondea al décimo**, porque una nota
+  continua nunca empata y se cargaba el desempate por canon (sin redondear, «La Odisea» adelantaba a
+  «Lawrence de Arabia» por tener nueve veces más votos con la misma nota); y el umbral es una
+  **constante de cien votos**, no un percentil del país, porque sacándolo del país se aplanaban las
+  cinematografías pequeñas (Armenia movía el 69 % de sus notas). Con el cien fijo, los diez primeros
+  de España, Armenia, Estados Unidos, Reino Unido, Senegal y Bosnia se quedan como estaban. La nota
+  que se pinta sigue siendo la de Letterboxd: esto solo decide el orden.
+- **La película de episodios ya no es de todos los países a la vez.** «Basta con que uno sea del
+  país» es lo justo para los Coen o los Dardenne, pero una película firmada por cinco personas de
+  cinco sitios entraba en el ranking de los cinco. A partir de tres direcciones de países distintos
+  manda la nacionalidad de la película.
+- **Los puestos se recalculan al sembrar**, para que un país que viene hecho y uno reconstruido no
+  discrepen cuando cambian las reglas del orden. No cuesta ni una petición: lo que necesita el orden
+  viaja dentro del paquete.
+
+### El 500 de la vista por año, con nombre
+
+Sigue sin reproducirse —base vacía, base llena y ocho combinaciones de URL, todas 200—, pero el
+guardián de la 1.26 solo envolvía el sembrado y todo lo demás daba el mismo 500 mudo. Ahora cada
+paso dice su nombre: «No se pudo cargar Armenia al leer la regleta de años: …».
+
 ## Beta 1.26 (1.0.26-beta) — 2026-08-27
 
 **Los 72 países vienen hechos. Y MDBList nunca estuvo racionando nada: nos racionábamos solos.**
