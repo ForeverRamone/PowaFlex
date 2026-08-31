@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, tmdbImg } from '../api.js';
-import { Select, Spinner } from '../components.jsx';
+import { Select, Spinner, BotonConfirmar } from '../components.jsx';
 import { t, locale } from '../i18n.js';
 import { toast } from '../toast.js';
 
@@ -146,17 +146,14 @@ function ReglaCard({ regla, catalog, onPatch, onDelete, onRun, corriendo, parte 
     <div className={`rounded-lg border p-3 ${regla.enabled ? 'border-ink-600 bg-ink-800/40' : 'border-ink-700 opacity-60'}`}>
       <Titulo
         extra={
-          <button
+          <BotonConfirmar
             className="text-xs text-zinc-500 hover:text-red-400 shrink-0 disabled:opacity-40"
             disabled={corriendo}
-            title={corriendo ? t('Hay una pasada en curso') : t('Borrar la regla')}
-            onClick={() => {
-              if (!window.confirm(t('¿Borrar la regla «{r}»? Lo que ya mandó a Radarr se queda.', { r: nombre }))) return;
-              onDelete(regla.id);
-            }}
-          >
-            {t('borrar')}
-          </button>
+            title={corriendo ? t('Hay una pasada en curso') : t('Borrar la regla. Lo que ya mandó a Radarr se queda.')}
+            etiqueta={t('borrar')}
+            confirma={t('¿seguro?')}
+            onConfirm={() => onDelete(regla.id)}
+          />
         }
       >
         <label className="flex items-center gap-2 cursor-pointer">
@@ -660,9 +657,15 @@ function Cuarentena({ criterios, pendientes, onGuardar, onAprobar, onRechazar, o
               <button className="btn-ghost !py-0.5 !px-2 text-xs" onClick={() => onTodas('aprobar')}>
                 {t('✓ Aprobar las {n}', { n: pendientes.length })}
               </button>
-              <button className="btn-ghost !py-0.5 !px-2 text-xs" onClick={() => onTodas('rechazar')}>
-                {t('🚫 Vetar las {n}', { n: pendientes.length })}
-              </button>
+              {/* vetar en bloque es irreversible: ninguna regla las volverá a
+                  proponer, así que pide dos toques */}
+              <BotonConfirmar
+                className="btn-ghost !py-0.5 !px-2 text-xs"
+                title={t('Ninguna regla volverá a proponerlas')}
+                etiqueta={t('🚫 Vetar las {n}', { n: pendientes.length })}
+                confirma={t('🚫 ¿Vetar las {n}?', { n: pendientes.length })}
+                onConfirm={() => onTodas('rechazar')}
+              />
             </div>
           )}
         </div>
@@ -859,10 +862,11 @@ export default function RadarrRulesSection() {
     load();
   };
 
-  /** Vaciar la bandeja de una vez. Vetar en bloque es irreversible: se pregunta. */
+  /**
+   * Vaciar la bandeja de una vez. Vetar en bloque es irreversible, y la
+   * pregunta la hace el botón en dos toques (ver `BotonConfirmar`).
+   */
   const todas = async (accion) => {
-    const n = data?.pendientes?.length || 0;
-    if (accion === 'rechazar' && !window.confirm(t('¿Vetar las {n} en cuarentena? Ninguna regla las volverá a proponer.', { n }))) return;
     const r = await api('/radarr/pending/all', { method: 'POST', body: { accion } });
     if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     if (accion === 'aprobar') {
@@ -911,20 +915,16 @@ export default function RadarrRulesSection() {
             <button className="btn-ghost !py-1 text-xs" disabled={corriendo || !activas} onClick={() => ejecutar(null, true)}>
               {t('Previsualizar todas')}
             </button>
-            <button
+            {/* un clic puede mandar cientos de películas a Radarr (una regla de
+                palmarés sin tope son 300), así que pide dos toques */}
+            <BotonConfirmar
               className="btn-gold !py-1 text-xs"
               disabled={corriendo || !activas}
-              onClick={() => {
-                // sin esto, un clic podía mandar cientos de películas a Radarr
-                // de golpe (una regla de palmarés sin tope son 300)
-                const tope = data.rules.filter((r) => r.enabled && !r.invalid)
-                  .reduce((n, r) => n + (r.cap > 0 ? r.cap : 500), 0);
-                if (!window.confirm(t('Vas a ejecutar {n} regla(s) sobre Radarr ahora mismo (hasta {m} películas). ¿Sigo?', { n: activas, m: tope }))) return;
-                ejecutar(null, false);
-              }}
-            >
-              {t('Ejecutar todas')}
-            </button>
+              title={t('Ejecuta ahora todas las reglas activas sobre Radarr')}
+              etiqueta={t('Ejecutar todas')}
+              confirma={t('¿Ejecutar ya?')}
+              onConfirm={() => ejecutar(null, false)}
+            />
           </div>
         }
       >

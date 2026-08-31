@@ -17,7 +17,7 @@
  * viaja al contenedor es `data/filmaffinity-2026.js`: el mismo trato que los
  * palmareses de Wikipedia. Se refresca con `npm run snapshot:fa`.
  *
- * NO todos los países tienen ranking: Islandia, India, China, Dinamarca e Irán
+ * NO todos los países tienen ranking: Islandia, India, Dinamarca, Irán y Suiza
  * no lo tienen. Eso se dice, en vez de enseñar una pestaña vacía sin explicar
  * por qué está vacía.
  */
@@ -40,6 +40,17 @@ export const FA_VERSION = 1;
  * minúsculas: Reino Unido es `uk` (no `gb`) e Italia es `italy` (no `it`). Y
  * ojo con darlo por bueno mirando el código HTTP: un ranking que no existe
  * responde 200 igual, con una página sin una sola ficha dentro.
+ *
+ * EL CASO QUE HAY QUE MIRAR DOS VECES: `ranking_movies_ch` es CHINA, no Suiza.
+ * En ISO, `CH` es Suiza y China es `CN`; en FilmAffinity el código de la lista
+ * no es ISO, es su abreviatura. Su lista empieza por «La linterna roja», «¡Vivir!»
+ * y «El camino a casa», así que no hay duda de cuál es. Mapearlo por su parecido
+ * habría metido el cine chino en Suiza —que también está entre los 72 países y
+ * sigue sin ranking— sin que nada lo dijera.
+ *
+ * Y Hong Kong tiene el suyo aparte: comparte cinco títulos con el chino entre
+ * los veinte primeros (coproducciones), pero el suyo va por «Deseando amar»,
+ * «Chungking Express» e «Infernal Affairs».
  */
 export const RANKINGS = {
   ES: 'ranking_movies_es',
@@ -56,6 +67,13 @@ export const RANKINGS = {
   BR: 'ranking_movies_br',
   PL: 'ranking_movies_pl',
   RU: 'ranking_movies_ru',
+  CN: 'ranking_movies_ch', // China, no Suiza: ver arriba
+  HK: 'ranking_movies_hk',
+  CA: 'ranking_movies_ca',
+  AU: 'ranking_movies_au',
+  CZ: 'ranking_movies_cz',
+  NZ: 'ranking_movies_nz',
+  PT: 'ranking_movies_pt',
 };
 
 export const tieneRanking = (iso) => Object.hasOwn(RANKINGS, String(iso || '').toUpperCase());
@@ -82,13 +100,16 @@ export function parsearFichas(html) {
     const year = (bloque.match(/class="mc-year[^"]*">(\d{4})</) || [])[1];
     const director = (bloque.match(/mc-director[\s\S]{0,300}?title="([^"]+)"/) || [])[1];
     if (!id || !title) continue;
-    const { titulo, original } = partirTitulo(decodificar(title.trim()));
+    const { titulo, original, marca } = partirTitulo(decodificar(title.trim()));
     out.push({
       fa_id: Number(id),
       title: titulo,
       original_title: original,
       year: Number(year) || null,
       director: director ? decodificar(director.trim()) : null,
+      // «(TV)», «(S)», «(TV Series)»…: dice qué es la ficha, y lo que es una
+      // serie no tiene película que buscar
+      marca: marca || null,
     });
   }
   return out;
@@ -109,18 +130,36 @@ export function parsearFichas(html) {
  * «(1998)» o un «(TV)» no son un título original.
  */
 export function partirTitulo(bruto) {
-  const m = String(bruto || '').match(/^(.+?)\s*\(([^()]{2,})\)\s*$/);
-  if (!m) return { titulo: String(bruto || '').trim(), original: null };
+  // `{1,}` y no `{2,}`: las marcas de una sola letra —«(S)» de cortometraje,
+  // «(V)» de vídeo, «(C)»— nunca llegaban a mirarse, y se quedaban pegadas al
+  // título. Lo que sí exige dos letras es tomarlo por un TÍTULO original.
+  const m = String(bruto || '').match(/^(.+?)\s*\(([^()]{1,})\)\s*$/);
+  if (!m) return { titulo: String(bruto || '').trim(), original: null, marca: null };
   const dentro = m[2].trim();
   // Lo que va entre paréntesis no siempre es un título: puede ser el año o una
   // marca de formato. La guarda cubre las formas que usan de verdad —«TV»,
   // «TV Series», «S» de cortometraje, «V» de vídeo— y no solo las de una
   // palabra, que era lo que dejaba pasar «(TV Series)» como si fuera un título.
-  if (/^(19|20)\d{2}$/.test(dentro) || /^(TV|S|V|TV Series|TV Movie|Serie de TV|C)$/i.test(dentro)) {
-    return { titulo: String(bruto || '').trim(), original: null };
+  if (/^(19|20)\d{2}$/.test(dentro)) return { titulo: String(bruto || '').trim(), original: null, marca: null };
+  if (MARCA.test(dentro)) {
+    // LA MARCA SE QUITA DEL TÍTULO, y ese es el arreglo: antes se quedaba
+    // pegada y se buscaba en TMDB «Queen: Days of Our Lives (TV)», que no
+    // existe. Con el paréntesis fuera aparece a la primera. La marca se
+    // devuelve aparte porque también dice qué es la ficha: `TV Series` y
+    // `Serie de TV` no tienen ficha de película y no vale la pena buscarlas.
+    return { titulo: m[1].trim(), original: null, marca: dentro.toUpperCase() };
   }
-  return { titulo: m[1].trim(), original: dentro };
+  // una sola letra que no es marca conocida no es un título original: se deja
+  // donde estaba en vez de inventarse un «título» de un carácter
+  if (dentro.length < 2) return { titulo: String(bruto || '').trim(), original: null, marca: null };
+  return { titulo: m[1].trim(), original: dentro, marca: null };
 }
+
+// Las marcas de formato de FilmAffinity, pegadas al final del título.
+const MARCA = /^(TV|S|V|C|TV Series|TV Movie|Serie de TV|Miniserie de TV)$/i;
+
+/** Lo que no es una película y por tanto no tiene ficha que buscar en TMDB. */
+export const esSerieFA = (marca) => /^(TV SERIES|SERIE DE TV|MINISERIE DE TV)$/.test(String(marca || ''));
 
 // Las entidades que salen en títulos y nombres. No hace falta más: la página
 // viene en UTF-8 y solo escapa lo que rompería el HTML.

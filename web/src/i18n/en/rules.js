@@ -7,6 +7,14 @@
 // festivales— se reutilizan tal cual desde el servidor y desde el catálogo,
 // que a propósito manda las MISMAS cadenas castellanas que ya usa la interfaz.
 export default {
+  // la confirmación en dos toques que sustituye a window.confirm
+  'Borrar la regla. Lo que ya mandó a Radarr se queda.':
+    'Delete the rule. What it already sent to Radarr stays.',
+  'Ninguna regla volverá a proponerlas': 'No rule will propose them again',
+  '🚫 ¿Vetar las {n}?': '🚫 Veto all {n}?',
+  'Ejecuta ahora todas las reglas activas sobre Radarr':
+    'Runs every active rule against Radarr right now',
+  '¿Ejecutar ya?': 'Run now?',
   // ── espera del montaje ────────────────────────────────────────────────────
   'Leyendo tus reglas automáticas…': 'Reading your automatic rules…',
 

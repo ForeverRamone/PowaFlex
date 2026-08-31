@@ -28,6 +28,7 @@ import { watchedIndex, isWatched } from './letterboxd.js';
 import { SIGHT_AND_SOUND_2022 } from './data/sight-and-sound-2022.js';
 import { MIL_UNA_2021 } from './data/1001-movies-2021.js';
 import { FA_TOP1000 } from './data/fa-top1000.js';
+import { FA_CANONES } from './data/fa-canones-2026.js';
 import { OSCAR_BEST_PICTURE } from './data/oscar-best-picture.js';
 import { PALMARES } from './data/palmares-2026.js';
 
@@ -46,6 +47,19 @@ const nth = (n) => {
 // `awardPage`/`awardSection`: dónde vive el palmarés histórico del premio que
 // clasifica. Sundance y Busan no tienen artículo de premio utilizable (el de
 // Busan nació en 2025); su palmarés queda sin servir, con aviso claro.
+/**
+ * Las filas empaquetadas de un canon de FilmAffinity, y la coletilla que dice
+ * cuántas se quedaron sin ficha de TMDB.
+ *
+ * La cuenta se calcula, no se escribe: un número a mano en una nota envejece a
+ * la primera regeneración del paquete y nadie se entera.
+ */
+const filasFA = (clave) => FA_CANONES[clave]?.rows || [];
+const sinFichaFA = (clave) => {
+  const n = filasFA(clave).filter((r) => !r.tmdb_id).length;
+  return n ? ` ${n} no tienen ficha de TMDB segura y se quedan sin cartel hasta que se corrijan a mano.` : '';
+};
+
 export const REGISTRY = {
   cannes: {
     name: 'Cannes',
@@ -464,6 +478,71 @@ export const REGISTRY = {
     staticList: FA_TOP1000,
     staticSource: 'https://www.filmaffinity.com/es/ranking.php?rn=ranking_fa_movies',
     staticNote: `Las mil del ranking histórico de FilmAffinity, en su orden. Es el canon que vota el público en español, y por eso no se parece a Sight & Sound ni a las 1001: donde aquellas ponen «Todo sobre mi madre», esta empieza el cine español por «El verdugo». ${FA_TOP1000.filter((r) => !r.tmdb_id).length} no tienen ficha de TMDB segura y se quedan sin cartel hasta que se corrijan a mano.`,
+  },
+
+  /**
+   * LOS CUATRO CÁNONES TEMÁTICOS DE FILMAFFINITY.
+   *
+   * El Top 1000 de ahí arriba está escorado al clásico y al cine que ha tenido
+   * tiempo de acumular votos; estos cuatro cubren lo que aquel deja fuera, y
+   * cada uno es una pregunta distinta de completismo: qué llevamos de siglo,
+   * qué documental hay que haber visto, qué queda del mudo y qué es el cine
+   * negro y el western como géneros con historiografía propia.
+   *
+   * De los 162 rankings del índice de FilmAffinity solo entran estos: los
+   * treinta y tantos de género con mil filas (drama, comedia, terror, acción…)
+   * son la nota media filtrada por etiqueta y se repiten entre ellos —cualquier
+   * película con nota alta sale en tres o cuatro—, así que no separan nada. Y
+   * fuera todo lo que no es largometraje: series, cortos, videoclips y
+   * conciertos tienen su ranking allí y aquí no pintan nada.
+   *
+   * Datasets fijos, como el Top 1000, y por el mismo motivo (FilmAffinity
+   * contesta 403 a Node): se generan con `npm run snapshot:facanones`.
+   */
+  faxxi: {
+    name: 'Siglo XXI de FilmAffinity',
+    award: 'Las mejores de lo que llevamos de siglo según la nota de los usuarios de FilmAffinity',
+    group: 'canon',
+    onlyWinners: true,
+    staticList: filasFA('faxxi'),
+    staticSource: 'https://www.filmaffinity.com/es/ranking.php?rn=ranking_fa_xxi_movies',
+    staticNote: `El contrapeso del Top 1000, que está lleno de clásicos: aquí solo entra el cine de este siglo, con un mínimo de 500 votos.${sinFichaFA('faxxi')}`,
+  },
+  fadocs: {
+    name: 'Documentales de FilmAffinity',
+    award: 'Los documentales mejor valorados por los usuarios de FilmAffinity',
+    group: 'canon',
+    onlyWinners: true,
+    staticList: filasFA('fadocs'),
+    staticSource: 'https://www.filmaffinity.com/es/ranking.php?rn=ranking_fa_documentaries',
+    staticNote: `El único canon documental que no depende de los festivales: el documental casi nunca llega a las listas de «mejores películas», y aquí tiene la suya.${sinFichaFA('fadocs')}`,
+  },
+  famudo: {
+    name: 'Cine mudo de FilmAffinity',
+    award: 'Las obras de cine mudo mejor valoradas por los usuarios de FilmAffinity',
+    group: 'canon',
+    onlyWinners: true,
+    staticList: filasFA('famudo'),
+    staticSource: 'https://www.filmaffinity.com/es/ranking.php?rn=ranking_silent',
+    staticNote: `Un eje que no cubre ningún otro canon de la casa. La lista de origen mezcla largos y cortos; los cortos se caen al empaquetarla, como en el resto de la aplicación.${sinFichaFA('famudo')}`,
+  },
+  fanegro: {
+    name: 'Cine negro de FilmAffinity',
+    award: 'Las mejores películas de cine negro según los usuarios de FilmAffinity',
+    group: 'canon',
+    onlyWinners: true,
+    staticList: filasFA('fanegro'),
+    staticSource: 'https://www.filmaffinity.com/es/ranking.php?rn=ranking_filmnoir',
+    staticNote: `Género con canon propio y bibliografía detrás, no un cajón de etiquetas: por eso entra donde no entran el drama ni el thriller.${sinFichaFA('fanegro')}`,
+  },
+  fawestern: {
+    name: 'Western de FilmAffinity',
+    award: 'Los mejores western según los usuarios de FilmAffinity',
+    group: 'canon',
+    onlyWinners: true,
+    staticList: filasFA('fawestern'),
+    staticSource: 'https://www.filmaffinity.com/es/ranking.php?rn=ranking_western',
+    staticNote: `Lo mismo que el cine negro: un género con historia propia, del clásico americano al spaghetti y al crepuscular.${sinFichaFA('fawestern')}`,
   },
   // --- LOS CATÁLOGOS Y CANONES TABULADOS ------------------------------------
   //
@@ -2199,7 +2278,10 @@ export function festivalOverrideKey(title, year, director) {
  * avales lo lee también, y tenerlo escrito en dos sitios ya se pagó una vez —al
  * subir la versión aquí, allí se seguía leyendo la anterior en silencio.
  */
-export const CLAVE_MATCH = 'film_match:v9:';
+// v10: un nivel 1 con pocos votos ya no cierra la búsqueda. Lo cacheado con v9
+// tiene «In the Mood for Love» apuntando a «@ in the mood for love» —el
+// mediometraje de 51 minutos— y con ella todo lo de su clase.
+export const CLAVE_MATCH = 'film_match:v10:';
 
 export const FICHA_FANTASMA = Symbol('TMDB 404');
 
@@ -2421,6 +2503,8 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
    * película en vez de la prueba de cámara.
    */
   let soloPorDireccion = null;
+  // los que pasan el nivel 1 pero con pocos votos, por si aparece uno mejor
+  const conTitulo = [];
   for (const c of row.director ? enVentana : []) {
     // null = fallo de red (no «sin créditos»). Se ABORTA la resolución de esta
     // película: seguir probando dejaría ganar a un candidato peor solo porque
@@ -2444,14 +2528,47 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
     let titulo = tituloClavado(c);
     if (!titulo && tituloEnDe) titulo = clava(await tituloEnDe(c.id));
     if (titulo) {
-      tmdbId = c.id;
-      break;
+      /**
+       * UN NIVEL 1 CON CUATRO VOTOS NO CIERRA LA BÚSQUEDA.
+       *
+       * «In the Mood for Love» de Wong Kar-Wai acababa en **«@ in the mood for
+       * love»**, un mediometraje de 51 minutos del mismo director y del año
+       * siguiente. Pasaba el nivel 1 entero: la dirección casa, y el título
+       * TAMBIÉN clava, porque `normName` se lleva la arroba por delante y las
+       * dos cadenas quedan idénticas. Como el bucle se quedaba con el primero
+       * que llegara a nivel 1, la película —que en TMDB se llama «Deseando
+       * amar» y «花樣年華», y solo clava por su título internacional— no se
+       * llegaba a mirar nunca. Y no era un caso suelto: ese id se coló en el
+       * Top 1000, en el ranking de Hong Kong, en el paquete de palmareses y,
+       * por la caché de emparejado, en Sight & Sound, las 1001 y Cahiers.
+       *
+       * Tampoco lo cazaba `esObraDerivada`, y está dicho en su comentario: pide
+       * ocho letras de sobrante para no confundir un reportaje con un subtítulo,
+       * y aquí sobra UNA.
+       *
+       * Lo que sí los separa son los votos: 3.350 contra 37. Es la misma prueba
+       * —y las mismas constantes— que ya desempataba las filas sin dirección.
+       * Así que un nivel 1 con cuerpo cierra la búsqueda como siempre, y uno
+       * flaco solo se guarda: si más adelante aparece otro nivel 1 que le saque
+       * un orden de magnitud, gana ese.
+       */
+      if (votos(c) >= VOTOS_CON_CUERPO) {
+        tmdbId = c.id;
+        break;
+      }
+      if (!conTitulo.length || votos(c) > votos(conTitulo[0])) conTitulo.unshift(c);
+      else conTitulo.push(c);
+      continue;
     }
     // NIVEL 2: se guarda como respaldo, salvo que huela a obra derivada. No se
     // corta el bucle: si más adelante aparece una que además clave el título,
     // esa gana, que son dos pruebas contra una.
     if (!soloPorDireccion && !esObraDerivada(c)) soloPorDireccion = c;
   }
+  // Los niveles 1 flacos que quedaron guardados: manda el más votado, que ya va
+  // el primero. Dos pruebas siguen siendo más que una, así que esto va ANTES del
+  // respaldo por dirección sola.
+  if (!tmdbId && !fallosRed && conTitulo.length) tmdbId = conTitulo[0].id;
   // El respaldo solo se usa si el bucle llegó al final: un fallo de red lo
   // ABORTA a media lista, y ahí la candidata buena puede ser una de las que no
   // se han llegado a mirar.

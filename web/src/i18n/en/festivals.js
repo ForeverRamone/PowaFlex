@@ -41,7 +41,7 @@ export default {
   'TMDB cortó el grifo a mitad de comprobación; este resultado no se guarda en caché':
     'TMDB cut us off mid-check; this result is not cached',
   '{n} sin comprobar por fallos de red — recarga en un rato': '{n} unchecked due to network errors — reload in a while',
-  'fuente: Wikipedia': 'source: Wikipedia',
+  'fuente: {sitio}': 'source: {sitio}',
   '↻ Recargar': '↻ Reload',
   'Sus estrenos futuros entrarán en el calendario de cine venidero':
     'Their future releases will show up in the upcoming cinema calendar',
@@ -193,6 +193,23 @@ export default {
     "Main awards of the world's largest documentary festival",
   'NSFC (crítica de EE UU)': 'NSFC (US critics)',
   'National Society of Film Critics a la mejor película': 'National Society of Film Critics Award for Best Film',
+  // los cinco cánones temáticos de FilmAffinity (el Top 1000 va más arriba)
+  'Siglo XXI de FilmAffinity': 'FilmAffinity’s 21st Century',
+  'Las mejores de lo que llevamos de siglo según la nota de los usuarios de FilmAffinity':
+    'The best of the century so far, by FilmAffinity user rating',
+  'Documentales de FilmAffinity': 'FilmAffinity Documentaries',
+  'Los documentales mejor valorados por los usuarios de FilmAffinity':
+    'The documentaries rated highest by FilmAffinity users',
+  'Cine mudo de FilmAffinity': 'FilmAffinity Silent Cinema',
+  'Las obras de cine mudo mejor valoradas por los usuarios de FilmAffinity':
+    'The silent films rated highest by FilmAffinity users',
+  'Cine negro de FilmAffinity': 'FilmAffinity Film Noir',
+  'Las mejores películas de cine negro según los usuarios de FilmAffinity':
+    'The best film noir according to FilmAffinity users',
+  'Western de FilmAffinity': 'FilmAffinity Westerns',
+  'Los mejores western según los usuarios de FilmAffinity':
+    'The best westerns according to FilmAffinity users',
+
   // los tres catálogos/cánones tabulados
   'Criterion Collection': 'Criterion Collection',
   'El catálogo de Criterion por número de espina: el mayor trabajo de recuperación del cine en edición doméstica':
@@ -203,6 +220,6 @@ export default {
   'National Film Registry': 'National Film Registry',
   'Biblioteca del Congreso de EE UU: cine conservado por su valor cultural, histórico o estético (25 al año desde 1989)':
     'US Library of Congress: films preserved for their cultural, historical or aesthetic value (25 a year since 1989)',
-  'Sesenta y seis fuentes: secciones oficiales, palmareses y nominadas, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el Top 1000 de FilmAffinity, el AFI, Criterion y el registro estadounidense).':
-    'Sixty-six sources: official selections, winners and nominees, guild critics, animation and documentary, and the canons (Sight & Sound, the 1001, FilmAffinity’s Top 1000, the AFI, Criterion and the US registry).',
+  'Setenta y una fuentes: secciones oficiales, palmareses y nominadas, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, los seis de FilmAffinity, el AFI, Criterion y el registro estadounidense).':
+    'Seventy-one sources: official selections, winners and nominees, guild critics, animation and documentary, and the canons (Sight & Sound, the 1001, FilmAffinity’s six, the AFI, Criterion and the US registry).',
 };

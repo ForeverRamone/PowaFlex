@@ -3,6 +3,22 @@
 // cabecera de la página vive en en/app.js, igual que el titular «Festivales y
 // premios» de la Alpha 0.9.5, que allí ya es nombre de página.
 export default {
+  // ── Beta 1.30 ──────────────────────────────────────────────
+  'Cinco cánones nuevos de FilmAffinity, siete países más y una ficha que llevaba años siendo la que no era':
+    'Five new FilmAffinity canons, seven more countries and a record that had long been the wrong film',
+  'Festivales y premios estrena cinco cánones de FilmAffinity: el Siglo XXI (1.000 películas), Documentales (832), Cine mudo (423), Cine negro (341) y Western (436). Tres mil filas, el 98% con su ficha y su cartel.':
+    'Festivals & Awards adds five FilmAffinity canons: the 21st Century (1,000 films), Documentaries (832), Silent Cinema (423), Film Noir (341) and Westerns (436). Three thousand rows, 98% of them with their record and poster.',
+  'Por países pasa de catorce a veintiún rankings de FilmAffinity: China, Hong Kong, Canadá, Australia, Chequia, Nueva Zelanda y Portugal.':
+    'By Country goes from fourteen FilmAffinity rankings to twenty-one: China, Hong Kong, Canada, Australia, Czechia, New Zealand and Portugal.',
+  '«Deseando amar» estaba mal en media aplicación. Donde debía salir la película salía «@ in the mood for love», un mediometraje de 51 minutos del mismo director: se había colado en el Top 1000, en Hong Kong, en Sight & Sound, en las 1001 y en Cahiers. Arreglado de raíz, y de paso el emparejado ya no se queda con una ficha de cuarenta votos si hay otra con tres mil.':
+    '“In the Mood for Love” was wrong across half the app. Where the film should have appeared you got “@ in the mood for love”, a 51-minute mid-length piece by the same director: it had crept into the Top 1000, into Hong Kong, into Sight & Sound, into the 1001 and into Cahiers. Fixed at the root — and matching no longer settles for a record with forty votes when another has three thousand.',
+  'Y con él, cincuenta y tres películas que antes se quedaban sin cartel: la lista las llama «To Return», «Love» o «The Downfall» y TMDB las tiene como «Volver», «Amour» y «El hundimiento». Ahora se buscan por quien las dirige.':
+    'And with it, fifty-three films that used to end up without a poster: the list calls them “To Return”, “Love” or “The Downfall” and TMDB has them as “Volver”, “Amour” and “Downfall”. They are now looked up by their director.',
+  'El ✕ de «Listas y retos» no quitaba nada: el diálogo de confirmación del navegador se puede desactivar y dejaba el botón muerto sin decirlo. Ahora se pregunta dentro de la página, en dos toques. Igual en Descubrir y en las reglas de Radarr.':
+    'The ✕ in “Lists & Challenges” removed nothing: the browser’s confirmation dialog can be switched off, and that left the button dead without saying so. The question is now asked inside the page, in two taps. Same in Discover and in the Radarr rules.',
+  'En el móvil, los seis contadores del Dashboard no cuadraban entre filas y el «Ver todos →» de los titulares largos flotaba a media altura.':
+    'On mobile, the Dashboard’s six counters did not line up across rows and the “See all →” link on long headings floated halfway down.',
+
   // ── Beta 1.29 ──────────────────────────────────────────────
   'Quién estrena en España en los tres próximos meses':
     'Who is releasing in Spain over the next three months',

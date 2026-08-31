@@ -27,8 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'csv-parse/sync';
 import { resolveFilms } from '../src/festivals.js';
-import { movieDetail } from '../src/tmdb.js';
-import { normName } from '../src/names.js';
+import { esSospechosa } from './fa-comun.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (nombre, pordefecto = null) => {
@@ -42,32 +41,11 @@ if (!origen) {
   process.exit(1);
 }
 
-// Lo mismo que en el ranking por países: lo derivado nunca es la película, y
-// una parte suelta solo vale si la lista pedía una parte.
-const DERIVADAS = ['makingof', 'behindthescenes', 'screentest', 'bakom', 'comosehizo', 'elrodajede'];
-const PARTE =
-  /\b(part|parte|vol|volume)\.?\s*(i{1,3}|iv|v|one|two|three|dos|tres|\d{1,2})\b|\b(primera|segunda|tercera|first|second|third|fourth)\s+(parte|part)\b/i;
-
-async function sospechosa(id, fila) {
-  try {
-    const d = await movieDetail(id);
-    const anio = Number(String(d.release_date || '').slice(0, 4)) || null;
-    if (!anio) return 'sin fecha';
-    if (fila.year && Math.abs(anio - fila.year) > 2) return `año ${anio} frente a ${fila.year}`;
-    if ((d.runtime || 0) > 0 && d.runtime < 40) return `${d.runtime} min: no es un largometraje`;
-    if ((d.vote_count || 0) === 0 && (d.runtime || 0) === 0) return 'ficha vacía';
-    const deLaFicha = `${normName(d.title)} ${normName(d.original_title || '')}`;
-    const suyo = normName(fila.title);
-    for (const marca of DERIVADAS) {
-      if (deLaFicha.includes(marca) && !suyo.includes(marca)) return `«${d.title}» no es la película`;
-    }
-    const fichaEsParte = PARTE.test(d.title || '') || PARTE.test(d.original_title || '');
-    if (fichaEsParte && !PARTE.test(fila.title)) return `«${d.title}» es solo una parte`;
-    return null;
-  } catch {
-    return null; // si TMDB no contesta no se condena a nadie
-  }
-}
+// La comprobación de que la ficha emparejada es LA PELÍCULA vive en
+// `fa-comun.mjs`, compartida con las otras dos herramientas de FilmAffinity:
+// lo derivado nunca es la película, y una parte suelta solo vale si la lista
+// pedía una parte. Aquí las filas vienen del CSV y no traen título original,
+// así que `esSospechosa` compara contra el único título que hay.
 
 /**
  * LAS QUE HAY QUE EMPAREJAR A MANO, con el porqué de cada una.
@@ -150,9 +128,9 @@ for (let i = 0; i < filas.length; i++) {
     id = null;
   }
   if (id) {
-    const motivo = await sospechosa(id, fila);
-    if (motivo) {
-      console.error(`    ✕ #${fila.rank} «${fila.title}» → tmdb ${id}: ${motivo}`);
+    const fallo = await esSospechosa(id, fila);
+    if (fallo) {
+      console.error(`    ✕ #${fila.rank} «${fila.title}» → tmdb ${id}: ${fallo.motivo}`);
       tiradas++;
       id = null;
     }

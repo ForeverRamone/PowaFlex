@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import {
   Spinner, Progreso, useCargaProgresiva, ErrorBox, Empty, ProgressBar, MovieModal, MediaModal,
-  PageHeader, RadarrButton, useRadarrIds,
+  PageHeader, RadarrButton, useRadarrIds, BotonConfirmar,
 } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
@@ -261,21 +261,22 @@ function ChallengeCard({ l, mode, open, setOpen, load }) {
             >
               {l.hidden ? t('👁 Mostrar') : t('🚫 Ocultar')}
             </button>
-            <button
+            {/* la confirmación va DENTRO de la página: el `window.confirm` que
+                había aquí lo puede desactivar el navegador y dejaba la ✕ muerta
+                sin decir nada (ver BotonConfirmar) */}
+            <BotonConfirmar
               className="text-zinc-500 hover:text-red-400"
-              title={t('Quitar reto')}
-              onClick={async () => {
-                // quitar el reto borra también su progreso importado: se pregunta
-                // con el nombre delante para que la ✕ pequeña no se lleve otro
-                if (!window.confirm(t('¿Quitar el reto «{name}»? Su progreso se pierde.', { name: l.name }))) return;
+              title={t('Quitar reto: se pierde su progreso')}
+              etiqueta="✕"
+              confirma={t('✕ ¿Seguro?')}
+              onConfirm={async () => {
                 const r = await api(`/letterboxd/lists/${l.id}`, { method: 'DELETE' });
                 if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
                 if (open === l.id) setOpen(null);
+                toast(t('✕ Reto «{name}» quitado', { name: l.name }));
                 load();
               }}
-            >
-              ✕
-            </button>
+            />
           </div>
         </div>
       </div>
@@ -698,21 +699,19 @@ function PanelMdblist() {
                   >
                     ↻
                   </button>
-                  <button
+                  <BotonConfirmar
                     className="text-zinc-500 hover:text-red-400"
-                    title={t('Dejar de seguir')}
-                    onClick={async () => {
-                      // dejar de seguir borra el progreso calculado de la lista:
-                      // se pregunta con el nombre para que la ✕ no se equivoque de fila
-                      if (!window.confirm(t('¿Dejar de seguir «{name}»?', { name: l.name }))) return;
+                    title={t('Dejar de seguir esta lista')}
+                    etiqueta="✕"
+                    confirma={t('✕ ¿Seguro?')}
+                    onConfirm={async () => {
                       const r = await api(`/mdblist/lists/${l.id}`, { method: 'DELETE' });
                       if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
                       if (open === l.id) setOpen(null);
+                      toast(t('✕ Ya no sigues «{name}»', { name: l.name }));
                       load();
                     }}
-                  >
-                    ✕
-                  </button>
+                  />
                 </div>
               </div>
               <div className="max-w-md mt-2">

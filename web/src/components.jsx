@@ -712,20 +712,46 @@ export function ErrorBox({ error }) {
 
 // Numbers read as data, not as accents: gold is reserved for actions and
 // favourites, so the figure itself is white in the display face.
+/**
+ * EL CONTADOR, Y POR QUÉ RESERVA LA LÍNEA DE LA APOSTILLA.
+ *
+ * En el Dashboard son seis, y en el móvil caben de dos en dos: tres filas. Solo
+ * la mitad lleva apostilla («≈ 33 días», «34% de la biblioteca»), así que las
+ * filas medían 112, 112 y 92 px y la última se quedaba corta — con un hueco
+ * muerto debajo de las que no la llevan. En el escritorio no se veía nunca,
+ * porque las seis van en UNA fila y la rejilla las estira todas por igual.
+ *
+ * Se arregla reservando la línea siempre, no estirando la tarjeta: así todas
+ * miden lo mismo con cualquier número de columnas, y sin depender de que la
+ * rejilla las estire.
+ *
+ * Las tres clases son las de la casa (`stat-cifra`, `stat-rotulo`, `stat-nota`)
+ * y no una copia a mano: esa copia ya se pagó una vez con dos contadores de la
+ * misma colección en dos tipografías distintas.
+ */
 export function StatCard({ label, value, sub }) {
   return (
     <div className="card p-4">
-      <div className="font-display text-3xl text-zinc-100 tabular leading-none">{value}</div>
-      <div className="text-sm text-zinc-400 mt-2">{label}</div>
-      {sub && <div className="text-xs text-zinc-500 mt-1">{sub}</div>}
+      <div className="stat-cifra">{value}</div>
+      <div className="stat-rotulo">{label}</div>
+      <div className="stat-nota">{sub || ' '}</div>
     </div>
   );
 }
 
+/**
+ * La cabecera de sección, con su enlace a la derecha.
+ *
+ * `items-baseline` y no `items-center`: en el móvil, un titular que no cabe en
+ * una línea —«Actores/actrices con más películas»— dejaba el «Ver todos →»
+ * flotando a media altura, sin alinearse con nada. Con la línea base, el enlace
+ * se apoya en la PRIMERA línea del titular, que es donde uno lo busca. Y
+ * `gap-3` para que no se toquen cuando el titular llega justo al borde.
+ */
 export function Section({ title, action, children, className = '' }) {
   return (
     <section className={`mb-8 ${className}`}>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-baseline justify-between gap-3 mb-3">
         <h2 className="text-lg font-semibold text-zinc-100">{title}</h2>
         {action}
       </div>
@@ -1064,6 +1090,57 @@ export function Select({ value, onChange, options, placeholder = null, className
 
 export function Empty({ children }) {
   return <div className="text-zinc-500 text-sm py-8 text-center">{children}</div>;
+}
+
+/**
+ * CONFIRMAR SIN `window.confirm`, EN DOS TOQUES.
+ *
+ * El ✕ de «Listas y retos» no borraba nada, y el motivo no estaba ni en la ruta
+ * ni en el manejador: los dos funcionan. Estaba en el `window.confirm` de por
+ * medio. Ese diálogo lo puede desactivar el propio navegador —basta que alguien
+ * marque «impedir que esta página cree más diálogos» una vez— y a partir de
+ * entonces devuelve `false` para siempre, en silencio y sin rastro en la
+ * consola. El botón queda muerto y no hay forma de saber por qué. En una app
+ * instalada como PWA pasa lo mismo de serie.
+ *
+ * Así que la pregunta se hace DENTRO de la página: el primer toque arma el
+ * botón y lo cambia por su confirmación, el segundo ejecuta. Se desarma solo a
+ * los cinco segundos, para que un clic olvidado no deje una bomba puesta.
+ *
+ * `etiqueta` es lo que se ve en reposo (una ✕, «Borrar la regla»…) y `confirma`
+ * lo que se ve armado. La clase de armado va en `claseArmada` para que cada
+ * sitio conserve su aspecto.
+ */
+export function BotonConfirmar({
+  etiqueta, confirma, title = null, onConfirm,
+  className = '', claseArmada = 'text-red-400', disabled = false,
+}) {
+  const [armado, setArmado] = useState(false);
+  const reloj = useRef(null);
+  useEffect(() => () => clearTimeout(reloj.current), []);
+  const pulsar = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!armado) {
+      setArmado(true);
+      reloj.current = setTimeout(() => setArmado(false), 5000);
+      return;
+    }
+    clearTimeout(reloj.current);
+    setArmado(false);
+    onConfirm();
+  };
+  return (
+    <button
+      type="button"
+      onClick={pulsar}
+      disabled={disabled}
+      title={armado ? t('Pulsa otra vez para confirmar') : title || undefined}
+      className={`${className} ${armado ? claseArmada : ''}`}
+    >
+      {armado ? confirma : etiqueta}
+    </button>
+  );
 }
 
 /**

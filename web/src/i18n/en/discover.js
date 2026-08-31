@@ -1,5 +1,8 @@
 // Descubrir (huecos, tops, grandes ausentes) — la clave es el texto castellano
 export default {
+  // la confirmación en dos toques que sustituye a window.confirm
+  'Borrar esta lista. No hay papelera: habría que volver a pegar los nombres.':
+    'Delete this list. There is no bin: you would have to paste the names again.',
   // pestañas
   'Tus favoritos': 'Your favorites',
   'Directores/as top': 'Top directors',

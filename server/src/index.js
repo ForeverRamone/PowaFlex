@@ -961,7 +961,7 @@ app.post('/api/directors/follow', async (req, reply) => {
 // dentro de la petición, que es instantáneo.
 
 // `fa` dice si ese país tiene ranking en FilmAffinity: no lo tienen todos
-// (Islandia, India, China, Dinamarca e Irán no), y la pestaña necesita saberlo
+// (Islandia, India, Dinamarca, Irán y Suiza no), y la pestaña necesita saberlo
 // para explicar el vacío en vez de enseñarlo a secas.
 app.get('/api/paises', async () => ({
   paises: catalogoPaises().map((p) => ({ ...p, fa: tieneRanking(p.iso) && hayPaqueteFA(p.iso) })),

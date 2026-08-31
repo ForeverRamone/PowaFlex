@@ -5,7 +5,7 @@ import { Star, Clapperboard, Drama, Landmark, Plus, RotateCw, User, LayoutGrid, 
 import {
   Spinner, Progreso, useCargaProgresiva, ErrorBox, TmdbCard, RadarrButton, ProgressBar, Empty, BuildProgress,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts, PageHeader, Signature, Select,
-  MinScoreBar, passesScore, useMinScore, useAvales, conAval } from '../components.jsx';
+  MinScoreBar, passesScore, useMinScore, useAvales, conAval, BotonConfirmar } from '../components.jsx';
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 import { t, locale } from '../i18n.js';
@@ -543,9 +543,10 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
   };
 
   // borrar un canon propio destruye la lista de nombres que el usuario pegó a
-  // mano: sin vuelta atrás, así que se pregunta antes con su nombre delante
+  // mano: sin vuelta atrás. La pregunta la hace el botón en dos toques (ver
+  // `BotonConfirmar`): el `window.confirm` que había aquí lo puede desactivar
+  // el navegador y dejar el botón muerto sin decir nada.
   const removeCanon = async (c) => {
-    if (!window.confirm(t('¿Borrar la lista «{name}»? No hay papelera: habría que volver a pegar los nombres.', { name: c.label }))) return;
     const r = await api(`/discover/canons/${encodeURIComponent(c.key)}`, { method: 'DELETE' });
     if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
     if (canon === c.key) setCanon('alltime');
@@ -591,13 +592,13 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
               {c.builtin ? t(c.label) : c.label}
             </button>
             {!c.builtin && (
-              <button
-                onClick={() => removeCanon(c)}
-                title={t('Borrar esta lista')}
+              <BotonConfirmar
+                onConfirm={() => removeCanon(c)}
+                title={t('Borrar esta lista. No hay papelera: habría que volver a pegar los nombres.')}
                 className="text-zinc-600 hover:text-red-400 ml-1"
-              >
-                <X size={13} />
-              </button>
+                etiqueta={<X size={13} />}
+                confirma={t('¿seguro?')}
+              />
             )}
           </span>
         ))}

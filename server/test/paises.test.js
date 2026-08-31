@@ -13,7 +13,7 @@ const {
   ponerOverride, quitarOverride, overridesDePais, peliculasDePais, aniosDePais, catalogoPaises,
   apuntarFallo, guardarBuild, esConcierto, esMonologo, estaEstrenada,
 } = await import('../src/paises.js');
-const { RANKINGS, parsearFichas, partirTitulo, tieneRanking } = await import('../src/filmaffinity.js');
+const { RANKINGS, parsearFichas, partirTitulo, tieneRanking, esSerieFA } = await import('../src/filmaffinity.js');
 const { FA_RANKINGS } = await import('../src/data/filmaffinity-2026.js');
 const { db } = await import('../src/db.js');
 
@@ -373,6 +373,29 @@ test('los códigos de ranking NO son el ISO en minúsculas, y por eso van escrit
   assert.equal(RANKINGS.IT, 'ranking_movies_italy');
 });
 
+/**
+ * EL FALSO AMIGO: `ranking_movies_ch` es CHINA, no Suiza.
+ *
+ * En ISO, `CH` es Suiza y China es `CN`; el código de la lista de FilmAffinity
+ * no es ISO, es su abreviatura. Mapearlo por su parecido metería el cine chino
+ * en la página de Suiza —que también está entre los 72 países— sin que nada lo
+ * dijera: la lista se pintaría entera y con carteles.
+ */
+test('el ranking «ch» es el de China, y Suiza se queda sin ranking', () => {
+  assert.equal(RANKINGS.CN, 'ranking_movies_ch');
+  assert.ok(!Object.hasOwn(RANKINGS, 'CH'), 'Suiza no tiene ranking en FilmAffinity');
+  assert.equal(tieneRanking('CH'), false);
+  assert.equal(tieneRanking('CN'), true);
+});
+
+test('todos los países con ranking vienen empaquetados', () => {
+  // tener ranking y tenerlo bajado no es lo mismo, y la diferencia se nota en
+  // la pestaña: sin paquete, el botón de construir falla en vez de no estar
+  for (const iso of Object.keys(RANKINGS)) {
+    assert.ok(FA_RANKINGS[iso]?.rows?.length, `${iso} figura con ranking pero no está empaquetado`);
+  }
+});
+
 test('el paquete trae puesto, título y año, y los ids que trae son enteros', () => {
   for (const [iso, paquete] of Object.entries(FA_RANKINGS)) {
     assert.ok(paquete.rows.length > 0, `${iso} empaquetado sin filas`);
@@ -397,13 +420,41 @@ test('el título original se separa del traducido cuando viene entre paréntesis
   assert.deepEqual(partirTitulo('Butterfly Tongues (La lengua de las mariposas)'), {
     titulo: 'Butterfly Tongues',
     original: 'La lengua de las mariposas',
+    marca: null,
   });
-  assert.deepEqual(partirTitulo('Harakiri'), { titulo: 'Harakiri', original: null });
+  assert.deepEqual(partirTitulo('Harakiri'), { titulo: 'Harakiri', original: null, marca: null });
 });
 
-test('un año o una marca de televisión entre paréntesis NO son un título original', () => {
-  assert.deepEqual(partirTitulo('Una peli (1998)'), { titulo: 'Una peli (1998)', original: null });
-  assert.deepEqual(partirTitulo('Una peli (TV)'), { titulo: 'Una peli (TV)', original: null });
+test('el año entre paréntesis no es un título original, y se queda donde está', () => {
+  assert.deepEqual(partirTitulo('Una peli (1998)'), { titulo: 'Una peli (1998)', original: null, marca: null });
+});
+
+/**
+ * LA MARCA DE FORMATO SE QUITA DEL TÍTULO, y ese era el fallo.
+ *
+ * FilmAffinity pega «(TV)», «(S)» o «(TV Series)» al final del título, y antes
+ * se dejaba pegada: se buscaba en TMDB «Queen: Days of Our Lives (TV)», que no
+ * existe, y la fila se quedaba sin ficha en el canon de documentales. Con el
+ * paréntesis fuera aparece a la primera.
+ */
+test('la marca de formato se separa del título en vez de quedarse pegada', () => {
+  assert.deepEqual(partirTitulo('Queen: Days of Our Lives (TV)'), {
+    titulo: 'Queen: Days of Our Lives',
+    original: null,
+    marca: 'TV',
+  });
+  assert.deepEqual(partirTitulo('Window Water Baby Moving (S)').titulo, 'Window Water Baby Moving');
+  assert.deepEqual(partirTitulo('Lo que sea (TV Series)').marca, 'TV SERIES');
+});
+
+test('lo que FilmAffinity marca como serie no tiene película que buscar', () => {
+  assert.equal(esSerieFA('TV SERIES'), true);
+  assert.equal(esSerieFA('SERIE DE TV'), true);
+  assert.equal(esSerieFA('MINISERIE DE TV'), true);
+  // un telefilme SÍ es una película, y un corto también: esos no se saltan
+  assert.equal(esSerieFA('TV'), false);
+  assert.equal(esSerieFA('S'), false);
+  assert.equal(esSerieFA(null), false);
 });
 
 test('el lector de fichas saca id, título, año y dirección de su HTML', () => {
@@ -415,7 +466,7 @@ test('el lector de fichas saca id, título, año y dirección de su HTML', () =>
         <a href="/en/name.php?name-id=267661574" title="Masaki Kobayashi">Masaki Kobayashi</a></span></div></div>
     </div>`;
   assert.deepEqual(parsearFichas(html), [
-    { fa_id: 209631, title: 'Harakiri', original_title: null, year: 1962, director: 'Masaki Kobayashi' },
+    { fa_id: 209631, title: 'Harakiri', original_title: null, year: 1962, director: 'Masaki Kobayashi', marca: null },
   ]);
 });
 

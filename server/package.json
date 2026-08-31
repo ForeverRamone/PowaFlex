@@ -1,7 +1,7 @@
 {
   "name": "powaflex-server",
-  "version": "1.0.29-beta",
-  "versionLabel": "Beta 1.29",
+  "version": "1.0.30-beta",
+  "versionLabel": "Beta 1.30",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,8 @@
     "snapshot": "node tools/snapshot-palmares.mjs",
     "snapshot:fa": "node tools/snapshot-filmaffinity.mjs",
     "snapshot:fa1000": "node tools/snapshot-fa-top1000.mjs",
-    "snapshot:paises": "node tools/snapshot-paises.mjs"
+    "snapshot:paises": "node tools/snapshot-paises.mjs",
+    "snapshot:facanones": "node tools/snapshot-fa-canones.mjs"
   },
   "dependencies": {
     "@fastify/compress": "^9.2.0",

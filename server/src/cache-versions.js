@@ -118,7 +118,11 @@ export const CACHE_VERSIONS = {
   // título normalizado, así que en la Berlinale de 2025 —dos películas
   // tituladas «Dreams»— coronaba la de Michel Franco en vez del Oso de Oro de
   // Dag Johan Haugerud. Lo cacheado antes lleva las tres cosas.
-  festival: 20,
+  // v21: el emparejado ya no se queda con el primer candidato que clave el
+  // título si tiene cuatro votos: «In the Mood for Love» acababa en «@ in the
+  // mood for love», un mediometraje de 51 minutos del mismo director, y de ahí
+  // pasó al Top 1000, a Hong Kong, a Sight & Sound, a las 1001 y a Cahiers.
+  festival: 21,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)

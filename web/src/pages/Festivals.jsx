@@ -158,6 +158,30 @@ function ordenaPorPadre(lista) {
   return out;
 }
 
+/**
+ * DE DÓNDE SALE ESTA LISTA, dicho de verdad.
+ *
+ * El enlace de la fuente ponía «fuente: Wikipedia» pase lo que pase, y ya no
+ * era cierto ni antes: el Óscar viene de Wikidata, Sight & Sound del BFI y el
+ * Top 1000 de FilmAffinity. Con los cinco cánones nuevos de FilmAffinity serían
+ * siete listas diciendo que las escribió Wikipedia. El nombre sale del enlace,
+ * que es el único sitio donde el dato es cierto por construcción.
+ */
+const SITIOS = [
+  [/wikipedia\.org$/, 'Wikipedia'],
+  [/wikidata\.org$/, 'Wikidata'],
+  [/filmaffinity\.com$/, 'FilmAffinity'],
+  [/bfi\.org\.uk$/, 'BFI'],
+];
+function nombreDeFuente(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return SITIOS.find(([re]) => re.test(host))?.[1] || host;
+  } catch {
+    return null;
+  }
+}
+
 // Los grupos de «Lo mejor del año», en el orden en que se leen: primero quién
 // ganó dónde, luego quién premió qué. Mismos rótulos que el menú.
 const GRUPOS_ANUARIO = [
@@ -384,7 +408,7 @@ export default function Festivals() {
       <PageHeader
         eyebrow={t('La caza')}
         title={t('Festivales y premios')}
-        subtitle={t('Sesenta y seis fuentes: secciones oficiales, palmareses y nominadas, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, el Top 1000 de FilmAffinity, el AFI, Criterion y el registro estadounidense).')}
+        subtitle={t('Setenta y una fuentes: secciones oficiales, palmareses y nominadas, crítica gremial, animación y documental, y los cánones (Sight & Sound, las 1001, los seis de FilmAffinity, el AFI, Criterion y el registro estadounidense).')}
       />
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
@@ -539,9 +563,9 @@ export default function Festivals() {
                 </span>
               )}
             </span>
-            {data.source && (
+            {data.source && nombreDeFuente(data.source) && (
               <a href={data.source} target="_blank" rel="noreferrer" className="text-[11px] text-zinc-500 hover:text-gold-400 underline">
-                {t('fuente: Wikipedia')}
+                {t('fuente: {sitio}', { sitio: nombreDeFuente(data.source) })}
               </a>
             )}
             <button className="btn-ghost !py-1 text-xs" onClick={() => load(fest, year, view, true, anuario)}>{t('↻ Recargar')}</button>

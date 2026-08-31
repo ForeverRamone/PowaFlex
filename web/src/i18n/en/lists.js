@@ -2,6 +2,12 @@
 // Letterboxd). Clave = texto castellano. «La caza», «Listas y retos» y
 // «Buscar» ya viven en app.js.
 export default {
+  // la confirmación en dos toques que sustituye a window.confirm
+  'Quitar reto: se pierde su progreso': 'Remove challenge: its progress is lost',
+  '✕ ¿Seguro?': '✕ Sure?',
+  '✕ Reto «{name}» quitado': '✕ Challenge “{name}” removed',
+  'Dejar de seguir esta lista': 'Stop following this list',
+  '✕ Ya no sigues «{name}»': '✕ No longer following “{name}”',
   // Retos de Letterboxd — filas y detalle
   'No encuentro esta película en TMDB': "Can't find this movie on TMDB",
   '{title} — ver ficha': '{title} — view details',

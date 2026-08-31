@@ -25,6 +25,19 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.30',
+    fecha: '2026-08-31',
+    titular: 'Cinco cánones nuevos de FilmAffinity, siete países más y una ficha que llevaba años siendo la que no era',
+    puntos: [
+      'Festivales y premios estrena cinco cánones de FilmAffinity: el Siglo XXI (1.000 películas), Documentales (832), Cine mudo (423), Cine negro (341) y Western (436). Tres mil filas, el 98% con su ficha y su cartel.',
+      'Por países pasa de catorce a veintiún rankings de FilmAffinity: China, Hong Kong, Canadá, Australia, Chequia, Nueva Zelanda y Portugal.',
+      '«Deseando amar» estaba mal en media aplicación. Donde debía salir la película salía «@ in the mood for love», un mediometraje de 51 minutos del mismo director: se había colado en el Top 1000, en Hong Kong, en Sight & Sound, en las 1001 y en Cahiers. Arreglado de raíz, y de paso el emparejado ya no se queda con una ficha de cuarenta votos si hay otra con tres mil.',
+      'Y con él, cincuenta y tres películas que antes se quedaban sin cartel: la lista las llama «To Return», «Love» o «The Downfall» y TMDB las tiene como «Volver», «Amour» y «El hundimiento». Ahora se buscan por quien las dirige.',
+      'El ✕ de «Listas y retos» no quitaba nada: el diálogo de confirmación del navegador se puede desactivar y dejaba el botón muerto sin decirlo. Ahora se pregunta dentro de la página, en dos toques. Igual en Descubrir y en las reglas de Radarr.',
+      'En el móvil, los seis contadores del Dashboard no cuadraban entre filas y el «Ver todos →» de los titulares largos flotaba a media altura.',
+    ],
+  },
+  {
     label: 'Beta 1.29',
     fecha: '2026-08-31',
     titular: 'Quién estrena en España en los tres próximos meses',

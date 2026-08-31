@@ -6,6 +6,85 @@ Lo que ve quien usa la app está en `/novedades`, que es otro texto para otro p�
 Formato: un titular en negrita, secciones cortas y los hechos con sus cifras. La crónica de cómo
 se llegó a cada arreglo vive en el mensaje del commit, no aquí.
 
+## Beta 1.30 (1.0.30-beta) — 2026-08-31
+
+**Siete países más y cinco cánones nuevos de FilmAffinity — y, de camino, la ficha equivocada que llevaba años colada en el Top 1000, en Sight & Sound, en las 1001 y en Cahiers.**
+
+### Cinco cánones nuevos de FilmAffinity
+
+De los 162 rankings de su índice entran los cinco que son un canon y no un cajón:
+**Siglo XXI** (1.000), **Documentales** (832), **Cine mudo** (423), **Cine negro** (341) y
+**Western** (436). En total **3.032 filas, 2.984 con ficha de TMDB (98%)**; el cine negro y el
+western van al 100%. Se sirven como Sight & Sound o las 1001 —dataset fijo, sin salir a
+internet— y suman sus avales a las fichas de película.
+
+Fuera quedan a propósito los treinta y tantos rankings de género de mil filas (drama, comedia,
+terror…): son la nota media filtrada por etiqueta, se repiten entre ellos y no separan nada. Y
+fuera todo lo que no es largometraje.
+
+### Siete países más en Por países
+
+**China, Hong Kong, Canadá, Australia, Chequia, Nueva Zelanda y Portugal**: 605 filas, 592 con
+ficha. De 14 países con ranking a 21.
+
+Ojo con el que parece obvio y no lo es: el código de FilmAffinity `ranking_movies_ch` es **China,
+no Suiza** —Suiza sigue sin ranking—, y Hong Kong tiene el suyo aparte (comparten cinco títulos
+de los veinte primeros). Va con su test.
+
+### La ficha que no era, y por qué estaba en todas partes
+
+«In the Mood for Love» apuntaba a **«@ in the mood for love»**, un mediometraje de 51 minutos del
+mismo director y del año siguiente. Pasaba todas las comprobaciones: la dirección casa, y el
+título *también* clava, porque al normalizar se cae la arroba. Como el emparejador se quedaba con
+el primer candidato que llegara a ese nivel, la película —que TMDB titula «Deseando amar» y
+«花樣年華», y solo clava por su título internacional— no se llegaba a mirar nunca.
+
+Ese id se había colado en **cinco paquetes** (el Top 1000, el ranking de Hong Kong, el de
+palmareses, el índice de países y el nuevo del siglo XXI) y en la caché de emparejado, y desde ahí
+en **Sight & Sound, las 1001 y Cahiers**. Arreglado en la raíz: un candidato con menos de 100 votos
+ya no cierra la búsqueda, y si aparece otro que le saca un orden de magnitud (3.350 votos contra
+37), gana ese. Corregidos también los cinco paquetes.
+
+### El emparejado de FilmAffinity, tres arreglos
+
+- **La marca de formato se despega del título.** Se buscaba en TMDB «Queen: Days of Our Lives
+  (TV)», que no existe. Las marcas de una letra —«(S)» de corto, «(V)», «(C)»— ni se miraban.
+- **Rescate por filmografía.** Cuando el título no lleva a ninguna parte se pregunta por quien
+  firma: la lista dice «The Downfall: Hitler and the End of the Third Reich» y TMDB «Downfall»;
+  dice «To Return» y es «Volver»; «Love» y es «Amour»; «Hell» y es «El infierno». **53 filas
+  rescatadas.** Con cuidado en los nombres que TMDB guarda en otro alfabeto (Edward Yang es
+  «楊德昌» y su lista de alias no trae el nombre occidental).
+- **19 correcciones a mano**, cada una verificada contra TMDB.
+
+Y las tres herramientas de FilmAffinity comparten por fin `fa-comun.mjs`: la regla de «mejor sin
+ficha que la ficha de otra» vivía por triplicado.
+
+### El botón que no borraba nada
+
+El ✕ de «Listas y retos» no quitaba el reto. Ni la ruta ni el manejador fallaban: fallaba el
+`window.confirm` de por medio, que el navegador puede desactivar para siempre —basta marcar una
+vez «impedir que esta página cree más diálogos»— y que a partir de ahí devuelve `false` en
+silencio. En una app instalada como PWA pasa de serie.
+
+La confirmación se hace ahora **dentro de la página**, en dos toques, y se desarma sola a los cinco
+segundos. Convertidos los **seis** `window.confirm` que quedaban: los dos de Listas, el de
+Descubrir y los tres de las reglas de Radarr. Comprobado con `confirm` saboteado a `false`: borra
+igual.
+
+### Dashboard en móvil
+
+- Los **seis contadores** hacían tres filas de 112, 112 y **92 px**: solo la mitad lleva apostilla
+  y las demás se quedaban con un hueco muerto debajo. Ahora la línea va reservada siempre y las
+  tres filas cuadran. De paso, la tarjeta usa las clases de la casa en vez de una copia a mano.
+- «Actores/actrices con más películas» no cabe en una línea, y el «Ver todos →» quedaba flotando a
+  media altura. Ahora se apoya en la primera línea del titular.
+
+### Y una cosa que decía Wikipedia sin serlo
+
+El enlace de la fuente de cada palmarés ponía «fuente: Wikipedia» pasara lo que pasara. Ya no era
+cierto antes —el Óscar viene de Wikidata y Sight & Sound del BFI— y con los cinco cánones nuevos
+habrían sido siete listas mintiendo. El nombre sale del propio enlace.
+
 ## Beta 1.29 (1.0.29-beta) — 2026-08-31
 
 **Estrenos contesta también QUIÉN: 144 directores con estreno en España en los tres próximos meses, cada uno con su obra anterior y su palmarés.**
