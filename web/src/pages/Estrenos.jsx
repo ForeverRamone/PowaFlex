@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
-import { Ticket, Flag, MonitorPlay, Tv, Plus, RotateCw, Sigma } from 'lucide-react';
+import { Ticket, Flag, MonitorPlay, Tv, Plus, RotateCw, Sigma, Clapperboard } from 'lucide-react';
 import {
   ErrorBox, TmdbCard, RadarrButton, Empty, Spinner, PageHeader, Select,
   useRadarrIds, useTypeFilters, TypeFilterBar, matchesTypeFilters, typeCounts,
@@ -10,14 +10,23 @@ import {
 import { toast } from '../toast.js';
 import { addBulkToRadarr } from '../radarr.js';
 import { t, locale } from '../i18n.js';
+import EstrenosDirectores from './EstrenosDirectores.jsx';
 
 const TABS = [
   ['cine-es', 'Cines · España', Ticket],
   ['cine-us', 'Cines · EE UU', Flag],
   ['plataformas-es', 'Plataformas y VOD · España', MonitorPlay],
   ['plataformas-us', 'Plataformas y VOD · EE UU', Tv],
+  // La quinta pestaña no es otra parrilla de carteles: es la MISMA cartelera
+  // española leída por quien firma, que es la pregunta con la que se decide ir
+  // al cine. Vive aparte porque no comparte ni datos ni filtros con las otras
+  // cuatro (ver EstrenosDirectores).
+  ['directores-es', 'Directores · España', Clapperboard],
 ];
 const TAB_KEYS = new Set(TABS.map(([key]) => key));
+// la pestaña de quién estrena no pasa por /api/releases: ni ventana, ni listón
+// Σ, ni tipos. Su carga y sus filtros son suyos.
+const esDirectores = (tab) => tab === 'directores-es';
 // las dos pestañas de plataformas traen el «dónde verla» de su región
 const esPlataformas = (tab) => tab.startsWith('plataformas-');
 
@@ -114,6 +123,25 @@ function EstrenoCard({ f, radarrIds, addRadarrId, onDismiss, conProviders }) {
 }
 
 /**
+ * La fila de pestañas. Vive fuera del cuerpo de la página porque las dos caras
+ * de Estrenos —las cuatro parrillas y la de directores— la comparten, y
+ * copiarla habría dejado dos filas que se separan a la primera de cambio.
+ */
+function Pestanas({ tab, setTab }) {
+  return (
+    <div className="flex gap-2 mb-4 flex-wrap">
+      {/* la clave de pestaña NO puede llamarse t: pisaría la función de
+          traducción importada y el {t(label)} de abajo reventaría la página */}
+      {TABS.map(([key, label, Icon]) => (
+        <button key={key} onClick={() => setTab(key)} className={`${tab === key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
+          <Icon size={15} strokeWidth={1.75} /> {t(label)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Estrenos: lo que llega a los cines y a las plataformas y VOD de España y de
  * EE UU, recién estrenado y venidero, con los filtros de la casa — el listón Σ
  * de MDBList sobre todo, que es lo que separa el estreno que importa del
@@ -166,6 +194,9 @@ export default function Estrenos() {
   // MDBList aún no tenía cuando se miró (ver `ponerNotas` en el servidor)
   const [notasBusy, setNotasBusy] = useState(false);
   const load = ({ refresh = false, notas = false } = {}) => {
+    // la pestaña de directores no es un `kind` de /api/releases: pedirlo
+    // devolvía un 502 «kind desconocido» nada más abrirla
+    if (esDirectores(tab)) return;
     const id = ++reqId.current;
     setError(null);
     if (notas) setNotasBusy(true);
@@ -237,6 +268,23 @@ export default function Estrenos() {
     </div>
   );
 
+  // Quién estrena en España: otra pregunta, otros datos y otros filtros. Sale
+  // antes de montar nada de las parrillas para no arrastrar aquí su ventana, su
+  // listón Σ ni su barra de tipos, que allí no significan nada.
+  if (esDirectores(tab)) {
+    return (
+      <div>
+        <PageHeader eyebrow={t('La caza')} title={t('Estrenos')} />
+        <p className="text-sm text-zinc-500 mb-4 max-w-3xl">
+          <b>{t('Directores que estrenan en España')}</b>
+          {t(', mes a mes: la misma cartelera española —cines y plataformas— leída por quien firma, con su obra anterior y por dónde ha pasado.')}
+        </p>
+        <Pestanas tab={tab} setTab={setTab} />
+        <EstrenosDirectores />
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader eyebrow={t('La caza')} title={t('Estrenos')} />
@@ -245,15 +293,7 @@ export default function Estrenos() {
         <b>{t('plataformas y VOD de España y de EE UU')}</b>{t(' (fecha digital de TMDB, con dónde verla en cada país). Solo largometraje. El listón Σ separa lo que importa del relleno, sin ocultar lo que aún no tiene nota.')}
       </p>
 
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {/* la clave de pestaña NO puede llamarse t: pisaría la función de
-            traducción importada y el {t(label)} de abajo reventaría la página */}
-        {TABS.map(([key, label, Icon]) => (
-          <button key={key} onClick={() => setTab(key)} className={`${tab === key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
-            <Icon size={15} strokeWidth={1.75} /> {t(label)}
-          </button>
-        ))}
-      </div>
+      <Pestanas tab={tab} setTab={setTab} />
 
       <div className="card p-3 mb-4 space-y-3">
         <div className="flex items-center gap-2 flex-wrap text-sm">

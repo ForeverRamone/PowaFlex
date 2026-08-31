@@ -6,6 +6,52 @@ Lo que ve quien usa la app está en `/novedades`, que es otro texto para otro p�
 Formato: un titular en negrita, secciones cortas y los hechos con sus cifras. La crónica de cómo
 se llegó a cada arreglo vive en el mensaje del commit, no aquí.
 
+## Beta 1.29 (1.0.29-beta) — 2026-08-31
+
+**Estrenos contesta también QUIÉN: 144 directores con estreno en España en los tres próximos meses, cada uno con su obra anterior y su palmarés.**
+
+### Directores que estrenan en España
+
+Quinta pestaña de Estrenos (`/estrenos?tab=directores-es`), servida por `/api/estrenan`. La misma
+cartelera española que ya conocía la casa —discover de TMDB con `region=ES`, tipo 3|2 para sala y
+tipo 4 para digital— pero dada la vuelta: en vez de una parrilla de carteles, **una ficha por quien
+firma**.
+
+Tres meses en pestañas separadas. Medido hoy: **54 directores en septiembre, 45 en octubre y 45 en
+noviembre** sobre 126 películas, 144 nombres distintos.
+
+Cada ficha trae el título que estrena con su fecha y su canal, sus **tres mejores anteriores**, su
+**palmarés** (hasta cuatro fuentes, las ganadas delante) y lo que la base ya sabe de esa persona:
+si la sigues, cuántas suyas tienes y si es su ópera prima. Diez lo son este trimestre.
+
+Filtros: canal (las dos a la vez o solo una), a quién (todos / solo favoritos / los que no sigues),
+**con palmarés** (21 de los 144), buscador por nombre —insensible a tildes: «inarritu» encuentra a
+Iñárritu— y cuatro órdenes. La ★ sigue y deja de seguir sin salir de la página.
+
+### Tres decisiones que se tomaron mirando los datos
+
+- **La ventana salta de mes cuando quedan menos de siete días.** Abrir la página el 31 de agosto
+  para que la primera pestaña sea «agosto» —un día, cero estrenos— no informa de nada.
+- **«Lo mejor» va por nota ponderada y con suelo de 50 votos.** Con la nota pelada, la mejor
+  película de casi cualquier director era un corto de doce votos con un 9,5.
+- **Una Σ de 0 no es un cero.** `score_average` de MDBList vale 0 cuando aún no la ha puntuado
+  nadie, y en una lista de estrenos eso son **81 de 145**. «Σ 0» junto a la película nueva de
+  Iñárritu dice lo contrario de lo que significa: sin nota es sin nota.
+
+### Rendimiento
+
+Construcción en frío **4,6 s** (327 peticiones a TMDB), 1 s con las fichas ya cacheadas; caché de
+doce horas. Barra de progreso con `{done,total}` real en las tres fases (descubrimiento, fichas,
+filmografías).
+
+Lo tuyo **no entra en la caché**: a quién sigues y cuántas suyas tienes se vuelve a mirar en cada
+respuesta, con dos consultas a la base. Con el favorito cacheado, darle a la ★ y recargar devolvía
+la estrella apagada durante medio día.
+
+Y solo los fallos del descubrimiento marcan la página como parcial: que a un director no se le haya
+podido leer la filmografía es un hueco en su ficha, no media lista, y contarlo como parcial obligaba
+a reconstruirlo todo cada veinte minutos por una persona.
+
 ## Beta 1.28 (1.0.28-beta) — 2026-08-28
 
 **Cinco usuarios adversariales recorriendo la app a la vez. Nueve ediciones de festival que se servían como error, «Nanette» quinta de Australia y la biblioteca entera en un JSON.**

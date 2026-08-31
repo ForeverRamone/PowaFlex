@@ -25,6 +25,18 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.29',
+    fecha: '2026-08-31',
+    titular: 'Quién estrena en España en los tres próximos meses',
+    puntos: [
+      'Estrenos tiene una pestaña nueva: quién estrena en España en los tres próximos meses, un mes por pestaña. Esta vez son 144 directores sobre 126 películas.',
+      'Cada ficha dice lo mismo que dirías tú al recomendar a alguien: qué estrena y cuándo, si va a los cines o a una plataforma, sus tres mejores anteriores y por dónde ha pasado —Cannes, los Óscar, los cánones—. Veintiuno de los 144 traen palmarés y diez estrenan su primera película.',
+      'Filtros: los dos canales a la vez o solo uno, todos o solo tus favoritos, solo quien tiene premios, buscador por nombre que no se pelea con las tildes («inarritu» encuentra a Iñárritu) y cuatro maneras de ordenar. La estrella de seguir funciona sin salir de la página.',
+      'También te dice lo tuyo: si ya le sigues, cuántas suyas tienes en tu Plex y si la que llega es su ópera prima.',
+      'Y una nota de 0 ya no se pinta como un cero: en MDBList ese 0 quiere decir que todavía no la ha puntuado nadie, y eso le pasa a más de la mitad de un mes de estrenos.',
+    ],
+  },
+  {
     label: 'Beta 1.28',
     fecha: '2026-08-28',
     titular: 'Nueve ediciones de festival que salían como error, y «Nanette» quinta de Australia',

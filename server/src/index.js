@@ -58,6 +58,7 @@ import {
   descartarEmergente, recuperarEmergente, CLAVES_PESO,
 } from './emergentes.js';
 import { releases } from './releases.js';
+import { directoresQueEstrenan } from './estrenan.js';
 import {
   mdbTest,
   syncRatings,
@@ -1950,6 +1951,17 @@ app.get('/api/releases', async (req, reply) => {
       // sin reconstruir la lista entera desde TMDB (que es lo caro)
       refrescarNotas: req.query.notas === '1',
     });
+  } catch (err) {
+    reply.code(502);
+    return { error: String(err.message || err) };
+  }
+});
+
+// quién estrena en España en los tres meses de la ventana, agrupado por
+// dirección: la pestaña «Directores» de Estrenos
+app.get('/api/estrenan', async (req, reply) => {
+  try {
+    return await directoresQueEstrenan({ refresh: req.query.refresh === '1' });
   } catch (err) {
     reply.code(502);
     return { error: String(err.message || err) };

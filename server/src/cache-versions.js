@@ -125,6 +125,9 @@ export const CACHE_VERSIONS = {
   releases: 2,
   // v1: el recorrido por años de cada país (una entrada por país, año y página)
   paises: 1,
+  // v1: quién estrena en España en los tres meses de la ventana, con su obra
+  // anterior y su palmarés (pestaña Directores de Estrenos)
+  estrenan: 1,
 };
 
 /** Prefijo con versión de una caché: `calendar:v8`, `discover_gaps:v10`… */

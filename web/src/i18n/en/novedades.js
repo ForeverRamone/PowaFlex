@@ -3,6 +3,20 @@
 // cabecera de la página vive en en/app.js, igual que el titular «Festivales y
 // premios» de la Alpha 0.9.5, que allí ya es nombre de página.
 export default {
+  // ── Beta 1.29 ──────────────────────────────────────────────
+  'Quién estrena en España en los tres próximos meses':
+    'Who is releasing in Spain over the next three months',
+  'Estrenos tiene una pestaña nueva: quién estrena en España en los tres próximos meses, un mes por pestaña. Esta vez son 144 directores sobre 126 películas.':
+    'New Releases has a new tab: who is releasing in Spain over the next three months, one tab per month. This time that is 144 directors across 126 films.',
+  'Cada ficha dice lo mismo que dirías tú al recomendar a alguien: qué estrena y cuándo, si va a los cines o a una plataforma, sus tres mejores anteriores y por dónde ha pasado —Cannes, los Óscar, los cánones—. Veintiuno de los 144 traen palmarés y diez estrenan su primera película.':
+    'Each card says what you would say when recommending someone: what they are releasing and when, whether it lands in theaters or on a platform, their three best earlier films and where they have been — Cannes, the Oscars, the canons. Twenty-one of the 144 come with awards and ten are releasing their first feature.',
+  'Filtros: los dos canales a la vez o solo uno, todos o solo tus favoritos, solo quien tiene premios, buscador por nombre que no se pelea con las tildes («inarritu» encuentra a Iñárritu) y cuatro maneras de ordenar. La estrella de seguir funciona sin salir de la página.':
+    'Filters: both channels at once or just one, everyone or only your favorites, only those with awards, a name search that does not fight accents (“inarritu” finds Iñárritu) and four ways to sort. The follow star works without leaving the page.',
+  'También te dice lo tuyo: si ya le sigues, cuántas suyas tienes en tu Plex y si la que llega es su ópera prima.':
+    'It also tells you your side of it: whether you already follow them, how many of theirs are in your Plex and whether the one coming is their first feature.',
+  'Y una nota de 0 ya no se pinta como un cero: en MDBList ese 0 quiere decir que todavía no la ha puntuado nadie, y eso le pasa a más de la mitad de un mes de estrenos.':
+    'And a score of 0 is no longer painted as a zero: on MDBList that 0 means nobody has rated it yet, and that happens to more than half of any month of releases.',
+
   // ── Beta 1.28 ──────────────────────────────────────────────
   'Nueve ediciones de festival que salían como error, y «Nanette» quinta de Australia':
     'Nine festival editions that came back as errors, and “Nanette” fifth in Australia',
