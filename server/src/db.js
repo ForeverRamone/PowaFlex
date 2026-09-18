@@ -968,3 +968,14 @@ export function cacheWrite(key, value) {
     setStmt.run('radarr_rules_migrated', '1');
   }
 }
+
+// Una Σ de 0 guardada de MDBList nunca fue una nota: es «todavía sin votos
+// suficientes» (ver `sigmaDeMdblist` en mdblist.js). Se guardaba tal cual, se
+// pintaba como «Σ 0» y, al no ser NULL, no se volvía a pedir jamás. En la base
+// de producción eran 62.954 filas de 133.100. Pasan a NULL una sola vez; a
+// partir de ahí las reglas las vuelven a pedir cada tres días y el barrido
+// semanal las recoge cuando MDBList las calcule.
+if (!getStmt.get('mdb_score_cero_migrado')) {
+  db.prepare('UPDATE mdb_ratings SET score = NULL WHERE score = 0').run();
+  setStmt.run('mdb_score_cero_migrado', '1');
+}

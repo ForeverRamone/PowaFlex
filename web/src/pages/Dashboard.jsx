@@ -223,7 +223,7 @@ export default function Dashboard() {
                       {p.has_file ? '✓' : '⏳'}
                     </span>
                     <span className="text-zinc-200 truncate flex-1">{p.title}</span>
-                    {p.score != null && <span className="text-[11px] text-gold-400 shrink-0 tabular">Σ {p.score}</span>}
+                    {p.score > 0 && <span className="text-[11px] text-gold-400 shrink-0 tabular">Σ {p.score}</span>}
                     <span className="text-[11px] text-zinc-500 shrink-0 tabular">{fmtDate(p.at)}</span>
                   </div>
                 ))}

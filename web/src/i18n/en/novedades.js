@@ -3,6 +3,17 @@
 // cabecera de la página vive en en/app.js, igual que el titular «Festivales y
 // premios» de la Alpha 0.9.5, que allí ya es nombre de página.
 export default {
+  // ── Beta 1.32 ──────────────────────────────────────────────
+  'Un cero de MDBList ya no es una nota, y las reglas pueden pedir las que faltan':
+    'A zero from MDBList is no longer a score, and rules can fetch the missing ones',
+  'MDBList manda un 0 cuando todavía no tiene votos suficientes para calcular la nota, y la aplicación lo guardaba como si la película fuera un cero. Casi la mitad de las notas guardadas eran así y no se volvían a preguntar. Ahora ese 0 es «sin nota» y se vuelve a pedir hasta que exista.':
+    'MDBList sends a 0 when it does not yet have enough votes to compute a score, and the app stored it as if the film were a zero. Almost half of the stored scores were like that and were never asked for again. That 0 is now “no score” and gets requested again until one exists.',
+  'Cuando no hay nota combinada, la previsualización de cada regla enseña lo que MDBList sí sabe: la de IMDb, la de Letterboxd o la de Rotten Tomatoes.':
+    'When there is no combined score, each rule’s preview shows what MDBList does know: the IMDb, Letterboxd or Rotten Tomatoes rating.',
+  'Cada regla tiene un botón «Pedir notas a MDBList», y hay otro para todas a la vez: pide ahora mismo las que faltan y previsualiza la regla con ellas.':
+    'Every rule has a “Fetch scores from MDBList” button, and there is another for all of them at once: it requests the missing ones right now and previews the rule with them.',
+  'Las reglas sin umbral también refrescan sus notas en cada pasada. Antes solo lo hacían las que tenían nota mínima.':
+    'Rules without a threshold also refresh their scores on every run. Before, only the ones with a minimum score did.',
   // ── Beta 1.31 ──────────────────────────────────────────────
   'Cada regla automática enseña lo que ha mandado a Radarr':
     'Every automatic rule now shows what it has sent to Radarr',

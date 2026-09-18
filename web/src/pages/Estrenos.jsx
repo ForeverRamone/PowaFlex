@@ -86,7 +86,7 @@ function EstrenoCard({ f, radarrIds, addRadarrId, onDismiss, conProviders }) {
   return (
     <TmdbCard item={f}>
       <div className="text-[11px] text-zinc-500">{fmtFecha(f.date)}</div>
-      {f.mdb?.score != null && (
+      {f.mdb?.score > 0 && (
         <div className="text-[11px] text-gold-400">
           Σ {f.mdb.score}{f.mdb.imdb != null ? ` · IMDb ${Number(f.mdb.imdb).toFixed(1)}` : ''}
         </div>

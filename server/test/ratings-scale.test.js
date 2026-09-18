@@ -53,3 +53,16 @@ test('la discrepancia con la comunidad compara dos escalas 0–10', () => {
   // …y la que casa con la comunidad NO sale (antes el ×2 la colaba siempre)
   assert.equal(letterboxdDivergence.some((r) => r.rating_key === 1), false);
 });
+
+// Una Σ de 0 de MDBList no es un cero: es «sin votos suficientes todavía».
+// Medido contra su API: «A Bit of Light» llega con score 0 y score_average 50,
+// y una película con doce votos en IMDb llega con los dos a 0 pese a un 7,4.
+test('la Σ de MDBList: el 0 es «sin nota», y la media manda sobre la ponderada', async () => {
+  const { sigmaDeMdblist } = await import('../src/mdblist.js');
+  assert.equal(sigmaDeMdblist({ score: 0, score_average: 0 }), null, 'los dos a 0: sin nota');
+  assert.equal(sigmaDeMdblist({ score: 0, score_average: 50 }), 50, 'la media sí existe aunque la ponderada no');
+  assert.equal(sigmaDeMdblist({ score: 49, score_average: 56 }), 56);
+  assert.equal(sigmaDeMdblist({ score: 49 }), 49, 'sin media, la ponderada');
+  assert.equal(sigmaDeMdblist({}), null);
+  assert.equal(sigmaDeMdblist(null), null);
+});

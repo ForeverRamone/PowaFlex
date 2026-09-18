@@ -25,6 +25,17 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.32',
+    fecha: '2026-09-18',
+    titular: 'Un cero de MDBList ya no es una nota, y las reglas pueden pedir las que faltan',
+    puntos: [
+      'MDBList manda un 0 cuando todavía no tiene votos suficientes para calcular la nota, y la aplicación lo guardaba como si la película fuera un cero. Casi la mitad de las notas guardadas eran así y no se volvían a preguntar. Ahora ese 0 es «sin nota» y se vuelve a pedir hasta que exista.',
+      'Cuando no hay nota combinada, la previsualización de cada regla enseña lo que MDBList sí sabe: la de IMDb, la de Letterboxd o la de Rotten Tomatoes.',
+      'Cada regla tiene un botón «Pedir notas a MDBList», y hay otro para todas a la vez: pide ahora mismo las que faltan y previsualiza la regla con ellas.',
+      'Las reglas sin umbral también refrescan sus notas en cada pasada. Antes solo lo hacían las que tenían nota mínima.',
+    ],
+  },
+  {
     label: 'Beta 1.31',
     fecha: '2026-09-18',
     titular: 'Cada regla automática enseña lo que ha mandado a Radarr',

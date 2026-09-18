@@ -150,7 +150,7 @@ function Enviadas({ filas, max, onVetar }) {
       <span className="truncate min-w-0" title={f.title}>
         {f.title}
         {f.person ? ` · ${f.person}` : ''}
-        {f.score != null ? ` · Σ ${f.score}` : ''}
+        {f.score > 0 ? ` · Σ ${f.score}` : ''}
       </span>
       {f.tmdb_id && (
         <button
@@ -190,7 +190,7 @@ function Enviadas({ filas, max, onVetar }) {
   );
 }
 
-function ReglaCard({ regla, catalog, onPatch, onDelete, onRun, onVetar, corriendo, parte, enviadasMax }) {
+function ReglaCard({ regla, catalog, onPatch, onDelete, onRun, onVetar, onNotas, mdblist, corriendo, parte, enviadasMax }) {
   const [umbral, setUmbral] = useState(regla.min_score);
   useEffect(() => { setUmbral(regla.min_score); }, [regla.min_score]);
   const nombre = etiqueta(regla, catalog);
@@ -326,6 +326,14 @@ function ReglaCard({ regla, catalog, onPatch, onDelete, onRun, onVetar, corriend
           </button>
           <button className="btn-ghost !py-1 text-xs" disabled={corriendo} onClick={() => onRun(regla.id, false)}>
             {t('Ejecutar ahora')}
+          </button>
+          <button
+            className="btn-ghost !py-1 text-xs"
+            disabled={corriendo || !mdblist}
+            title={mdblist ? t('Pide ahora a MDBList la nota de las candidatas que aún no la tienen') : t('Sin clave de MDBList no hay nota Σ')}
+            onClick={() => onNotas(regla.id)}
+          >
+            {t('Pedir notas a MDBList')}
           </button>
           {regla.last_run_at > 0 && (
             <span className="text-[11px] text-zinc-500">
@@ -521,7 +529,7 @@ function FilaPendiente({ p, onAprobar, onRechazar }) {
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="text-zinc-200 truncate">{p.title || `TMDB ${p.tmdb_id}`}</span>
           {p.year && <span className="text-zinc-500">{p.year}</span>}
-          {p.score != null && <span className="text-gold-400 tabular">Σ {p.score}</span>}
+          {p.score > 0 && <span className="text-gold-400 tabular">Σ {p.score}</span>}
         </div>
         <div className="text-zinc-500 truncate">
           {motivoLegible(p)}
@@ -906,6 +914,29 @@ export default function RadarrRulesSection() {
     }, 1500);
   };
 
+  /**
+   * Pedir a MDBList ahora las notas que faltan. Se sirve dentro de la
+   * petición (una o dos llamadas por regla) y al volver se previsualiza la
+   * regla, que es donde se ve si llegaron.
+   */
+  const pedirNotas = async (ruleId) => {
+    setCorriendo(true);
+    const r = await api(ruleId != null ? `/radarr/rules/${ruleId}/notas` : '/radarr/rules/notas', { method: 'POST' });
+    setCorriendo(false);
+    if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
+    const partes = ruleId != null ? [r] : r.reglas || [];
+    const nuevas = partes.reduce((n, p) => n + (p.nuevas || 0), 0);
+    const pedidas = partes.reduce((n, p) => n + (p.pedidas || 0), 0);
+    const motivo = partes.map((p) => p.motivo || p.error).find(Boolean);
+    toast(
+      pedidas === 0 && !motivo
+        ? t('Nada que pedir: todas las candidatas tienen ya su nota, o MDBList aún no la calcula')
+        : t('{n} notas nuevas de {p} pedidas', { n: nuevas, p: pedidas }) + (motivo ? ` · ${t(motivo)}` : ''),
+      motivo ? 'error' : undefined
+    );
+    ejecutar(ruleId, true);
+  };
+
   const guardarCriterios = async (campos) => {
     const r = await api('/settings', { method: 'PUT', body: campos });
     if (r?.error) return toast(`⚠️ ${t(r.error)}`, 'error');
@@ -978,6 +1009,14 @@ export default function RadarrRulesSection() {
             <button className="btn-ghost !py-1 text-xs" disabled={corriendo || !activas} onClick={() => ejecutar(null, true)}>
               {t('Previsualizar todas')}
             </button>
+            <button
+              className="btn-ghost !py-1 text-xs"
+              disabled={corriendo || !activas || data.mdblistConfigurado === false}
+              title={t('Pide ahora a MDBList la nota de las candidatas que aún no la tienen')}
+              onClick={() => pedirNotas(null)}
+            >
+              {t('Pedir notas a MDBList')}
+            </button>
             {/* un clic puede mandar cientos de películas a Radarr (una regla de
                 palmarés sin tope son 300), así que pide dos toques */}
             <BotonConfirmar
@@ -1047,6 +1086,8 @@ export default function RadarrRulesSection() {
                   onDelete={borrar}
                   onRun={ejecutar}
                   onVetar={vetar}
+                  onNotas={pedirNotas}
+                  mdblist={data.mdblistConfigurado !== false}
                   corriendo={corriendo}
                   parte={parteDe(r.id)}
                   enviadasMax={data.enviadasMax || 50}
@@ -1084,7 +1125,7 @@ export default function RadarrRulesSection() {
                 </span>
                 <span className="truncate">
                   {l.title || l.detail}
-                  {l.title && l.score != null ? ` · Σ ${l.score}` : ''}
+                  {l.title && l.score > 0 ? ` · Σ ${l.score}` : ''}
                 </span>
                 {l.action === 'added' && l.tmdb_id && (
                   <button

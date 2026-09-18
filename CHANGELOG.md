@@ -6,6 +6,45 @@ Lo que ve quien usa la app está en `/novedades`, que es otro texto para otro p�
 Formato: un titular en negrita, secciones cortas y los hechos con sus cifras. La crónica de cómo
 se llegó a cada arreglo vive en el mensaje del commit, no aquí.
 
+## Beta 1.32 (1.0.32-beta) — 2026-09-18
+
+**Una Σ de 0 de MDBList nunca fue una nota, y la aplicación la guardaba como si lo fuera: 62.954 películas con un cero que no se volvía a preguntar.**
+
+### El 0 que no era un cero
+
+MDBList manda `score` (su nota ponderada) y `score_average` (la media simple de las
+fuentes), y los dos valen 0 mientras no tiene votos suficientes para calcularlos. Medido contra
+su API: «A Bit of Light» llega con `score` 0 y `score_average` 50, con IMDb 6,0 sobre 367 votos
+y Letterboxd 3,1 sobre 221; una película con doce votos en IMDb llega con los dos a 0 pese a un
+7,4. La aplicación guardaba ese 0 como nota. Dos consecuencias: la tarjeta pintaba «Σ 0», y
+como 0 no es NULL la nota no se volvía a pedir nunca. En la base de producción: **62.954 filas
+de 133.100, casi la mitad**.
+
+`sigmaDeMdblist` guarda ahora el 0 como «sin nota» y usa la media simple cuando existe aunque
+la ponderada sea 0. Una migración pasa a NULL las filas heredadas, una sola vez al arrancar.
+Descubrir, Estrenos, el Dashboard y las listas de Radarr ya no pintan un Σ 0 aunque venga de
+una caché anterior.
+
+### Las reglas vuelven a preguntar, también sin umbral
+
+La pasada solo refrescaba notas en las reglas con umbral: una regla «sin filtro» enseñaba
+«Σ 0» en todas sus candidatas y no preguntaba nunca. Ahora refresca en todas, con el mismo
+ritmo de tres días para lo que sigue sin Σ. Y la línea de cada candidata enseña lo que MDBList
+sí sabe cuando no hay Σ («Bunker · sin Σ · IMDb 6.7»): «sin nota» queda solo para las que no
+tienen nada.
+
+### Botón «Pedir notas a MDBList»
+
+En cada regla y uno global junto a «Previsualizar todas». Pide ahora las candidatas sin Σ, se
+hayan mirado cuando se hayan mirado, avisa con «N notas nuevas de P pedidas» y previsualiza la
+regla. Medido con Venecia 2025: 42 candidatas, 21 sin Σ, una petición, 8 con Σ al volver; las
+13 restantes son las que MDBList aún no calcula y salen con su IMDb. Cannes 2025: 3 sin Σ,
+2 recuperadas.
+
+### Tests
+
+468 en verde: uno nuevo para `sigmaDeMdblist` y otro para la migración y las líneas sin Σ.
+
 ## Beta 1.31 (1.0.31-beta) — 2026-09-18
 
 **Cada regla automática enseña, en su propia tarjeta, lo que ha mandado a Radarr.**

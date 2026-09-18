@@ -202,6 +202,29 @@ ON CONFLICT(tmdb_id) DO UPDATE SET imdb=excluded.imdb, imdb_votes=excluded.imdb_
   letterboxd=excluded.letterboxd, lb_votes=excluded.lb_votes, trakt=excluded.trakt, score=excluded.score,
   json=excluded.json, fetched_at=excluded.fetched_at`);
 
+/**
+ * LA Σ DE MDBLIST, Y POR QUÉ UN 0 NO ES UN CERO.
+ *
+ * MDBList manda dos números: `score` (su nota ponderada) y `score_average` (la
+ * media simple de las fuentes). Los dos valen 0 mientras no tienen votos
+ * suficientes para calcularlos — no porque la película sea un cero. Medido
+ * contra su API: «A Bit of Light» (Venecia 2022) llega con score 0 y
+ * score_average 50, con IMDb 6,0 sobre 367 votos y Letterboxd 3,1 sobre 221;
+ * y una película con doce votos en IMDb llega con los dos a 0 aunque tenga
+ * un 7,4. Guardar ese 0 como nota tenía dos consecuencias: la tarjeta pintaba
+ * «Σ 0» y, como 0 no es NULL, la nota no se volvía a pedir nunca — en la base
+ * de producción había 62.954 filas así, casi la mitad.
+ *
+ * Aquí un 0 pasa a ser «sin nota todavía»: se pinta como ausente, y las
+ * reglas la vuelven a pedir cada tres días hasta que MDBList la calcule.
+ */
+export function sigmaDeMdblist(item) {
+  const media = Number(item?.score_average);
+  if (media > 0) return media;
+  const nota = Number(item?.score);
+  return nota > 0 ? nota : null;
+}
+
 function parseItem(item) {
   const tmdbId = item?.ids?.tmdb ?? item?.tmdbid ?? item?.id;
   if (!tmdbId) return null;
@@ -224,7 +247,7 @@ function parseItem(item) {
     // TMDB apenas vota nadie), usada por el umbral de ruido de Descubrir
     lb_votes: src.letterboxd?.votes ?? null,
     trakt: val('trakt'),
-    score: item.score_average ?? item.score ?? null,
+    score: sigmaDeMdblist(item),
     json: JSON.stringify(item.ratings || []),
     fetched_at: Date.now(),
   };

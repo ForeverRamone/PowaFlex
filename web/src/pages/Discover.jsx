@@ -53,7 +53,7 @@ function GapCard({ f, radarrIds, addRadarrId, onDismiss, person, avales }) {
           {person.name}
         </Link>
       )}
-      {f.mdb?.score != null && (
+      {f.mdb?.score > 0 && (
         <div className="text-[11px] text-gold-400">
           Σ {f.mdb.score}{f.mdb.imdb != null ? ` · IMDb ${Number(f.mdb.imdb).toFixed(1)}` : ''}
         </div>

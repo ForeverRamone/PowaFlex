@@ -89,6 +89,7 @@ import {
   runAutoRadarr, runRadarrRules, rulesStatus, rulesOverview, rulesLog,
   createRule, updateRule, deleteRule, getRule,
   aprobarPendiente, rechazarPendiente, resolverTodasLasPendientes, cuantasPendientes, enviosDeFavoritos,
+  pedirNotasDeRegla, pedirNotasDeTodas,
 } from './rules.js';
 import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
 import { avalesDe, conteoAvales, indiceAvales, avalesDeFilmografia } from './avales.js';
@@ -2255,6 +2256,26 @@ app.post('/api/radarr/rules/run', async (req, reply) => {
   }
   runRadarrRules({ dryRun: !!req.body?.dryRun, ruleId }).catch(() => {});
   return { started: true, status: rulesStatus };
+});
+
+// Pedir AHORA a MDBList las notas que faltan a las candidatas de una regla
+// (o de todas las activas). Se sirve dentro de la petición: son una o dos
+// llamadas por regla, no un palmarés entero contra Radarr.
+app.post('/api/radarr/rules/notas', async (req, reply) => {
+  try {
+    return { reglas: await pedirNotasDeTodas() };
+  } catch (err) {
+    reply.code(409);
+    return { error: String(err.message || err) };
+  }
+});
+app.post('/api/radarr/rules/:id/notas', async (req, reply) => {
+  try {
+    return await pedirNotasDeRegla(req.params.id);
+  } catch (err) {
+    reply.code(/desconocida/.test(String(err.message)) ? 404 : 502);
+    return { error: String(err.message || err) };
+  }
 });
 
 // --- cuarentena pre-Radarr ----------------------------------------------------

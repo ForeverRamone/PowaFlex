@@ -421,6 +421,23 @@ export const MOTIVOS = {
 };
 
 const scoreDe = (i) => (i?.mdb?.score == null ? null : Number(i.mdb.score));
+
+/**
+ * La nota en una línea de la pasada. Con Σ, la Σ. Sin ella, lo que MDBList SÍ
+ * sabe —IMDb, Letterboxd, RT— para que «sin Σ» no se lea como «sin datos»:
+ * una película de festival tiene cientos de votos en IMDb semanas antes de
+ * que MDBList calcule su media. Y sin nada, «sin nota».
+ */
+export function notaTexto(item) {
+  const s = scoreDe(item);
+  if (s != null) return `Σ ${s}`;
+  const m = item?.mdb || {};
+  const partes = [];
+  if (m.imdb != null) partes.push(`IMDb ${Number(m.imdb).toFixed(1)}`);
+  if (m.letterboxd != null) partes.push(`LB ${Number(m.letterboxd).toFixed(1)}`);
+  if (m.rt_critic != null) partes.push(`RT ${Math.round(Number(m.rt_critic))}%`);
+  return partes.length ? `sin Σ · ${partes.join(' · ')}` : 'sin nota';
+}
 const fechaDe = (i) => i.date || (i.year ? `${i.year}-01-01` : null);
 
 /** Días entre dos fechas ISO (positivo = la primera es posterior). */
@@ -738,9 +755,12 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
         // se REFRESCAN: enrichWithScores solo pide lo que no tiene fila, así
         // que una película vista sin Σ la primera noche se quedaba «esperando
         // nota» para siempre y la reevaluación nocturna era una promesa falsa.
-        if (rule.min_score > 0) {
+        // También sin umbral: la Σ ordena quién entra hoy cuando hay tope, y
+        // una regla «sin filtro» que enseñaba «Σ 0» en todas sus candidatas
+        // no volvía a preguntar nunca, porque solo se refrescaba con umbral.
+        {
           const notas = await refrescarNotasDeReglas(items, { maxFetch: 200 });
-          if (notas.motivo) {
+          if (notas.motivo && (rule.min_score > 0 || notas.motivo === 'sin_presupuesto')) {
             const texto = MOTIVO_NOTAS[notas.motivo] || notas.motivo;
             parte.log.push(`⚠️ ${texto}`);
             if (notas.motivo === 'sin_api_key' || notas.motivo === 'sin_presupuesto') rulesStatus.aviso = texto;
@@ -778,7 +798,7 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
         for (const item of elegidas) {
           const score = scoreDe(item);
           if (dryRun) {
-            parte.log.push(`(simulado) ${item.title}${score != null ? ` · Σ ${score}` : ''}`);
+            parte.log.push(`(simulado) ${item.title} · ${notaTexto(item)}`);
             continue;
           }
           try {
@@ -786,7 +806,7 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
             owned.add(item.tmdb_id); // que otra regla no la reintente en la misma pasada
             parte.added++;
             rulesStatus.added++;
-            parte.log.push(`✓ ${item.title}${score != null ? ` · Σ ${score}` : ''}`);
+            parte.log.push(`✓ ${item.title} · ${notaTexto(item)}`);
             // `item.person` solo lo traen las candidatas del pase de favoritos:
             // es la persona por la que esta película entró
             log.run(rule.id, Date.now(), item.tmdb_id, item.title, score, 'added', ruleLabel(rule), item.person || null);
@@ -991,4 +1011,57 @@ export function rulesOverview() {
     // ejecutándola y leyendo el aviso de la pasada — es decir, después.
     mdblistConfigurado: hayClaveMdblist(),
   };
+}
+
+// --- pedir notas a MDBList a mano ---------------------------------------------
+
+let notasEnCurso = false;
+
+/**
+ * EL BOTÓN «PEDIR NOTAS A MDBLIST».
+ *
+ * La pasada nocturna vuelve a pedir las candidatas sin Σ cada tres días, que
+ * está bien para una regla que corre sola y mal para quien acaba de ver «sin
+ * nota» en media previsualización y quiere saber si es que MDBList aún no la
+ * tiene o es que no se le ha preguntado. Aquí se pregunta AHORA por todas las
+ * candidatas de la regla que sigan sin Σ, se hayan mirado cuando se hayan
+ * mirado (`caducaMs: 0`). Lo que MDBList siga sin calcular seguirá sin Σ: no
+ * se inventa una media con doce votos.
+ *
+ * Cuesta una petición por cada cien títulos sin nota, y se contabiliza igual
+ * que todo lo demás contra el cupo del día.
+ */
+export async function pedirNotasDeRegla(ruleId) {
+  const rule = getRule(ruleId);
+  if (!rule) throw new Error('Regla desconocida');
+  if (rule.invalid) throw new Error(rule.invalid);
+  const { items } = await candidatasDeRegla(rule);
+  const antes = (await enrichWithScores(items, { fetchMissing: false })).filter((i) => scoreDe(i) != null).length;
+  const r = await refrescarNotasDeReglas(items, { maxFetch: 1000, caducaMs: 0 });
+  const despues = (await enrichWithScores(items, { fetchMissing: false })).filter((i) => scoreDe(i) != null).length;
+  return {
+    id: rule.id, label: rule.label, candidatas: items.length,
+    pedidas: r.pedidas, recibidas: r.recibidas, pendientes: r.pendientes,
+    conNota: despues, nuevas: Math.max(0, despues - antes),
+    motivo: r.motivo ? (MOTIVO_NOTAS[r.motivo] || r.motivo) : null,
+  };
+}
+
+/** Lo mismo para todas las reglas activas, una detrás de otra. */
+export async function pedirNotasDeTodas() {
+  if (notasEnCurso) throw new Error('Ya se están pidiendo notas');
+  notasEnCurso = true;
+  try {
+    const out = [];
+    for (const r of listRules().filter((x) => x.enabled && !x.invalid)) {
+      try {
+        out.push(await pedirNotasDeRegla(r.id));
+      } catch (err) {
+        out.push({ id: r.id, label: r.label, error: String(err.message || err) });
+      }
+    }
+    return out;
+  } finally {
+    notasEnCurso = false;
+  }
 }
