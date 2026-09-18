@@ -25,6 +25,16 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.31',
+    fecha: '2026-09-18',
+    titular: 'Cada regla automática enseña lo que ha mandado a Radarr',
+    puntos: [
+      'Cada regla de Automatismos enseña ahora, a la derecha de su tarjeta, las últimas películas que ha mandado a Radarr: cuándo, cuál y con qué nota. En las de favoritos, también por quién entró.',
+      'Se ven las diez más recientes y el resto tras un desplegable. Cada regla guarda sus cincuenta últimas sin caducar por fecha: una regla de festival puede pasarse meses sin mandar nada y no por eso se le borra la lista.',
+      'El 🚫 de vetar está también ahí, línea a línea: si una regla mandó algo que no querías, se corta desde la misma regla que lo mandó.',
+    ],
+  },
+  {
     label: 'Beta 1.30',
     fecha: '2026-08-31',
     titular: 'Cinco cánones nuevos de FilmAffinity, siete países más y una ficha que llevaba años siendo la que no era',

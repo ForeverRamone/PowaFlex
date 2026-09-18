@@ -33,7 +33,7 @@
  *  - **Borrar de Radarr NO basta**: con reevaluación nocturna vuelve mañana.
  *    Para decir «esta no», el 🚫 (auto_radarr_vetoed) o el ✕ de Descubrir.
  */
-import { db, getSetting } from './db.js';
+import { db, getSetting, podarLogReglas, ENVIADAS_POR_REGLA } from './db.js';
 import { today } from './dates.js';
 import { REGISTRY, festivalEdition, festivalWinners } from './festivals.js';
 import { RELEASE_KINDS, releases } from './releases.js';
@@ -273,11 +273,42 @@ export function deleteRule(id) {
   return { deleted: r.changes };
 }
 
+/**
+ * El historial cronológico, acotado a 30 días: las altas ya no se podan por
+ * fecha (ver `podarLogReglas`), y sin el corte el rótulo «30 días» mentiría.
+ */
 export function rulesLog({ ruleId = null, limit = 200 } = {}) {
   const lim = entero(limit, 1, 1000, 200);
+  const desde = Date.now() - 30 * DAY;
   return ruleId
-    ? db.prepare('SELECT * FROM radarr_rule_log WHERE rule_id = ? ORDER BY at DESC, id DESC LIMIT ?').all(Number(ruleId), lim)
-    : db.prepare('SELECT * FROM radarr_rule_log ORDER BY at DESC, id DESC LIMIT ?').all(lim);
+    ? db.prepare('SELECT * FROM radarr_rule_log WHERE rule_id = ? AND at >= ? ORDER BY at DESC, id DESC LIMIT ?').all(Number(ruleId), desde, lim)
+    : db.prepare('SELECT * FROM radarr_rule_log WHERE at >= ? ORDER BY at DESC, id DESC LIMIT ?').all(desde, lim);
+}
+
+/**
+ * LO QUE CADA REGLA HA MANDADO A RADARR, para la tarjeta de cada una.
+ *
+ * Devuelve un Map rule_id → filas, de la más reciente a la más antigua, con el
+ * tope que conserva la poda. Aquí entran también las aprobadas desde la
+ * cuarentena: quedaron registradas bajo la regla que las propuso y se enseñan
+ * sin distinguirlas, que fue la decisión de producto.
+ */
+export function enviadasPorRegla() {
+  const filas = db
+    .prepare(
+      `SELECT rule_id, tmdb_id, title, score, at, person FROM (
+         SELECT rule_id, tmdb_id, title, score, at, person,
+                ROW_NUMBER() OVER (PARTITION BY rule_id ORDER BY at DESC, id DESC) AS n
+         FROM radarr_rule_log WHERE action = 'added'
+       ) WHERE n <= ? ORDER BY at DESC`
+    )
+    .all(ENVIADAS_POR_REGLA);
+  const por = new Map();
+  for (const f of filas) {
+    if (!por.has(f.rule_id)) por.set(f.rule_id, []);
+    por.get(f.rule_id).push(f);
+  }
+  return por;
 }
 
 /**
@@ -793,9 +824,7 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
       parte.log = parte.log.slice(0, 60);
     }
 
-    if (!dryRun) {
-      db.prepare('DELETE FROM radarr_rule_log WHERE at < ?').run(Date.now() - 30 * DAY);
-    }
+    if (!dryRun) podarLogReglas();
   } catch (err) {
     rulesStatus.error = String(err.message || err);
   } finally {
@@ -948,8 +977,10 @@ export function rulesOverview() {
   // se purga también al abrir la página, no solo de noche: si acabas de meter
   // una a mano en Radarr, pedirte permiso para bajarla se lee como una avería
   purgarPendientes();
+  const enviadas = enviadasPorRegla();
   return {
-    rules: listRules(),
+    rules: listRules().map((r) => ({ ...r, enviadas: enviadas.get(r.id) || [] })),
+    enviadasMax: ENVIADAS_POR_REGLA,
     catalog: rulesCatalog(),
     status: rulesStatus,
     criterios: criteriosCuarentena(),

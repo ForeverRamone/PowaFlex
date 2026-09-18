@@ -3,6 +3,15 @@
 // cabecera de la página vive en en/app.js, igual que el titular «Festivales y
 // premios» de la Alpha 0.9.5, que allí ya es nombre de página.
 export default {
+  // ── Beta 1.31 ──────────────────────────────────────────────
+  'Cada regla automática enseña lo que ha mandado a Radarr':
+    'Every automatic rule now shows what it has sent to Radarr',
+  'Cada regla de Automatismos enseña ahora, a la derecha de su tarjeta, las últimas películas que ha mandado a Radarr: cuándo, cuál y con qué nota. En las de favoritos, también por quién entró.':
+    'Every rule in Automations now shows, to the right of its card, the latest films it has sent to Radarr: when, which one and with what score. In the favourites rules, also who it came in for.',
+  'Se ven las diez más recientes y el resto tras un desplegable. Cada regla guarda sus cincuenta últimas sin caducar por fecha: una regla de festival puede pasarse meses sin mandar nada y no por eso se le borra la lista.':
+    'The ten most recent are in view and the rest sit behind a toggle. Each rule keeps its last fifty with no expiry date: a festival rule can go months without sending anything, and its list is not wiped for that.',
+  'El 🚫 de vetar está también ahí, línea a línea: si una regla mandó algo que no querías, se corta desde la misma regla que lo mandó.':
+    'The 🚫 veto is there too, line by line: if a rule sent something you did not want, you cut it off from the very rule that sent it.',
   // ── Beta 1.30 ──────────────────────────────────────────────
   'Cinco cánones nuevos de FilmAffinity, siete países más y una ficha que llevaba años siendo la que no era':
     'Five new FilmAffinity canons, seven more countries and a record that had long been the wrong film',

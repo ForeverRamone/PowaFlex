@@ -61,12 +61,14 @@ test('poda los avisos viejos del Dashboard y el log de reglas', () => {
   );
   ins.run('viejo', 'De hace un año', Date.now() - 300 * DIA);
   ins.run('nuevo', 'De esta semana', Date.now() - 2 * DIA);
-  db.prepare(
-    'INSERT INTO radarr_rule_log (rule_id, at, tmdb_id, title, score, action, detail) VALUES (1, ?, 1, ?, null, ?, null)'
-  ).run(Date.now() - 60 * DIA, 'vieja', 'added');
-  db.prepare(
-    'INSERT INTO radarr_rule_log (rule_id, at, tmdb_id, title, score, action, detail) VALUES (1, ?, 2, ?, null, ?, null)'
-  ).run(Date.now() - 2 * DIA, 'reciente', 'added');
+  // un alta vieja SE QUEDA (el historial por regla se conserva por cantidad,
+  // no por fecha); un descarte viejo es ruido y se va a los 30 días
+  const log = db.prepare(
+    'INSERT INTO radarr_rule_log (rule_id, at, tmdb_id, title, score, action, detail) VALUES (1, ?, ?, ?, null, ?, null)'
+  );
+  log.run(Date.now() - 60 * DIA, 1, 'alta vieja', 'added');
+  log.run(Date.now() - 60 * DIA, null, null, 'skipped');
+  log.run(Date.now() - 2 * DIA, 2, 'reciente', 'added');
 
   const r = podarCaches();
   assert.equal(r.eventos, 1);
@@ -74,7 +76,10 @@ test('poda los avisos viejos del Dashboard y el log de reglas', () => {
   assert.equal(db.prepare('SELECT COUNT(*) n FROM app_events').get().n, 1);
   // el log de reglas se poda DENTRO de la pasada de Radarr, pero solo si hay
   // reglas activas: al apagarlas todas, lo último se quedaba ahí para siempre
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM radarr_rule_log').get().n, 1);
+  assert.deepEqual(
+    db.prepare('SELECT action FROM radarr_rule_log ORDER BY at').all().map((l) => l.action),
+    ['added', 'added']
+  );
 });
 
 test('una base sin nada que podar no miente diciendo que podó', () => {

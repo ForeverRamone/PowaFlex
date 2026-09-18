@@ -132,7 +132,65 @@ function etiqueta(regla, catalog) {
   return regla.label;
 }
 
-function ReglaCard({ regla, catalog, onPatch, onDelete, onRun, corriendo, parte }) {
+/** Cuántas enviadas se ven de entrada en la tarjeta; el resto, tras el desplegable. */
+const ENVIADAS_A_LA_VISTA = 10;
+
+/**
+ * Lo que esta regla ha mandado a Radarr, de la más reciente a la más antigua.
+ * Es un registro de envíos, no del estado en Radarr: que esté descargada o que
+ * la hayas quitado después no se mira aquí. Se enseña también con la regla
+ * apagada, que el historial es suyo y no depende de que siga activa.
+ */
+function Enviadas({ filas, max, onVetar }) {
+  const visibles = filas.slice(0, ENVIADAS_A_LA_VISTA);
+  const resto = filas.slice(ENVIADAS_A_LA_VISTA);
+  const linea = (f, i) => (
+    <div key={`${f.tmdb_id}-${f.at}-${i}`} className="flex items-baseline gap-2">
+      <span className="text-zinc-600 shrink-0 tabular-nums">{new Date(f.at).toLocaleDateString(locale())}</span>
+      <span className="truncate min-w-0" title={f.title}>
+        {f.title}
+        {f.person ? ` · ${f.person}` : ''}
+        {f.score != null ? ` · Σ ${f.score}` : ''}
+      </span>
+      {f.tmdb_id && (
+        <button
+          className="shrink-0 ml-auto hover:text-red-400"
+          title={t('Que ninguna regla la vuelva a mandar')}
+          onClick={() => onVetar(f.tmdb_id, f.title)}
+        >
+          🚫
+        </button>
+      )}
+    </div>
+  );
+  return (
+    <div className="text-[11px] text-zinc-400 md:border-l md:border-ink-700 md:pl-3 min-w-0">
+      <div className="text-zinc-500 mb-1">
+        {t('Últimas enviadas a Radarr por esta regla')}
+        {filas.length > 0 && (
+          <span className="text-zinc-600"> · {filas.length >= max ? t('las {n} últimas', { n: max }) : filas.length}</span>
+        )}
+      </div>
+      {filas.length === 0 ? (
+        <p className="text-zinc-600">{t('Todavía no ha mandado ninguna.')}</p>
+      ) : (
+        <div className="space-y-0.5">
+          {visibles.map(linea)}
+          {resto.length > 0 && (
+            <details className="mt-1">
+              <summary className="cursor-pointer text-zinc-500 hover:text-zinc-200">
+                {t('ver las {n} anteriores', { n: resto.length })}
+              </summary>
+              <div className="mt-1 max-h-48 overflow-y-auto space-y-0.5">{resto.map(linea)}</div>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReglaCard({ regla, catalog, onPatch, onDelete, onRun, onVetar, corriendo, parte, enviadasMax }) {
   const [umbral, setUmbral] = useState(regla.min_score);
   useEffect(() => { setUmbral(regla.min_score); }, [regla.min_score]);
   const nombre = etiqueta(regla, catalog);
@@ -171,7 +229,10 @@ function ReglaCard({ regla, catalog, onPatch, onDelete, onRun, corriendo, parte 
         <p className="text-[11px] text-red-400 mt-1">⚠️ {regla.invalid}</p>
       )}
 
-      <div className="mt-3 space-y-2">
+      {/* dos columnas en pantallas anchas: los controles y, a su derecha, el
+          registro de lo enviado; en las estrechas, el registro baja debajo */}
+      <div className="mt-3 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:gap-4 space-y-3 md:space-y-0">
+      <div className="space-y-2 min-w-0">
         {/* El umbral de una regla de emergentes es el del DETECTOR —la persona,
             de 0 a 100— y no la Σ de la película: son dos números distintos y
             enseñar los dos a la vez sería garantizar que se confunden. */}
@@ -298,6 +359,8 @@ function ReglaCard({ regla, catalog, onPatch, onDelete, onRun, corriendo, parte 
             )}
           </div>
         )}
+      </div>
+      <Enviadas filas={regla.enviadas || []} max={enviadasMax} onVetar={onVetar} />
       </div>
     </div>
   );
@@ -983,8 +1046,10 @@ export default function RadarrRulesSection() {
                   onPatch={patch}
                   onDelete={borrar}
                   onRun={ejecutar}
+                  onVetar={vetar}
                   corriendo={corriendo}
                   parte={parteDe(r.id)}
+                  enviadasMax={data.enviadasMax || 50}
                 />
               ))}
             </div>

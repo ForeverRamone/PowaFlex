@@ -877,10 +877,35 @@ export function podarCaches() {
     .run(Date.now() - 180 * 24 * 3600 * 1000).changes;
   // El log de reglas se poda dentro de la pasada de Radarr, pero SOLO si hay
   // reglas activas: al apagarlas todas, lo último se quedaba ahí para siempre.
-  const reglas = db
-    .prepare('DELETE FROM radarr_rule_log WHERE at < ?')
-    .run(Date.now() - 30 * 24 * 3600 * 1000).changes;
+  const reglas = podarLogReglas();
   return { cache: total, detalle: borradas, eventos, reglas };
+}
+
+/** Cuántas altas conserva cada regla en su historial. */
+export const ENVIADAS_POR_REGLA = 50;
+
+/**
+ * Podar el log de reglas. Dos vidas distintas en la misma tabla:
+ *  - los descartes y los errores son ruido de diagnóstico: 30 días y fuera.
+ *  - las ALTAS son el historial de lo que cada regla ha mandado a Radarr, y
+ *    una regla de festival puede pasarse meses sin mandar nada. Se conservan
+ *    por cantidad, no por fecha: las últimas ENVIADAS_POR_REGLA de cada una.
+ */
+export function podarLogReglas() {
+  const ruido = db
+    .prepare("DELETE FROM radarr_rule_log WHERE action <> 'added' AND at < ?")
+    .run(Date.now() - 30 * 24 * 3600 * 1000).changes;
+  const altas = db
+    .prepare(
+      `DELETE FROM radarr_rule_log WHERE action = 'added' AND id NOT IN (
+         SELECT id FROM (
+           SELECT id, ROW_NUMBER() OVER (PARTITION BY rule_id ORDER BY at DESC, id DESC) AS n
+           FROM radarr_rule_log WHERE action = 'added'
+         ) WHERE n <= ?
+       )`
+    )
+    .run(ENVIADAS_POR_REGLA).changes;
+  return ruido + altas;
 }
 
 /**

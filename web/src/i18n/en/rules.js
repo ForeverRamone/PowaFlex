@@ -92,6 +92,10 @@ export default {
   '{c} películas entrarían en Radarr ({s} descartadas)': '{c} movies would go into Radarr ({s} skipped)',
   '✓ {a} añadidas de {c} candidatas ({s} descartadas)': '✓ {a} added out of {c} candidates ({s} skipped)',
   'Historial de las reglas (30 días)': 'Rule history (30 days)',
+  'Últimas enviadas a Radarr por esta regla': 'Latest sent to Radarr by this rule',
+  'las {n} últimas': 'the last {n}',
+  'Todavía no ha mandado ninguna.': 'It has not sent any yet.',
+  'ver las {n} anteriores': 'show the {n} before',
 
   // ── motivos de descarte (MOTIVO_TEXTO) ────────────────────────────────────
   'sin ficha en TMDB': 'no TMDB entry',

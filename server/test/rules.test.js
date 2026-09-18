@@ -490,3 +490,42 @@ test('todo tipo de regla tiene su sección en la interfaz y su entrada en el cat
     assert.ok(secciones.has(kind), `«${kind}» no tiene sección en RadarrRules.jsx: se crearía y no se vería`);
   }
 });
+
+// --- historial por regla ------------------------------------------------------
+
+test('la poda deja el ruido en 30 días y guarda las últimas 50 altas de cada regla', async () => {
+  const { podarLogReglas, ENVIADAS_POR_REGLA } = await import('../src/db.js');
+  const { enviadasPorRegla, rulesLog } = await import('../src/rules.js');
+  const a = createRule({ kind: 'favoritos', source: 'editor' });
+  const b = createRule({ kind: 'favoritos', source: 'dop' });
+  const ins = db.prepare('INSERT INTO radarr_rule_log (rule_id, at, tmdb_id, title, score, action, detail) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  const DIA = 24 * 3600 * 1000;
+  const hace = (d) => Date.now() - d * DIA;
+  // 60 altas en la regla A repartidas en dos años: se quedan las 50 más recientes
+  for (let i = 0; i < 60; i++) ins.run(a.id, hace(i * 12), 1000 + i, `Peli ${i}`, 70, 'added', 'x');
+  // 3 altas en la B, de hace un año: se quedan todas, que nada tiene que ver la fecha
+  for (let i = 0; i < 3; i++) ins.run(b.id, hace(365 + i), 2000 + i, `Vieja ${i}`, null, 'added', 'x');
+  // descartes: uno reciente y otro de hace 40 días, que es el que sobra
+  ins.run(a.id, hace(1), null, null, null, 'skipped', 'bajo el umbral: 2');
+  ins.run(a.id, hace(40), null, null, null, 'skipped', 'bajo el umbral: 9');
+
+  const borradas = podarLogReglas();
+  assert.equal(borradas, 10 + 1);
+  assert.equal(ENVIADAS_POR_REGLA, 50);
+
+  const por = enviadasPorRegla();
+  assert.equal(por.get(a.id).length, 50);
+  assert.equal(por.get(a.id)[0].title, 'Peli 0', 'la más reciente va primero');
+  assert.equal(por.get(a.id)[49].title, 'Peli 49', 'sobreviven las 50 más recientes, no las primeras');
+  assert.deepEqual(por.get(b.id).map((f) => f.title), ['Vieja 0', 'Vieja 1', 'Vieja 2']);
+  assert.ok(por.get(a.id).every((f) => f.tmdb_id && f.title), 'cada fila trae con qué pintarse');
+
+  // el historial cronológico sigue acotado a 30 días aunque las altas viejas vivan
+  const log = rulesLog({ ruleId: a.id, limit: 1000 });
+  assert.ok(log.every((l) => l.at >= hace(30)));
+  assert.equal(log.filter((l) => l.action === 'skipped').length, 1);
+  assert.equal(rulesLog({ ruleId: b.id }).length, 0);
+
+  deleteRule(a.id);
+  deleteRule(b.id);
+});

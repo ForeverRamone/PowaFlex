@@ -6,6 +6,35 @@ Lo que ve quien usa la app está en `/novedades`, que es otro texto para otro p�
 Formato: un titular en negrita, secciones cortas y los hechos con sus cifras. La crónica de cómo
 se llegó a cada arreglo vive en el mensaje del commit, no aquí.
 
+## Beta 1.31 (1.0.31-beta) — 2026-09-18
+
+**Cada regla automática enseña, en su propia tarjeta, lo que ha mandado a Radarr.**
+
+### El registro por regla
+
+En Ajustes → Automatismos, a la derecha de los controles de cada regla: «Últimas enviadas a
+Radarr por esta regla», con fecha, título y Σ, y en las de favoritos la persona por la que entró
+cada una. Diez a la vista y el resto tras un desplegable; cada línea lleva su 🚫 de vetar. Se
+enseña también con la regla apagada. En pantallas estrechas baja debajo de los controles.
+
+Las aprobadas desde la cuarentena entran igual que las automáticas: ya quedaban registradas
+bajo la regla que las propuso. No se mira el estado en Radarr: es un registro de envíos.
+
+### La retención, partida en dos
+
+El log de reglas se podaba entero a 30 días, y con eso una regla de festival con dos ediciones
+tendría la lista vacía casi todo el año. Ahora `podarLogReglas` separa las dos vidas de la tabla:
+descartes y errores siguen a 30 días; las altas se conservan **por cantidad, las 50 últimas de
+cada regla**, sin caducar por fecha. El historial global del pie sigue acotado a 30 días para que
+su rótulo siga siendo verdad. Lo ya podado antes de esta versión no se recupera: la lista arranca
+con lo que hubiera en el log.
+
+### Tests
+
+464 en verde. Uno nuevo para la poda (60 altas → quedan 50, las más recientes; tres de hace un
+año en otra regla sobreviven; el descarte de 40 días se va). El de mantenimiento codificaba la
+política vieja y se ha actualizado.
+
 ## Beta 1.30 (1.0.30-beta) — 2026-08-31
 
 **Siete países más y cinco cánones nuevos de FilmAffinity — y, de camino, la ficha equivocada que llevaba años colada en el Top 1000, en Sight & Sound, en las 1001 y en Cahiers.**
