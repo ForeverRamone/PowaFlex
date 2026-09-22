@@ -8,3 +8,8 @@ server/data/
 .DS_Store
 .claude/
 npm-debug.log*
+
+# Variables de entorno con secretos
+.env
+.env.*
+!.env.example
