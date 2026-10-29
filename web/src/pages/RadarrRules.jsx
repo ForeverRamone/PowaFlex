@@ -1123,7 +1123,9 @@ export default function RadarrRulesSection() {
                 <span className={l.action === 'added' ? 'text-emerald-400' : l.action === 'error' ? 'text-red-400' : ''}>
                   {l.action === 'added' ? '✓' : l.action === 'error' ? '⚠️' : '·'}
                 </span>
-                <span className="truncate">
+                {/* los resúmenes sin título pueden traer la lista de las que
+                    esperan nota: cortados a una línea, no se leería ninguna */}
+                <span className={l.title ? 'truncate' : 'min-w-0 break-words'}>
                   {l.title || l.detail}
                   {l.title && l.score > 0 ? ` · Σ ${l.score}` : ''}
                 </span>

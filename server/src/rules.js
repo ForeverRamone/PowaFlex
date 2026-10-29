@@ -422,6 +422,30 @@ export const MOTIVOS = {
 
 const scoreDe = (i) => (i?.mdb?.score == null ? null : Number(i.mdb.score));
 
+/** Los títulos de lo que espera nota, en orden alfabético y sin repetir. */
+export function titulosEsperandoNota(descartadas = []) {
+  const titulos = descartadas.filter((d) => d.motivo === 'esperando_nota' && d.title).map((d) => d.title);
+  return [...new Set(titulos)].sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+const MAX_TITULOS_RESUMEN = 30;
+
+/**
+ * La línea del historial para un motivo de descarte. La de «esperando nota»
+ * lleva los títulos: son las únicas descartadas que entrarán solas más
+ * adelante, y con «espera: 17» a secas no había forma de saber si la película
+ * que buscabas estaba en camino o se había caído por otro lado.
+ */
+export function resumenDescarte(motivo, n, descartadas = []) {
+  const base = `${MOTIVOS[motivo] || motivo}: ${n}`;
+  if (motivo !== 'esperando_nota') return base;
+  const titulos = titulosEsperandoNota(descartadas);
+  if (!titulos.length) return base;
+  const resto = titulos.length - MAX_TITULOS_RESUMEN;
+  const lista = titulos.slice(0, MAX_TITULOS_RESUMEN).join(', ');
+  return `${base} — ${lista}${resto > 0 ? ` y ${resto} más` : ''}`;
+}
+
 /**
  * La nota en una línea de la pasada. Con Σ, la Σ. Sin ella, lo que MDBList SÍ
  * sabe —IMDb, Letterboxd, RT— para que «sin Σ» no se lea como «sin datos»:
@@ -819,10 +843,14 @@ export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = nu
           }
         }
 
+        // las que esperan nota, por su nombre también en el detalle de la tarjeta
+        // (y en la simulación, que es donde se comprueba si una concreta está)
+        for (const titulo of titulosEsperandoNota(descartadas)) parte.log.push(`⏳ ${titulo} — ${MOTIVOS.esperando_nota}`);
+
         // el resumen de descartes, para que «0 añadidas» sea explicable
         if (!dryRun) {
           for (const [motivo, n] of Object.entries(porMotivo)) {
-            log.run(rule.id, Date.now(), null, null, null, 'skipped', `${MOTIVOS[motivo] || motivo}: ${n}`, null);
+            log.run(rule.id, Date.now(), null, null, null, 'skipped', resumenDescarte(motivo, n, descartadas), null);
           }
           // si TODAS las altas fallaron, eso NO es una pasada correcta: sin
           // esto la tarjeta decía «0 añadidas de 20 candidatas» y borraba el

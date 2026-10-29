@@ -14,7 +14,7 @@ const { db } = await import('../src/db.js');
 const {
   evaluarRegla, MOTIVOS, diasEntre, scopesDeFestival, rulesCatalog, reglaValida,
   createRule, updateRule, deleteRule, listRules, normalizarCampos, valoresPorDefecto, ruleLabel,
-  radarrListoParaAñadir,
+  radarrListoParaAñadir, resumenDescarte, titulosEsperandoNota,
 } = await import('../src/rules.js');
 const { REGISTRY } = await import('../src/festivals.js');
 const { ROLE_KEYS } = await import('../src/roles.js');
@@ -155,6 +155,33 @@ test('todo motivo que emite el evaluador tiene texto en MOTIVOS', () => {
   }
   assert.equal(emitidos.size, Object.keys(MOTIVOS).length, `motivos emitidos: ${[...emitidos].join(', ')}`);
   for (const m of emitidos) assert.ok(MOTIVOS[m], `el motivo «${m}» no tiene texto en MOTIVOS`);
+});
+
+test('el historial nombra las que esperan nota, y solo esas', () => {
+  // «aún sin nota Σ: espera: 17» a secas no decía si la película que buscabas
+  // estaba en camino o se había caído por otro motivo
+  const r = evaluarRegla(
+    [peli(1, { title: 'Colisión' }), peli(2, { title: 'Ayer' }), conNota(3, 10), peli(4, { title: 'Corto', isShort: true })],
+    { min_score: 50 },
+    ctx()
+  );
+  assert.deepEqual(titulosEsperandoNota(r.descartadas), ['Ayer', 'Colisión']);
+  assert.equal(
+    resumenDescarte('esperando_nota', r.porMotivo.esperando_nota, r.descartadas),
+    'aún sin nota Σ: espera: 2 — Ayer, Colisión'
+  );
+  // los demás motivos siguen siendo solo un recuento
+  assert.equal(resumenDescarte('corto', 1, r.descartadas), 'cortometraje: 1');
+  assert.equal(resumenDescarte('bajo_umbral', 1, r.descartadas), 'por debajo del umbral: 1');
+});
+
+test('una lista larga de las que esperan nota se corta con «y N más»', () => {
+  const items = Array.from({ length: 35 }, (_, i) => peli(i + 1, { title: `T${String(i + 1).padStart(2, '0')}` }));
+  const r = evaluarRegla(items, { min_score: 50 }, ctx());
+  const linea = resumenDescarte('esperando_nota', 35, r.descartadas);
+  assert.match(linea, /^aún sin nota Σ: espera: 35 — T01, T02, /);
+  assert.match(linea, /T30 y 5 más$/);
+  assert.doesNotMatch(linea, /T31/);
 });
 
 test('la interfaz sabe traducir TODOS los motivos del servidor', () => {
