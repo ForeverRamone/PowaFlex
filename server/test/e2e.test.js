@@ -316,7 +316,9 @@ test('sin contraseña, un nombre de fuera de la red usa el panel pero no toca cr
   );
   assert.equal(await pedir('/api/backup/database', { headers: ajeno }), 403);
   // el resto del panel funciona por cualquier nombre (un proxy con dominio propio)
-  assert.equal(await pedir('/', { headers: ajeno }), 200);
+  // (una ruta de la API y no la página: en la CI los tests corren antes del
+  // build de la web y web/dist no existe todavía)
+  assert.equal(await pedir('/api/setup-state', { headers: ajeno }), 200);
   assert.equal(await pedir('/api/settings', { headers: ajeno }), 200);
   assert.equal(
     await pedir('/api/settings', {
