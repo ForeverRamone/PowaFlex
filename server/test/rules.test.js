@@ -141,6 +141,7 @@ test('todo motivo que emite el evaluador tiene texto en MOTIVOS', () => {
     [[peli(1, { isDocumentary: true })], { min_score: 0 }, ctx()],
     [[peli(1, { isCameo: true })], { min_score: 0 }, ctx()],
     [[peli(1, { isEvento: true })], { min_score: 0 }, ctx()],
+    [[peli(1, { fichaSinLeer: true })], { min_score: 0 }, ctx()],
     [[peli(1, { date: '2000-01-01' })], { min_score: 0, window_days: 5 }, ctx()],
     [[peli(1)], { min_score: 50 }, ctx()],
     [[conNota(1, 10)], { min_score: 50 }, ctx()],

@@ -405,6 +405,7 @@ export const textoCuarentena = (m) =>
 /** Los motivos de descarte, con su texto. Un sitio, para que log e interfaz coincidan. */
 export const MOTIVOS = {
   sin_ficha: 'sin ficha en TMDB',
+  ficha_sin_leer: 'ficha de TMDB sin leer: espera',
   ya_la_tienes: 'ya la tienes',
   vetada: 'vetada (🚫)',
   descartada: 'descartada (✕)',
@@ -480,6 +481,11 @@ export function evaluarRegla(items = [], rule = {}, ctx = {}) {
 
     if (inLib.has(item.tmdb_id) || owned.has(item.tmdb_id)) { fuera(item, 'ya_la_tienes'); continue; }
     if (excluidas.has(item.tmdb_id)) { fuera(item, excluidas.get(item.tmdb_id)); continue; }
+    // Si TMDB no contestó (429, corte), la película llega sin idioma, países
+    // ni duración: la cuarentena no la retendría y los filtros de corto,
+    // telefilme y documental no la verían. Mejor esperar a otra noche que
+    // mandar a Radarr justo lo que esos filtros existen para parar.
+    if (item.fichaSinLeer) { fuera(item, 'ficha_sin_leer'); continue; }
     if (item.isShort) { fuera(item, 'corto'); continue; }
     if (item.isTvMovie) { fuera(item, 'telefilme'); continue; }
     // una gala de lucha libre o un evento deportivo no es una película, aunque
@@ -709,8 +715,26 @@ const insLog = () =>
  * `kinds` a un tipo, y `dryRun` no toca Radarr ni escribe log: es la
  * previsualización.
  */
-export async function runRadarrRules({ dryRun = false, ruleId = null, kinds = null } = {}) {
-  if (rulesStatus.running) return rulesStatus;
+let pasadaEnCurso = null;
+
+/**
+ * Con `esperar`, si ya hay una pasada en marcha se espera a que acabe y luego se
+ * corre esta: el paso nocturno lo usa porque, sin esperar, una previsualización
+ * abierta en Ajustes le devolvía SU estado («0 añadidas», sin error) y la noche
+ * apuntaba en verde una pasada real que no había ocurrido.
+ */
+export function runRadarrRules(opts = {}) {
+  if (rulesStatus.running) {
+    if (opts.esperar && pasadaEnCurso) {
+      return pasadaEnCurso.catch(() => {}).then(() => runRadarrRules(opts));
+    }
+    return Promise.resolve(rulesStatus);
+  }
+  pasadaEnCurso = pasadaDeReglas(opts);
+  return pasadaEnCurso;
+}
+
+async function pasadaDeReglas({ dryRun = false, ruleId = null, kinds = null } = {}) {
   Object.assign(rulesStatus, {
     running: true, startedAt: Date.now(), finishedAt: null, dryRun: !!dryRun,
     considered: 0, added: 0, skipped: 0, cuarentena: 0, error: null, aviso: null, rules: [],

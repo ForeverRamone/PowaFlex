@@ -186,8 +186,10 @@ export async function checkDigitalReleases({ maxFetch = 500 } = {}) {
 /** Reordena a Radarr buscar una película concreta ya monitorizada. */
 export async function radarrSearchAgain(tmdbId) {
   const found = await radarrFetch(`/movie?tmdbId=${tmdbId}`);
-  const movie = Array.isArray(found) ? found[0] : null;
-  if (!movie?.id) throw new Error('Radarr no tiene esa película');
+  // por su tmdbId, no la primera: un Radarr que ignore el filtro devuelve la
+  // biblioteca entera, y se mandaría buscar otra película
+  const movie = Array.isArray(found) ? found.find((m) => Number(m?.tmdbId) === Number(tmdbId)) : null;
+  if (!movie?.id) throw new Error(`Radarr no tiene la película con tmdbId ${tmdbId}`);
   await radarrFetch('/command', { method: 'POST', body: { name: 'MoviesSearch', movieIds: [movie.id] } });
   return { ok: true, title: movie.title };
 }

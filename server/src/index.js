@@ -92,6 +92,7 @@ import {
   pedirNotasDeRegla, pedirNotasDeTodas,
 } from './rules.js';
 import { asRole, isRankable, roleHint, RANKABLE_ROLES } from './roles.js';
+import { hostDeConfianza, hostsDeclarados, nombreDeHost } from './hosts.js';
 import { avalesDe, conteoAvales, indiceAvales, avalesDeFilmografia } from './avales.js';
 import {
   catalogoPaises, peliculasDePais, aniosDePais, esPaisConocido, PAISES,
@@ -142,6 +143,7 @@ if (process.env.POWAFLEX_AUTH) {
   // tarde. Ventana deslizante en memoria, que basta para lo que esto es.
   const FAILS_MAX = 10;
   const FAILS_WINDOW = 5 * 60 * 1000;
+  const FAILS_TOPE_IPS = 10000;
   const fails = new Map();
   const tooManyFails = (ip) => {
     const hits = (fails.get(ip) || []).filter((t) => Date.now() - t < FAILS_WINDOW);
@@ -165,11 +167,40 @@ if (process.env.POWAFLEX_AUTH) {
       return reply.code(429).send({ error: 'Demasiados intentos, prueba en unos minutos' });
     }
     fails.set(ip, [...(fails.get(ip) || []), Date.now()]);
+    // el mapa solo se poda cuando vuelve la MISMA IP: rotando direcciones
+    // (IPv6 da para eso) crecía sin fin. Por encima del tope se tiran las
+    // más antiguas, que son las primeras del Map.
+    if (fails.size > FAILS_TOPE_IPS) {
+      for (const vieja of fails.keys()) {
+        fails.delete(vieja);
+        if (fails.size <= FAILS_TOPE_IPS) break;
+      }
+    }
     reply.header('WWW-Authenticate', 'Basic realm="PowaFlex", charset="UTF-8"');
     return reply.code(401).send({ error: 'No autorizado' });
   });
   console.log('[PowaFlex] Autenticación básica activada (POWAFLEX_AUTH)');
 } else {
+  // Sin contraseña, el nombre con el que te llaman tiene que ser de tu red: ver
+  // hosts.js (DNS rebinding). Con POWAFLEX_AUTH no hace falta, porque el
+  // navegador no manda tus credenciales al dominio de nadie.
+  const declarados = hostsDeclarados();
+  app.addHook('onRequest', async (req, reply) => {
+    if (AUTH_OPEN_PATHS.has((req.raw.url || '').split('?')[0])) return;
+    // X-Forwarded-Host también: tras un proxy inverso es el nombre que escribió
+    // el navegador, y desde una web con rebinding la puede poner quien llama
+    for (const h of [req.headers.host, req.headers['x-forwarded-host']]) {
+      if (h == null) continue;
+      const primero = String(h).split(',')[0];
+      if (hostDeConfianza(primero, declarados)) continue;
+      reply.code(403);
+      return reply.send({
+        error:
+          `PowaFlex no responde al nombre «${nombreDeHost(primero).slice(0, 100)}» sin contraseña: ` +
+          'añádelo a POWAFLEX_HOSTS o activa POWAFLEX_AUTH',
+      });
+    }
+  });
   console.warn(
     '[PowaFlex] SIN autenticación: cualquiera que alcance este puerto puede leer y CAMBIAR tus\n' +
     '           ajustes, y con ello hacer que PowaFlex mande tu token de Plex a otra dirección.\n' +
@@ -186,7 +217,11 @@ app.get('/api/version', async () => ({
 // El export completo de Letterboxd de una cinefilia larga no pasa de unos
 // pocos MB; 40 MB × 4 sobra de calle y evita que una subida se coma la RAM del
 // NAS (cada parte se materializa entera en memoria con toBuffer()).
-await app.register(multipart, { limits: { fileSize: 40 * 1024 * 1024, files: 4 } });
+// Los campos de texto también tienen tope: la app solo manda ficheros, y sin
+// límite busboy guardaba en memoria hasta 1.000 campos de 1 MB por petición.
+await app.register(multipart, {
+  limits: { fileSize: 40 * 1024 * 1024, files: 4, fields: 10, fieldSize: 1024, parts: 20 },
+});
 
 /**
  * Cortafuegos contra peticiones lanzadas desde OTRA web.
@@ -2438,7 +2473,7 @@ app.post('/api/letterboxd/import', async (req, reply) => {
     const name = (part.filename || '').toLowerCase();
     try {
       if (name.endsWith('.zip')) {
-        const z = importLetterboxdZip(buf);
+        const z = await importLetterboxdZip(buf);
         results.push(...z.results);
         lists.push(...z.lists);
       } else {
@@ -2460,8 +2495,10 @@ app.post('/api/letterboxd/import', async (req, reply) => {
 // RSS feed of a user, to keep pulling recent watches
 app.post('/api/letterboxd/rss', async (req, reply) => {
   try {
-    const user = req.body?.user ?? getSetting('letterboxd_rss');
-    if (req.body?.save != null || req.body?.user != null) setSetting('letterboxd_rss', String(user || ''));
+    // un usuario de Letterboxd son unos pocos caracteres; esto se guarda y se
+    // vuelve a procesar cada noche
+    const user = String(req.body?.user ?? getSetting('letterboxd_rss') ?? '').slice(0, 200);
+    if (req.body?.save != null || req.body?.user != null) setSetting('letterboxd_rss', user);
     if (!user) {
       reply.code(400);
       return { error: 'Indica tu usuario de Letterboxd' };

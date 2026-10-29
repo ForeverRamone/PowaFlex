@@ -15,12 +15,14 @@
  * Nada de esto afecta al emparejado: Plex, Radarr y Letterboxd van por id.
  */
 
-// Griego, cirílico, hebreo, árabe, índicas, tailandés, georgiano, CJK, hangul y
-// formas de ancho completo. Deliberadamente NO entran ni el latín acentuado
-// (é, ñ, ø) ni la puntuación tipográfica (—, «», …), que son latinos de toda la
-// vida y no hay que tocar.
-const NON_LATIN =
-  /[Ͱ-ݏऀ-๿Ⴀ-ᇿ⺀-꓏가-힯豈-﫿＀-￯]/;
+// Cualquier letra que no sea latina, por su escritura Unicode y no por rangos
+// a mano: la lista de rangos se dejaba el jemer, el birmano, el amhárico, el
+// lao, el tibetano, el mongol, el thaana y los ideogramas fuera del plano
+// básico. Deliberadamente NO entran ni el latín acentuado (é, ñ, ø) ni la
+// puntuación y los símbolos comunes (—, «», …, ½), que son latinos de toda la
+// vida y no hay que tocar. Las formas de ancho completo y la puntuación CJK sí
+// cuentan, como hasta ahora.
+const NON_LATIN = /[^\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]|[\u3000-\u303F\uFF00-\uFFEF]/u;
 
 /** ¿Este título hay que cambiarlo por su versión internacional? */
 export const needsLatin = (title) => !!title && NON_LATIN.test(String(title));

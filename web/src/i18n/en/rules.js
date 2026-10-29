@@ -112,6 +112,7 @@ export default {
   telefilme: 'TV movie',
   'fuera de la ventana': 'outside the window',
   'esperando nota': 'waiting for a score',
+  'ficha de TMDB sin leer': 'TMDB record not read yet',
   'bajo el umbral': 'below the threshold',
   'aplazadas por el tope': 'held back by the cap',
   // ── cuarentena pre-Radarr ─────────────────────────────────────────────────

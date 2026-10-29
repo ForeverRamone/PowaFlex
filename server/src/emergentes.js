@@ -607,6 +607,7 @@ export async function resolverCandidato(cand, { nowYear, hoy, gustos }) {
     age: cat?.age ?? null,
     last: ultimoAño,
   });
+  if (info?.falloDeRed) throw new Error('TMDB no contesta');
   if (!info?.id) return { descartado: 'sin ficha en TMDB' };
 
   const det = await personDetails(info.id);
@@ -743,13 +744,17 @@ export async function detectarEmergentes({ years = VENTANA_AÑOS, tope = TOPE_PO
     const pesos = pesosEmergentes();
 
     const nuevos = [];
+    let fallidos = 0;
+    let ultimoFallo = null;
     for (const cand of aMirar) {
       emergentesStatus.paso = `mirando a ${cand.name}`;
       emergentesStatus.mirados++;
       let ficha;
       try {
         ficha = await resolverCandidato(cand, { nowYear, hoy, gustos });
-      } catch {
+      } catch (err) {
+        fallidos++;
+        ultimoFallo = err;
         continue; // un fallo de red con uno no puede tumbar la pasada entera
       }
       if (!ficha || ficha.descartado) continue;
@@ -764,6 +769,15 @@ export async function detectarEmergentes({ years = VENTANA_AÑOS, tope = TOPE_PO
       const { score, desglose, ausentes } = puntuar(senales, pesos);
       const ultima = ficha.pelis[ficha.pelis.length - 1];
       nuevos.push({ ficha, score, desglose, ausentes, ultima });
+    }
+
+    // …pero si fallan la mayoría, no es «uno»: es que TMDB no contesta. Reescribir
+    // con eso vaciaba la página y apuntaba la pasada como hecha, así que nadie
+    // la reintentaba en una semana. Se deja la tabla de ayer y se da el error.
+    if (aMirar.length && fallidos * 2 > aMirar.length) {
+      throw new Error(
+        `fallaron ${fallidos} de ${aMirar.length} fichas (${ultimoFallo?.message || ultimoFallo}); se conserva la lista anterior`
+      );
     }
 
     // se reescribe ENTERA y de golpe: media pasada no puede dejar la página con

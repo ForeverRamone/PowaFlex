@@ -134,7 +134,7 @@ export const isNoise = (m) => !!(m.isShort || m.isDocumentary || m.isMusic || m.
  */
 const SOLO_DEL_SERVIDOR = [
   'original_language', 'countries', 'imdb_id', 'runtime', 'genre_ids',
-  'character', 'job', 'popularity', 'directorCount',
+  'character', 'job', 'popularity', 'directorCount', 'fichaSinLeer',
 ];
 export function podarDatosDeTrabajo(items) {
   for (const it of items || []) {
@@ -238,11 +238,44 @@ export async function canonNames(canon) {
 }
 
 /** Guarda una lista pegada como canon propio. Devuelve su clave. */
+/**
+ * Parte una lista pegada en nombres: por saltos de línea, «;» y comas, salvo las
+ * comas de dentro de un paréntesis («Kim (Corea del Sur, 1970)»). Es lo mismo
+ * que hacía `split(/[\n;]+|,(?![^(]*\))/)`, pero en una pasada: esa expresión
+ * es cuadrática y una lista de 300.000 comas dejaba el servidor medio minuto
+ * sin contestar a nadie.
+ */
+export function partirNombres(texto) {
+  const s = String(texto);
+  // de derecha a izquierda: ¿el próximo paréntesis tras la posición i es «)»?
+  const cierraDespues = new Array(s.length + 1).fill(false);
+  let ultimo = null;
+  for (let i = s.length - 1; i >= 0; i--) {
+    cierraDespues[i] = ultimo === ')';
+    if (s[i] === '(' || s[i] === ')') ultimo = s[i];
+  }
+  const trozos = [];
+  let actual = '';
+  let enSeparador = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '\n' || c === ';') {
+      if (!enSeparador) { trozos.push(actual); actual = ''; }
+      enSeparador = true;
+      continue;
+    }
+    enSeparador = false;
+    if (c === ',' && !cierraDespues[i]) { trozos.push(actual); actual = ''; continue; }
+    actual += c;
+  }
+  trozos.push(actual);
+  return trozos;
+}
+
 export function saveCanon({ label, names, source = null }) {
   const parsed = [
     ...new Set(
-      String(names || '')
-        .split(/[\n;]+|,(?![^(]*\))/)
+      partirNombres(names || '')
         .map((s) => s.replace(/^\s*\d+[.)-]\s*/, '').trim()) // «12. Chantal Akerman»
         .filter((s) => s.length > 1 && s.length < 80)
     ),

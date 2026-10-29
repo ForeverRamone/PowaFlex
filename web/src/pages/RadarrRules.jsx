@@ -378,6 +378,7 @@ function ReglaCard({ regla, catalog, onPatch, onDelete, onRun, onVetar, onNotas,
 // MOTIVOS en server/src/rules.js: si se añade una allí, va también aquí.
 const MOTIVO_TEXTO = {
   sin_ficha: 'sin ficha en TMDB',
+  ficha_sin_leer: 'ficha de TMDB sin leer',
   ya_la_tienes: 'ya la tienes',
   vetada: 'vetada (🚫)',
   descartada: 'descartada (✕)',

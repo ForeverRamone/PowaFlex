@@ -1,6 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -61,7 +62,11 @@ const get = async (ruta) => {
 before(async () => {
   servidor = spawn(process.execPath, ['server/src/index.js'], {
     cwd: raiz,
-    env: { ...process.env, DATA_DIR: dataDir, PORT: String(PUERTO), POWAFLEX_AUTH: '' },
+    // sin contraseña, el dominio del proxy inverso se declara (ver hosts.js)
+    env: {
+      ...process.env, DATA_DIR: dataDir, PORT: String(PUERTO), POWAFLEX_AUTH: '',
+      POWAFLEX_HOSTS: 'powaflex.midominio.com',
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   servidor.stdout.on('data', (d) => { salida += d; });
@@ -285,6 +290,38 @@ test('un proxy inverso que anuncia X-Forwarded-Host no queda bloqueado', async (
     headers: { Origin: 'https://web-cualquiera.example', 'X-Forwarded-Host': 'powaflex.midominio.com' },
   });
   assert.equal(impostor.status, 403);
+});
+
+// DNS rebinding: una web cuyo dominio resuelve a la IP de PowaFlex manda Origin y
+// Host suyos, que casan entre sí. Sin contraseña, un nombre que no es de la red
+// local ni está declarado no recibe respuesta, ni siquiera en GET.
+test('sin contraseña, un nombre de fuera de la red no lee nada', async () => {
+  // con node:http y no con fetch: fetch reescribe la cabecera Host
+  const pedir = (ruta, { method = 'GET', headers = {}, body = null } = {}) =>
+    new Promise((resolve, reject) => {
+      const r = http.request({ host: '127.0.0.1', port: PUERTO, path: ruta, method, headers }, (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode));
+      });
+      r.on('error', reject);
+      r.end(body);
+    });
+  const rebind = `rebind.attacker.example:${PUERTO}`;
+  const ajeno = { Host: rebind, Origin: `http://${rebind}` };
+  assert.equal(await pedir('/api/backup/settings', { headers: ajeno }), 403);
+  assert.equal(
+    await pedir('/api/settings', {
+      method: 'PUT',
+      headers: { ...ajeno, 'Content-Type': 'application/json' },
+      body: '{"plex_url":"http://evil:1"}',
+    }),
+    403
+  );
+  assert.equal(await pedir('/', { headers: ajeno }), 403);
+  // lo de casa sigue entrando, y el healthcheck de Docker sigue abierto
+  assert.equal(await pedir('/api/settings', { headers: { Host: `127.0.0.1:${PUERTO}` } }), 200);
+  assert.equal(await pedir('/api/settings', { headers: { Host: 'beelink' } }), 200);
+  assert.equal(await pedir('/api/version', { headers: { Host: 'evil.example' } }), 200);
 });
 
 test('el proxy de imágenes normaliza el id y rechaza lo que no es un entero', async () => {

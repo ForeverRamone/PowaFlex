@@ -84,7 +84,16 @@ ON CONFLICT(rating_key) DO UPDATE SET
   studio = excluded.studio, tagline = excluded.tagline, summary = excluded.summary,
   -- el emparejado que fijaste a mano sobrevive a la sincronización: si no,
   -- cada pasada volvía a poner el guid de Plex y tu corrección duraba horas
-  tmdb_id = CASE WHEN movies.tmdb_locked = 1 THEN movies.tmdb_id ELSE excluded.tmdb_id END,
+  -- Si el guid no trae tmdb://, se conserva el id que resolvió el backfill
+  -- (por IMDb o por título), pero SOLO si Plex sigue describiendo la misma
+  -- película: borrarlo en cada sincronización dejaba esas películas fuera de
+  -- «lo que ya tienes» y una regla podía mandarlas a Radarr; conservarlo tras
+  -- un reemparejado en Plex dejaría la ficha de otra.
+  tmdb_id = CASE WHEN movies.tmdb_locked = 1 THEN movies.tmdb_id
+                 WHEN excluded.tmdb_id IS NOT NULL THEN excluded.tmdb_id
+                 WHEN movies.imdb_id IS excluded.imdb_id AND movies.year IS excluded.year
+                      AND movies.plex_title IS excluded.plex_title THEN movies.tmdb_id
+                 ELSE NULL END,
   imdb_id = excluded.imdb_id, thumb = excluded.thumb, art = excluded.art,
   resolution = excluded.resolution, video_codec = excluded.video_codec,
   audio_codec = excluded.audio_codec, audio_channels = excluded.audio_channels,
@@ -272,11 +281,13 @@ export async function runSync({ force = false } = {}) {
     finishedAt: null,
     error: null,
   });
-  const logId = db
-    .prepare('INSERT INTO sync_log (started_at, status) VALUES (?, ?)')
-    .run(Date.now(), 'running').lastInsertRowid;
-
+  let logId = null;
   try {
+    // dentro del try: si este INSERT falla (disco lleno), el finally tiene que
+    // bajar `running`, o ninguna sincronización volvería a arrancar
+    logId = db
+      .prepare('INSERT INTO sync_log (started_at, status) VALUES (?, ?)')
+      .run(Date.now(), 'running').lastInsertRowid;
     let sections = await movieSections();
     if (!sections.length) throw new Error('No hay bibliotecas de películas en este servidor Plex');
 
@@ -293,6 +304,11 @@ export async function runSync({ force = false } = {}) {
     const preExisting = new Set(db.prepare('SELECT rating_key FROM movies').all().map((r) => r.rating_key));
     const seen = new Set();
     const PAGE = 240;
+    // cuántas había y cuántas vienen por biblioteca, para el freno de abajo
+    const antesEn = new Map(
+      db.prepare('SELECT section_id, COUNT(*) n FROM movies GROUP BY section_id').all().map((r) => [r.section_id, r.n])
+    );
+    const vistosEn = new Map();
 
     for (const section of sections) {
       syncStatus.section = section.title;
@@ -324,28 +340,55 @@ export async function runSync({ force = false } = {}) {
         });
         tx();
         syncStatus.done += items.length;
+        vistosEn.set(section.id, (vistosEn.get(section.id) || 0) + items.length);
         start += PAGE;
-        if (items.length < PAGE) break;
+        // también por el total: un Plex (o un proxy) que ignore el desplazamiento
+        // devolvería la misma página llena para siempre
+        if (items.length < PAGE || start >= sectionTotal) break;
       }
     }
 
     // remove movies no longer in Plex
     syncStatus.phase = 'cleanup';
-    const existing = db.prepare('SELECT rating_key FROM movies').all();
+    const existing = db.prepare('SELECT rating_key, section_id FROM movies').all();
     // Plex puede responder 200 con la biblioteca vacía mientras la reescanea, o
     // si se le cae el disco donde vive: eso NO es «has borrado tus películas».
     // Sin este freno, un barrido en falso se llevaba por delante las 12.400 con
     // sus personas, etiquetas y enlaces de Letterboxd.
-    const aBorrar = existing.map((r) => r.rating_key).filter((k) => !seen.has(k));
+    // El mismo freno, por biblioteca: con una biblioteca por disco, el disco que
+    // no se montó devolvía su sección vacía y, como el resto sí llegaba, el
+    // freno global no saltaba y se borraban todas las suyas.
+    const secciónEnFalso = new Set(
+      force
+        ? []
+        : sections
+            .filter((sec) => {
+              const antes = antesEn.get(sec.id) || 0;
+              const vistos = vistosEn.get(sec.id) || 0;
+              // vacía del todo cuando tenía algo es la firma del disco caído
+              return antes > 0 && (vistos === 0 || (antes > 5 && vistos < antes * 0.5));
+            })
+            .map((sec) => sec.id)
+    );
+    const aBorrar = existing
+      .filter((r) => !seen.has(r.rating_key) && !secciónEnFalso.has(r.section_id))
+      .map((r) => r.rating_key);
     // `force` es la salida: una sincronización completa lanzada a mano SÍ borra.
     // Sin ella el aviso mentía —repetir la sincronización daba los mismos
     // números y la volvía a omitir—, así que quien de verdad hubiera partido su
     // biblioteca en dos se quedaba sin manera de limpiarla.
     const desaparecenDemasiadas = !force && existing.length > 5 && seen.size < existing.length * 0.5;
+    if (secciónEnFalso.size && !desaparecenDemasiadas) {
+      const nombres = sections.filter((sec) => secciónEnFalso.has(sec.id)).map((sec) => `«${sec.title}»`);
+      syncStatus.warning =
+        `Limpieza omitida en ${nombres.join(', ')}: Plex ha devuelto menos de la mitad de las películas que había. ` +
+        `Si de verdad las has quitado, usa «Re-sincronización completa» en Ajustes para confirmarlo.`;
+      console.warn(`[PowaFlex] ${syncStatus.warning}`);
+    }
     if (desaparecenDemasiadas) {
       syncStatus.warning =
         `Limpieza omitida: Plex ha devuelto ${seen.size} películas y aquí hay ${existing.length}. ` +
-        `Si de verdad has quitado tantas, usa «Sincronización completa» en Ajustes para confirmarlo.`;
+        `Si de verdad has quitado tantas, usa «Re-sincronización completa» en Ajustes para confirmarlo.`;
       console.warn(`[PowaFlex] ${syncStatus.warning}`);
     } else {
       const removeTx = db.transaction((keys) => {
@@ -399,12 +442,14 @@ export async function runSync({ force = false } = {}) {
   } catch (err) {
     syncStatus.phase = 'error';
     syncStatus.error = String(err.message || err);
-    db.prepare('UPDATE sync_log SET finished_at = ?, status = ?, detail = ? WHERE id = ?').run(
-      Date.now(),
-      'error',
-      syncStatus.error,
-      logId
-    );
+    try {
+      db.prepare('UPDATE sync_log SET finished_at = ?, status = ?, detail = ? WHERE id = ?').run(
+        Date.now(),
+        'error',
+        syncStatus.error,
+        logId
+      );
+    } catch {} // el error que cuenta ya está en syncStatus.error
   } finally {
     syncStatus.running = false;
     syncStatus.finishedAt = Date.now();

@@ -71,6 +71,7 @@ export function currentProgress() {
 // corta el grifo dejaba la promesa sin resolver NUNCA: el refresco se quedaba
 // con la marca de «en marcha» puesta y el cron nocturno no volvía a arrancar.
 const MAX_429_RETRIES = 3;
+const MAX_429_WAIT_MS = 60 * 1000;
 
 // Un resultado construido con fallos se sirve, pero solo un rato: pasado esto se
 // reconstruye aunque su caché siga «fresca».
@@ -99,7 +100,10 @@ export async function tmdbGet(path, params = {}, { cacheKey = null, cacheMs = DA
     // espera creciente: si los cinco trabajadores reintentan a la vez y a la
     // misma hora, el siguiente 429 está garantizado
     const retryAfter = Number(res.headers.get('retry-after')) || 2;
-    await new Promise((r) => setTimeout(r, retryAfter * 1000 * (attempt + 1)));
+    // con tope: un Retry-After de 3600 dejaba el trabajo dormido una hora con
+    // su hueco del limitador ocupado; el siguiente intento ya dirá si sigue
+    const esperaMs = Math.min(retryAfter * 1000 * (attempt + 1), MAX_429_WAIT_MS);
+    await new Promise((r) => setTimeout(r, esperaMs));
     return tmdbGet(path, params, { cacheKey, cacheMs, attempt: attempt + 1 });
   }
   if (!res.ok) throw new Error(`TMDB ${res.status} en ${path}`);
@@ -206,7 +210,9 @@ export async function resolveCatalogDirector({ name, birth = null, age = null, l
     );
     candidatos = (data.results || []).slice(0, 6);
   } catch {
-    return { id: null, profile_path: null }; // fallo de red: no se cachea
+    // fallo de red: no se cachea, y se distingue de «no tiene ficha» para que
+    // quien decide con esto no confunda un apagón con un resultado
+    return { id: null, profile_path: null, falloDeRed: true };
   }
   if (!candidatos.length) {
     const vacio = { id: null, profile_path: null };
@@ -580,6 +586,7 @@ export async function enrichRuntimes(items, { concurrency = 6, withCredits = fal
     try {
       // With credits we can also count co-directors → "dirección coral" (#7).
       const det = await movieDetail(it.tmdb_id, { withCredits });
+      it.fichaSinLeer = false;
       it.runtime = det.runtime || null;
       // el detalle ya lo trae y no cuesta nada: el id de IMDb permite cruzar
       // con el volcado local de notas para el umbral de ruido
@@ -598,6 +605,9 @@ export async function enrichRuntimes(items, { concurrency = 6, withCredits = fal
       }
     } catch {
       it.runtime = it.runtime ?? null;
+      // sin ficha no hay idioma, países ni tipo: quien decide algo con ellos
+      // (la cuarentena y los filtros de las reglas) tiene que saber que faltan
+      it.fichaSinLeer = true;
     }
     it.isShort = !!it.runtime && it.runtime < 40;
   });
@@ -608,26 +618,44 @@ export async function enrichRuntimes(items, { concurrency = 6, withCredits = fal
   return items;
 }
 
-/** Pick the best /search/movie result for (title, year): exact normalised
- *  title/original-title match first, then year proximity (±1); with a year and
- *  nothing close, better no match than a wrong film. */
+/**
+ * La mejor ficha de /search/movie para (título, año). Aquí no hay dirección que
+ * verifique detrás, así que el título es la prueba y nunca se suelta:
+ *
+ *  1. Título u original clavados, dentro de ±1 año (o sin año).
+ *  2. Con año, uno que EMPIECE por el buscado o al revés, palabra a palabra:
+ *     el subtítulo de más («Birdman» y «Birdman o (la inesperada virtud…)»).
+ *     Por el principio y no en cualquier sitio, que «The Making of Birdman»
+ *     también lo contiene; y a palabra entera, que «Alien» no es «Aliens».
+ *     Sin año no: «Halloween» casaría con «Halloween II».
+ *
+ * Quedarse con «el primero del año» o «el primero a secas» daba la ficha de
+ * otra película. Y un título que normaliza a vacío (otro alfabeto, «?») no es
+ * un título: casaba con cualquier otro que también se quedara vacío.
+ */
 export function pickSearchResult(results, title, year = null) {
   const list = (results || []).filter(Boolean);
   if (!list.length) return null;
   const wanted = normTitle(title);
+  if (!wanted) return null;
   const resYear = (r) => (r.release_date ? Number(r.release_date.slice(0, 4)) : null);
   const yearOk = (r) => !year || (resYear(r) != null && Math.abs(resYear(r) - year) <= 1);
   const exact = list.filter((r) => yearOk(r) && (normTitle(r.title) === wanted || normTitle(r.original_title) === wanted));
   if (exact.length) return exact[0];
-  const inYear = list.filter(yearOk);
-  if (inYear.length) return inYear[0];
-  return year ? null : list[0];
+  if (!year) return null;
+  const empiezaPor = (a, b) => !!a && !!b && `${a} `.startsWith(`${b} `);
+  const casi = (t) => {
+    const n = normTitle(t);
+    return empiezaPor(n, wanted) || empiezaPor(wanted, n);
+  };
+  return list.find((r) => yearOk(r) && (casi(r.title) || casi(r.original_title))) || null;
 }
 
 /** Resolve a TMDB movie id from title (+year), cached. Null if not found.
  *  Hits cache 30 days; misses only 1 day, so a transient failure can't stick. */
 export async function searchMovieId(title, year = null) {
-  if (!title) return null;
+  // sin letras comparables `pickSearchResult` no acepta nada: ni se pregunta
+  if (!title || !normTitle(title)) return null;
   const key = `movie_search:${title.toLowerCase()}:${year || ''}`;
   const cached = cacheRead(key, 30 * DAY);
   if (cached?.id) return cached.id;
@@ -900,9 +928,11 @@ export async function esSerieEnTmdb(title, year) {
   const key = `tv_check:${String(title).toLowerCase()}:${year || ''}`;
   const cached = cacheRead(key, 30 * DAY);
   if (cached) return !!cached.tv;
+  // sin letras comparables, cualquier serie que tampoco las tenga «clavaría»
+  const buscado = normTitle(title);
+  if (!buscado) return false;
   try {
     const data = await tmdbGet('/search/tv', { query: title }, { cacheKey: null });
-    const buscado = normTitle(title);
     const tv = (data.results || []).some((r) => {
       const mismoTitulo = normTitle(r.name) === buscado || normTitle(r.original_name) === buscado;
       if (!mismoTitulo) return false;

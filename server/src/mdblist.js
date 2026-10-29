@@ -26,11 +26,16 @@ async function mdbFetch(path, { method = 'GET', body = null, params = {} } = {})
     err.rateLimited = true;
     throw err;
   }
-  if (!res.ok) throw new Error(`MDBList ${res.status} en ${path}`);
   // La cuenta se lleva AQUÍ, que es lo único que ellos cobran: UNA petición
   // HTTP, lleve dentro un título o cien. El 429 no se apunta porque no se
-  // sirvió nada, pero cualquier otra respuesta sí: un 404 les cuenta igual.
+  // sirvió nada, pero cualquier otra respuesta sí: un 404 les cuenta igual
+  // (por eso va ANTES del throw de las respuestas que no son 2xx).
   addUsage(1);
+  if (!res.ok) {
+    const err = new Error(`MDBList ${res.status} en ${path}`);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
 
@@ -277,12 +282,21 @@ export async function fetchRatingsBatch(tmdbIds) {
   apiKey(); // no key = no request leaves: must not spend budget either
   let items = null;
   let parsed = [];
+  // los ids a los que MDBList ha CONTESTADO: solo esos pueden quedar apuntados
+  // como «no la conoce». Un lote cortado a medias por un 429 o un 5xx no sabe
+  // nada de los que no llegó a pedir, y marcarlos los dejaba una semana sin nota.
+  let contestados = [];
+  // «este servidor no tiene el endpoint por lotes» es un 404/405; un 401 (clave
+  // revocada), un 5xx o un timeout NO lo son, y caer a cien GET sueltos por
+  // lote multiplicaba por cien las peticiones que iban a fallar igual
+  const sinLotes = (err) => err.status === 404 || err.status === 405;
   try {
     try {
       const res = await mdbFetch('/tmdb/movie', { method: 'POST', body: { ids: tmdbIds } });
       items = Array.isArray(res) ? res : res.movies || res.results || null;
+      if (items) contestados = tmdbIds;
     } catch (err) {
-      if (err.rateLimited) throw err;
+      if (!sinLotes(err)) throw err;
       items = null; // endpoint not supported here: fall back to per-title GETs
     }
     if (!items) {
@@ -290,8 +304,11 @@ export async function fetchRatingsBatch(tmdbIds) {
       for (const id of tmdbIds) {
         try {
           items.push(await mdbFetch(`/tmdb/movie/${id}`));
+          contestados.push(id);
         } catch (err) {
-          if (err.rateLimited) throw err;
+          // un 404 de UNA película es «no la conozco»: respuesta válida
+          if (err.status === 404) { contestados.push(id); continue; }
+          throw err;
         }
       }
     }
@@ -299,8 +316,8 @@ export async function fetchRatingsBatch(tmdbIds) {
     // Guardar va en el finally a propósito: un 429 a mitad de lote se lleva por
     // delante el resto, pero las que YA se descargaron están pagadas del
     // presupuesto del día y tirarlas obligaba a volver a pedirlas mañana.
-    if (items?.length) {
-      parsed = items.map(parseItem).filter(Boolean); // una sola pasada: el return lo reutiliza
+    if (items?.length || contestados.length) {
+      parsed = (items || []).map(parseItem).filter(Boolean); // una sola pasada: el return lo reutiliza
       db.transaction(() => {
         for (const p of parsed) upsertRating.run(p);
         // MDBList no conoce todas las películas (las raras y las antiguas se le
@@ -312,7 +329,7 @@ export async function fetchRatingsBatch(tmdbIds) {
         // como el barrido semanal reintenta lo más viejo, si MDBList la añade
         // algún día se acaba recogiendo igual.
         const vinieron = new Set(parsed.map((p) => p.tmdb_id));
-        for (const id of tmdbIds) {
+        for (const id of contestados) {
           if (vinieron.has(id)) continue;
           upsertRating.run({
             tmdb_id: id, imdb: null, imdb_votes: null, rt_critic: null, rt_audience: null,

@@ -327,7 +327,7 @@ function buildSteps({ includeAutoRadarr }) {
       label: 'Aplicar las reglas automáticas de Radarr',
       enabled: () => includeAutoRadarr && has('radarr_url', 'radarr_key') && hayReglasActivas(),
       run: async () => {
-        const r = await runRadarrRules();
+        const r = await runRadarrRules({ esperar: true });
         // una pasada que revienta entera NO puede quedar registrada como paso
         // correcto con un «0 añadidas de 0 candidatas»: eso se lee como «no
         // había nada nuevo» y es justo lo contrario
@@ -451,42 +451,66 @@ export async function runFullRefresh({ trigger = 'manual', includeAutoRadarr = t
     trigger,
   });
 
-  // la fila se abre YA y se reescribe tras CADA paso: un crash deja rastro
-  const runId = db
-    .prepare('INSERT INTO refresh_runs (started_at, trigger_kind, steps) VALUES (?, ?, ?)')
-    .run(Date.now(), trigger, JSON.stringify(steps)).lastInsertRowid;
-  const persist = db.prepare('UPDATE refresh_runs SET steps = ?, finished_at = ? WHERE id = ?');
-
+  // Todo lo que sigue va dentro de un try/finally: si una escritura en la base
+  // falla (disco lleno), `running` se quedaba en true para siempre y ni el
+  // nocturno ni «Actualizar todo» volvían a arrancar hasta reiniciar.
   let done = 0;
-  for (let i = 0; i < all.length; i++) {
-    const entry = steps[i];
-    if (entry.state === 'skipped') continue;
-    const startedAt = Date.now();
-    entry.state = 'running';
-    refreshStatus.step = entry.label;
-    refreshStatus.stepIndex = done;
+  let runId = null;
+  let persist = null;
+  // apuntar el avance nunca puede tumbar la pasada: si no se puede escribir,
+  // los pasos siguen y el estado en memoria sigue diciendo la verdad
+  const apuntar = (finishedAt) => {
     try {
-      entry.detail = (await conTimeout(all[i].run())) || 'hecho';
-      entry.state = 'done';
+      persist?.run(JSON.stringify(steps), finishedAt, runId);
     } catch (err) {
-      entry.state = 'error';
-      entry.detail = String(err?.message || err);
+      refreshStatus.lastError = `No se pudo guardar el avance: ${err?.message || err}`;
     }
-    entry.ms = Date.now() - startedAt;
-    done++;
-    persist.run(JSON.stringify(steps), null, runId);
-  }
+  };
+  try {
+    // la fila se abre YA y se reescribe tras CADA paso: un crash deja rastro
+    try {
+      runId = db
+        .prepare('INSERT INTO refresh_runs (started_at, trigger_kind, steps) VALUES (?, ?, ?)')
+        .run(Date.now(), trigger, JSON.stringify(steps)).lastInsertRowid;
+      persist = db.prepare('UPDATE refresh_runs SET steps = ?, finished_at = ? WHERE id = ?');
+    } catch (err) {
+      refreshStatus.lastError = `No se pudo abrir el registro de la pasada: ${err?.message || err}`;
+    }
 
-  const failed = steps.filter((s) => s.state === 'error');
-  Object.assign(refreshStatus, {
-    running: false,
-    finishedAt: Date.now(),
-    step: null,
-    stepIndex: done,
-    lastError: failed.length ? `${failed.length} paso(s) con error: ${failed.map((s) => s.key).join(', ')}` : null,
-  });
-  persist.run(JSON.stringify(steps), Date.now(), runId);
-  db.prepare('DELETE FROM refresh_runs WHERE started_at < ?').run(Date.now() - 30 * 24 * 3600 * 1000);
-  setSetting('full_refresh_last_run', String(Date.now()));
+    for (let i = 0; i < all.length; i++) {
+      const entry = steps[i];
+      if (entry.state === 'skipped') continue;
+      const startedAt = Date.now();
+      entry.state = 'running';
+      refreshStatus.step = entry.label;
+      refreshStatus.stepIndex = done;
+      try {
+        entry.detail = (await conTimeout(all[i].run())) || 'hecho';
+        entry.state = 'done';
+      } catch (err) {
+        entry.state = 'error';
+        entry.detail = String(err?.message || err);
+      }
+      entry.ms = Date.now() - startedAt;
+      done++;
+      apuntar(null);
+    }
+  } finally {
+    const failed = steps.filter((s) => s.state === 'error');
+    Object.assign(refreshStatus, {
+      running: false,
+      finishedAt: Date.now(),
+      step: null,
+      stepIndex: done,
+      lastError: failed.length
+        ? `${failed.length} paso(s) con error: ${failed.map((s) => s.key).join(', ')}`
+        : refreshStatus.lastError,
+    });
+    apuntar(Date.now());
+    try {
+      db.prepare('DELETE FROM refresh_runs WHERE started_at < ?').run(Date.now() - 30 * 24 * 3600 * 1000);
+      setSetting('full_refresh_last_run', String(Date.now()));
+    } catch {}
+  }
   return refreshStatus;
 }

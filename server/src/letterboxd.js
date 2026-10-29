@@ -1,6 +1,6 @@
 import { parse } from 'csv-parse/sync';
 import { mapPool } from './pool.js';
-import { unzipSync, strFromU8 } from 'fflate';
+import { Unzip, UnzipInflate, strFromU8 } from 'fflate';
 import { db } from './db.js';
 
 // --- title normalisation & matching -----------------------------------------
@@ -82,6 +82,139 @@ const col = (row, ...names) => {
   return null;
 };
 
+// --- reimportaciones: una nota por película, un visionado por día y fuente ---
+
+/**
+ * ratings.csv dice la nota VIGENTE de cada película, pero la clave única lleva
+ * la fecha: cambiar una nota y reimportar el mismo día no entraba (INSERT OR
+ * IGNORE), y otro día dejaba dos filas. Aquí cada película de 'ratings' queda en
+ * una sola fila con la nota de fecha más reciente. Una película se reconoce por
+ * su uri (el enlace boxd.it de la película), por título+año o por tmdb_id.
+ */
+function fusionadorNotas() {
+  const filas = new Map(); // id -> fila
+  const porClave = new Map(); // clave -> Set(id)
+  const claves = (f) => [
+    `t:${f.title}|${f.year ?? ''}`,
+    f.uri ? `u:${f.uri}` : null,
+    f.tmdb_id ? `m:${f.tmdb_id}` : null,
+  ].filter(Boolean);
+  const registrar = (f) => {
+    filas.set(f.id, f);
+    for (const k of claves(f)) {
+      if (!porClave.has(k)) porClave.set(k, new Set());
+      porClave.get(k).add(f.id);
+    }
+  };
+  const olvidar = (f) => {
+    filas.delete(f.id);
+    for (const k of claves(f)) porClave.get(k)?.delete(f.id);
+  };
+  for (const f of db
+    .prepare(`SELECT id, title, year, rating, watched_date, uri, movie_id, tmdb_id FROM lb_entries WHERE list = 'ratings'`)
+    .all()) registrar(f);
+
+  const insert = db.prepare(
+    `INSERT OR IGNORE INTO lb_entries (list, title, year, rating, watched_date, uri, movie_id, tmdb_id)
+     VALUES ('ratings', ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const borrar = db.prepare('DELETE FROM lb_entries WHERE id = ?');
+  const actualizar = db.prepare(
+    `UPDATE lb_entries SET title = ?, year = ?, rating = ?, watched_date = ?, uri = ?,
+       movie_id = COALESCE(?, movie_id), tmdb_id = COALESCE(?, tmdb_id) WHERE id = ?`
+  );
+
+  /** Devuelve true si la nota entra o cambia. */
+  return (n) => {
+    // mismo título y año pero otra uri u otro tmdb_id es OTRA película
+    const distinta = (f) => (f.uri && n.uri && f.uri !== n.uri) || (f.tmdb_id && n.tmdb_id && f.tmdb_id !== n.tmdb_id);
+    const previas = new Set();
+    for (const k of claves(n)) {
+      for (const id of porClave.get(k) || []) if (!distinta(filas.get(id))) previas.add(filas.get(id));
+    }
+    if (!previas.size) {
+      const res = insert.run(n.title, n.year, n.rating, n.watched_date, n.uri, n.movie_id, n.tmdb_id);
+      if (!res.changes) return false;
+      registrar({ ...n, id: Number(res.lastInsertRowid) });
+      return true;
+    }
+    const lista = [...previas].sort((a, b) => a.id - b.id);
+    const masNueva = lista.reduce((a, b) =>
+      ((b.watched_date || '') > (a.watched_date || '') || ((b.watched_date || '') === (a.watched_date || '') && b.id > a.id) ? b : a));
+    // sin fecha en alguno de los dos lados manda lo que se importa ahora; un
+    // export más viejo que la nota guardada no la pisa
+    const ganaNueva = !n.watched_date || !masNueva.watched_date || n.watched_date >= masNueva.watched_date;
+    const queda = ganaNueva ? lista[0] : masNueva;
+    for (const f of lista) if (f !== queda) { borrar.run(f.id); olvidar(f); }
+    if (!ganaNueva) return false;
+    const cambia = queda.rating !== n.rating || queda.watched_date !== n.watched_date || queda.uri !== n.uri ||
+      queda.title !== n.title || queda.year !== n.year || lista.length > 1;
+    if (!cambia && (queda.movie_id === n.movie_id || !n.movie_id) && (queda.tmdb_id === n.tmdb_id || !n.tmdb_id)) return false;
+    actualizar.run(n.title, n.year, n.rating, n.watched_date, n.uri, n.movie_id, n.tmdb_id, queda.id);
+    olvidar(queda);
+    registrar({
+      ...queda, ...n,
+      movie_id: n.movie_id ?? queda.movie_id, tmdb_id: n.tmdb_id ?? queda.tmdb_id,
+    });
+    return cambia;
+  };
+}
+
+// El export enlaza cada entrada del diario como boxd.it/…; el RSS, como
+// letterboxd.com/usuario/film/…/. Por la forma de la uri se sabe de dónde vino.
+const fuenteDiario = (uri) =>
+  !uri ? null
+    : /^https?:\/\/boxd\.it\//i.test(uri) ? 'csv'
+      : /letterboxd\.com\/[^/]+\/film\//i.test(uri) ? 'rss'
+        : null;
+
+/**
+ * El mismo visionado llega dos veces con uris distintas: por el RSS nocturno y
+ * por el CSV del diario del export. No se puede casar una entrada con otra, así
+ * que se cuenta: para cada película y día, cada fuente dice cuántos visionados
+ * conoce, y se guardan tantas filas como diga la que más conozca. Dos
+ * visionados el mismo día de la MISMA fuente siguen siendo dos; uno por fuente
+ * es uno. Las filas sin fecha o con otra uri pasan como siempre.
+ */
+function deduplicadorDiario() {
+  const grupos = new Map(); // clave -> grupo { total, uris: { csv:Set, rss:Set } }
+  const claves = (e) => {
+    const t = normTitle(desescapar(e.title));
+    return [
+      `t:${t || `\u0001${e.title}`}|${e.year ?? ''}|${e.watched_date}`,
+      e.tmdb_id ? `m:${e.tmdb_id}|${e.watched_date}` : null,
+    ].filter(Boolean);
+  };
+  const grupo = (e) => {
+    const ks = claves(e);
+    let g = null;
+    for (const k of ks) if ((g = grupos.get(k))) break;
+    if (!g) g = { total: 0, uris: { csv: new Set(), rss: new Set() } };
+    for (const k of ks) if (!grupos.has(k)) grupos.set(k, g);
+    return g;
+  };
+  for (const e of db
+    .prepare(`SELECT title, year, tmdb_id, watched_date, uri FROM lb_entries
+              WHERE list = 'diary' AND watched_date IS NOT NULL AND uri IS NOT NULL`)
+    .all()) {
+    const fuente = fuenteDiario(e.uri);
+    if (!fuente) continue;
+    const g = grupo(e);
+    if (!g.uris[fuente].has(e.uri)) { g.uris[fuente].add(e.uri); g.total++; }
+  }
+  /** Devuelve false si la entrada es un visionado que ya está por la otra fuente. */
+  return (e) => {
+    const fuente = fuenteDiario(e.uri);
+    if (!fuente || !e.watched_date) return true;
+    const g = grupo(e);
+    if (g.uris[fuente].has(e.uri)) return true; // ya guardada: el INSERT OR IGNORE la salta
+    g.uris[fuente].add(e.uri);
+    if (g.uris[fuente].size <= g.total) return false;
+    g.total++;
+    return true;
+  };
+}
+
 /**
  * Import a Letterboxd export CSV (diary/ratings/watched/watchlist) or a
  * WebTools-NG "letterboxd format" CSV. List type detected from name/headers.
@@ -114,6 +247,8 @@ export function importLetterboxdCsv(buffer, { list = null, filename = '' } = {})
   let imported = 0;
   let matched = 0;
   const tx = db.transaction(() => {
+    const nota = detected === 'ratings' ? fusionadorNotas() : null;
+    const nuevoVisionado = detected === 'diary' ? deduplicadorDiario() : null;
     for (const row of rows) {
       const title = col(row, 'name', 'title');
       if (!title) continue;
@@ -128,8 +263,12 @@ export function importLetterboxdCsv(buffer, { list = null, filename = '' } = {})
       const uri = col(row, 'letterboxd uri') || null;
 
       const movieId = matchMovie({ title, year, tmdbId }, index);
-      const res = insert.run(detected, title, year, ratingNum, watchedDate, uri, movieId, tmdbId);
-      if (res.changes) {
+      const fila = { title, year, rating: ratingNum, watched_date: watchedDate, uri, movie_id: movieId, tmdb_id: tmdbId };
+      let entra;
+      if (nota) entra = nota(fila);
+      else if (nuevoVisionado && !nuevoVisionado(fila)) entra = false;
+      else entra = insert.run(detected, title, year, ratingNum, watchedDate, uri, movieId, tmdbId).changes > 0;
+      if (entra) {
         imported++;
         if (movieId) matched++;
       }
@@ -206,34 +345,65 @@ const isOfficialSlug = (slug) => OFFICIAL_HINTS.some((h) => slug.includes(h));
 // --- zip import -------------------------------------------------------------
 
 // Tope de lo que se descomprime de una tacada. Sin él, un zip preparado de 800 KB
-// se expandía a 765 MB en memoria y tumbaba el contenedor: `unzipSync` saca TODAS
-// las entradas antes de que nadie mire si son .csv. El export real de Letterboxd
-// de una filmoteca grande no llega a 30 MB.
+// se expandía a 765 MB en memoria y tumbaba el contenedor. El export real de
+// Letterboxd de una filmoteca grande no llega a 30 MB.
 const MAX_UNZIPPED = 64 * 1024 * 1024;
 const MAX_ENTRIES = 500;
+// El zip se le da al descompresor en trozos pequeños para cortar en cuanto lo
+// inflado pase del tope: un trozo de 16 KB no se expande a más de ~16 MB.
+const TROZO_ZIP = 16 * 1024;
 
-export function importLetterboxdZip(buffer) {
-  // El tope se aplica DENTRO del filtro, que fflate consulta antes de inflar
-  // cada entrada: comprobarlo después no sirve de nada, porque para entonces la
-  // memoria ya está gastada (40 CSV de 150 MB llevaban el proceso a 2 GB antes
-  // de que nadie dijera nada). Devolviendo `false` no se descomprime, y el
-  // motivo se guarda para avisar al terminar.
+/**
+ * Saca los .csv de un zip contando los bytes que salen DE VERDAD. El tamaño que
+ * declara la cabecera lo escribe quien fabrica el zip: uno de 4 MB que decía
+ * traer 10 bytes y se expandía a 4 GB tenía el servidor congelado casi un
+ * minuto, sin contestar a nada.
+ */
+function descomprimirCsv(buffer) {
+  const files = {};
   let acumulado = 0;
   let entradas = 0;
+  let vistas = 0;
+  let abiertas = 0;
   let motivo = null;
-  const files = unzipSync(new Uint8Array(buffer), {
-    filter: (f) => {
-      if (motivo) return false;
-      if (!f.name.toLowerCase().endsWith('.csv')) return false;
-      if (++entradas > MAX_ENTRIES) { motivo = `el zip trae más de ${MAX_ENTRIES} ficheros`; return false; }
-      acumulado += f.originalSize || 0;
-      if (acumulado > MAX_UNZIPPED) { motivo = 'el zip se expande muchísimo al abrirlo'; return false; }
-      return true;
-    },
-  });
-  if (motivo) {
-    throw new Error(`No se puede abrir: ${motivo}. ¿Seguro que es el export de Letterboxd?`);
+  const uz = new Unzip();
+  uz.register(UnzipInflate);
+  uz.onfile = (f) => {
+    vistas++;
+    if (motivo || !f.name.toLowerCase().endsWith('.csv')) return; // sin start(), no se infla
+    if (++entradas > MAX_ENTRIES) { motivo = `el zip trae más de ${MAX_ENTRIES} ficheros`; return; }
+    const trozos = [];
+    abiertas++;
+    f.ondata = (err, d, final) => {
+      if (motivo) return;
+      if (err) { motivo = 'el zip está dañado'; return; }
+      acumulado += d.length;
+      if (acumulado > MAX_UNZIPPED) {
+        motivo = 'el zip se expande muchísimo al abrirlo';
+        f.terminate();
+        return;
+      }
+      trozos.push(d);
+      if (final) { files[f.name] = Buffer.concat(trozos); abiertas--; }
+    };
+    f.start();
+  };
+  const u8 = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  try {
+    for (let i = 0; i < u8.length && !motivo; i += TROZO_ZIP) {
+      uz.push(u8.subarray(i, i + TROZO_ZIP), i + TROZO_ZIP >= u8.length);
+    }
+  } catch {
+    motivo ||= 'el zip está dañado';
   }
+  if (!motivo && !vistas) motivo = 'no parece un zip';
+  if (!motivo && abiertas) motivo = 'el zip está cortado';
+  if (motivo) throw new Error(`No se puede abrir: ${motivo}. ¿Seguro que es el export de Letterboxd?`);
+  return files;
+}
+
+export function importLetterboxdZip(buffer) {
+  const files = descomprimirCsv(buffer);
   const results = [];
   const lists = [];
   const base = (p) => p.split('/').pop().toLowerCase();
@@ -298,8 +468,12 @@ export function parseRssItems(xml) {
   return out;
 }
 
+// Un usuario de Letterboxd son unos pocos caracteres. El recorte y el ancla no
+// sobran: con `.*letterboxd\.com\/` suelta, un usuario de 300.000 caracteres
+// tenía el proceso 35 s parado, y el nocturno lo repetía cada noche.
 const cleanRssUser = (username) =>
-  String(username || '').trim().replace(/^@/, '').replace(/.*letterboxd\.com\//, '').replace(/\/.*/, '');
+  String(username || '').slice(0, 200).trim().replace(/^@/, '')
+    .replace(/^(?:https?:\/\/)?(?:www\.)?letterboxd\.com\//i, '').replace(/\/.*/, '');
 
 /** Fetch a user's Letterboxd RSS and store recent watched entries as diary. */
 export async function importLetterboxdRss(username) {
@@ -320,8 +494,10 @@ export async function importLetterboxdRss(username) {
   let imported = 0;
   let matched = 0;
   const tx = db.transaction(() => {
+    const nuevoVisionado = deduplicadorDiario();
     for (const it of items) {
       const movieId = matchMovie({ title: it.title, year: it.year, tmdbId: it.tmdbId }, index);
+      if (!nuevoVisionado({ title: it.title, year: it.year, tmdb_id: it.tmdbId, watched_date: it.watchedDate, uri: it.uri })) continue;
       const res2 = insert.run(it.title, it.year, it.rating, it.watchedDate, it.uri, movieId, it.tmdbId);
       if (res2.changes) { imported++; if (movieId) matched++; }
     }
@@ -333,14 +509,20 @@ export async function importLetterboxdRss(username) {
 // --- pasted letterboxd list (public page scrape, best-effort) ---------------
 
 const ENTIDADES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'", '#039': "'" };
+// fromCodePoint lanza fuera de rango, y un `&#99999999;` tumbaba la lista entera
+const codePoint = (n) => (Number.isFinite(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '');
 const desescapar = (t) =>
   String(t || '').replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (todo, e) => {
     const k = e.toLowerCase();
     if (ENTIDADES[k]) return ENTIDADES[k];
-    if (k.startsWith('#x')) return String.fromCodePoint(parseInt(k.slice(2), 16));
-    if (k.startsWith('#')) return String.fromCodePoint(Number(k.slice(1)));
+    if (k.startsWith('#x')) return codePoint(parseInt(k.slice(2), 16));
+    if (k.startsWith('#')) return codePoint(Number(k.slice(1)));
     return todo;
   });
+// un slug con un % suelto («100%-wolf») no es URI válida y decodeURIComponent lanza
+const decodificar = (s) => {
+  try { return decodeURIComponent(s); } catch { return s; }
+};
 
 /**
  * Saca las películas de una página de lista de Letterboxd.
@@ -383,7 +565,7 @@ export function parseListPage(html, seen = new Set(), items = []) {
       const attr = (etiqueta.match(/data-film-release-year="(\d{4})"/i) || [])[1];
       if (attr) year = Number(attr);
     }
-    if (!title) title = decodeURIComponent(slug).replace(/-\d{4}$/, '').replace(/-/g, ' ');
+    if (!title) title = decodificar(slug).replace(/-\d{4}$/, '').replace(/-/g, ' ');
     seen.add(slug);
     items.push({
       position: items.length + 1,
@@ -403,7 +585,7 @@ export async function importLetterboxdListUrl(url) {
   const slug = `lb:${user}/${listSlug}`;
   const items = [];
   const seen = new Set();
-  let nombre = decodeURIComponent(listSlug).replace(/-/g, ' ');
+  let nombre = decodificar(listSlug).replace(/-/g, ' ');
   for (let page = 1; page <= 20; page++) {
     // Una lista de 2.000 títulos son 20 páginas seguidas: pedirlas sin respirar
     // es la forma más rápida de que Letterboxd nos corte. Un cuarto de segundo
@@ -436,28 +618,42 @@ export async function importLetterboxdListUrl(url) {
 
 // Everything you've watched: Plex views + Letterboxd diary/watched/ratings.
 // Used for the "watched" completista ring (distinct from "owned" in Plex).
+//
+// Un título en otro alfabeto normaliza a cadena vacía: su clave sería «|1953» y
+// casaría con cualquier otra película de ese año que tampoco tenga letras
+// latinas. Esas se quedan sin clave por título; con id siguen emparejando.
+const claveVista = (title, year) => {
+  const t = normTitle(title);
+  return t ? `${t}|${year || ''}` : null;
+};
 export function watchedIndex() {
   const keys = new Set();      // normalised "title|year"
   const tmdbIds = new Set();
   const movieIds = new Set();  // library rating_keys that are watched
+  const addKey = (title, year) => {
+    const k = claveVista(title, year);
+    if (k) keys.add(k);
+  };
   for (const m of db.prepare('SELECT rating_key, title, original_title, english_title, year, tmdb_id FROM movies WHERE view_count > 0').all()) {
     movieIds.add(m.rating_key);
     if (m.tmdb_id) tmdbIds.add(m.tmdb_id);
-    keys.add(`${normTitle(m.title)}|${m.year || ''}`);
-    if (m.original_title) keys.add(`${normTitle(m.original_title)}|${m.year || ''}`);
-    if (m.english_title) keys.add(`${normTitle(m.english_title)}|${m.year || ''}`);
+    addKey(m.title, m.year);
+    if (m.original_title) addKey(m.original_title, m.year);
+    if (m.english_title) addKey(m.english_title, m.year);
   }
   for (const e of db.prepare(`SELECT title, year, tmdb_id, movie_id FROM lb_entries WHERE list IN ('diary','watched','ratings')`).all()) {
     if (e.movie_id) movieIds.add(e.movie_id);
     if (e.tmdb_id) tmdbIds.add(e.tmdb_id);
-    keys.add(`${normTitle(e.title)}|${e.year || ''}`);
+    addKey(e.title, e.year);
   }
   return { keys, tmdbIds, movieIds };
 }
-export const isWatched = (item, idx) =>
-  (item.movie_id && idx.movieIds.has(item.movie_id)) ||
-  (item.tmdb_id && idx.tmdbIds.has(item.tmdb_id)) ||
-  idx.keys.has(`${normTitle(item.title)}|${item.year || ''}`);
+export const isWatched = (item, idx) => {
+  if (item.movie_id && idx.movieIds.has(item.movie_id)) return true;
+  if (item.tmdb_id && idx.tmdbIds.has(item.tmdb_id)) return true;
+  const k = claveVista(item.title, item.year);
+  return !!k && idx.keys.has(k);
+};
 
 export function challengeLists() {
   const idx = watchedIndex();
@@ -691,14 +887,26 @@ export function letterboxdSummary() {
   // (WatchStats.jsx), pero aquí salían TODAS las notas del diario — con un
   // Letterboxd de años son ~100 KB de JSON que el móvil baja y parsea para
   // tirar. Si algún día se pagina la tabla, este número sube con ella.
+  //
+  // La nota es la vigente, no la más alta: la de ratings.csv si la hay (es la
+  // que Letterboxd tiene ahora) y si no la del visionado más reciente. Con MAX,
+  // bajar una nota en Letterboxd no se veía nunca aquí.
   const ratingCompare = db
     .prepare(
-      `SELECT m.rating_key, m.title, m.year, m.thumb, MAX(e.rating) * 2 AS lb,
+      `WITH nota AS (
+         SELECT movie_id, rating, ROW_NUMBER() OVER (
+           PARTITION BY movie_id
+           ORDER BY (list = 'ratings') DESC, COALESCE(watched_date, '') DESC, id DESC
+         ) rn
+         FROM lb_entries
+         WHERE list IN ('ratings','diary') AND rating IS NOT NULL AND movie_id IS NOT NULL
+       )
+       SELECT m.rating_key, m.title, m.year, m.thumb, n.rating * 2 AS lb,
               r.letterboxd AS community, r.score AS mdb_score
-       FROM lb_entries e JOIN movies m ON m.rating_key = e.movie_id
+       FROM nota n JOIN movies m ON m.rating_key = n.movie_id
        LEFT JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id
-       WHERE e.list IN ('ratings','diary') AND e.rating IS NOT NULL
-       GROUP BY m.rating_key ORDER BY MAX(e.rating) DESC
+       WHERE n.rn = 1
+       ORDER BY n.rating DESC
        LIMIT 200`
     )
     .all();

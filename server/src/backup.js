@@ -53,8 +53,19 @@ export function listarCopias() {
  * Hace una copia y poda las sobrantes. El nombre lleva la fecha; si ya hay una
  * de hoy (porque lanzaste «Actualizar todo» a mano), se le añade la hora en vez
  * de pisarla.
+ *
+ * Una sola a la vez: dos copias simultáneas (doble clic, o el botón mientras
+ * corre la del nocturno) elegían el mismo nombre y se pisaban hasta no dejar
+ * ninguna. La segunda espera a la primera y hace la suya después.
  */
-export async function hacerCopia({ fecha = new Date() } = {}) {
+let copiaEnCurso = Promise.resolve();
+export function hacerCopia(opts = {}) {
+  const esta = copiaEnCurso.catch(() => {}).then(() => copiar(opts));
+  copiaEnCurso = esta;
+  return esta;
+}
+
+async function copiar({ fecha = new Date() } = {}) {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
   const dia = fecha.toISOString().slice(0, 10);
   let nombre = `powaflex-${dia}.db`;
@@ -63,15 +74,17 @@ export async function hacerCopia({ fecha = new Date() } = {}) {
     nombre = `powaflex-${dia}-${hora}.db`;
   }
   const destino = path.join(BACKUP_DIR, nombre);
+  // se escribe con un nombre que la rotación NO reconoce y se renombra al
+  // terminar: una copia a medias nunca pasa por buena
+  const temporal = `${destino}.tmp`;
   try {
-    await db.backup(destino);
+    await db.backup(temporal);
+    fs.renameSync(temporal, destino);
   } catch (err) {
-    // Si el disco se llena a mitad, better-sqlite3 deja un fichero truncado con
-    // un nombre que la rotación da por bueno: en dos o tres noches las copias
-    // VÁLIDAS habrían desaparecido para hacerle sitio a la basura.
-    // el destino y su diario: SQLite suele limpiar el primero, pero el
-    // «-journal» se queda ahí ocupando sitio tras cada intento fallido
-    for (const f of [destino, `${destino}-journal`]) {
+    // Si el disco se llena a mitad, better-sqlite3 deja un fichero truncado:
+    // fuera, y su «-journal» también, que se queda ocupando sitio tras cada
+    // intento fallido
+    for (const f of [temporal, `${temporal}-journal`]) {
       try { fs.unlinkSync(f); } catch {}
     }
     throw err;

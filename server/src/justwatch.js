@@ -1,4 +1,5 @@
 import { getSetting, cacheRead, cacheWrite } from './db.js';
+import { normTitle } from './letterboxd.js';
 
 const DAY = 24 * 3600 * 1000;
 const ENDPOINT = 'https://apis.justwatch.com/graphql';
@@ -40,9 +41,21 @@ async function search(title, year) {
   if (!res.ok) throw new Error(`JustWatch ${res.status}`);
   const data = await res.json();
   const nodes = (data?.data?.popularTitles?.edges || []).map((e) => e.node).filter((n) => n.objectType === 'MOVIE');
-  if (!nodes.length) return null;
-  // prefer an exact release-year match
-  return (year && nodes.find((n) => n.content?.originalReleaseYear === year)) || nodes[0];
+  // La búsqueda de JustWatch devuelve lo más popular que se le parezca: sin
+  // exigir título Y año, «Avatar» de 1979 se llevaba las ofertas en 4K de la
+  // de 2022. Mejor sin dato que el de otra película. Un título que normaliza
+  // a vacío no casa con nada.
+  const buscado = normTitle(title);
+  if (!buscado) return null;
+  const casa = (n) => {
+    if (normTitle(n.content?.title) !== buscado) return false;
+    if (!year) return true;
+    const y = Number(n.content?.originalReleaseYear);
+    return Number.isFinite(y) && Math.abs(y - year) <= 1;
+  };
+  const buenos = nodes.filter(casa);
+  // dentro de la ventana, el año exacto primero
+  return buenos.find((n) => n.content?.originalReleaseYear === year) || buenos[0] || null;
 }
 
 /**

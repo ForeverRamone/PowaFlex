@@ -2066,7 +2066,13 @@ export function parseListaTabulada(html, spec = {}) {
   return out;
 }
 
-export function splitDirectors(s) {
+/**
+ * `todos`: sin el corte de cuatro letras. Ese corte quita trozos sueltos
+ * («Jr.») al contar directores, pero al VERIFICAR hay que conservar los
+ * mononombres cortos («Sia») y los que no están en latino: `directorsMatch`
+ * sabe qué hacer con ellos.
+ */
+export function splitDirectors(s, { todos = false } = {}) {
   const parts = String(s || '')
     .split(/,|;|&| and | y /i)
     .map((x) => x.trim())
@@ -2077,7 +2083,7 @@ export function splitDirectors(s) {
   const apellido = last.includes(' ') ? last.slice(last.indexOf(' ') + 1) : '';
   return parts
     .map((p) => (p !== last && !p.includes(' ') && apellido ? `${p} ${apellido}` : p))
-    .filter((x) => normName(x).length >= 4);
+    .filter((x) => todos || normName(x).length >= 4);
 }
 
 // nombres comparables entre Wikipedia y TMDB: sin acentos, sin guiones ni
@@ -2194,15 +2200,29 @@ const sameName = (a, b) => {
 /**
  * ¿La dirección que dice Wikipedia casa con la de TMDB? La celda puede traer
  * varios nombres («Ludovic and Zoran Boukherma», «A, B»); basta con que uno
- * coincida. Sin director en la tabla no hay contra qué verificar: pasa.
+ * coincida. Sin director en la tabla no hay contra qué verificar: pasa. Con
+ * texto que no se puede comparar, no pasa.
  */
 export function directorsMatch(wikiDirector, tmdbDirectors) {
   if (!wikiDirector) return true;
-  const wiki = String(wikiDirector)
-    .split(/,|&| and | y /i)
-    .filter((s) => normName(s).length >= 4);
-  if (!wiki.length) return true;
+  const partes = String(wikiDirector).split(/,|&| and | y /i);
   const tm = (tmdbDirectors || []).filter(Boolean);
+  // Una celda CON texto pero sin un nombre comparable («—», «N/A», «?», un
+  // nombre en cirílico o en kanji) no es una celda sin director: no prueba
+  // nada, y dar por buena la verificación dejaba entrar cualquier ficha con el
+  // título parecido. Solo la celda vacía de verdad pasa sin comparar.
+  //
+  // Lo único que sí se puede afirmar sin letras latinas es que el nombre sea
+  // EL MISMO en el mismo alfabeto (TMDB guarda a veces «王兵» tal cual, y sus
+  // alias traen el original).
+  const crudo = (s) => String(s).normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '');
+  const tmCrudos = new Set(tm.map(crudo).filter(Boolean));
+  if (partes.some((w) => !normName(w) && crudo(w) && tmCrudos.has(crudo(w)))) return true;
+  // Los mononombres cortos («Sia») se comparan ENTEROS: con tres letras no hay
+  // tolerancia de grafía que valga, y como prefijo casarían con medio TMDB.
+  const cortos = partes.map(normName).filter((n) => n && n.length < 4);
+  if (cortos.length && tm.some((t) => cortos.includes(normName(t)))) return true;
+  const wiki = partes.filter((s) => normName(s).length >= 4);
   return wiki.some((w) =>
     tm.some((t) => {
       if (sameName(w, t)) return true;
@@ -2234,7 +2254,11 @@ export function directorsMatch(wikiDirector, tmdbDirectors) {
 /** Clave estable de un emparejado (título+año+director normalizados): la usan
  *  la caché film_match y las correcciones manuales de match_overrides. */
 export function festivalOverrideKey(title, year, director) {
-  return `${normName(title)}:${Number(year)}:${normName(director || '')}`;
+  // Un título sin letras latinas («π», «Ψ») normaliza a vacío y todos los de
+  // ese año compartían clave —y corrección manual—. Solo en ese caso va el
+  // título crudo: las claves ya guardadas de los demás no pueden cambiar.
+  const t = normName(title) || String(title || '').normalize('NFC').trim();
+  return `${t}:${Number(year)}:${normName(director || '')}`;
 }
 
 /**
@@ -2781,6 +2805,9 @@ export async function elegirCandidato(row, year, candidatos, inLib, dirsDe, titu
 export async function peliculaPorDirector({ title, year, director }, { personasPosibles, creditosDe, tituloIngles }) {
   if (!director || !Number.isFinite(year)) return null;
   const buscado = normName(title);
+  // un título sin letras comparables («鐵西區», «?») casaría con cualquier
+  // película suya que tampoco las tenga: vacío no es un título
+  if (!buscado) return null;
   const nombres = splitDirectors(director);
   // Se prueban VARIAS personas por nombre, no solo la más popular: hay cuatro
   // «Wang Bing» en TMDB y el de «West of the Tracks» no es el más conocido.
@@ -2808,8 +2835,10 @@ export async function peliculaPorDirector({ title, year, director }, { personasP
     // general (y con el mismo cuerpo mínimo: «Anna» ≠ «Ana»): la errata de una
     // fuente no puede esconder la película
     const plegado = (s) => String(s || '').replace(/([a-z])\1+/g, '$1');
-    const clava = (s) =>
-      normName(s) === buscado || (buscado.length >= 5 && plegado(normName(s)) === plegado(buscado));
+    const clava = (s) => {
+      const n = normName(s);
+      return !!n && (n === buscado || (buscado.length >= 5 && plegado(n) === plegado(buscado)));
+    };
     const porTitulo = dirigidas.filter((c) => clava(c.title) || clava(c.original_title));
     if (porTitulo.length) return porTitulo.sort((a, b) => distancia(a) - distancia(b))[0].id;
 
@@ -2827,7 +2856,8 @@ export async function peliculaPorDirector({ title, year, director }, { personasP
       // por estar dentro de otro título sería colar cualquier cosa — y por aquí
       // pasan ahora más filas que antes, porque la vuelta de la ventana ya no
       // acepta una ficha sin mirarle el título.
-      if (normName(en) === buscado || (buscado.length >= 8 && normName(en).includes(buscado))) return c.id;
+      const nEn = normName(en);
+      if (nEn && (nEn === buscado || (buscado.length >= 8 && nEn.includes(buscado)))) return c.id;
     }
 
     // Y NO hay regla 3. La tentación era aceptar «la única película suya de ese
@@ -3186,7 +3216,7 @@ export function marcarGanadoras(films, filasDelPremio) {
     // dos fichas distintas con el mismo título son dos películas distintas: ahí
     // el título ya no prueba nada y sin dirección que lo avale no se marca
     if (pelicula.tmdb_id && fila.tmdb_id && !normName(fila.director || '')) return false;
-    return directorsMatch(fila.director, splitDirectors(pelicula.director));
+    return directorsMatch(fila.director, splitDirectors(pelicula.director, { todos: true }));
   };
   for (const pelicula of films) {
     if ((filasDelPremio || []).some((fila) => esLaGanadora(pelicula, fila))) pelicula.winner = true;

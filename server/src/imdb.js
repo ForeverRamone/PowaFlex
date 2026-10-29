@@ -1,6 +1,6 @@
 import zlib from 'node:zlib';
 import readline from 'node:readline';
-import { Readable } from 'node:stream';
+import { Readable, pipeline } from 'node:stream';
 import { db, getSetting, setSetting } from './db.js';
 
 /**
@@ -65,10 +65,13 @@ export async function importImdbRatings({ onProgress = null } = {}) {
     const res = await fetch(URL_RATINGS, { signal: AbortSignal.timeout(180000) });
     if (!res.ok) throw new Error(`IMDb respondió ${res.status}`);
 
-    const lineas = readline.createInterface({
-      input: Readable.fromWeb(res.body).pipe(zlib.createGunzip()),
-      crlfDelay: Infinity,
-    });
+    // pipeline y no .pipe: con .pipe, un corte de la descarga (o el timeout a
+    // mitad) es un 'error' sin nadie escuchando y tumba el proceso entero, y
+    // con él el resto del pase nocturno. Así llega al gunzip, y de ahí al
+    // for await, como un rechazo normal.
+    const gunzip = zlib.createGunzip();
+    pipeline(Readable.fromWeb(res.body), gunzip, () => {});
+    const lineas = readline.createInterface({ input: gunzip, crlfDelay: Infinity });
 
     const ins = db.prepare('INSERT OR REPLACE INTO imdb_ratings (tconst, rating, votes) VALUES (?, ?, ?)');
     let n = 0;
