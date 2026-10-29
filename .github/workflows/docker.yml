@@ -10,7 +10,30 @@ permissions:
   packages: write
 
 jobs:
+  # La imagen no se publica si los tests o el build de la web fallan: antes se
+  # construía y subía sin ejecutar ni uno.
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Tests del servidor
+        run: npm test --workspace=server
+
+      - name: Build de la web
+        run: npm run build
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
