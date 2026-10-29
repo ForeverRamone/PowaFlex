@@ -29,7 +29,7 @@ const VERSIONES = [
     fecha: '2026-10-29',
     titular: 'Una auditoría a fondo: más seguridad, menos sorpresas con Radarr y páginas más rápidas',
     puntos: [
-      'Sin contraseña, PowaFlex solo responde a nombres de tu red: una web ajena ya no puede leer tus claves. Si entras por un dominio propio, decláralo en POWAFLEX_HOSTS.',
+      'Sin contraseña, tus claves de Plex, Radarr y TMDB solo se ven y se cambian desde tu red: una web ajena ya no puede leerlas. El resto funciona igual que siempre.',
       'Si TMDB no contesta, una película candidata espera a otra noche en lugar de saltarse la cuarentena y los filtros de cortos, telefilmes y documentales.',
       'Sincronizar con Plex ya no hace que las reglas vean como nuevas películas que ya tienes, y una biblioteca que vuelve vacía no se borra.',
       'Una dirección en otro alfabeto o un título hecho solo de signos ya no casan con cualquier ficha.',

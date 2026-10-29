@@ -6,8 +6,8 @@ export default {
   // ── Beta 1.33 ──────────────────────────────────────────────
   'Una auditoría a fondo: más seguridad, menos sorpresas con Radarr y páginas más rápidas':
     'A thorough audit: tighter security, fewer Radarr surprises and faster pages',
-  'Sin contraseña, PowaFlex solo responde a nombres de tu red: una web ajena ya no puede leer tus claves. Si entras por un dominio propio, decláralo en POWAFLEX_HOSTS.':
-    'Without a password, PowaFlex only answers to names on your network: another website can no longer read your keys. If you come in through your own domain, declare it in POWAFLEX_HOSTS.',
+  'Sin contraseña, tus claves de Plex, Radarr y TMDB solo se ven y se cambian desde tu red: una web ajena ya no puede leerlas. El resto funciona igual que siempre.':
+    'Without a password, your Plex, Radarr and TMDB keys can only be seen and changed from your network: another website can no longer read them. Everything else works as always.',
   'Si TMDB no contesta, una película candidata espera a otra noche en lugar de saltarse la cuarentena y los filtros de cortos, telefilmes y documentales.':
     'If TMDB does not answer, a candidate film waits for another night instead of skipping quarantine and the short, TV-movie and documentary filters.',
   'Sincronizar con Plex ya no hace que las reglas vean como nuevas películas que ya tienes, y una biblioteca que vuelve vacía no se borra.':

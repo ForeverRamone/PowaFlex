@@ -44,10 +44,12 @@ Luego:
 
 ```bash
 git commit && git push origin main
-git tag -a v1.0.N-beta -m "…" && git push origin v1.0.N-beta
-gh release create v1.0.N-beta --title "Beta 1.0N" --prerelease --notes "<sección del changelog>"
-gh run watch   # esperar las DOS pasadas de CI en verde (~3 min, multiarco)
+gh run watch   # tests → imagen (latest + 1.0.N-beta, multiarco) → tag y release
 ```
+
+El job `release` de `.github/workflows/docker.yml` crea el tag `v1.0.N-beta` y la release
+(título = `versionLabel`, notas = la sección del CHANGELOG) si no existen: no hace falta
+crearlos a mano.
 
 No saltar de major por tu cuenta. Autoría de git: `ForeverRamone <foreverramone@users.noreply.github.com>`.
 

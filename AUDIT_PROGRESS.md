@@ -58,8 +58,8 @@ Detalle de cada arreglo: `CHANGELOG.md`, Beta 1.33, y los mensajes de commit.
 ## Pendiente (por prioridad)
 
 1. **Contraauditoría adversarial de los cambios de esta rama** (no hecha).
-2. **Cambio incompatible**: quien entre por dominio propio sin `POWAFLEX_AUTH` necesita
-   `POWAFLEX_HOSTS`. Documentado en README, docker-compose y CHANGELOG.
+2. Sin `POWAFLEX_AUTH` y desde un dominio propio no declarado en `POWAFLEX_HOSTS`, las rutas de
+   credenciales dan 403 (el resto del panel funciona). Documentado en README y CHANGELOG.
 3. Datos ya guardados que el código nuevo no repara (sin migraciones destructivas):
    `movies.tmdb_id` que el respaldo «primero del año» resolvió mal en el pasado; filas duplicadas
    de Letterboxd (notas y visionados RSS/CSV) en bases existentes.

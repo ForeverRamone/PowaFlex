@@ -10,16 +10,18 @@ se llegó a cada arreglo vive en el mensaje del commit, no aquí.
 
 **Auditoría completa del servidor, la interfaz y las integraciones: cada fallo demostrado lleva un test que fallaba con la 1.32 y pasa ahora (468 → 515 tests).**
 
-### Cambio incompatible: sin contraseña, solo nombres de tu red
+### Sin contraseña, las credenciales solo desde tu red
 
 Sin `POWAFLEX_AUTH`, una web cualquiera podía hacer que su dominio resolviera a la IP de
 PowaFlex (*DNS rebinding*): Origin y Host casaban y el cortafuegos anti-CSRF no veía nada.
 Reproducido contra el servidor real: `GET /api/backup/settings` devolvía el token de Plex y las
 claves de Radarr y TMDB en claro, y `PUT /api/settings` cambiaba `plex_url`. Ahora, sin
-contraseña, solo se responde a IPs, `localhost`, nombres sin punto y dominios locales
-(`.local`, `.lan`, `.home.arpa`, `.internal`, `.ts.net`…). **Quien entre por un dominio propio
-sin `POWAFLEX_AUTH` tiene que declararlo en `POWAFLEX_HOSTS`**; el 403 dice exactamente qué
-poner. Con `POWAFLEX_AUTH` nada cambia. `/api/version` sigue abierta para el healthcheck.
+contraseña y desde un nombre que no es de tu red (IPs, `localhost`, nombres sin punto,
+`.local`, `.lan`, `.home.arpa`, `.internal`, `.ts.net`…), se niegan solo las copias de ajustes
+y de la base y los cambios de URL o claves. **El resto del panel funciona igual por cualquier
+nombre: actualizar no exige tocar nada.** Un dominio propio se puede declarar en
+`POWAFLEX_HOSTS` para gestionar también las credenciales desde él. Con `POWAFLEX_AUTH` nada
+cambia.
 
 ### Lo que podía tumbar el proceso o congelarlo
 
@@ -94,7 +96,8 @@ en castellano con la interfaz en inglés; desborde a 390 px en Automatismos.
 ### CI
 
 Los tests y el build de la web bloquean la publicación de la imagen: antes se publicaba sin
-ejecutar ninguno.
+ejecutar ninguno. Desplegar es solo subir a `main`: la imagen sale como `latest` y con su
+versión (`1.0.33-beta`), y el tag y la release se crean solos con esta sección del CHANGELOG.
 
 ## Beta 1.32 (1.0.32-beta) — 2026-09-18
 

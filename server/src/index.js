@@ -181,24 +181,23 @@ if (process.env.POWAFLEX_AUTH) {
   });
   console.log('[PowaFlex] Autenticación básica activada (POWAFLEX_AUTH)');
 } else {
-  // Sin contraseña, el nombre con el que te llaman tiene que ser de tu red: ver
-  // hosts.js (DNS rebinding). Con POWAFLEX_AUTH no hace falta, porque el
-  // navegador no manda tus credenciales al dominio de nadie.
+  // Sin contraseña se apunta si el nombre con el que te llaman es de tu red
+  // (ver hosts.js, DNS rebinding). No se corta la petición: el panel funciona
+  // igual por un dominio propio sin tocar nada. Lo que se niega a un nombre de
+  // fuera son solo las rutas que entregan o redirigen credenciales (ver
+  // `nombreAjeno`). Con POWAFLEX_AUTH no hace falta: el navegador no manda tus
+  // credenciales al dominio de nadie.
   const declarados = hostsDeclarados();
-  app.addHook('onRequest', async (req, reply) => {
-    if (AUTH_OPEN_PATHS.has((req.raw.url || '').split('?')[0])) return;
+  app.addHook('onRequest', async (req) => {
     // X-Forwarded-Host también: tras un proxy inverso es el nombre que escribió
     // el navegador, y desde una web con rebinding la puede poner quien llama
     for (const h of [req.headers.host, req.headers['x-forwarded-host']]) {
       if (h == null) continue;
       const primero = String(h).split(',')[0];
-      if (hostDeConfianza(primero, declarados)) continue;
-      reply.code(403);
-      return reply.send({
-        error:
-          `PowaFlex no responde al nombre «${nombreDeHost(primero).slice(0, 100)}» sin contraseña: ` +
-          'añádelo a POWAFLEX_HOSTS o activa POWAFLEX_AUTH',
-      });
+      if (!hostDeConfianza(primero, declarados)) {
+        req.nombreAjeno = nombreDeHost(primero).slice(0, 100) || '(vacío)';
+        return;
+      }
     }
   });
   console.warn(
@@ -293,6 +292,23 @@ function entero(valor, porDefecto, { min = 0, max = Number.MAX_SAFE_INTEGER, cer
 
 /** Un id de TMDB de verdad: entero, positivo y dentro del rango seguro. */
 const idTmdbValido = (v) => Number.isSafeInteger(Number(v)) && Number(v) > 0;
+
+/**
+ * Las rutas que entregan credenciales (copias de ajustes y de la base) o que
+ * deciden a dónde viajan (URL y claves de Plex/Radarr/TMDB/MDBList) no se
+ * sirven a un nombre de fuera de tu red sin contraseña: es lo que buscaría una
+ * web con DNS rebinding. Devuelve el cuerpo del 403, o null si se puede seguir.
+ */
+function credencialesNegadas(req, reply) {
+  if (!req.nombreAjeno) return null;
+  reply.code(403);
+  return {
+    error:
+      `Por seguridad, desde «${req.nombreAjeno}» y sin contraseña no se pueden ver ni cambiar ` +
+      'las credenciales: entra por la IP del servidor, o declara ese nombre en POWAFLEX_HOSTS ' +
+      'o activa POWAFLEX_AUTH',
+  };
+}
 
 // Rutas de disco fuera de los mensajes de error: un ENOENT trae la ruta entera
 // del contenedor, y eso no pinta en una pantalla.
@@ -390,6 +406,15 @@ function urlDeServicioValida(v) {
 
 app.put('/api/settings', async (req, reply) => {
   const body = req.body || {};
+  // tocar una URL o una clave (no el «••••» que devuelve la pantalla) es
+  // decidir a dónde viajan las credenciales
+  const tocaCredenciales = Object.entries(body).some(
+    ([k, v]) => URL_SETTINGS.has(k) || (SECRET_KEYS.has(k) && !(typeof v === 'string' && v.startsWith('••••')))
+  );
+  if (tocaCredenciales) {
+    const negado = credencialesNegadas(req, reply);
+    if (negado) return negado;
+  }
   const ignoradas = [];
   let invalidar = false;
   for (const [k, v] of Object.entries(body)) {
@@ -559,6 +584,8 @@ app.get('/api/festivals/:key/:year', async (req, reply) => {
 // de SQLite (una lectura coherente aunque haya escrituras en marcha y WAL a
 // medias) y se sirve esa copia, nunca el fichero vivo.
 app.get('/api/backup/database', async (req, reply) => {
+  const negado = credencialesNegadas(req, reply);
+  if (negado) return negado;
   const tmp = path.join(os.tmpdir(), `powaflex-backup-${process.pid}-${Date.now()}.db`);
   await db.backup(tmp);
   const fecha = new Date().toISOString().slice(0, 10);
@@ -573,6 +600,8 @@ app.get('/api/backup/database', async (req, reply) => {
 // los secretos): es una copia para reinstalar, no una pantalla. Solo las claves
 // que se pueden escribir, nada de contadores ni estado interno.
 app.get('/api/backup/settings', async (req, reply) => {
+  const negado = credencialesNegadas(req, reply);
+  if (negado) return negado;
   const settings = {};
   // getSetting (no getAllSettings) porque este descifra: con POWAFLEX_SECRET
   // activo, el crudo son blobs «enc:v1:…» cifrados con ESTE secreto, y
@@ -589,6 +618,8 @@ app.get('/api/backup/settings', async (req, reply) => {
 });
 
 app.post('/api/backup/settings', async (req, reply) => {
+  const negado = credencialesNegadas(req, reply);
+  if (negado) return negado;
   const body = req.body || {};
   if (body.app !== 'powaflex' || body.kind !== 'ajustes' || typeof body.settings !== 'object' || !body.settings) {
     reply.code(400);

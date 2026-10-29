@@ -49,6 +49,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Versión
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Metadatos de la imagen
         id: meta
         uses: docker/metadata-action@v6
@@ -56,6 +60,7 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/powaflex
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.version }},enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=ref,event=tag
 
@@ -69,3 +74,32 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # El tag y la release salen solos al subir a main una versión nueva: así
+  # desplegar es solo «push a main». Si el tag ya existe no hace nada. Un tag
+  # creado con GITHUB_TOKEN no relanza este workflow, y no hace falta: la
+  # imagen ya va etiquetada con la versión desde el paso de metadatos.
+  release:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag y release de la versión
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          label=$(node -p "require('./server/package.json').versionLabel")
+          tag="v$version"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "La release $tag ya existe"
+            exit 0
+          fi
+          # la sección de esta versión en el CHANGELOG, sin la cabecera
+          awk -v l="$label" 'index($0, "## " l " ") == 1 {dentro=1; next} /^## / {if (dentro) exit} dentro' CHANGELOG.md > notas.md
+          test -s notas.md || echo "$label" > notas.md
+          gh release create "$tag" --target "$GITHUB_SHA" --title "$label" --prerelease --notes-file notas.md

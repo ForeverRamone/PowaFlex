@@ -62,11 +62,8 @@ const get = async (ruta) => {
 before(async () => {
   servidor = spawn(process.execPath, ['server/src/index.js'], {
     cwd: raiz,
-    // sin contraseña, el dominio del proxy inverso se declara (ver hosts.js)
-    env: {
-      ...process.env, DATA_DIR: dataDir, PORT: String(PUERTO), POWAFLEX_AUTH: '',
-      POWAFLEX_HOSTS: 'powaflex.midominio.com',
-    },
+    // sin POWAFLEX_HOSTS a propósito: actualizar no puede exigir tocar nada
+    env: { ...process.env, DATA_DIR: dataDir, PORT: String(PUERTO), POWAFLEX_AUTH: '', POWAFLEX_HOSTS: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   servidor.stdout.on('data', (d) => { salida += d; });
@@ -295,7 +292,7 @@ test('un proxy inverso que anuncia X-Forwarded-Host no queda bloqueado', async (
 // DNS rebinding: una web cuyo dominio resuelve a la IP de PowaFlex manda Origin y
 // Host suyos, que casan entre sí. Sin contraseña, un nombre que no es de la red
 // local ni está declarado no recibe respuesta, ni siquiera en GET.
-test('sin contraseña, un nombre de fuera de la red no lee nada', async () => {
+test('sin contraseña, un nombre de fuera de la red usa el panel pero no toca credenciales', async () => {
   // con node:http y no con fetch: fetch reescribe la cabecera Host
   const pedir = (ruta, { method = 'GET', headers = {}, body = null } = {}) =>
     new Promise((resolve, reject) => {
@@ -317,10 +314,19 @@ test('sin contraseña, un nombre de fuera de la red no lee nada', async () => {
     }),
     403
   );
-  assert.equal(await pedir('/', { headers: ajeno }), 403);
-  // lo de casa sigue entrando, y el healthcheck de Docker sigue abierto
-  assert.equal(await pedir('/api/settings', { headers: { Host: `127.0.0.1:${PUERTO}` } }), 200);
-  assert.equal(await pedir('/api/settings', { headers: { Host: 'beelink' } }), 200);
+  assert.equal(await pedir('/api/backup/database', { headers: ajeno }), 403);
+  // el resto del panel funciona por cualquier nombre (un proxy con dominio propio)
+  assert.equal(await pedir('/', { headers: ajeno }), 200);
+  assert.equal(await pedir('/api/settings', { headers: ajeno }), 200);
+  assert.equal(
+    await pedir('/api/settings', {
+      method: 'PUT', headers: { ...ajeno, 'Content-Type': 'application/json' }, body: '{"ui_theme":"dark"}',
+    }),
+    200
+  );
+  // y desde casa las credenciales sí
+  assert.equal(await pedir('/api/backup/settings', { headers: { Host: `127.0.0.1:${PUERTO}` } }), 200);
+  assert.equal(await pedir('/api/backup/settings', { headers: { Host: 'beelink' } }), 200);
   assert.equal(await pedir('/api/version', { headers: { Host: 'evil.example' } }), 200);
 });
 

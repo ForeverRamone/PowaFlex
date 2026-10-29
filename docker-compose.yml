@@ -26,9 +26,10 @@ services:
       # cualquiera en la red local puede leer y cambiar los ajustes, así que es
       # muy recomendable si el puerto queda expuesto.
       # - POWAFLEX_AUTH=usuario:contraseña
-      # Sin POWAFLEX_AUTH solo se responde a nombres de tu red (IP, nombre del
-      # equipo, .local, .lan…). Si entras por un dominio propio tras un proxy
-      # inverso, decláralo aquí (varios separados por comas):
+      # Opcional. Sin POWAFLEX_AUTH, las credenciales solo se ven y cambian desde
+      # nombres de tu red (IP, nombre del equipo, .local, .lan…); el resto del
+      # panel va por cualquier nombre. Para gestionarlas también desde un
+      # dominio propio tras un proxy inverso (varios separados por comas):
       # - POWAFLEX_HOSTS=cine.midominio.com
     labels:
       - net.unraid.docker.icon=https://raw.githubusercontent.com/ForeverRamone/PowaFlex/main/assets/icon.png
