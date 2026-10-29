@@ -656,7 +656,9 @@ export function pickSearchResult(results, title, year = null) {
 export async function searchMovieId(title, year = null) {
   // sin letras comparables `pickSearchResult` no acepta nada: ni se pregunta
   if (!title || !normTitle(title)) return null;
-  const key = `movie_search:${title.toLowerCase()}:${year || ''}`;
+  // v2: pickSearchResult ya no se queda con «el primero del año» sin que case
+  // el título; lo cacheado antes puede guardar esos ids
+  const key = `movie_search:v2:${title.toLowerCase()}:${year || ''}`;
   const cached = cacheRead(key, 30 * DAY);
   if (cached?.id) return cached.id;
   if (cached && cacheRead(key, DAY)) return null; // fresh miss
@@ -778,7 +780,9 @@ export async function searchMovieCandidates(title, year = null) {
         const enAño =
           !Number.isFinite(year) ||
           (c.date && Math.abs(Number(String(c.date).slice(0, 4)) - year) <= 1);
-        return enAño && (normTitle(c.title) === buscado || normTitle(c.original_title) === buscado);
+        // un título que normaliza a vacío (otro alfabeto) no «clava» nada: si
+        // no, cualquier candidata en otro alfabeto cortaba la búsqueda
+        return enAño && !!buscado && (normTitle(c.title) === buscado || normTitle(c.original_title) === buscado);
       });
 
     // El orden es de más barato a más caro, y cada escalón solo se sube si el

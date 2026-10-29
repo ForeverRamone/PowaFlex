@@ -463,7 +463,7 @@ export async function recolectarApariciones({ years = VENTANA_AÑOS } = {}) {
 
 // --- la criba barata, ANTES de gastar una sola petición ----------------------
 
-const CATALOGO = new Map(DIRECTORS_2026.map((d) => [normName(d.name), d]));
+const CATALOGO = new Map(DIRECTORS_2026.map((d) => [normName(d.name), d]).filter(([clave]) => clave));
 
 /**
  * A quién sigues ya como director/a, por NOMBRE normalizado y por id de TMDB.

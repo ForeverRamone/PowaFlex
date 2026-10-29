@@ -277,3 +277,45 @@ test('partir una lista de nombres es lineal y respeta los paréntesis', () => {
   partirNombres(','.repeat(300000));
   assert.ok(Date.now() - t0 < 1000);
 });
+
+// --- rendimiento: que las mejoras no se pierdan ni cambien resultados -----------
+
+test('las parrillas de personas van por un índice que cubre la consulta', async () => {
+  const nombres = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all().map((r) => r.name);
+  assert.ok(nombres.includes('idx_mp_role_movie') && nombres.includes('idx_mp_person_movie'));
+  assert.ok(!nombres.includes('idx_mp_role') && !nombres.includes('idx_mp_person'), 'quedan los índices viejos');
+  const plan = db
+    .prepare(
+      `EXPLAIN QUERY PLAN SELECT mp.person_id, COUNT(*) FROM movie_people mp
+       JOIN movies m ON m.rating_key = mp.movie_id WHERE mp.role = 'actor' GROUP BY mp.person_id`
+    )
+    .all()
+    .map((r) => r.detail)
+    .join(' | ');
+  assert.match(plan, /COVERING INDEX idx_mp_role_movie/);
+});
+
+test('el recuento de la biblioteca da lo mismo que la consulta completa', async () => {
+  const { listMovies } = await import('../src/queries.js');
+  db.prepare('DELETE FROM movies').run();
+  db.prepare('DELETE FROM mdb_ratings').run();
+  db.prepare('DELETE FROM movie_people').run();
+  const insM = db.prepare('INSERT INTO movies (rating_key, title, tmdb_id, year) VALUES (?, ?, ?, ?)');
+  const insR = db.prepare('INSERT INTO mdb_ratings (tmdb_id, imdb, fetched_at) VALUES (?, ?, 1)');
+  const insP = db.prepare('INSERT INTO movie_people (movie_id, person_id, role) VALUES (?, ?, ?)');
+  for (let i = 1; i <= 40; i++) {
+    insM.run(i, `Película ${i}`, i % 7 ? 500 + i : null, 1950 + i);
+    if (i % 3) insR.run(500 + i, 5 + (i % 5));
+    if (i % 4 === 0) { insP.run(i, 9, 'director'); insP.run(i, 9, 'writer'); }
+  }
+  const referencia = (where, args = [], join = '') =>
+    db.prepare(`SELECT COUNT(DISTINCT m.rating_key) n FROM movies m
+                LEFT JOIN mdb_ratings r ON r.tmdb_id = m.tmdb_id ${join} ${where}`).get(...args).n;
+  assert.equal(listMovies({}).total, referencia(''));
+  assert.equal(listMovies({ imdbMin: 7 }).total, referencia('WHERE r.imdb >= ?', [7]));
+  assert.equal(listMovies({ yearMin: 1970 }).total, referencia('WHERE m.year >= ?', [1970]));
+  // persona con dos oficios en la misma película: no puede contar dos veces
+  const conPersona = 'JOIN movie_people mpf ON mpf.movie_id = m.rating_key AND mpf.person_id = 9';
+  assert.equal(listMovies({ personId: 9 }).total, referencia('', [], conPersona));
+  assert.equal(listMovies({ personId: 9 }).total, 10);
+});

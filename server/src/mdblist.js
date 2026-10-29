@@ -457,7 +457,12 @@ export function insights() {
   const all = (sql) => db.prepare(sql).all();
   // "Your rating" is your Letterboxd rating (0–5) scaled to 0–10 — the Plex
   // personal rating was removed in v0.5.
-  const MINE = `(SELECT MAX(rating) * 2 FROM lb_entries WHERE movie_id = m.rating_key AND rating IS NOT NULL)`;
+  // La nota VIGENTE, la misma que enseña Letterboxd y ratingCompare: la de la
+  // lista de notas si la hay, y si no la del visionado más reciente. Con MAX,
+  // una nota rebajada quedaba tapada para siempre por un visionado viejo.
+  const MINE = `(SELECT rating * 2 FROM lb_entries WHERE movie_id = m.rating_key AND rating IS NOT NULL
+                   AND list IN ('ratings', 'diary')
+                 ORDER BY (list = 'ratings') DESC, COALESCE(watched_date, '') DESC, id DESC LIMIT 1)`;
   return {
     // you love them, critics don't
     hiddenGems: all(

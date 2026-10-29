@@ -78,11 +78,18 @@ CREATE TABLE IF NOT EXISTS movie_people (
   ord INTEGER,
   PRIMARY KEY (movie_id, person_id, role)
 );
-CREATE INDEX IF NOT EXISTS idx_mp_person ON movie_people(person_id, role);
+-- Los dos índices llevan movie_id al final para CUBRIR la consulta: sin él,
+-- cada uno de los ~113.000 créditos de actor obligaba a ir a la tabla a por el
+-- movie_id del JOIN (Personas/actor: 155 → 85 ms en una base de 12.400
+-- películas). Nombres nuevos a propósito: con el mismo nombre, el IF NOT EXISTS
+-- dejaba sin tocar las bases ya creadas. Los viejos se quitan abajo.
+CREATE INDEX IF NOT EXISTS idx_mp_person_movie ON movie_people(person_id, role, movie_id);
 -- las parrillas de Personas, los huecos de biblioteca y los «top» filtran SOLO
--- por oficio, y con idx_mp_person (person_id primero) eso recorría la tabla
--- entera —cientos de miles de filas— montando dos B-trees temporales
-CREATE INDEX IF NOT EXISTS idx_mp_role ON movie_people(role, person_id);
+-- por oficio, y con el índice por persona eso recorría la tabla entera
+-- —cientos de miles de filas— montando dos B-trees temporales
+CREATE INDEX IF NOT EXISTS idx_mp_role_movie ON movie_people(role, person_id, movie_id);
+DROP INDEX IF EXISTS idx_mp_person;
+DROP INDEX IF EXISTS idx_mp_role;
 CREATE INDEX IF NOT EXISTS idx_mp_movie ON movie_people(movie_id);
 
 CREATE TABLE IF NOT EXISTS tags (
@@ -176,7 +183,7 @@ CREATE TABLE IF NOT EXISTS lb_entries (
   UNIQUE (list, title, year, watched_date, uri)
 );
 CREATE INDEX IF NOT EXISTS idx_lb_list ON lb_entries(list);
--- «Tu nota» sale SIEMPRE de aquí (SELECT MAX(rating) FROM lb_entries WHERE
+-- «Tu nota» sale SIEMPRE de aquí (la vigente de lb_entries por
 -- movie_id = m.rating_key), y Visionado la pide hasta tres veces por fila sobre
 -- la biblioteca entera: sin índice por movie_id cada una de esas consultas
 -- recorría las miles de entradas de Letterboxd por película. Con 12.400 fichas

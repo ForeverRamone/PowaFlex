@@ -64,10 +64,13 @@ const dismissedIds = () =>
 // que el umbral de ruido por sí solo descartaba cine de verdad: una película
 // pasa si llega al listón en TMDB, en Letterboxd **o** en IMDb (esta última
 // desde la 1.04, del volcado local: es la más completa y no gasta API).
-const lbVotesMap = () =>
-  new Map(
-    db.prepare('SELECT tmdb_id, lb_votes FROM mdb_ratings WHERE lb_votes IS NOT NULL').all().map((r) => [r.tmdb_id, r.lb_votes])
-  );
+// Consulta puntual y no un Map de la tabla entera: con una biblioteca grande,
+// mdb_ratings tiene más de 130.000 filas y montar el Map costaba 100-160 ms de
+// hilo bloqueado en cada reconstrucción, para mirar unos pocos miles de ids.
+const lbVotesMap = () => {
+  const st = db.prepare('SELECT lb_votes FROM mdb_ratings WHERE tmdb_id = ?');
+  return { get: (id) => st.get(id)?.lb_votes ?? undefined };
+};
 
 /**
  * Las dos películas por las que se reconoce a alguien, para no tener que abrir

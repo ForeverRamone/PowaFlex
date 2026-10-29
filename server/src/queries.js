@@ -190,7 +190,7 @@ export function topPeople({ role = 'director', limit = 30, offset = 0, search = 
        JOIN people p ON p.id = mp.person_id
        JOIN movies m ON m.rating_key = mp.movie_id
        WHERE ${conds.join(' AND ')}
-       GROUP BY p.id ORDER BY n DESC, p.name LIMIT ? OFFSET ?`
+       GROUP BY mp.person_id ORDER BY n DESC, p.name LIMIT ? OFFSET ?`
     )
     .all(...args);
 }
@@ -285,8 +285,15 @@ export function listMovies(q) {
   const offset = Number(q.offset) || 0;
   const bound = [...joinArgs, ...args];
 
+  // El recuento solo cruza con las notas si algún filtro las usa (la clave de
+  // mdb_ratings es tmdb_id, así que el cruce no multiplica filas): sin filtro
+  // de nota se leían 12.400 filas anchas para nada. Y sin cruces que puedan
+  // repetir película (etiquetas, persona con dos oficios) basta un COUNT(*).
+  const usaNotas = Boolean(q.imdbMin || q.rtMin || q.lbMin);
+  const cuentaSql = usaNotas ? joinSql : joins.join('\n');
+  const contar = joins.length ? 'COUNT(DISTINCT m.rating_key)' : 'COUNT(*)';
   const total = db
-    .prepare(`SELECT COUNT(DISTINCT m.rating_key) n FROM movies m ${joinSql} ${whereSql}`)
+    .prepare(`SELECT ${contar} n FROM movies m ${cuentaSql} ${whereSql}`)
     .get(...bound).n;
 
   const rows = db

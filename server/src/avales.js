@@ -54,8 +54,10 @@ function mapaDeEmparejados() {
   const mapa = new Map();
   const corte = Date.now() - 365 * 24 * 3600 * 1000;
   for (const r of db
-    .prepare('SELECT key, json, fetched_at FROM tmdb_cache WHERE key LIKE ?')
-    .all(`${prefijo}%`)) {
+    // GLOB y no LIKE: LIKE no distingue mayúsculas y la clave es BINARY, así que
+    // no usaba el índice y recorría la caché entera; GLOB busca por rango
+    .prepare('SELECT key, json, fetched_at FROM tmdb_cache WHERE key GLOB ?')
+    .all(`${prefijo}*`)) {
     if (r.fetched_at < corte) continue;
     try {
       const id = JSON.parse(r.json)?.id;

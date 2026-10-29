@@ -899,6 +899,7 @@ app.get('/api/directors/catalog', async () => {
       )
       .all()
       .map((r) => norm(r.name))
+      .filter(Boolean) // un nombre que normaliza a vacío no puede encender ninguna ★
   );
   // los que quitaste con la ✕ no deberían reaparecer como sugerencia
   const vetados = new Set(
@@ -906,6 +907,7 @@ app.get('/api/directors/catalog', async () => {
       .prepare(`SELECT p.name FROM unfollowed_people u JOIN people p ON p.id = u.person_id`)
       .all()
       .map((r) => norm(r.name))
+      .filter(Boolean)
   );
   return {
     generatedAt: '2026-08-05',
@@ -1727,10 +1729,11 @@ app.get('/api/tracked/health', async () => {
   // one cache per facet now, so merge them all; a favorite missing from every
   // cache is "not calculated yet", which is NOT the same as "complete"
   const gapsRows = db
-    .prepare(`SELECT json FROM tmdb_cache WHERE key LIKE 'discover_favorites:%' ORDER BY fetched_at DESC`)
+    // GLOB usa el índice de la clave; LIKE recorría la caché entera
+    .prepare(`SELECT json FROM tmdb_cache WHERE key GLOB 'discover_favorites:*' ORDER BY fetched_at DESC`)
     .all();
   const calRow = db
-    .prepare(`SELECT json FROM tmdb_cache WHERE key LIKE 'calendar:%' ORDER BY fetched_at DESC LIMIT 1`)
+    .prepare(`SELECT json FROM tmdb_cache WHERE key GLOB 'calendar:*' ORDER BY fetched_at DESC LIMIT 1`)
     .get();
   // clave (id, faceta): con las facetas dobles, la fila de director y la de
   // actor de una misma persona buscan cada una SU cálculo de huecos
@@ -2468,19 +2471,30 @@ app.get('/api/quality/duplicates', async () => q.duplicates());
 app.post('/api/letterboxd/import', async (req, reply) => {
   const results = [];
   let lists = [];
-  for await (const part of req.files()) {
-    const buf = await part.toBuffer();
-    const name = (part.filename || '').toLowerCase();
-    try {
-      if (name.endsWith('.zip')) {
-        const z = await importLetterboxdZip(buf);
-        results.push(...z.results);
-        lists.push(...z.lists);
-      } else {
-        results.push({ file: part.filename, ...importLetterboxdCsv(buf, { filename: part.filename }) });
+  try {
+    await recorrerSubida();
+  } catch (err) {
+    // pasarse del tope de campos llega como un cierre prematuro del flujo, y
+    // salía como un 500 que no explicaba nada
+    if (err?.code !== 'ERR_STREAM_PREMATURE_CLOSE') throw err;
+    reply.code(400);
+    return { error: 'La subida llegó cortada o con más partes de las que admite' };
+  }
+  async function recorrerSubida() {
+    for await (const part of req.files()) {
+      const buf = await part.toBuffer();
+      const name = (part.filename || '').toLowerCase();
+      try {
+        if (name.endsWith('.zip')) {
+          const z = await importLetterboxdZip(buf);
+          results.push(...z.results);
+          lists.push(...z.lists);
+        } else {
+          results.push({ file: part.filename, ...importLetterboxdCsv(buf, { filename: part.filename }) });
+        }
+      } catch (err) {
+        results.push({ file: part.filename, error: String(err.message || err) });
       }
-    } catch (err) {
-      results.push({ file: part.filename, error: String(err.message || err) });
     }
   }
   if (!results.length && !lists.length) {

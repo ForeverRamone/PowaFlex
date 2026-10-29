@@ -2305,7 +2305,10 @@ export function festivalOverrideKey(title, year, director) {
 // v10: un nivel 1 con pocos votos ya no cierra la búsqueda. Lo cacheado con v9
 // tiene «In the Mood for Love» apuntando a «@ in the mood for love» —el
 // mediometraje de 51 minutos— y con ella todo lo de su clase.
-export const CLAVE_MATCH = 'film_match:v10:';
+// v11: una dirección que no se puede comparar («—», «N/A», cirílico, kanji) ya
+// no da por buena cualquier ficha, ni un título que normaliza a vacío casa con
+// cualquier película del director. Lo cacheado con v10 puede llevar esos casos.
+export const CLAVE_MATCH = 'film_match:v11:';
 
 export const FICHA_FANTASMA = Symbol('TMDB 404');
 

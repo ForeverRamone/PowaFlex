@@ -122,7 +122,9 @@ export const CACHE_VERSIONS = {
   // título si tiene cuatro votos: «In the Mood for Love» acababa en «@ in the
   // mood for love», un mediometraje de 51 minutos del mismo director, y de ahí
   // pasó al Top 1000, a Hong Kong, a Sight & Sound, a las 1001 y a Cahiers.
-  festival: 21,
+  // v22: una clave normalizada vacía ya no casa con todo (dirección «—» o en
+  // otro alfabeto, títulos que solo tienen signos): ver CLAVE_MATCH v11.
+  festival: 22,
   // v1: estrenos por región (cines ES/US, plataformas ES) con Σ y proveedores
   // v2: pestañas de plataformas y VOD de ES y US, y el alquiler/compra deja de
   // ser un sí/no para traer los NOMBRES de dónde se alquila (campo `vod`)
