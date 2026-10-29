@@ -2,7 +2,7 @@
 
 # 🎬 PowaFlex
 
-> **Beta 1.32** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
+> **Beta 1.33** · Dashboard de gestión de cine para tu servidor Plex: estadísticas, completismo
 > de filmografías, calendario de estrenos venideros conectado a TMDB y envío directo a Radarr.
 
 Vive junto a tu Plex en Docker, lee la biblioteca **por la API** —sin exports ni CSV— y la cruza
@@ -123,6 +123,11 @@ Los datos van a `server/data/` (configurable con `DATA_DIR`).
   Letterboxd y Wikipedia (festivales).
 - Autenticación básica opcional con `POWAFLEX_AUTH="usuario:contraseña"`. Está pensada para red
   local: no la expongas a internet sin un proxy con autenticación delante.
+- Sin `POWAFLEX_AUTH`, PowaFlex solo responde a nombres de tu red: IPs, `localhost`, nombres sin
+  punto (`beelink`) y dominios locales (`.local`, `.lan`, `.home.arpa`, `.internal`, `.ts.net`…).
+  Así una web ajena no puede leer tus claves por *DNS rebinding*. Si entras por un dominio propio
+  (un proxy inverso), decláralo: `POWAFLEX_HOSTS="cine.midominio.com"` (varios separados por comas;
+  `.midominio.com` vale para todos sus subdominios).
 - En **Ajustes → Copia de seguridad** te llevas la base entera y la configuración.
 
 ## 🙏 Créditos

@@ -19,7 +19,7 @@ const GRUPOS = { festival: 'Festivales', debut: 'Secciones de debut', premio: 'P
 
 function Titulo({ children, extra = null }) {
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex items-center justify-between gap-2 flex-wrap">
       <h3 className="text-sm font-semibold text-zinc-200">{children}</h3>
       {extra}
     </div>
@@ -1006,7 +1006,7 @@ export default function RadarrRulesSection() {
     <div>
       <Titulo
         extra={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button className="btn-ghost !py-1 text-xs" disabled={corriendo || !activas} onClick={() => ejecutar(null, true)}>
               {t('Previsualizar todas')}
             </button>

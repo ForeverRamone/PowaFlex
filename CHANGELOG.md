@@ -6,6 +6,96 @@ Lo que ve quien usa la app está en `/novedades`, que es otro texto para otro p�
 Formato: un titular en negrita, secciones cortas y los hechos con sus cifras. La crónica de cómo
 se llegó a cada arreglo vive en el mensaje del commit, no aquí.
 
+## Beta 1.33 (1.0.33-beta) — 2026-10-29
+
+**Auditoría completa del servidor, la interfaz y las integraciones: cada fallo demostrado lleva un test que fallaba con la 1.32 y pasa ahora (468 → 515 tests).**
+
+### Cambio incompatible: sin contraseña, solo nombres de tu red
+
+Sin `POWAFLEX_AUTH`, una web cualquiera podía hacer que su dominio resolviera a la IP de
+PowaFlex (*DNS rebinding*): Origin y Host casaban y el cortafuegos anti-CSRF no veía nada.
+Reproducido contra el servidor real: `GET /api/backup/settings` devolvía el token de Plex y las
+claves de Radarr y TMDB en claro, y `PUT /api/settings` cambiaba `plex_url`. Ahora, sin
+contraseña, solo se responde a IPs, `localhost`, nombres sin punto y dominios locales
+(`.local`, `.lan`, `.home.arpa`, `.internal`, `.ts.net`…). **Quien entre por un dominio propio
+sin `POWAFLEX_AUTH` tiene que declararlo en `POWAFLEX_HOSTS`**; el 403 dice exactamente qué
+poner. Con `POWAFLEX_AUTH` nada cambia. `/api/version` sigue abierta para el healthcheck.
+
+### Lo que podía tumbar el proceso o congelarlo
+
+- Un corte en la descarga de IMDb (o su timeout de 180 s a mitad) era un `'error'` sin nadie
+  escuchando: el proceso salía con código 1 y el resto del nocturno no corría.
+- Una sola petición multipart con una cabecera `constructor:` tumbaba el servidor
+  (@fastify/busboy 3.2.0). fastify 5.9.0 → 5.12.7, busboy → 3.2.4.
+- Un zip de 4 MB que declara 10 bytes y trae 4 GB congelaba el servidor 50 s: la descompresión
+  se fiaba del tamaño declarado. Ahora se cuentan los bytes reales: rechazado en 0,3 s.
+- ReDoS: un usuario de RSS de 300.000 caracteres bloqueaba 36 s (y se repetía cada noche): ahora
+  se recorta a 200 y la expresión va anclada. Una lista de cánones de 300.000 comas bloqueaba
+  31 s: ahora se parte en una pasada, 15 ms.
+- Sin tope de campos multipart, una petición subía la memoria de 126 a 571 MB.
+
+### Radarr: lo que se mandaba y no debía
+
+- Cada sincronización de Plex borraba el `tmdb_id` que había resuelto el backfill para las
+  películas sin guid de TMDB, y una regla las veía como «no la tienes». Se conserva mientras
+  Plex describa la misma película (imdb, título y año).
+- Si la ficha de TMDB fallaba (un 429), la candidata llegaba sin idioma ni países y la
+  **cuarentena la dejaba pasar**, igual que los filtros de corto, telefilme y documental. Ahora
+  espera a otra noche (`ficha de TMDB sin leer`).
+- Una previsualización abierta hacía que el nocturno apuntara en verde una pasada que no había
+  ocurrido. Ahora espera a que termine.
+- «Buscar de nuevo» tomaba la primera película que devolvía Radarr sin mirar su `tmdbId`.
+
+### Datos que se perdían o no se actualizaban
+
+- Una biblioteca de Plex que volvía vacía (un disco sin montar) se borraba entera: el freno del
+  50 % era global. Ahora también por biblioteca, con aviso y salida por «Re-sincronización completa».
+- Un fallo de escritura (disco lleno) dejaba «Actualizar todo» y la sincronización en marcha
+  para siempre, hasta reiniciar.
+- Dos copias de seguridad a la vez no dejaban ninguna (3 de 3 veces). Ahora se ponen en cola y
+  se escriben con nombre temporal.
+- Un apagón de TMDB vaciaba Emergentes y bloqueaba el reintento una semana.
+- MDBList con la clave revocada o caído: cada lote caía a cien peticiones sueltas (unas 12.500
+  por noche) y acababa «sin error». Un lote cortado por un 429 marcaba como desconocidas las que ni
+  se habían pedido, una semana sin nota.
+- Letterboxd: reimportar una nota cambiada no la actualizaba, y «Tu nota» era el máximo
+  histórico; el mismo visionado por RSS y por CSV contaba dos veces.
+
+### Emparejado: una clave vacía casaba con todo
+
+Un título o un nombre que normaliza a cadena vacía (otro alfabeto, «—», «N/A», «?») se trataba
+como clave válida. Consecuencias demostradas: una dirección en cirílico daba por buena
+cualquier ficha; un título en chino casaba con cualquier película del director; una película
+vista con título japonés marcaba como vista cualquier ficha de ese año con título no latino;
+la búsqueda por título se quedaba con «el primero del año» aunque no casara (Matrix 1999 →
+otra película) y ese id llegaba a `movies.tmdb_id`; JustWatch daba las ofertas de otra
+película. Regla aplicada en todos: vacío no casa. Cachés `film_match` v11, `festival` v22 y
+`movie_search` v2.
+
+### Rendimiento, medido en una base de 12.400 películas y 162.000 créditos
+
+| Consulta | Antes | Ahora |
+|---|---|---|
+| Personas · actores | 154 ms | 60 ms |
+| Biblioteca sin filtros (recuento) | 23 ms | 4 ms |
+| Calendario en salud de seguidos | 25 ms | 0,4 ms |
+| Votos de Letterboxd en Descubrir | 100-160 ms | consulta puntual |
+
+Índices que cubren la consulta de créditos y GLOB en vez de LIKE sobre la caché. Resultados
+comparados con el código anterior sobre la misma base: idénticos.
+
+### Interfaz
+
+Respuestas viejas que pisaban a las nuevas (Personas, ⌘K, listas, sagas, «Cargar más»);
+Descubrir decía «filmografías completas» cuando TMDB no contestaba; un fallo puntual mandaba a
+Ajustes; una dirección inexistente dejaba la página en blanco; errores y catálogo de directores
+en castellano con la interfaz en inglés; desborde a 390 px en Automatismos.
+
+### CI
+
+Los tests y el build de la web bloquean la publicación de la imagen: antes se publicaba sin
+ejecutar ninguno.
+
 ## Beta 1.32 (1.0.32-beta) — 2026-09-18
 
 **Una Σ de 0 de MDBList nunca fue una nota, y la aplicación la guardaba como si lo fuera: 62.954 películas con un cero que no se volvía a preguntar.**

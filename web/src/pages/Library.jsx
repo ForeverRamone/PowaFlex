@@ -112,9 +112,12 @@ export default function Library() {
   const loadMore = async () => {
     if (loadingMore) return;
     setLoadingMore(true);
+    // si cambia un filtro mientras llega el tramo, ese tramo es de otra lista
+    const id = reqId.current;
     try {
       const qs = new URLSearchParams({ limit: '60', ...q, offset: String(movies.length) });
       const d = await api(`/movies?${qs}`);
+      if (id !== reqId.current) return;
       if (d.error) return toast(`⚠️ ${t(d.error)}`, 'error');
       setMovies((prev) => {
         const vistas = new Set(prev.map((m) => m.rating_key));

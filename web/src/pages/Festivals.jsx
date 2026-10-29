@@ -457,6 +457,7 @@ export default function Festivals() {
                     {sub && <span className="text-[11px] text-zinc-500 uppercase tracking-wider">{t(sub)}:</span>}
                     {propias.map((f) => (
                       <button
+                        aria-pressed={!anuario && fest === f.key}
                         key={f.key}
                         onClick={() => {
                           setAnuario(false);
@@ -514,10 +515,10 @@ export default function Festivals() {
         )}
         {!anuario && !soloPalmares && (
           <div className="flex gap-2 flex-wrap">
-            <button onClick={() => setView('seleccion')} className={`${view === 'seleccion' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
+            <button aria-pressed={view === 'seleccion'} onClick={() => setView('seleccion')} className={`${view === 'seleccion' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
               {t(info?.editionLabel) || (info?.awardNominees ? t('Nominadas por año') : t('Sección oficial por año'))}
             </button>
-            <button onClick={() => setView('palmares')} className={`${view === 'palmares' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
+            <button aria-pressed={view === 'palmares'} onClick={() => setView('palmares')} className={`${view === 'palmares' ? 'btn-gold' : 'btn-ghost'} !py-1 text-xs`}>
               {t('🏆 Palmarés histórico')}
             </button>
           </div>

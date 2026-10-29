@@ -25,6 +25,19 @@ import { t } from '../i18n.js';
 
 const VERSIONES = [
   {
+    label: 'Beta 1.33',
+    fecha: '2026-10-29',
+    titular: 'Una auditoría a fondo: más seguridad, menos sorpresas con Radarr y páginas más rápidas',
+    puntos: [
+      'Sin contraseña, PowaFlex solo responde a nombres de tu red: una web ajena ya no puede leer tus claves. Si entras por un dominio propio, decláralo en POWAFLEX_HOSTS.',
+      'Si TMDB no contesta, una película candidata espera a otra noche en lugar de saltarse la cuarentena y los filtros de cortos, telefilmes y documentales.',
+      'Sincronizar con Plex ya no hace que las reglas vean como nuevas películas que ya tienes, y una biblioteca que vuelve vacía no se borra.',
+      'Una dirección en otro alfabeto o un título hecho solo de signos ya no casan con cualquier ficha.',
+      'Reimportar Letterboxd actualiza tus notas, y un visionado no cuenta dos veces por llegar por RSS y por CSV.',
+      'Personas, Biblioteca y Descubrir responden más rápido con bibliotecas grandes.',
+    ],
+  },
+  {
     label: 'Beta 1.32',
     fecha: '2026-09-18',
     titular: 'Un cero de MDBList ya no es una nota, y las reglas pueden pedir las que faltan',

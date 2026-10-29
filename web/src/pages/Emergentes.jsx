@@ -233,11 +233,15 @@ export default function Emergentes() {
     if (!corriendo) return;
     const id = setInterval(async () => {
       const s = await api('/emergentes/status');
-      if (s && !s.error) setEstadoVivo(s.running ? s : null);
-      if (s && !s.running) {
+      // sin `running` no es el estado del detector sino un corte de red o un
+      // HTTP fallido: no dice que haya terminado, se sigue preguntando. El
+      // `error` que sí trae el estado es el de la pasada, y ese la da por acabada.
+      if (!s || typeof s.running !== 'boolean') return;
+      if (!s.error) setEstadoVivo(s.running ? s : null);
+      if (!s.running) {
         setCorriendo(false);
         cargar();
-        if (s.error) toast(`⚠️ ${s.error}`, 'error');
+        if (s.error) toast(`⚠️ ${t(s.error)}`, 'error');
         else toast(t('Detección terminada: {n} emergentes', { n: s.elegidos }), 'info');
       }
     }, 4000);

@@ -123,11 +123,14 @@ export default function People() {
   useEffect(() => {
     if (!rankable) { setPeople([]); primeraParrilla.current = false; return undefined; }
     if (primeraParrilla.current) { primeraParrilla.current = false; return undefined; }
+    // `vivo`: una respuesta que llega después de cambiar de oficio o de búsqueda
+    // no debe pisar la parrilla nueva.
+    let vivo = true;
     const temporizador = setTimeout(() => {
       const qs = new URLSearchParams({ role, limit: String(limit), search, ...f });
-      api(`/people?${qs}`).then((r) => setPeople(Array.isArray(r) ? r : []));
+      api(`/people?${qs}`).then((r) => { if (vivo) setPeople(Array.isArray(r) ? r : []); });
     }, search ? 250 : 0);
-    return () => clearTimeout(temporizador);
+    return () => { vivo = false; clearTimeout(temporizador); };
   }, [role, search, limit, f, rankable]);
 
   const followState = (id) => {
@@ -227,6 +230,7 @@ export default function People() {
       <div className="flex flex-wrap gap-2 mb-3 items-center">
         {principales.map((r) => (
           <button
+            aria-pressed={role === r.key}
             key={r.key}
             onClick={() => setParams({ role: r.key })}
             className={role === r.key ? 'btn-gold' : 'btn-ghost'}

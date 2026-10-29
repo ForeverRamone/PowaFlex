@@ -1,11 +1,11 @@
 import { useEffect, useId, useState, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Film, Users, CalendarDays, Star, Compass, Trophy,
   Eye, Wrench, Settings as SettingsIcon, HelpCircle, Search, Menu, X, Award, Ticket, Sparkles,
   TrendingUp, Globe2,
 } from 'lucide-react';
-import { Spinner, Toaster, GlobalSearch, ErrorBoundary, useBloqueoDeFondo } from './components.jsx';
+import { Spinner, Toaster, GlobalSearch, ErrorBoundary, Empty, useBloqueoDeFondo } from './components.jsx';
 import { api, applyTheme } from './api.js';
 import { t, getLang, setLang, locale } from './i18n.js';
 import { ScrollMemory } from './scroll.js';
@@ -200,10 +200,26 @@ function Logotipo({ variante = 'apilado', className = '' }) {
   );
 }
 
+function NoEncontrada() {
+  return (
+    <Empty>
+      {t('Esta dirección no lleva a ninguna página.')}{' '}
+      <Link to="/" className="text-gold-400 hover:underline">{t('Ir al inicio')}</Link>
+    </Empty>
+  );
+}
+
 function Shell() {
-  const navigate = useNavigate();
   const location = useLocation();
   const [setup, setSetup] = useState(null);
+  // Sin Plex se va a Ajustes UNA vez, al arrancar. Va declarativo (<Navigate>
+  // en lugar de las rutas) y no con navigate(): una página ya montada podía
+  // reescribir su URL después (Favoritos con ?add=activos) y deshacerlo.
+  // Al llegar a /ajustes se suelta, y desde ahí se navega libremente.
+  const [aAjustes, setAAjustes] = useState(false);
+  useEffect(() => {
+    if (aAjustes && location.pathname === '/ajustes') setAAjustes(false);
+  }, [aAjustes, location.pathname]);
   const [version, setVersion] = useState(null);
   const [open, setOpen] = useState(false); // mobile drawer
   // el menú lateral es un cajón solo por debajo de md; hay que saberlo para no
@@ -221,8 +237,11 @@ function Shell() {
 
   useEffect(() => {
     api('/setup-state').then((s) => {
+      // api() no rechaza: un fallo puntual llega como { error } y no dice nada
+      // de Plex, así que no manda a Ajustes ni pinta datos a medias.
+      if (!s || s.error) return;
       setSetup(s);
-      if (!s.plex && window.location.pathname !== '/ajustes') navigate('/ajustes');
+      if (!s.plex && window.location.pathname !== '/ajustes') setAAjustes(true);
     });
     api('/version').then((v) => v.label && setVersion(v));
     // mirror display prefs locally: cards read the rating synchronously and
@@ -364,6 +383,7 @@ function Shell() {
         {/* la clave hace que la barrera se reinicie al cambiar de página: si no,
             una vez rota se quedaba rota aunque navegaras a otro sitio */}
         <ErrorBoundary key={location.pathname}>
+        {aAjustes && location.pathname !== '/ajustes' ? <Navigate to="/ajustes" replace /> : (
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/biblioteca" element={<Library />} />
@@ -389,7 +409,9 @@ function Shell() {
           <Route path="/salud" element={<Navigate to="/taller?tab=datos" replace />} />
           <Route path="/directores" element={<Navigate to="/favoritos?add=activos" replace />} />
           <Route path="/letterboxd" element={<Navigate to="/ajustes?tab=fuentes" replace />} />
+          <Route path="*" element={<NoEncontrada />} />
         </Routes>
+        )}
         </ErrorBoundary>
         </Suspense>
       </main>

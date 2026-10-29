@@ -36,6 +36,7 @@ export default function Taller() {
             traducción importada y el {t(label)} de abajo reventaría la página */}
         {TABS.map(([key, label, Icon]) => (
           <button
+            aria-pressed={tab === key}
             key={key}
             onClick={() => setParams({ tab: key })}
             className={`${tab === key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}

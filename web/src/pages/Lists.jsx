@@ -459,8 +459,11 @@ function ListDetail({ listId, onChanged }) {
   const [radarrIds, addRadarrId] = useRadarrIds();
 
   useEffect(() => {
+    // `vivo`: al saltar de lista, la respuesta de la anterior no pinta aquí
+    let vivo = true;
     setData(null);
-    api(`/mdblist/lists/${listId}`).then(setData);
+    api(`/mdblist/lists/${listId}`).then((d) => { if (vivo) setData(d); });
+    return () => { vivo = false; };
   }, [listId]);
 
   if (data?.error) return <ErrorBox error={data.error} />;
@@ -481,10 +484,10 @@ function ListDetail({ listId, onChanged }) {
     <div className="mt-4">
       <div className="flex gap-2 items-center flex-wrap mb-3">
         {/* mismo vocabulario en primera persona que OwnFilterBar (Me faltan / Las tengo) */}
-        <button className={view === 'missing' ? 'btn-gold' : 'btn-ghost'} onClick={() => setView('missing')}>
+        <button aria-pressed={view === 'missing'} className={view === 'missing' ? 'btn-gold' : 'btn-ghost'} onClick={() => setView('missing')}>
           {t('Me faltan ({n})', { n: missing.length })}
         </button>
-        <button className={view === 'owned' ? 'btn-gold' : 'btn-ghost'} onClick={() => setView('owned')}>
+        <button aria-pressed={view === 'owned'} className={view === 'owned' ? 'btn-gold' : 'btn-ghost'} onClick={() => setView('owned')}>
           {t('Las tengo ({n})', { n: owned.length })}
         </button>
         {missing.length > 0 && (
@@ -738,8 +741,8 @@ export default function Lists() {
         {t('Listas famosas como retos de completismo: qué tienes, qué has visto y qué te falta.')}
       </p>
       <div className="flex gap-2 mb-6">
-        <button onClick={() => setTab('letterboxd')} className={tab === 'letterboxd' ? 'btn-gold' : 'btn-ghost'}>{t('🟠 Retos de Letterboxd')}</button>
-        <button onClick={() => setTab('mdblist')} className={tab === 'mdblist' ? 'btn-gold' : 'btn-ghost'}>{t('Listas de MDBList')}</button>
+        <button aria-pressed={tab === 'letterboxd'} onClick={() => setTab('letterboxd')} className={tab === 'letterboxd' ? 'btn-gold' : 'btn-ghost'}>{t('🟠 Retos de Letterboxd')}</button>
+        <button aria-pressed={tab === 'mdblist'} onClick={() => setTab('mdblist')} className={tab === 'mdblist' ? 'btn-gold' : 'btn-ghost'}>{t('Listas de MDBList')}</button>
       </div>
 
       {tab === 'letterboxd' ? <PanelLetterboxd /> : <PanelMdblist />}

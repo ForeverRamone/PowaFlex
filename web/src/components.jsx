@@ -140,8 +140,10 @@ export function GlobalSearch() {
   }, [open, fests]);
   useEffect(() => {
     if (!q.trim()) { setRes(null); return; }
-    const t = setTimeout(() => api(`/search?q=${encodeURIComponent(q.trim())}`).then((r) => !r.error && setRes(r)), 200);
-    return () => clearTimeout(t);
+    // `vivo`: la respuesta de una consulta ya reescrita no pisa la de la nueva
+    let vivo = true;
+    const temporizador = setTimeout(() => api(`/search?q=${encodeURIComponent(q.trim())}`).then((r) => { if (vivo && !r.error) setRes(r); }), 200);
+    return () => { vivo = false; clearTimeout(temporizador); };
   }, [q]);
   // el hook va SIEMPRE (no se pueden llamar a medias) y no hace nada si está cerrado
   const dialogo = useFocusTrap(() => setOpen(false), open);
@@ -705,7 +707,9 @@ export class ErrorBoundary extends Component {
 export function ErrorBox({ error }) {
   return (
     <div className="alert my-4">
-      ⚠️ {error}
+      {/* t() devuelve tal cual lo que no conoce: el mensaje ya traducido o
+          el del servidor sin entrada en el diccionario pasan igual */}
+      ⚠️ {t(error)}
     </div>
   );
 }

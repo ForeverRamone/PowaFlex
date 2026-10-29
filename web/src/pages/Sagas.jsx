@@ -9,9 +9,16 @@ function SagaDetail({ id, radarrIds, addRadarrId }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // `vivo`: al saltar de saga, la respuesta de la anterior no pinta aquí
+    let vivo = true;
     setDetail(null);
     setError(null);
-    api(`/sagas/${id}`).then((d) => (d.error ? setError(d.error) : setDetail(d)));
+    api(`/sagas/${id}`).then((d) => {
+      if (!vivo) return;
+      if (d.error) setError(d.error);
+      else setDetail(d);
+    });
+    return () => { vivo = false; };
   }, [id]);
 
   if (error) return <ErrorBox error={error} />;

@@ -1086,9 +1086,13 @@ export default function Settings() {
   // poll sync status while running. Durante «Actualizar todo» NO: ese bucle ya
   // pregunta por /sync/status cada 1,5 s, y con los dos vivos se preguntaba dos
   // veces por lo mismo al mismo ritmo.
+  // Un sondeo sin `running` es un corte de red o un HTTP fallido, no el estado
+  // de la sincronización: tomarlo por «terminada» paraba el sondeo a medias.
+  // El `error` que sí trae el estado (con running: false) es el de la pasada.
+  const sondeoSync = (r) => { if (r && typeof r.running === 'boolean') setSync(r); };
   useEffect(() => {
     if (!sync?.running || refresh?.running) return;
-    const id = setInterval(() => api('/sync/status').then(setSync), 1500);
+    const id = setInterval(() => api('/sync/status').then(sondeoSync), 1500);
     return () => clearInterval(id);
   }, [sync?.running, refresh?.running]);
 
@@ -1097,7 +1101,7 @@ export default function Settings() {
     if (!refresh?.running) return;
     const id = setInterval(() => {
       api('/refresh-all').then((r) => !r.error && setRefresh(r));
-      api('/sync/status').then(setSync);
+      api('/sync/status').then(sondeoSync);
     }, 1500);
     return () => clearInterval(id);
   }, [refresh?.running]);
@@ -1190,6 +1194,7 @@ export default function Settings() {
         <div className="flex gap-2 mb-5 flex-wrap">
           {TABS.map(([key, label, Icon]) => (
             <button
+              aria-pressed={tab === key}
               key={key}
               onClick={() => setParams({ tab: key })}
               className={`${tab === key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}

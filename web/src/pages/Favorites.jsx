@@ -575,6 +575,7 @@ export default function Favorites() {
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         {roles.filter((r) => r.principal).map((r) => (
           <button
+            aria-pressed={role === r.key}
             key={r.key}
             onClick={() => setRole(r.key)}
             className={`${role === r.key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}

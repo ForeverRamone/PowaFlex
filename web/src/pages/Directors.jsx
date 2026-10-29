@@ -20,6 +20,18 @@ import { t } from '../i18n.js';
  * mover un control responde al instante en vez de esperar al servidor.
  */
 
+// «BAFTA dirección · Palma de Oro x2 · nom. Óscar dirección…»: el dataset trae
+// los premios en castellano y en una sola cadena; se traduce premio a premio,
+// dejando tal cual el «nom.», el «x2» y los puntos suspensivos del recorte.
+const premiosTraducidos = (texto) =>
+  texto
+    .split(' · ')
+    .map((tramo) => {
+      const [, nom = '', premio, veces = '', corte = ''] = tramo.match(/^(nom\. )?(.*?)( x\d+)?(…)?$/) || [null, '', tramo];
+      return `${nom}${t(premio)}${veces}${corte}`;
+    })
+    .join(' · ');
+
 const ORDENES = {
   importancia: { label: 'Importancia', fn: (a, b) => (b.importance ?? -1) - (a.importance ?? -1) },
   prestigio: { label: 'Prestigio (premios y crítica)', fn: (a, b) => (b.prestige ?? -1) - (a.prestige ?? -1) },
@@ -95,12 +107,12 @@ function Ficha({ d, foto, onFollow, busy }) {
           )}
         </div>
         <div className="text-[11px] text-zinc-500 mt-0.5">
-          {[d.country, d.age ? t('{n} años', { n: d.age }) : null, d.features ? t('{n} largos', { n: d.features }) : null,
+          {[d.country ? t(d.country) : null, d.age ? t('{n} años', { n: d.age }) : null, d.features ? t('{n} largos', { n: d.features }) : null,
             d.first && d.last ? `${d.first}–${d.last}` : null].filter(Boolean).join(' · ')}
         </div>
         {d.awardsText && (
-          <div className="text-[11px] text-zinc-400 mt-1 leading-snug" title={d.awardsText}>
-            🏆 {d.awardsText}
+          <div className="text-[11px] text-zinc-400 mt-1 leading-snug" title={premiosTraducidos(d.awardsText)}>
+            🏆 {premiosTraducidos(d.awardsText)}
           </div>
         )}
       </div>
@@ -158,7 +170,8 @@ export default function Directors({ embedded = false }) {
     const regiones = cuenta(todos, 'region');
     return {
       regiones: ORDEN_REGIONES.filter((r) => regiones.has(r)).map((r) => [r, `${t(r)} (${regiones.get(r)})`]),
-      paises: paises.map(([p, n]) => [p, `${p} (${n})`]),
+      // el valor sigue siendo el del dataset (castellano); solo se traduce lo pintado
+      paises: paises.map(([p, n]) => [p, `${t(p)} (${n})`]),
     };
   }, [todos, f.region]);
 
@@ -171,7 +184,8 @@ export default function Directors({ embedded = false }) {
       if (f.status === 'activo' && d.status !== 'En activo') return false;
       if (f.status === 'parado' && d.status === 'En activo') return false;
       if (f.pendientes && d.tracked) return false;
-      if (termino && !d.name.toLowerCase().includes(termino) && !(d.country || '').toLowerCase().includes(termino)) return false;
+      if (termino && !d.name.toLowerCase().includes(termino) && !(d.country || '').toLowerCase().includes(termino)
+        && !(d.country ? t(d.country) : '').toLowerCase().includes(termino)) return false;
       return true;
     });
     return lista.sort(ORDENES[orden]?.fn || ORDENES.importancia.fn);

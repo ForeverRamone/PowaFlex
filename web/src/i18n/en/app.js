@@ -18,6 +18,8 @@ export default {
   'Menú': 'Menu',
   'Buscar': 'Search',
   'Buscar…': 'Search…',
+  'Esta dirección no lleva a ninguna página.': 'This address doesn’t lead to any page.',
+  'Ir al inicio': 'Go to the home page',
   'Cerrar': 'Close',
   'La última actualización completa tiene más de 26 horas: el pase nocturno puede no estar corriendo':
     'The last full refresh is more than 26 hours old: the nightly run may not be running',

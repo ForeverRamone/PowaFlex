@@ -3,6 +3,21 @@
 // cabecera de la página vive en en/app.js, igual que el titular «Festivales y
 // premios» de la Alpha 0.9.5, que allí ya es nombre de página.
 export default {
+  // ── Beta 1.33 ──────────────────────────────────────────────
+  'Una auditoría a fondo: más seguridad, menos sorpresas con Radarr y páginas más rápidas':
+    'A thorough audit: tighter security, fewer Radarr surprises and faster pages',
+  'Sin contraseña, PowaFlex solo responde a nombres de tu red: una web ajena ya no puede leer tus claves. Si entras por un dominio propio, decláralo en POWAFLEX_HOSTS.':
+    'Without a password, PowaFlex only answers to names on your network: another website can no longer read your keys. If you come in through your own domain, declare it in POWAFLEX_HOSTS.',
+  'Si TMDB no contesta, una película candidata espera a otra noche en lugar de saltarse la cuarentena y los filtros de cortos, telefilmes y documentales.':
+    'If TMDB does not answer, a candidate film waits for another night instead of skipping quarantine and the short, TV-movie and documentary filters.',
+  'Sincronizar con Plex ya no hace que las reglas vean como nuevas películas que ya tienes, y una biblioteca que vuelve vacía no se borra.':
+    'Syncing with Plex no longer makes rules see films you already own as new, and a library that comes back empty is not deleted.',
+  'Una dirección en otro alfabeto o un título hecho solo de signos ya no casan con cualquier ficha.':
+    'A director in another script or a title made only of symbols no longer matches any record.',
+  'Reimportar Letterboxd actualiza tus notas, y un visionado no cuenta dos veces por llegar por RSS y por CSV.':
+    'Re-importing Letterboxd updates your ratings, and a watch no longer counts twice for arriving through RSS and CSV.',
+  'Personas, Biblioteca y Descubrir responden más rápido con bibliotecas grandes.':
+    'People, Library and Discover respond faster with large libraries.',
   // ── Beta 1.32 ──────────────────────────────────────────────
   'Un cero de MDBList ya no es una nota, y las reglas pueden pedir las que faltan':
     'A zero from MDBList is no longer a score, and rules can fetch the missing ones',

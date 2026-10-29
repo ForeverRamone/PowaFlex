@@ -133,7 +133,7 @@ function Pestanas({ tab, setTab }) {
       {/* la clave de pestaña NO puede llamarse t: pisaría la función de
           traducción importada y el {t(label)} de abajo reventaría la página */}
       {TABS.map(([key, label, Icon]) => (
-        <button key={key} onClick={() => setTab(key)} className={`${tab === key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
+        <button aria-pressed={tab === key} key={key} onClick={() => setTab(key)} className={`${tab === key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
           <Icon size={15} strokeWidth={1.75} /> {t(label)}
         </button>
       ))}

@@ -232,7 +232,7 @@ export default function PersonDetail() {
     </button>
   );
 
-  if (error) return <ErrorBox error={t('No se pudo cargar la filmografía: {error}. ¿Está configurada la API key de TMDB en Ajustes?', { error })} />;
+  if (error) return <ErrorBox error={t('No se pudo cargar la filmografía: {error}. ¿Está configurada la API key de TMDB en Ajustes?', { error: t(error) })} />;
   if (!data) return <Progreso {...carga} />;
   if (!data.matched)
     return (
@@ -311,6 +311,7 @@ export default function PersonDetail() {
             <h1 className="font-display text-3xl text-zinc-100 leading-tight">{person.name}</h1>
             <DeathBadge deathday={person.deathday} />
             <button
+              aria-pressed={trackedRoles.has(active)}
               onClick={() => toggleTrack(active)}
               className={trackedRoles.has(active) ? 'btn-gold' : 'btn-ghost'}
               title={
@@ -405,7 +406,7 @@ export default function PersonDetail() {
 
       <div className="flex gap-2 mb-3 flex-wrap items-center">
         {VIEWS.map(([v, label]) => (
-          <button key={v} onClick={() => setViewPref(v)} className={view === v ? 'btn-gold' : 'btn-ghost'}>
+          <button aria-pressed={view === v} key={v} onClick={() => setViewPref(v)} className={view === v ? 'btn-gold' : 'btn-ghost'}>
             {t(label)}
             {v === 'missing' && ` (${stats.released - stats.owned})`}
             {v === 'upcoming' && ` (${stats.upcoming})`}

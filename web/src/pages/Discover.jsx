@@ -248,7 +248,7 @@ function GapsView({
     });
   };
 
-  if (error) return <ErrorBox error={t('{error} — comprueba la API key de TMDB en Ajustes.', { error })} />;
+  if (error) return <ErrorBox error={t('{error} — comprueba la API key de TMDB en Ajustes.', { error: t(error) })} />;
   // BuildProgress y no Progreso: aquí hay UNA petición, pero mientras el
   // servidor arma el cruce va publicando done/total en /build-progress, y ese
   // es el único porcentaje de verdad que se puede enseñar. La etiqueta la pone
@@ -259,6 +259,11 @@ function GapsView({
   const withGaps = (data.people || []).filter((p) => (p.missingTotal || 0) > 0);
   const sortedPeople = [...withGaps].sort(PERSON_SORTS[personSort]?.fn || PERSON_SORTS.huecos.fn);
   const complete = (data.people || []).length - withGaps.length;
+  // «Nombre: mensaje» por persona; suele ser la misma causa repetida
+  const fallosTmdb = [...new Set((data.errors || []).map((e) => {
+    const corte = String(e).indexOf(': ');
+    return corte >= 0 ? String(e).slice(corte + 2) : String(e);
+  }))];
   // cuántas de las que TIENEN huecos se quedan sin nada que enseñar
   const escondidas = withGaps.filter(
     (p) => visibleMissing(p, show, minScore, dismissed, ocultarRadarr, radarrIds).length === 0
@@ -270,13 +275,19 @@ function GapsView({
         <p className="text-sm text-zinc-500">
           {intro} {t('Actualizado {date}.', { date: new Date(data.generatedAt).toLocaleString(locale()) })}
           {complete > 0 && <span className="text-emerald-400"> · {t('{n} con filmografía completa', { n: complete })}</span>}
+          {fallosTmdb.length > 0 && data.people.length > 0 && (
+            <span className="text-orange-300"> · {t('TMDB cortó a mitad: lista incompleta, recarga en un rato')}</span>
+          )}
         </p>
         <button className="btn-ghost !py-1 shrink-0 inline-flex items-center gap-1.5" onClick={() => load(true)} disabled={refreshing}>
           {refreshing ? t('Actualizando…') : <><RotateCw size={13} strokeWidth={2} /> {t('Actualizar')}</>}
         </button>
       </div>
 
-      {data.people.length === 0 ? (
+      {data.people.length === 0 && fallosTmdb.length > 0 ? (
+        // sin nadie Y con fallos no es «todo completo»: TMDB no contestó
+        <ErrorBox error={t('{error} — comprueba la API key de TMDB en Ajustes.', { error: fallosTmdb.map((m) => t(m)).join(' · ') })} />
+      ) : data.people.length === 0 ? (
         <Empty>
           {data.totalPeople === 0
             ? t('Nadie en tu biblioteca casa con esos filtros. Puede que falten datos demográficos: amplíalos en Ajustes.')
@@ -574,6 +585,8 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
 
   const canonUrl = CANON_URLS[canon];
   const activo = canons.find((c) => c.key === canon);
+  // misma regla que en los botones: los de serie se traducen, los pegados no
+  const activoLabel = activo ? (activo.builtin ? t(activo.label) : activo.label) : null;
 
   return (
     <div>
@@ -606,7 +619,7 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
       </div>
 
       {fallo ? (
-        <ErrorBox error={t('{error} — comprueba la API key de TMDB en Ajustes.', { error: fallo })} />
+        <ErrorBox error={t('{error} — comprueba la API key de TMDB en Ajustes.', { error: t(fallo) })} />
       ) : !data ? (
         <Progreso {...carga} />
       ) : (
@@ -616,10 +629,10 @@ function AbsentView({ radarrIds, addRadarrId, dismissed, onDismiss }) {
           {t('De los {n} directores/as de', { n: data.checked })}{' '}
           {canonUrl ? (
             <a href={canonUrl} target="_blank" rel="noreferrer" className="underline hover:text-gold-400">
-              {activo?.label || t('la lista')}
+              {activoLabel || t('la lista')}
             </a>
           ) : (
-            <b className="text-zinc-300">{activo?.label || t('tu lista')}</b>
+            <b className="text-zinc-300">{activoLabel || t('tu lista')}</b>
           )}
           ,{' '}
           <b className="text-gold-400">{t('{n} no tienen ni una película en tu Plex', { n: data.absent.length })}</b> {t('({n} sí están).', { n: data.present.length })}
@@ -787,7 +800,7 @@ export default function Discover() {
         {/* la clave de pestaña NO puede llamarse t: pisaría la función de
             traducción importada y el {t(label)} de abajo reventaría la página */}
         {TABS.map(([key, label, Icon]) => (
-          <button key={key} onClick={() => setTab(key)} className={`${tab === key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
+          <button aria-pressed={tab === key} key={key} onClick={() => setTab(key)} className={`${tab === key ? 'btn-gold' : 'btn-ghost'} inline-flex items-center gap-2`}>
             <Icon size={15} strokeWidth={1.75} /> {t(label)}
           </button>
         ))}
